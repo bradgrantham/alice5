@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <fstream>
 
+#include <StandAlone/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>
 
 const int imageWidth = 256;
@@ -55,11 +56,19 @@ int main(int argc, char **argv)
 
     shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_3);
 
-#if 0
-    if (!shader->parse(&resources, defaultVersion, false, messages, includer)) {
-        /* compile failed */
+    EShMessages messages = (EShMessages)(EShMsgDefault | EShMsgSpvRules | EShMsgVulkanRules | EShMsgDebugInfo);
+
+    glslang::TShader::ForbidIncluder includer;
+    TBuiltInResource resources;
+
+    resources = glslang::DefaultTBuiltInResource;
+
+    ShInitialize();
+
+    if (!shader->parse(&resources, 110, false, messages, includer)) {
+        std::cerr << "compile failed\n";
+        exit(EXIT_FAILURE);
     }
-#endif
 
     for(int y = 0; y < imageHeight; y++)
         for(int x = 0; x < imageWidth; x++) {
