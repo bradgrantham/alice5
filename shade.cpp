@@ -1,13 +1,11 @@
 #include <cstdio>
 #include <fstream>
 
+#include <glslang/Public/ShaderLang.h>
+
 const int imageWidth = 256;
 const int imageHeight = 256;
 unsigned char imageBuffer[imageHeight][imageWidth][3];
-
-namespace glslang {
-    typedef void* TShader;
-};
 
 struct fvec4 {
     float v[4];
@@ -28,9 +26,9 @@ int main(int argc, char **argv)
 {
     glslang::TShader *shader = nullptr;
 
-#if 0
-    shader = new glslang::TShader(glslang::EShLangFragment);
+    shader = new glslang::TShader(EShLangFragment);
 
+#if 0
     shader->setStringsWithLengthsAndNames(text, NULL, filenames, count);
 
     shader->setEnvInput(glslang::EShSourceGlsl, glslang::EShLangFragment, client, version);
