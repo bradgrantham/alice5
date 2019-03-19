@@ -46,16 +46,16 @@ int main(int argc, char **argv)
 
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 
-#if 0
-    const char* strings[1];
-    strings[0] = text.c_str();
+    const char* strings[1] = { text.c_str() };
     shader->setStringsWithLengthsAndNames(strings, NULL, &argv[1], 1);
 
+    shader->setEnvInput(glslang::EShSourceGlsl, EShLangFragment, glslang::EShClientVulkan, glslang::EShTargetVulkan_1_0);
 
-    shader->setEnvInput(glslang::EShSourceGlsl, glslang::EShLangFragment, client, version);
-    shader->setEnvClient(client, clientVersion);
-    shader->setEnvTarget(language, targetVersion);
+    shader->setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_1);
 
+    shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_3);
+
+#if 0
     if (!shader->parse(&resources, defaultVersion, false, messages, includer)) {
         /* compile failed */
     }
