@@ -1047,6 +1047,12 @@ std::string readFileContents(std::string shaderFileName)
     return text;
 }
 
+std::string readStdin()
+{
+    std::istreambuf_iterator<char> begin(std::cin), end;
+    return std::string(begin, end);
+}
+
 int main(int argc, char **argv)
 {
     if(argc < 2) {
@@ -1054,14 +1060,26 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    std::string preamble = readFileContents("preamble.frag");
-    std::string text = readFileContents(argv[1]);
+    std::string preambleFilename = "preamble.frag";
+    std::string preamble = readFileContents(preambleFilename.c_str());
+
+    std::string filename;
+    std::string text;
+    if(strcmp(argv[1], "-") == 0) {
+        filename = "stdin";
+        text = readStdin();
+    } else {
+        filename = argv[1];
+        text = readFileContents(filename.c_str());
+    }
 
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 
-    const char* strings[2] = { preamble.c_str(), text.c_str() };
-    const char* names[2] = { "preamble.frag", argv[1] };
-    shader->setStringsWithLengthsAndNames(strings, NULL, names, 2);
+    {
+        const char* strings[2] = { preamble.c_str(), text.c_str() };
+        const char* names[2] = { preambleFilename.c_str(), filename.c_str() };
+        shader->setStringsWithLengthsAndNames(strings, NULL, names, 2);
+    }
 
     shader->setEnvInput(glslang::EShSourceGlsl, EShLangFragment, glslang::EShClientVulkan, glslang::EShTargetVulkan_1_0);
 
