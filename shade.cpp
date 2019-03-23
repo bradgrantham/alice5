@@ -1034,6 +1034,7 @@ void eval(glslang::TShader *shader, float u, float v, fvec4& color)
     }
 }
 
+
 std::string readFileContents(std::string shaderFileName)
 {
     std::ifstream shaderFile(shaderFileName.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
@@ -1053,12 +1054,14 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    std::string preamble = readFileContents("preamble.frag");
     std::string text = readFileContents(argv[1]);
 
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 
-    const char* strings[1] = { text.c_str() };
-    shader->setStringsWithLengthsAndNames(strings, NULL, &argv[1], 1);
+    const char* strings[2] = { preamble.c_str(), text.c_str() };
+    const char* names[2] = { "preamble.frag", argv[1] };
+    shader->setStringsWithLengthsAndNames(strings, NULL, names, 2);
 
     shader->setEnvInput(glslang::EShSourceGlsl, EShLangFragment, glslang::EShClientVulkan, glslang::EShTargetVulkan_1_0);
 
@@ -1077,6 +1080,7 @@ int main(int argc, char **argv)
 
     if (!shader->parse(&resources, 110, false, messages, includer)) {
         std::cerr << "compile failed\n";
+        std::cerr << shader->getInfoLog();
         exit(EXIT_FAILURE);
     }
 
