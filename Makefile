@@ -10,7 +10,7 @@ LDFLAGS         :=      $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLA
 # $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLANG_SOURCE_DIR)/build/glslang/OSDependent/Unix/libOSDependent.a
 
 simple.spv: simple.frag
-	$(GLSLANG_BINARY_DIR)/glslangValidator -H -V100 -d -o simple.spv simple.frag
+	(cat preamble.frag simple.frag) | $(GLSLANG_BINARY_DIR)/glslangValidator -H -V100 -d -o simple.spv --stdin -S frag
 
 .PHONY: clean
 clean:
