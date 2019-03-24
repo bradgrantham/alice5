@@ -986,6 +986,10 @@ std::map<glslang::TBasicType, std::string> BasicTypeToString = {
 struct interpreter 
 {
     bool verbose;
+    std::set<uint32_t> capabilities;
+    std::map<uint32_t, std::string> extInstSets;
+    uint32_t memoryModel;
+    uint32_t addressingModel;
 
     interpreter(bool verbose_) :
         verbose(verbose_)
@@ -1011,6 +1015,7 @@ struct interpreter
             case SpvOpCapability: {
                 uint32_t cap = insn->words[opds[0].offset];
                 assert(cap == SpvCapabilityShader);
+                ip->capabilities.insert(cap);
                 if(ip->verbose) {
                     std::cout << "OpCapability " << cap << " \n";
                 }
@@ -1020,8 +1025,20 @@ struct interpreter
             case SpvOpExtInstImport: {
                 const char *name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
                 assert(strcmp(name, "GLSL.std.450") == 0);
+                ip->extInstSets[insn->words[opds[0].offset]] = name;
                 if(ip->verbose) {
                     std::cout << "OpExtInstImport " << insn->words[opds[0].offset] << " " << name << "\n";
+                }
+                break;
+            }
+
+            case SpvOpMemoryModel: {
+                ip->addressingModel = insn->words[opds[0].offset];
+                ip->memoryModel = insn->words[opds[1].offset];
+                assert(ip->addressingModel == SpvAddressingModelLogical);
+                assert(ip->memoryModel == SpvMemoryModelGLSL450);
+                if(ip->verbose) {
+                    std::cout << "OpMemoryModel " << ip->addressingModel << " " << ip->memoryModel << "\n";
                 }
                 break;
             }
