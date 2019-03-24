@@ -7,6 +7,8 @@
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Include/intermediate.h>
 #include <SPIRV/GlslangToSpv.h>
+#include <spirv-tools/libspirv.h>
+#include "spirv.h"
 
 const int imageWidth = 256;
 const int imageHeight = 256;
@@ -981,6 +983,62 @@ std::map<glslang::TBasicType, std::string> BasicTypeToString = {
     {glslang::EbtString, "String"},
 };
 
+struct interpreter 
+{
+    bool verbose;
+
+    interpreter(bool verbose_) :
+        verbose(verbose_)
+    { }
+
+    static spv_result_t handleHeader(void* user_data, spv_endianness_t endian,
+                               uint32_t /* magic */, uint32_t version,
+                               uint32_t generator, uint32_t id_bound,
+                               uint32_t schema)
+    {
+        // auto ip = static_cast<interpreter*>(user_data);
+        return SPV_SUCCESS;
+    }
+
+    static spv_result_t handleInstruction(void* user_data, const spv_parsed_instruction_t* insn)
+    {
+        auto ip = static_cast<interpreter*>(user_data);
+
+        auto opds = insn->operands;
+
+        switch(insn->opcode) {
+
+            case SpvOpCapability: {
+                uint32_t cap = insn->words[opds[0].offset];
+                assert(cap == SpvCapabilityShader);
+                if(ip->verbose) {
+                    std::cout << "OpCapability " << cap << " \n";
+                }
+                break;
+            }
+
+            case SpvOpExtInstImport: {
+                const char *name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
+                assert(strcmp(name, "GLSL.std.450") == 0);
+                if(ip->verbose) {
+                    std::cout << "OpExtInstImport " << insn->words[opds[0].offset] << " " << name << "\n";
+                }
+                break;
+            }
+
+            default:
+                if(false) {
+                    std::cout << "unimplemented opcode " << insn->opcode << "\n";
+                } else {
+                    throw std::runtime_error("unimplemented opcode " + std::to_string(insn->opcode));
+                }
+                break;
+        }
+
+        return SPV_SUCCESS;
+    }
+};
+
 void eval(const std::vector<unsigned int>& spirv, float u, float v, fvec4& color)
 {
     if(0) {
@@ -989,6 +1047,9 @@ void eval(const std::vector<unsigned int>& spirv, float u, float v, fvec4& color
         color[2] = 0.5f;
         color[3] = 1.0f;
     } else {
+        interpreter ip(true);
+        spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
+        spvBinaryParse(context, &ip, spirv.data(), spirv.size(), interpreter::handleHeader, interpreter::handleInstruction, nullptr);
     }
 }
 
@@ -1070,8 +1131,8 @@ int main(int argc, char **argv)
     glslang::TIntermediate *shaderInterm = shader->getIntermediate();
     glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
 
-    for(int y = 0; y < imageHeight; y++)
-        for(int x = 0; x < imageWidth; x++) {
+    for(int y = 0; y < 1 /* imageHeight */; y++)
+        for(int x = 0; x < 1 /* imageWidth */; x++) {
             fvec4 color;
             float u = (x + .5) / imageWidth;
             float v = (y + .5) / imageHeight;
