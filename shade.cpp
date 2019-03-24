@@ -1318,15 +1318,24 @@ std::map<glslang::TBasicType, std::string> BasicTypeToString = {
     {glslang::EbtString, "String"},
 };
 
-struct interpreter 
+struct EntryPoint
+{
+    uint32_t executionModel;
+    std::string name;
+    std::vector<uint32_t> interfaceIds;
+    std::map<uint32_t, std::vector<uint32_t>> executionModesAndOperands;
+};
+
+struct Interpreter 
 {
     bool verbose;
     std::set<uint32_t> capabilities;
     std::map<uint32_t, std::string> extInstSets;
     uint32_t memoryModel;
     uint32_t addressingModel;
+    std::map<uint32_t, EntryPoint> entryPoints;
 
-    interpreter(bool verbose_) :
+    Interpreter(bool verbose_) :
         verbose(verbose_)
     { }
 
@@ -1335,13 +1344,13 @@ struct interpreter
                                uint32_t generator, uint32_t id_bound,
                                uint32_t schema)
     {
-        // auto ip = static_cast<interpreter*>(user_data);
+        // auto ip = static_cast<Interpreter*>(user_data);
         return SPV_SUCCESS;
     }
 
     static spv_result_t handleInstruction(void* user_data, const spv_parsed_instruction_t* insn)
     {
-        auto ip = static_cast<interpreter*>(user_data);
+        auto ip = static_cast<Interpreter*>(user_data);
 
         auto opds = insn->operands;
 
@@ -1378,13 +1387,32 @@ struct interpreter
                 break;
             }
 
-            default:
-                if(true) {
-                    std::cout << "unimplemented opcode " << OpcodeToString[insn->opcode] << " (" << insn->opcode << ")\n";
-                } else {
-                    throw std::runtime_error("unimplemented opcode " + std::to_string(insn->opcode));
+            case SpvOpEntryPoint: {
+                uint32_t executionModel = insn->words[opds[0].offset];
+                uint32_t id = insn->words[opds[1].offset];
+                std::string name = reinterpret_cast<const char *>(&insn->words[opds[2].offset]);
+                const uint32_t *ids = &insn->words[opds[3].offset];
+                std::vector<uint32_t> interfaceIds(ids, ids + opds[3].num_words);
+                assert(executionModel == SpvExecutionModelFragment);
+                ip->entryPoints[id] = {executionModel, name, interfaceIds};
+                if(ip->verbose) {
+                    std::cout << "OpEntryPoint " << executionModel << " " << id << " " << name;
+                    for(auto& i: interfaceIds)
+                        std::cout << " " << i;
+                    std::cout << "\n";
                 }
                 break;
+            }
+
+            default: {
+                const bool throw_on_unimplemented = true;
+                if(throw_on_unimplemented) {
+                    throw std::runtime_error("unimplemented opcode " + OpcodeToString[insn->opcode] + " (" + std::to_string(insn->opcode) + ")");
+                } else {
+                    std::cout << "unimplemented opcode " << OpcodeToString[insn->opcode] << " (" << insn->opcode << ")\n";
+                }
+                break;
+            }
         }
 
         return SPV_SUCCESS;
@@ -1399,9 +1427,9 @@ void eval(const std::vector<unsigned int>& spirv, float u, float v, fvec4& color
         color[2] = 0.5f;
         color[3] = 1.0f;
     } else {
-        interpreter ip(true);
+        Interpreter ip(true);
         spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
-        spvBinaryParse(context, &ip, spirv.data(), spirv.size(), interpreter::handleHeader, interpreter::handleInstruction, nullptr);
+        spvBinaryParse(context, &ip, spirv.data(), spirv.size(), Interpreter::handleHeader, Interpreter::handleInstruction, nullptr);
     }
 }
 
