@@ -6,6 +6,7 @@
 #include <glslang/MachineIndependent/localintermediate.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Include/intermediate.h>
+#include <SPIRV/GlslangToSpv.h>
 
 const int imageWidth = 256;
 const int imageHeight = 256;
@@ -952,74 +953,35 @@ std::map<glslang::TOperator, std::string> OperatorToString = {
     {glslang::EOpWavePrefixCountBits, "WavePrefixCountBits"},
 };
 
+std::map<glslang::TBasicType, std::string> BasicTypeToString = {
+    {glslang::EbtVoid, "Void"},
+    {glslang::EbtFloat, "Float"},
+    {glslang::EbtDouble, "Double"},
+    {glslang::EbtFloat16, "Float16"},
+    {glslang::EbtInt8, "Int8"},
+    {glslang::EbtUint8, "Uint8"},
+    {glslang::EbtInt16, "Int16"},
+    {glslang::EbtUint16, "Uint16"},
+    {glslang::EbtInt, "Int"},
+    {glslang::EbtUint, "Uint"},
+    {glslang::EbtInt64, "Int64"},
+    {glslang::EbtUint64, "Uint64"},
+    {glslang::EbtBool, "Bool"},
+    {glslang::EbtAtomicUint, "AtomicUint"},
+    {glslang::EbtSampler, "Sampler"},
+    {glslang::EbtStruct, "Struct"},
+    {glslang::EbtBlock, "Block"},
 
-struct ShaderEvaluator : glslang::TIntermTraverser
-{
-    bool verbose;
+#ifdef NV_EXTENSIONS
+    {glslang::EbtAccStructNV, "AccStructNV"},
+#endif
 
-    ShaderEvaluator(bool verbose_ = false) :
-        glslang::TIntermTraverser(false, false, true, false),
-        verbose(verbose_)
-    {}
+    {glslang::EbtReference, "Reference"},
 
-    virtual ~ShaderEvaluator() { }
-
-    virtual void visitSymbol(glslang::TIntermSymbol* node)
-    {
-    }
-
-    virtual void visitConstantUnion(glslang::TIntermConstantUnion* node)
-    {
-    }
-
-    virtual bool visitBinary(glslang::TVisit where, glslang::TIntermBinary* node)
-    {
-        if(verbose) {
-            std::string opstring;
-            if(OperatorToString.count(node->getOp()) > 0) {
-                opstring = OperatorToString[node->getOp()];
-            } else {
-                opstring = "unknown operator";
-            }
-            for(int i = 0; i < depth; i++)
-                std::cout << " ";
-            std::cout << "operator node: " << opstring << "\n";
-        }
-        return true;
-    }
-
-    virtual bool visitUnary(glslang::TVisit where, glslang::TIntermUnary* node)
-    {
-        return true;
-        }
-
-    virtual bool visitSelection(glslang::TVisit where, glslang::TIntermSelection* node)
-    {
-        return true;
-    }
-
-    virtual bool visitAggregate(glslang::TVisit where, glslang::TIntermAggregate* node)
-    {
-        return true;
-    }
-
-    virtual bool visitLoop(glslang::TVisit where, glslang::TIntermLoop* node)
-    {
-        return true;
-    }
-
-    virtual bool visitBranch(glslang::TVisit where, glslang::TIntermBranch* node)
-    {
-        return true;
-    }
-
-    virtual bool visitSwitch(glslang::TVisit where, glslang::TIntermSwitch* node)
-    {
-        return true;
-    }
+    {glslang::EbtString, "String"},
 };
 
-void eval(glslang::TShader *shader, float u, float v, fvec4& color)
+void eval(const std::vector<unsigned int>& spirv, float u, float v, fvec4& color)
 {
     if(0) {
         color[0] = u;
@@ -1027,10 +989,6 @@ void eval(glslang::TShader *shader, float u, float v, fvec4& color)
         color[2] = 0.5f;
         color[3] = 1.0f;
     } else {
-        glslang::TIntermediate *shaderInterm = shader->getIntermediate();
-        TIntermNode *root = shaderInterm->getTreeRoot();
-        ShaderEvaluator etor;
-        root->traverse(&etor);
     }
 }
 
@@ -1102,12 +1060,22 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    std::vector<unsigned int> spirv;
+    std::string warningsErrors;
+    spv::SpvBuildLogger logger;
+    glslang::SpvOptions options;
+    options.generateDebugInfo = true;
+    options.disableOptimizer = true;
+    options.optimizeSize = false;
+    glslang::TIntermediate *shaderInterm = shader->getIntermediate();
+    glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
+
     for(int y = 0; y < imageHeight; y++)
         for(int x = 0; x < imageWidth; x++) {
             fvec4 color;
             float u = (x + .5) / imageWidth;
             float v = (y + .5) / imageHeight;
-            eval(shader, u, v, color);
+            eval(spirv, u, v, color);
             for(int c = 0; c < 3; c++) {
                 imageBuffer[y][x][c] = color[c] * 255;
             }
