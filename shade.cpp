@@ -1323,7 +1323,7 @@ struct EntryPoint
     uint32_t executionModel;
     std::string name;
     std::vector<uint32_t> interfaceIds;
-    std::map<uint32_t, std::vector<uint32_t>> executionModesAndOperands;
+    std::map<uint32_t, std::vector<uint32_t>> executionModesToOperands;
 };
 
 struct Interpreter 
@@ -1398,6 +1398,30 @@ struct Interpreter
                 if(ip->verbose) {
                     std::cout << "OpEntryPoint " << executionModel << " " << id << " " << name;
                     for(auto& i: interfaceIds)
+                        std::cout << " " << i;
+                    std::cout << "\n";
+                }
+                break;
+            }
+
+            case SpvOpExecutionMode: {
+                uint32_t entryPointId = insn->words[opds[0].offset];
+                uint32_t executionMode = insn->words[opds[1].offset];
+
+                if(insn->num_operands > 2) {
+
+                    const uint32_t *ops = &insn->words[opds[2].offset];
+                    std::vector<uint32_t> operands(ops, ops + opds[2].num_words);
+                    ip->entryPoints[entryPointId].executionModesToOperands[executionMode] = operands;
+
+                } else {
+
+                    ip->entryPoints[entryPointId].executionModesToOperands[executionMode] = {};
+                }
+
+                if(ip->verbose) {
+                    std::cout << "OpExecutionMode " << entryPointId << " " << executionMode;
+                    for(auto& i: ip->entryPoints[entryPointId].executionModesToOperands[executionMode])
                         std::cout << " " << i;
                     std::cout << "\n";
                 }
