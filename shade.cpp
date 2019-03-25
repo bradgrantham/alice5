@@ -1334,6 +1334,13 @@ struct Source
     std::string source;
 };
 
+struct MemberName
+{
+    uint32_t type;
+    uint32_t member;
+    std::string name;
+};
+
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 
 struct Interpreter 
@@ -1345,7 +1352,10 @@ struct Interpreter
     uint32_t memoryModel;
     uint32_t addressingModel;
     std::map<uint32_t, EntryPoint> entryPoints;
+    std::map<uint32_t, std::string> names;
     std::vector<Source> sources;
+    std::vector<std::string> processes;
+    std::map<uint32_t, std::map<uint32_t, std::string> > memberNames;
 
     Interpreter(bool verbose_) :
         verbose(verbose_)
@@ -1450,6 +1460,16 @@ struct Interpreter
                 break;
             }
 
+            case SpvOpName: {
+                uint32_t id = insn->words[opds[0].offset];
+                std::string name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
+                ip->names[id] = name;
+                if(ip->verbose) {
+                    std::cout << "OpName " << id << " " << name << "\n";
+                }
+                break;
+            }
+
             case SpvOpSource: {
                 uint32_t language = insn->words[opds[0].offset];
                 uint32_t version = insn->words[opds[1].offset];
@@ -1458,6 +1478,26 @@ struct Interpreter
                 ip->sources.push_back({language, version, file, source});
                 if(ip->verbose) {
                     std::cout << "OpSource " << language << " " << version << " " << file << " " << ((source.size() > 0) ? "with source" : "without source") << "\n";
+                }
+                break;
+            }
+
+            case SpvOpMemberName: {
+                uint32_t type = insn->words[opds[0].offset];
+                uint32_t member = insn->words[opds[1].offset];
+                std::string name = reinterpret_cast<const char *>(&insn->words[opds[2].offset]);
+                ip->memberNames[type][member] = name;
+                if(ip->verbose) {
+                    std::cout << "OpMemberName " << type << " " << member << " " << name << "\n";
+                }
+                break;
+            }
+
+            case SpvOpModuleProcessed: {
+                std::string process = reinterpret_cast<const char *>(&insn->words[opds[0].offset]);
+                ip->processes.push_back(process);
+                if(ip->verbose) {
+                    std::cout << "OpModulesProcessed " << process << "\n";
                 }
                 break;
             }
@@ -1477,7 +1517,7 @@ struct Interpreter
     }
 };
 
-void eval(const std::vector<unsigned int>& spirv, float u, float v, fvec4& color)
+void eval(Interpreter& ip, float u, float v, fvec4& color)
 {
     if(0) {
         color[0] = u;
@@ -1485,9 +1525,6 @@ void eval(const std::vector<unsigned int>& spirv, float u, float v, fvec4& color
         color[2] = 0.5f;
         color[3] = 1.0f;
     } else {
-        Interpreter ip(true);
-        spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
-        spvBinaryParse(context, &ip, spirv.data(), spirv.size(), Interpreter::handleHeader, Interpreter::handleInstruction, nullptr);
     }
 }
 
@@ -1569,12 +1606,22 @@ int main(int argc, char **argv)
     glslang::TIntermediate *shaderInterm = shader->getIntermediate();
     glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
 
-    for(int y = 0; y < 1 /* imageHeight */; y++)
-        for(int x = 0; x < 1 /* imageWidth */; x++) {
+    if(false) {
+        FILE *fp = fopen("spirv", "wb");
+        fwrite(spirv.data(), 1, spirv.size() * 4, fp);
+        fclose(fp);
+    }
+
+    Interpreter ip(true);
+    spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
+    spvBinaryParse(context, &ip, spirv.data(), spirv.size(), Interpreter::handleHeader, Interpreter::handleInstruction, nullptr);
+
+    for(int y = 0; y < imageHeight; y++)
+        for(int x = 0; x < imageWidth; x++) {
             fvec4 color;
             float u = (x + .5) / imageWidth;
             float v = (y + .5) / imageHeight;
-            eval(spirv, u, v, color);
+            eval(ip, u, v, color);
             for(int c = 0; c < 3; c++) {
                 imageBuffer[y][x][c] = color[c] * 255;
             }
