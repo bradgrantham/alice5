@@ -1326,14 +1326,26 @@ struct EntryPoint
     std::map<uint32_t, std::vector<uint32_t>> executionModesToOperands;
 };
 
+struct Source
+{
+    uint32_t language;
+    uint32_t version;
+    uint32_t file;
+    std::string source;
+};
+
+const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
+
 struct Interpreter 
 {
     bool verbose;
     std::set<uint32_t> capabilities;
     std::map<uint32_t, std::string> extInstSets;
+    std::map<uint32_t, std::string> strings;
     uint32_t memoryModel;
     uint32_t addressingModel;
     std::map<uint32_t, EntryPoint> entryPoints;
+    std::vector<Source> sources;
 
     Interpreter(bool verbose_) :
         verbose(verbose_)
@@ -1424,6 +1436,28 @@ struct Interpreter
                     for(auto& i: ip->entryPoints[entryPointId].executionModesToOperands[executionMode])
                         std::cout << " " << i;
                     std::cout << "\n";
+                }
+                break;
+            }
+
+            case SpvOpString: {
+                uint32_t id = insn->words[opds[0].offset];
+                std::string name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
+                ip->strings[id] = name;
+                if(ip->verbose) {
+                    std::cout << "OpString " << id << " " << name << "\n";
+                }
+                break;
+            }
+
+            case SpvOpSource: {
+                uint32_t language = insn->words[opds[0].offset];
+                uint32_t version = insn->words[opds[1].offset];
+                uint32_t file = (insn->num_operands > 2) ? insn->words[opds[2].offset] : SOURCE_NO_FILE;
+                std::string source = (insn->num_operands > 3) ? reinterpret_cast<const char *>(&insn->words[opds[3].offset]) : "";
+                ip->sources.push_back({language, version, file, source});
+                if(ip->verbose) {
+                    std::cout << "OpSource " << language << " " << version << " " << file << " " << ((source.size() > 0) ? "with source" : "without source") << "\n";
                 }
                 break;
             }
