@@ -1347,6 +1347,13 @@ struct MemberName
     std::string name;
 };
 
+struct Type
+{
+    // fill in more of these as necessary
+    enum { VOID, BOOL, INT, FLOAT, VECTOR, MATRIX, IMAGE, FUNCTION, } type;
+    std::vector<uint32_t> parameters;
+};
+
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 
 struct Interpreter 
@@ -1364,6 +1371,7 @@ struct Interpreter
     std::vector<std::string> processes;
     std::map<uint32_t, std::map<uint32_t, std::string> > memberNames;
     std::map<uint32_t, std::map<uint32_t, Decoration> > memberDecorations;
+    std::map<uint32_t, Type> types;
 
     Interpreter(bool verbose_) :
         verbose(verbose_)
@@ -1554,6 +1562,44 @@ struct Interpreter
                     std::cout << "OpMemberDecorate " << id << " " << member << " " << decoration;
                     for(auto& i: ip->memberDecorations[id][member].operands)
                         std::cout << " " << i;
+                    std::cout << "\n";
+                }
+                break;
+            }
+
+            case SpvOpTypeVoid: {
+                uint32_t id = insn->words[opds[0].offset];
+                ip->types[id] = {Type::VOID, {}};
+                if(ip->verbose) {
+                    std::cout << "TypeVoid " << id << "\n";
+                }
+                break;
+            }
+
+            case SpvOpTypeFloat: {
+                uint32_t id = insn->words[opds[0].offset];
+                uint32_t width = insn->words[opds[1].offset];
+                ip->types[id] = {Type::VOID, {width}};
+                if(ip->verbose) {
+                    std::cout << "TypeFloat " << id << " " << width << "\n";
+                }
+                break;
+            }
+
+            case SpvOpTypeFunction: {
+                uint32_t id = insn->words[opds[0].offset];
+                std::vector<uint32_t> params;
+                params.push_back(insn->words[opds[1].offset]);
+                for(int i = 0; i < opds[2].num_words; i++)
+                    params.push_back(insn->words[opds[2].offset + i]);
+                ip->types[id] = {Type::FUNCTION, params};
+                if(ip->verbose) {
+                    std::cout << "TypeFunction " << id << " returning " << params[0];
+                    if(params.size() > 0) {
+                        std::cout << " with parameters"; 
+                        for(int i = 1; i < params.size(); i++)
+                            std::cout << " " << params[i];
+                    }
                     std::cout << "\n";
                 }
                 break;
