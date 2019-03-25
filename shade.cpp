@@ -1326,6 +1326,12 @@ struct EntryPoint
     std::map<uint32_t, std::vector<uint32_t>> executionModesToOperands;
 };
 
+struct Decoration
+{
+    uint32_t decoration;
+    std::vector<uint32_t> operands;
+};
+
 struct Source
 {
     uint32_t language;
@@ -1352,10 +1358,12 @@ struct Interpreter
     uint32_t memoryModel;
     uint32_t addressingModel;
     std::map<uint32_t, EntryPoint> entryPoints;
+    std::map<uint32_t, Decoration> decorations;
     std::map<uint32_t, std::string> names;
     std::vector<Source> sources;
     std::vector<std::string> processes;
     std::map<uint32_t, std::map<uint32_t, std::string> > memberNames;
+    std::map<uint32_t, std::map<uint32_t, Decoration> > memberDecorations;
 
     Interpreter(bool verbose_) :
         verbose(verbose_)
@@ -1498,6 +1506,55 @@ struct Interpreter
                 ip->processes.push_back(process);
                 if(ip->verbose) {
                     std::cout << "OpModulesProcessed " << process << "\n";
+                }
+                break;
+            }
+
+            case SpvOpDecorate: {
+                uint32_t id = insn->words[opds[0].offset];
+                uint32_t decoration = insn->words[opds[1].offset];
+
+                if(insn->num_operands > 2) {
+
+                    const uint32_t *ops = &insn->words[opds[2].offset];
+                    std::vector<uint32_t> operands(ops, ops + opds[2].num_words);
+                    ip->decorations[id] = {decoration, operands};
+
+                } else {
+
+                    ip->decorations[id] = {decoration, {}};
+                }
+
+                if(ip->verbose) {
+                    std::cout << "OpDecorate " << id << " " << decoration;
+                    for(auto& i: ip->decorations[id].operands)
+                        std::cout << " " << i;
+                    std::cout << "\n";
+                }
+                break;
+            }
+
+            case SpvOpMemberDecorate: {
+                uint32_t id = insn->words[opds[0].offset];
+                uint32_t member = insn->words[opds[1].offset];
+                uint32_t decoration = insn->words[opds[2].offset];
+
+                if(insn->num_operands > 2) {
+
+                    const uint32_t *ops = &insn->words[opds[3].offset];
+                    std::vector<uint32_t> operands(ops, ops + opds[3].num_words);
+                    ip->memberDecorations[id][member] = {decoration, operands};
+
+                } else {
+
+                    ip->memberDecorations[id][member] = {decoration, {}};
+                }
+
+                if(ip->verbose) {
+                    std::cout << "OpMemberDecorate " << id << " " << member << " " << decoration;
+                    for(auto& i: ip->memberDecorations[id][member].operands)
+                        std::cout << " " << i;
+                    std::cout << "\n";
                 }
                 break;
             }
