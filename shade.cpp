@@ -1590,12 +1590,14 @@ struct Interpreter
                 uint32_t id = insn->words[opds[0].offset];
                 std::vector<uint32_t> params;
                 params.push_back(insn->words[opds[1].offset]);
-                for(int i = 0; i < opds[2].num_words; i++)
-                    params.push_back(insn->words[opds[2].offset + i]);
+                if(insn->num_operands > 2) {
+                    for(int i = 0; i < opds[2].num_words; i++)
+                        params.push_back(insn->words[opds[2].offset + i]);
+                }
                 ip->types[id] = {Type::FUNCTION, params};
                 if(ip->verbose) {
                     std::cout << "TypeFunction " << id << " returning " << params[0];
-                    if(params.size() > 0) {
+                    if(params.size() > 1) {
                         std::cout << " with parameters"; 
                         for(int i = 1; i < params.size(); i++)
                             std::cout << " " << params[i];
