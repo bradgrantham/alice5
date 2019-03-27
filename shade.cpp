@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdio>
 #include <fstream>
+#include <variant>
 
 #include <StandAlone/ResourceLimits.h>
 #include <glslang/MachineIndependent/localintermediate.h>
@@ -1354,12 +1355,40 @@ struct MemberName
     std::string name;
 };
 
-struct Type
+struct TypeVoid
 {
-    // fill in more of these as necessary
-    enum { VOID, BOOL, INT, FLOAT, VECTOR, MATRIX, IMAGE, FUNCTION, POINTER, } type;
-    std::vector<uint32_t> parameters;
 };
+
+struct TypeInt
+{
+    uint32_t width;
+    uint32_t signedness;
+};
+
+struct TypeFloat
+{
+    uint32_t width;
+};
+
+struct TypeVector
+{
+    uint32_t type;
+    uint32_t count;
+};
+
+struct TypeFunction
+{
+    uint32_t returnType;
+    std::vector<uint32_t> parameterTypes;
+};
+
+struct TypePointer
+{
+    uint32_t storageClass;
+    uint32_t type;
+};
+
+typedef std::variant<TypeVoid, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt> Type;
 
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
@@ -1421,9 +1450,10 @@ struct Interpreter
 
             case SpvOpExtInstImport: {
                 // XXX result id
+                uint32_t id = insn->words[opds[0].offset];
                 const char *name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
                 assert(strcmp(name, "GLSL.std.450") == 0);
-                ip->extInstSets[insn->words[opds[0].offset]] = name;
+                ip->extInstSets[id] = name;
                 if(ip->verbose) {
                     std::cout << "OpExtInstImport " << insn->words[opds[0].offset] << " " << name << "\n";
                 }
@@ -1588,7 +1618,8 @@ struct Interpreter
             case SpvOpTypeVoid: {
                 // XXX result id
                 uint32_t id = insn->words[opds[0].offset];
-                ip->types[id] = {Type::VOID, {}};
+                TypeVoid t;
+                ip->types[id] = t;
                 if(ip->verbose) {
                     std::cout << "TypeVoid " << id << "\n";
                 }
@@ -1599,9 +1630,21 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = insn->words[opds[0].offset];
                 uint32_t width = insn->words[opds[1].offset];
-                ip->types[id] = {Type::VOID, {width}};
+                ip->types[id] = TypeFloat {width};
                 if(ip->verbose) {
                     std::cout << "TypeFloat " << id << " " << width << "\n";
+                }
+                break;
+            }
+
+            case SpvOpTypeInt: {
+                // XXX result id
+                uint32_t id = insn->words[opds[0].offset];
+                uint32_t width = insn->words[opds[1].offset];
+                uint32_t signedness = insn->words[opds[2].offset];
+                ip->types[id] = TypeInt {width, signedness};
+                if(ip->verbose) {
+                    std::cout << "TypeInt " << id << " width " << width << " signedness " << signedness << "\n";
                 }
                 break;
             }
@@ -1609,18 +1652,18 @@ struct Interpreter
             case SpvOpTypeFunction: {
                 // XXX result id
                 uint32_t id = insn->words[opds[0].offset];
+                uint32_t returnType = insn->words[opds[1].offset];
                 std::vector<uint32_t> params;
-                params.push_back(insn->words[opds[1].offset]);
                 if(insn->num_operands > 2) {
                     for(int i = 0; i < opds[2].num_words; i++)
                         params.push_back(insn->words[opds[2].offset + i]);
                 }
-                ip->types[id] = {Type::FUNCTION, params};
+                ip->types[id] = TypeFunction {returnType, params};
                 if(ip->verbose) {
-                    std::cout << "TypeFunction " << id << " returning " << params[0];
+                    std::cout << "TypeFunction " << id << " returning " << returnType;
                     if(params.size() > 1) {
                         std::cout << " with parameters"; 
-                        for(int i = 1; i < params.size(); i++)
+                        for(int i = 0; i < params.size(); i++)
                             std::cout << " " << params[i];
                     }
                     std::cout << "\n";
@@ -1632,10 +1675,10 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = insn->words[opds[0].offset];
                 uint32_t type = insn->words[opds[1].offset];
-                uint32_t comp = insn->words[opds[2].offset];
-                ip->types[id] = {Type::VECTOR, {type, comp}};
+                uint32_t count = insn->words[opds[2].offset];
+                ip->types[id] = TypeVector {type, count};
                 if(ip->verbose) {
-                    std::cout << "TypeVector " << id << " of " << type << " count " << comp << "\n";
+                    std::cout << "TypeVector " << id << " of " << type << " count " << count << "\n";
                 }
                 break;
             }
@@ -1645,7 +1688,7 @@ struct Interpreter
                 uint32_t id = insn->words[opds[0].offset];
                 uint32_t storageClass = insn->words[opds[1].offset];
                 uint32_t type = insn->words[opds[2].offset];
-                ip->types[id] = {Type::POINTER, {storageClass, type}};
+                ip->types[id] = TypePointer {storageClass, type};
                 if(ip->verbose) {
                     std::cout << "TypePointer " << id << " class " << storageClass << " type " << type << "\n";
                 }
@@ -1660,7 +1703,10 @@ struct Interpreter
                 uint32_t initializer = (insn->num_operands > 3) ? insn->words[opds[3].offset] : NO_INITIALIZER;
                 ip->variables[id] = {type, storageClass, initializer};
                 if(ip->verbose) {
-                    std::cout << "Variable " << id << " type " << type << " storageClass " << storageClass << " initializer " << initializer << "\n";
+                    std::cout << "Variable " << id << " type " << type << " storageClass " << storageClass;
+                    if(initializer != NO_INITIALIZER)
+                        std::cout << " initializer " << initializer;
+                    std::cout << "\n";
                 }
                 break;
             }
