@@ -1318,6 +1318,13 @@ std::map<glslang::TBasicType, std::string> BasicTypeToString = {
     {glslang::EbtString, "String"},
 };
 
+struct Variable
+{
+    uint32_t type;
+    uint32_t storageClass;
+    uint32_t initializer;
+};
+
 struct EntryPoint
 {
     uint32_t executionModel;
@@ -1350,16 +1357,22 @@ struct MemberName
 struct Type
 {
     // fill in more of these as necessary
-    enum { VOID, BOOL, INT, FLOAT, VECTOR, MATRIX, IMAGE, FUNCTION, } type;
+    enum { VOID, BOOL, INT, FLOAT, VECTOR, MATRIX, IMAGE, FUNCTION, POINTER, } type;
     std::vector<uint32_t> parameters;
 };
 
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
+const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 
 struct Interpreter 
 {
+    bool throwOnUnimplemented;
     bool verbose;
     std::set<uint32_t> capabilities;
+
+    // main id-to-thingie map containing extinstsets, types, variables, etc
+    // secondary maps of entryPoint, decorations, names, etc
+
     std::map<uint32_t, std::string> extInstSets;
     std::map<uint32_t, std::string> strings;
     uint32_t memoryModel;
@@ -1372,8 +1385,10 @@ struct Interpreter
     std::map<uint32_t, std::map<uint32_t, std::string> > memberNames;
     std::map<uint32_t, std::map<uint32_t, Decoration> > memberDecorations;
     std::map<uint32_t, Type> types;
+    std::map<uint32_t, Variable> variables;
 
-    Interpreter(bool verbose_) :
+    Interpreter(bool throwOnUnimplemented_, bool verbose_) :
+        throwOnUnimplemented(throwOnUnimplemented_),
         verbose(verbose_)
     { }
 
@@ -1405,6 +1420,7 @@ struct Interpreter
             }
 
             case SpvOpExtInstImport: {
+                // XXX result id
                 const char *name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
                 assert(strcmp(name, "GLSL.std.450") == 0);
                 ip->extInstSets[insn->words[opds[0].offset]] = name;
@@ -1426,6 +1442,7 @@ struct Interpreter
             }
 
             case SpvOpEntryPoint: {
+                // XXX not result id but id must eventually be Function result id
                 uint32_t executionModel = insn->words[opds[0].offset];
                 uint32_t id = insn->words[opds[1].offset];
                 std::string name = reinterpret_cast<const char *>(&insn->words[opds[2].offset]);
@@ -1467,6 +1484,7 @@ struct Interpreter
             }
 
             case SpvOpString: {
+                // XXX result id
                 uint32_t id = insn->words[opds[0].offset];
                 std::string name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
                 ip->strings[id] = name;
@@ -1568,6 +1586,7 @@ struct Interpreter
             }
 
             case SpvOpTypeVoid: {
+                // XXX result id
                 uint32_t id = insn->words[opds[0].offset];
                 ip->types[id] = {Type::VOID, {}};
                 if(ip->verbose) {
@@ -1577,6 +1596,7 @@ struct Interpreter
             }
 
             case SpvOpTypeFloat: {
+                // XXX result id
                 uint32_t id = insn->words[opds[0].offset];
                 uint32_t width = insn->words[opds[1].offset];
                 ip->types[id] = {Type::VOID, {width}};
@@ -1587,6 +1607,7 @@ struct Interpreter
             }
 
             case SpvOpTypeFunction: {
+                // XXX result id
                 uint32_t id = insn->words[opds[0].offset];
                 std::vector<uint32_t> params;
                 params.push_back(insn->words[opds[1].offset]);
@@ -1607,9 +1628,45 @@ struct Interpreter
                 break;
             }
 
+            case SpvOpTypeVector: {
+                // XXX result id
+                uint32_t id = insn->words[opds[0].offset];
+                uint32_t type = insn->words[opds[1].offset];
+                uint32_t comp = insn->words[opds[2].offset];
+                ip->types[id] = {Type::VECTOR, {type, comp}};
+                if(ip->verbose) {
+                    std::cout << "TypeVector " << id << " of " << type << " count " << comp << "\n";
+                }
+                break;
+            }
+
+            case SpvOpTypePointer: {
+                // XXX result id
+                uint32_t id = insn->words[opds[0].offset];
+                uint32_t storageClass = insn->words[opds[1].offset];
+                uint32_t type = insn->words[opds[2].offset];
+                ip->types[id] = {Type::POINTER, {storageClass, type}};
+                if(ip->verbose) {
+                    std::cout << "TypePointer " << id << " class " << storageClass << " type " << type << "\n";
+                }
+                break;
+            }
+
+            case SpvOpVariable: {
+                // XXX result id
+                uint32_t type = insn->words[opds[0].offset];
+                uint32_t id = insn->words[opds[1].offset];
+                uint32_t storageClass = insn->words[opds[2].offset];
+                uint32_t initializer = (insn->num_operands > 3) ? insn->words[opds[3].offset] : NO_INITIALIZER;
+                ip->variables[id] = {type, storageClass, initializer};
+                if(ip->verbose) {
+                    std::cout << "Variable " << id << " type " << type << " storageClass " << storageClass << " initializer " << initializer << "\n";
+                }
+                break;
+            }
+
             default: {
-                const bool throw_on_unimplemented = true;
-                if(throw_on_unimplemented) {
+                if(ip->throwOnUnimplemented) {
                     throw std::runtime_error("unimplemented opcode " + OpcodeToString[insn->opcode] + " (" + std::to_string(insn->opcode) + ")");
                 } else {
                     std::cout << "unimplemented opcode " << OpcodeToString[insn->opcode] << " (" << insn->opcode << ")\n";
@@ -1652,10 +1709,62 @@ std::string readStdin()
     return std::string(begin, end);
 }
 
+void usage(const char* progname)
+{
+    printf("usage: %s [options] shader.frag\n", progname);
+    printf("provide \"-\" as a filename to read from stdin\n");
+    printf("options:\n");
+    printf("\t-g    Generate debugging information\n");
+    printf("\t-O    Run optimizing passes\n");
+}
+
 int main(int argc, char **argv)
 {
-    if(argc < 2) {
-        std::cerr << "usage: " << argv[0] << " fragshader.frag\n";
+    bool debug = false;
+    bool optimize = false;
+    bool beVerbose = false;
+    bool throwOnUnimplemented = false;
+
+    char *progname = argv[0];
+    argv++; argc--;
+
+    while(argc > 0 && argv[0][0] == '-') {
+        if(strcmp(argv[0], "-g") == 0) {
+
+            debug = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "-v") == 0) {
+
+            beVerbose = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "-t") == 0) {
+
+            throwOnUnimplemented = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "-O") == 0) {
+
+            optimize = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "-h") == 0) {
+
+            usage(progname);
+            exit(EXIT_SUCCESS);
+
+        } else {
+
+            usage(progname);
+            exit(EXIT_FAILURE);
+
+        }
+    }
+
+
+    if(argc < 1) {
+        usage(progname);
         exit(EXIT_FAILURE);
     }
 
@@ -1664,11 +1773,11 @@ int main(int argc, char **argv)
 
     std::string filename;
     std::string text;
-    if(strcmp(argv[1], "-") == 0) {
+    if(strcmp(argv[0], "-") == 0) {
         filename = "stdin";
         text = readStdin();
     } else {
-        filename = argv[1];
+        filename = argv[0];
         text = readFileContents(filename.c_str());
     }
 
@@ -1705,8 +1814,8 @@ int main(int argc, char **argv)
     std::string warningsErrors;
     spv::SpvBuildLogger logger;
     glslang::SpvOptions options;
-    options.generateDebugInfo = true;
-    options.disableOptimizer = true;
+    options.generateDebugInfo = debug;
+    options.disableOptimizer = !optimize;
     options.optimizeSize = false;
     glslang::TIntermediate *shaderInterm = shader->getIntermediate();
     glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
@@ -1717,7 +1826,7 @@ int main(int argc, char **argv)
         fclose(fp);
     }
 
-    Interpreter ip(true);
+    Interpreter ip(throwOnUnimplemented, beVerbose);
     spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
     spvBinaryParse(context, &ip, spirv.data(), spirv.size(), Interpreter::handleHeader, Interpreter::handleInstruction, nullptr);
 
