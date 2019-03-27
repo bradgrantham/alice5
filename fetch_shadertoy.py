@@ -50,5 +50,5 @@ if __name__ == "__main__":
     shadertoy_key = sys.argv[1]
 
     # analyze_shader("tsjXDh", shadertoy_key)
-    analyze_shader("WsSXWz", shadertoy_key)
-    # main(shadertoy_key)
+    # analyze_shader("WsSXWz", shadertoy_key)
+    main(shadertoy_key)
