@@ -1800,6 +1800,11 @@ int main(int argc, char **argv)
             usage(progname);
             exit(EXIT_SUCCESS);
 
+        } else if(strcmp(argv[0], "-") == 0) {
+
+            // Read from stdin.
+            break;
+
         } else {
 
             usage(progname);

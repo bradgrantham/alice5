@@ -31,3 +31,8 @@
 *.exe
 *.out
 *.app
+
+# Our files.
+*.ppm
+/shade
+*.dSYM
