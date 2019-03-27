@@ -1821,6 +1821,8 @@ int main(int argc, char **argv)
 
     std::string preambleFilename = "preamble.frag";
     std::string preamble = readFileContents(preambleFilename.c_str());
+    std::string epilogueFilename = "epilogue.frag";
+    std::string epilogue = readFileContents(epilogueFilename.c_str());
 
     std::string filename;
     std::string text;
@@ -1835,9 +1837,9 @@ int main(int argc, char **argv)
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 
     {
-        const char* strings[2] = { preamble.c_str(), text.c_str() };
-        const char* names[2] = { preambleFilename.c_str(), filename.c_str() };
-        shader->setStringsWithLengthsAndNames(strings, NULL, names, 2);
+        const char* strings[3] = { preamble.c_str(), text.c_str(), epilogue.c_str() };
+        const char* names[3] = { preambleFilename.c_str(), filename.c_str(), epilogueFilename.c_str() };
+        shader->setStringsWithLengthsAndNames(strings, NULL, names, 3);
     }
 
     shader->setEnvInput(glslang::EShSourceGlsl, EShLangFragment, glslang::EShClientVulkan, glslang::EShTargetVulkan_1_0);

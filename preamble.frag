@@ -17,9 +17,3 @@ layout (location = 0) in vec2 fragCoord;
 
 layout (location = 0) out vec4 color;
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord );
-
-void main()
-{
-    mainImage(color, fragCoord);
-}
