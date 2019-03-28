@@ -1426,20 +1426,63 @@ struct FunctionParameter
 
 struct InsnLoad {
     uint32_t type;
-    uint32_t id;
-    uint32_t pointer;
+    uint32_t resultId;
+    uint32_t pointerId;
     uint32_t memoryAccess;
 };
 
 struct InsnStore {
-    uint32_t pointer;
-    uint32_t object;
+    uint32_t pointerId;
+    uint32_t objectId;
     uint32_t memoryAccess;
+};
+
+struct InsnAccessChain {
+    uint32_t type;
+    uint32_t resultId;
+    uint32_t basePointerId;
+    std::vector<uint32_t> indexes;
+};
+
+struct InsnCompositeConstruct {
+    uint32_t type;
+    uint32_t resultId;
+    std::vector<uint32_t> constituentIds;
+};
+
+struct InsnCompositeExtract {
+    uint32_t type;
+    uint32_t resultId;
+    uint32_t compositeId;
+    std::vector<uint32_t> indexes;
+};
+
+struct InsnConvertSToF {
+    uint32_t type;
+    uint32_t resultId;
+    uint32_t sourceId;
+};
+
+struct InsnFDiv {
+    uint32_t type;
+    uint32_t resultId;
+    uint32_t operand1Id; // dividend
+    uint32_t operand2Id; // divisor
+};
+
+struct InsnFunctionCall {
+    uint32_t type;
+    uint32_t resultId;
+    uint32_t functionId;
+    std::vector<uint32_t> argumentIds;
+};
+
+struct InsnReturn {
 };
 
 const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
 
-typedef std::variant<InsnLoad, InsnStore> Instruction;
+typedef std::variant<InsnLoad, InsnStore, InsnAccessChain, InsnCompositeConstruct, InsnCompositeExtract, InsnConvertSToF, InsnFDiv, InsnFunctionCall, InsnReturn> Instruction;
 
 struct Function {
     uint32_t id;
@@ -1563,7 +1606,7 @@ struct Interpreter
                 uint32_t executionModel = nextu();
                 uint32_t id = nextu();
                 std::string name = nexts();
-                std::vector<uint32_t> interfaceIds = nextv();
+                std::vector<uint32_t> interfaceIds = restv();
                 assert(executionModel == SpvExecutionModelFragment);
                 ip->entryPoints[id] = {executionModel, name, interfaceIds};
                 if(ip->verbose) {
@@ -1900,13 +1943,19 @@ struct Interpreter
                 break;
             }
 
+            case SpvOpReturn: {
+                ip->currentFunction->code.push_back(InsnReturn{});
+                std::cout << "Return\n";
+                break;
+            }
+
             case SpvOpLoad: {
                 uint32_t type = nextu();
                 uint32_t id = nextu();
                 uint32_t pointer = nextu();
                 uint32_t memoryAccess = (insn->num_operands > 3) ? nextu() : NO_MEMORY_ACCESS_SEMANTIC;
                 ip->currentFunction->code.push_back(InsnLoad{type, id, pointer, memoryAccess});
-                std::cout << "Load "
+                std::cout << "Load"
                     << " type " << type
                     << " id " << id
                     << " pointer " << pointer;
@@ -1921,7 +1970,7 @@ struct Interpreter
                 uint32_t object = nextu();
                 uint32_t memoryAccess = (insn->num_operands > 3) ? nextu() : NO_MEMORY_ACCESS_SEMANTIC;
                 ip->currentFunction->code.push_back(InsnStore{pointer, object, memoryAccess});
-                std::cout << "Store "
+                std::cout << "Store"
                     << " pointer " << pointer
                     << " object " << object;
                 if(memoryAccess != NO_MEMORY_ACCESS_SEMANTIC)
@@ -1929,7 +1978,100 @@ struct Interpreter
                 std::cout << "\n";
                 break;
             }
+            
+            case SpvOpAccessChain: {
+                uint32_t type = nextu();
+                uint32_t resultId = nextu();
+                uint32_t basePointerId = nextu();
+                auto indexes = restv();
+                ip->currentFunction->code.push_back(InsnAccessChain{type, resultId, basePointerId, indexes});
+                std::cout << "AccessChain"
+                    << " type " << type
+                    << " resultId " << resultId
+                    << " basePointerId " << basePointerId;
+                std::cout << " indexes"; 
+                for(int i = 0; i < indexes.size(); i++)
+                    std::cout << " " << indexes[i];
+                std::cout << "\n";
+                break;
+            }
+            
+            case SpvOpCompositeConstruct: {
+                uint32_t type = nextu();
+                uint32_t resultId = nextu();
+                auto constituentIds = restv();
+                ip->currentFunction->code.push_back(InsnCompositeConstruct{type, resultId, constituentIds});
+                std::cout << "CompositeConstruct"
+                    << " type " << type
+                    << " resultId " << resultId;
+                std::cout << " constituentIds"; 
+                for(int i = 0; i < constituentIds.size(); i++)
+                    std::cout << " " << constituentIds[i];
+                std::cout << "\n";
+                break;
+            }
+            
+            case SpvOpCompositeExtract: {
+                uint32_t type = nextu();
+                uint32_t resultId = nextu();
+                uint32_t compositeId = nextu();
+                auto indexes = restv();
+                ip->currentFunction->code.push_back(InsnCompositeExtract{type, resultId, compositeId, indexes});
+                std::cout << "CompositeExtract"
+                    << " type " << type
+                    << " resultId " << resultId
+                    << " compositeId " << compositeId;
+                std::cout << " indexes"; 
+                for(int i = 0; i < indexes.size(); i++)
+                    std::cout << " " << indexes[i];
+                std::cout << "\n";
+                break;
+            }
+            
+            case SpvOpConvertSToF: {
+                uint32_t type = nextu();
+                uint32_t resultId = nextu();
+                uint32_t sourceId = nextu();
+                ip->currentFunction->code.push_back(InsnConvertSToF{type, resultId, sourceId});
+                std::cout << "ConvertSToF"
+                    << " type " << type
+                    << " resultId " << resultId
+                    << " sourceId " << sourceId
+                    << "\n";
+                break;
+            }
 
+            case SpvOpFDiv: {
+                uint32_t type = nextu();
+                uint32_t resultId = nextu();
+                uint32_t operand1Id = nextu();
+                uint32_t operand2Id = nextu();
+                ip->currentFunction->code.push_back(InsnFDiv{type, resultId, operand1Id, operand2Id});
+                std::cout << "FDiv"
+                    << " type " << type
+                    << " resultId " << resultId
+                    << " operand2Id " << operand2Id
+                    << "\n";
+                break;
+            }
+
+            case SpvOpFunctionCall: {
+                uint32_t type = nextu();
+                uint32_t resultId = nextu();
+                uint32_t functionId = nextu();
+                auto argumentIds = restv();
+                ip->currentFunction->code.push_back(InsnFunctionCall{type, resultId, functionId, argumentIds});
+                std::cout << "FunctionCall"
+                    << " type " << type
+                    << " resultId " << resultId
+                    << " functionId " << functionId;
+                std::cout << " argumentIds"; 
+                for(int i = 0; i < argumentIds.size(); i++)
+                    std::cout << " " << argumentIds[i];
+                std::cout << "\n";
+                break;
+            }
+            
             default: {
                 if(ip->throwOnUnimplemented) {
                     throw std::runtime_error("unimplemented opcode " + OpcodeToString[insn->opcode] + " (" + std::to_string(insn->opcode) + ")");
