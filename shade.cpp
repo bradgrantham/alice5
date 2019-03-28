@@ -1506,6 +1506,16 @@ const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
 
+struct Address
+{
+    Function *function;
+    uint32_t address;
+};
+
+// helper type for visitor
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
 struct Interpreter 
 {
     bool throwOnUnimplemented;
@@ -1532,6 +1542,7 @@ struct Interpreter
     std::map<uint32_t, Function> functions;
     Function* currentFunction;
     std::map<uint32_t, Label> labels;
+    Function* mainFunction; 
 
     Interpreter(bool throwOnUnimplemented_, bool verbose_) :
         throwOnUnimplemented(throwOnUnimplemented_),
@@ -1555,9 +1566,28 @@ struct Interpreter
         auto opds = insn->operands;
 
         int which = 0;
-        auto nextu = [insn, opds, &which]() { return insn->words[opds[which++].offset]; };
-        auto nexts = [insn, opds, &which]() { const char *s = reinterpret_cast<const char *>(&insn->words[opds[which].offset]); which++; return s; };
-        auto nextv = [insn, opds, &which]() { std::vector<uint32_t> v(&insn->words[opds[which].offset], &insn->words[opds[which].offset] + opds[which].num_words); which++; return v; };
+
+        auto nextu = [insn, opds, &which](uint32_t deflt = 0xFFFFFFFF) {
+            return (which < insn->num_operands) ? insn->words[opds[which++].offset] : deflt;
+        };
+
+        auto nexts = [insn, opds, &which]() {
+            const char *s = reinterpret_cast<const char *>(&insn->words[opds[which].offset]);
+            which++;
+            return s;
+        };
+
+        auto nextv = [insn, opds, &which]() {
+            std::vector<uint32_t> v;
+            if(which < insn->num_operands) {
+                v = std::vector<uint32_t> {&insn->words[opds[which].offset], &insn->words[opds[which].offset] + opds[which].num_words};
+            } else {
+                v = {};
+            }
+            which++;
+            return v;
+        };
+
         auto restv = [insn, opds, &which]() {
             std::vector<uint32_t> v;
             while(which < insn->num_operands) {
@@ -1621,16 +1651,8 @@ struct Interpreter
             case SpvOpExecutionMode: {
                 uint32_t entryPointId = nextu();
                 uint32_t executionMode = nextu();
-
-                if(insn->num_operands > 2) {
-
-                    std::vector<uint32_t> operands = nextv();
-                    ip->entryPoints[entryPointId].executionModesToOperands[executionMode] = operands;
-
-                } else {
-
-                    ip->entryPoints[entryPointId].executionModesToOperands[executionMode] = {};
-                }
+                std::vector<uint32_t> operands = nextv();
+                ip->entryPoints[entryPointId].executionModesToOperands[executionMode] = operands;
 
                 if(ip->verbose) {
                     std::cout << "OpExecutionMode " << entryPointId << " " << executionMode;
@@ -1665,7 +1687,7 @@ struct Interpreter
             case SpvOpSource: {
                 uint32_t language = nextu();
                 uint32_t version = nextu();
-                uint32_t file = (insn->num_operands > 2) ? nextu(): SOURCE_NO_FILE;
+                uint32_t file = nextu(SOURCE_NO_FILE);
                 std::string source = (insn->num_operands > 3) ? nexts() : "";
                 ip->sources.push_back({language, version, file, source});
                 if(ip->verbose) {
@@ -1697,17 +1719,8 @@ struct Interpreter
             case SpvOpDecorate: {
                 uint32_t id = nextu();
                 uint32_t decoration = nextu();
-
-                if(insn->num_operands > 2) {
-
-                    std::vector<uint32_t> operands = nextv();
-                    ip->decorations[id] = {decoration, operands};
-
-                } else {
-
-                    ip->decorations[id] = {decoration, {}};
-                }
-
+                std::vector<uint32_t> operands = nextv();
+                ip->decorations[id] = {decoration, operands};
                 if(ip->verbose) {
                     std::cout << "OpDecorate " << id << " " << decoration;
                     for(auto& i: ip->decorations[id].operands)
@@ -1721,17 +1734,8 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t member = nextu();
                 uint32_t decoration = nextu();
-
-                if(insn->num_operands > 2) {
-
-                    std::vector<uint32_t> operands = nextv();
-                    ip->memberDecorations[id][member] = {decoration, operands};
-
-                } else {
-
-                    ip->memberDecorations[id][member] = {decoration, {}};
-                }
-
+                std::vector<uint32_t> operands = nextv();
+                ip->memberDecorations[id][member] = {decoration, operands};
                 if(ip->verbose) {
                     std::cout << "OpMemberDecorate " << id << " " << member << " " << decoration;
                     for(auto& i: ip->memberDecorations[id][member].operands)
@@ -1780,10 +1784,7 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = nextu();
                 uint32_t returnType = nextu();
-                std::vector<uint32_t> params;
-                if(insn->num_operands > 2) {
-                    params = restv();
-                }
+                std::vector<uint32_t> params = restv();
                 ip->types[id] = TypeFunction {returnType, params};
                 if(ip->verbose) {
                     std::cout << "TypeFunction " << id << " returning " << returnType;
@@ -1843,7 +1844,7 @@ struct Interpreter
                 uint32_t type = nextu();
                 uint32_t id = nextu();
                 uint32_t storageClass = nextu();
-                uint32_t initializer = (insn->num_operands > 3) ? nextu() : NO_INITIALIZER;
+                uint32_t initializer = nextu(NO_INITIALIZER);
                 ip->variables[id] = {type, storageClass, initializer};
                 if(ip->verbose) {
                     std::cout << "Variable " << id << " type " << type << " storageClass " << storageClass;
@@ -1886,7 +1887,7 @@ struct Interpreter
                 uint32_t ms = nextu();
                 uint32_t sampled = nextu();
                 uint32_t imageFormat = nextu();
-                uint32_t accessQualifier = (insn->num_operands > 8) ? nextu() : NO_ACCESS_QUALIFIER;
+                uint32_t accessQualifier = nextu(NO_ACCESS_QUALIFIER);
                 ip->types[id] = TypeImage { sampledType, dim, depth, arrayed, ms, sampled, imageFormat, accessQualifier };
                 std::cout << "TypeImage " << id
                     << " sampledType " << sampledType
@@ -1953,7 +1954,7 @@ struct Interpreter
                 uint32_t type = nextu();
                 uint32_t id = nextu();
                 uint32_t pointer = nextu();
-                uint32_t memoryAccess = (insn->num_operands > 3) ? nextu() : NO_MEMORY_ACCESS_SEMANTIC;
+                uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
                 ip->currentFunction->code.push_back(InsnLoad{type, id, pointer, memoryAccess});
                 std::cout << "Load"
                     << " type " << type
@@ -1968,7 +1969,7 @@ struct Interpreter
             case SpvOpStore: {
                 uint32_t pointer = nextu();
                 uint32_t object = nextu();
-                uint32_t memoryAccess = (insn->num_operands > 3) ? nextu() : NO_MEMORY_ACCESS_SEMANTIC;
+                uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
                 ip->currentFunction->code.push_back(InsnStore{pointer, object, memoryAccess});
                 std::cout << "Store"
                     << " pointer " << pointer
@@ -2084,6 +2085,76 @@ struct Interpreter
 
         return SPV_SUCCESS;
     }
+
+    void prepare()
+    {
+        mainFunction = nullptr;
+        for(auto& e: entryPoints) {
+            if(e.second.name == "main") {
+                mainFunction = &functions[e.first];
+            }
+        }
+        /* run main */
+    }
+
+    Address pc;
+    std::vector<Address> callstack;
+
+    void stepLoad(const InsnLoad& insn)
+    {
+    }
+
+    void stepStore(const InsnStore& insn)
+    {
+    }
+
+    void stepCompositeExtract(const InsnCompositeExtract& insn)
+    {
+    }
+
+    void stepCompositeConstruct(const InsnCompositeConstruct& insn)
+    {
+    }
+
+    void stepFDiv(const InsnFDiv& insn)
+    {
+    }
+
+    void stepConvertSToF(const InsnConvertSToF& insn)
+    {
+    }
+
+    void stepAccessChain(const InsnAccessChain& insn)
+    {
+    }
+
+    void stepFunctionCall(const InsnFunctionCall& insn)
+    {
+    }
+
+    bool step()
+    {
+        Instruction insn = pc.function->code[pc.address++];
+        bool executionDone;
+        std::visit(overloaded {
+            [&](const InsnReturn& insn) { if(callstack.size() == 0) { executionDone = true; } else { pc = callstack.back(); callstack.pop_back(); } } ,
+            [&](const InsnLoad& insn) { stepLoad(insn); },
+            [&](const InsnStore& insn) { stepStore(insn); },
+            [&](const InsnAccessChain& insn) { stepAccessChain(insn); },
+            [&](const InsnCompositeConstruct& insn) { stepCompositeConstruct(insn); },
+            [&](const InsnCompositeExtract& insn) { stepCompositeExtract(insn); },
+            [&](const InsnConvertSToF& insn) { stepConvertSToF(insn); },
+            [&](const InsnFDiv& insn) { stepFDiv(insn); },
+            [&](const InsnFunctionCall& insn) { stepFunctionCall(insn); },
+        }, insn);
+        return executionDone;
+    }
+
+    void run()
+    {
+        pc = { mainFunction, 0 };
+        while(step());
+    }
 };
 
 void eval(Interpreter& ip, float u, float v, fvec4& color)
@@ -2094,6 +2165,9 @@ void eval(Interpreter& ip, float u, float v, fvec4& color)
         color[2] = 0.5f;
         color[3] = 1.0f;
     } else {
+        /* set pipeline vars */
+        ip.run();
+        /* get fragcolor */
     }
 }
 
@@ -2244,6 +2318,8 @@ int main(int argc, char **argv)
     spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
     spvBinaryParse(context, &ip, spirv.data(), spirv.size(), Interpreter::handleHeader, Interpreter::handleInstruction, nullptr);
 
+    ip.prepare();
+    /* set uniforms */
     for(int y = 0; y < imageHeight; y++)
         for(int x = 0; x < imageWidth; x++) {
             fvec4 color;
