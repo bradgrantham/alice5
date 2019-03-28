@@ -1395,6 +1395,12 @@ struct TypePointer
 
 typedef std::variant<TypeVoid, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct> Type;
 
+struct Constant
+{
+    uint32_t type;
+    uint32_t value;
+};
+
 typedef std::array<float,4> vec4f;
 typedef std::array<uint32_t,4> vec4u;
 typedef std::array<int32_t,4> vec4i;
@@ -1424,6 +1430,7 @@ struct Interpreter
     std::map<uint32_t, std::map<uint32_t, Decoration> > memberDecorations;
     std::map<uint32_t, Type> types;
     std::map<uint32_t, Variable> variables;
+    std::map<uint32_t, Constant> constants;
 
     Interpreter(bool throwOnUnimplemented_, bool verbose_) :
         throwOnUnimplemented(throwOnUnimplemented_),
@@ -1738,6 +1745,17 @@ struct Interpreter
                         std::cout << " initializer " << initializer;
                     std::cout << "\n";
                 }
+                break;
+            }
+
+            case SpvOpConstant: {
+                // XXX result id
+                uint32_t typeId = insn->words[opds[0].offset];
+                uint32_t id = insn->words[opds[1].offset];
+                assert(opds[2].num_words == 1); // XXX limit to 32 bits for now
+                uint32_t value = insn->words[opds[2].offset];
+                ip->constants[id] = { typeId, value };
+                std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
                 break;
             }
 
