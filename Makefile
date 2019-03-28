@@ -14,7 +14,7 @@ LDFLAGS         :=      $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLA
 default: shade
 
 simple.spv: simple.frag
-	(cat preamble.frag simple.frag) | $(GLSLANG_BINARY_DIR)/glslangValidator -H -V100 -d -o simple.spv --stdin -S frag
+	cat preamble.frag simple.frag epilogue.frag | $(GLSLANG_BINARY_DIR)/glslangValidator -H -V100 -d -o simple.spv --stdin -S frag
 
 .PHONY: clean
 clean:
