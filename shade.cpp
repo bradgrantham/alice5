@@ -1418,6 +1418,28 @@ struct Constant
     uint32_t value;
 };
 
+struct FunctionParameter
+{
+    uint32_t type;
+    uint32_t id;
+};
+
+typedef std::variant<uint32_t> Instruction; // XXX TBD
+
+struct Function {
+    uint32_t id;
+    uint32_t resultType;
+    uint32_t functionControl;
+    uint32_t functionType;
+    std::vector<FunctionParameter> parameters;
+    std::vector<Instruction> code;
+};
+
+struct Label {
+    Function *function;
+    size_t instruction;
+};
+
 typedef std::array<float,4> vec4f;
 typedef std::array<uint32_t,4> vec4u;
 typedef std::array<int32_t,4> vec4i;
@@ -1449,10 +1471,14 @@ struct Interpreter
     std::map<uint32_t, Type> types;
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Constant> constants;
+    std::map<uint32_t, Function> functions;
+    Function* currentFunction;
+    std::map<uint32_t, Label> labels;
 
     Interpreter(bool throwOnUnimplemented_, bool verbose_) :
         throwOnUnimplemented(throwOnUnimplemented_),
-        verbose(verbose_)
+        verbose(verbose_),
+        currentFunction(nullptr)
     { }
 
     static spv_result_t handleHeader(void* user_data, spv_endianness_t endian,
@@ -1814,6 +1840,48 @@ struct Interpreter
                     << " imageFormat " << imageFormat
                     << " accessQualifier " << accessQualifier
                     << "\n";
+                break;
+            }
+
+            case SpvOpFunction: {
+                uint32_t resultType = nextu();
+                uint32_t id = nextu();
+                uint32_t functionControl = nextu();
+                uint32_t functionType = nextu();
+                ip->functions[id] = Function {id, resultType, functionControl, functionType };
+                ip->currentFunction = &ip->functions[id];
+                std::cout << "Function " << id
+                    << " resultType " << resultType
+                    << " functionControl " << functionControl
+                    << " functionType " << functionType
+                    << "\n";
+                break;
+            }
+
+            case SpvOpFunctionParameter: {
+                assert(ip->currentFunction != nullptr);
+                uint32_t type = nextu();
+                uint32_t id = nextu();
+                ip->currentFunction->parameters.push_back({type, id});
+                std::cout << "FunctionParameter " << id
+                    << " type " << type
+                    << "\n";
+                break;
+            }
+
+            case SpvOpLabel: {
+                uint32_t id = nextu();
+                ip->labels[id] = {ip->currentFunction, ip->currentFunction->code.size()};
+                std::cout << "Label " << id
+                    << " is Function " << ip->labels[id].function->id
+                    << " at " << ip->labels[id].instruction
+                    << "\n";
+                break;
+            }
+
+            case SpvOpFunctionEnd: {
+                ip->currentFunction = NULL;
+                std::cout << "FunctionEnd\n";
                 break;
             }
 
