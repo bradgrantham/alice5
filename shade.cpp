@@ -1470,10 +1470,22 @@ struct Interpreter
 
         auto opds = insn->operands;
 
+        int which = 0;
+        auto nextu = [insn, opds, &which]() { return insn->words[opds[which++].offset]; };
+        auto nexts = [insn, opds, &which]() { const char *s = reinterpret_cast<const char *>(&insn->words[opds[which].offset]); which++; return s; };
+        auto nextv = [insn, opds, &which]() { std::vector<uint32_t> v(&insn->words[opds[which].offset], &insn->words[opds[which].offset] + opds[which].num_words); which++; return v; };
+        auto restv = [insn, opds, &which]() {
+            std::vector<uint32_t> v;
+            while(which < insn->num_operands) {
+                v.push_back(insn->words[opds[which++].offset]);
+            }
+            return v;
+        };
+
         switch(insn->opcode) {
 
             case SpvOpCapability: {
-                uint32_t cap = insn->words[opds[0].offset];
+                uint32_t cap = nextu();
                 assert(cap == SpvCapabilityShader);
                 ip->capabilities.insert(cap);
                 if(ip->verbose) {
@@ -1484,8 +1496,8 @@ struct Interpreter
 
             case SpvOpExtInstImport: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                const char *name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
+                uint32_t id = nextu();
+                const char *name = nexts();
                 assert(strcmp(name, "GLSL.std.450") == 0);
                 ip->extInstSets[id] = name;
                 if(ip->verbose) {
@@ -1495,8 +1507,8 @@ struct Interpreter
             }
 
             case SpvOpMemoryModel: {
-                ip->addressingModel = insn->words[opds[0].offset];
-                ip->memoryModel = insn->words[opds[1].offset];
+                ip->addressingModel = nextu();
+                ip->memoryModel = nextu();
                 assert(ip->addressingModel == SpvAddressingModelLogical);
                 assert(ip->memoryModel == SpvMemoryModelGLSL450);
                 if(ip->verbose) {
@@ -1507,11 +1519,10 @@ struct Interpreter
 
             case SpvOpEntryPoint: {
                 // XXX not result id but id must eventually be Function result id
-                uint32_t executionModel = insn->words[opds[0].offset];
-                uint32_t id = insn->words[opds[1].offset];
-                std::string name = reinterpret_cast<const char *>(&insn->words[opds[2].offset]);
-                const uint32_t *ids = &insn->words[opds[3].offset];
-                std::vector<uint32_t> interfaceIds(ids, ids + opds[3].num_words);
+                uint32_t executionModel = nextu();
+                uint32_t id = nextu();
+                std::string name = nexts();
+                std::vector<uint32_t> interfaceIds = nextv();
                 assert(executionModel == SpvExecutionModelFragment);
                 ip->entryPoints[id] = {executionModel, name, interfaceIds};
                 if(ip->verbose) {
@@ -1524,13 +1535,12 @@ struct Interpreter
             }
 
             case SpvOpExecutionMode: {
-                uint32_t entryPointId = insn->words[opds[0].offset];
-                uint32_t executionMode = insn->words[opds[1].offset];
+                uint32_t entryPointId = nextu();
+                uint32_t executionMode = nextu();
 
                 if(insn->num_operands > 2) {
 
-                    const uint32_t *ops = &insn->words[opds[2].offset];
-                    std::vector<uint32_t> operands(ops, ops + opds[2].num_words);
+                    std::vector<uint32_t> operands = nextv();
                     ip->entryPoints[entryPointId].executionModesToOperands[executionMode] = operands;
 
                 } else {
@@ -1549,8 +1559,8 @@ struct Interpreter
 
             case SpvOpString: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                std::string name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
+                uint32_t id = nextu();
+                std::string name = nexts();
                 ip->strings[id] = name;
                 if(ip->verbose) {
                     std::cout << "OpString " << id << " " << name << "\n";
@@ -1559,8 +1569,8 @@ struct Interpreter
             }
 
             case SpvOpName: {
-                uint32_t id = insn->words[opds[0].offset];
-                std::string name = reinterpret_cast<const char *>(&insn->words[opds[1].offset]);
+                uint32_t id = nextu();
+                std::string name = nexts();
                 ip->names[id] = name;
                 if(ip->verbose) {
                     std::cout << "OpName " << id << " " << name << "\n";
@@ -1569,10 +1579,10 @@ struct Interpreter
             }
 
             case SpvOpSource: {
-                uint32_t language = insn->words[opds[0].offset];
-                uint32_t version = insn->words[opds[1].offset];
-                uint32_t file = (insn->num_operands > 2) ? insn->words[opds[2].offset] : SOURCE_NO_FILE;
-                std::string source = (insn->num_operands > 3) ? reinterpret_cast<const char *>(&insn->words[opds[3].offset]) : "";
+                uint32_t language = nextu();
+                uint32_t version = nextu();
+                uint32_t file = (insn->num_operands > 2) ? nextu(): SOURCE_NO_FILE;
+                std::string source = (insn->num_operands > 3) ? nexts() : "";
                 ip->sources.push_back({language, version, file, source});
                 if(ip->verbose) {
                     std::cout << "OpSource " << language << " " << version << " " << file << " " << ((source.size() > 0) ? "with source" : "without source") << "\n";
@@ -1581,9 +1591,9 @@ struct Interpreter
             }
 
             case SpvOpMemberName: {
-                uint32_t type = insn->words[opds[0].offset];
-                uint32_t member = insn->words[opds[1].offset];
-                std::string name = reinterpret_cast<const char *>(&insn->words[opds[2].offset]);
+                uint32_t type = nextu();
+                uint32_t member = nextu();
+                std::string name = nexts();
                 ip->memberNames[type][member] = name;
                 if(ip->verbose) {
                     std::cout << "OpMemberName " << type << " " << member << " " << name << "\n";
@@ -1592,7 +1602,7 @@ struct Interpreter
             }
 
             case SpvOpModuleProcessed: {
-                std::string process = reinterpret_cast<const char *>(&insn->words[opds[0].offset]);
+                std::string process = nexts();
                 ip->processes.push_back(process);
                 if(ip->verbose) {
                     std::cout << "OpModulesProcessed " << process << "\n";
@@ -1601,13 +1611,12 @@ struct Interpreter
             }
 
             case SpvOpDecorate: {
-                uint32_t id = insn->words[opds[0].offset];
-                uint32_t decoration = insn->words[opds[1].offset];
+                uint32_t id = nextu();
+                uint32_t decoration = nextu();
 
                 if(insn->num_operands > 2) {
 
-                    const uint32_t *ops = &insn->words[opds[2].offset];
-                    std::vector<uint32_t> operands(ops, ops + opds[2].num_words);
+                    std::vector<uint32_t> operands = nextv();
                     ip->decorations[id] = {decoration, operands};
 
                 } else {
@@ -1625,14 +1634,13 @@ struct Interpreter
             }
 
             case SpvOpMemberDecorate: {
-                uint32_t id = insn->words[opds[0].offset];
-                uint32_t member = insn->words[opds[1].offset];
-                uint32_t decoration = insn->words[opds[2].offset];
+                uint32_t id = nextu();
+                uint32_t member = nextu();
+                uint32_t decoration = nextu();
 
                 if(insn->num_operands > 2) {
 
-                    const uint32_t *ops = &insn->words[opds[3].offset];
-                    std::vector<uint32_t> operands(ops, ops + opds[3].num_words);
+                    std::vector<uint32_t> operands = nextv();
                     ip->memberDecorations[id][member] = {decoration, operands};
 
                 } else {
@@ -1651,9 +1659,8 @@ struct Interpreter
 
             case SpvOpTypeVoid: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                TypeVoid t;
-                ip->types[id] = t;
+                uint32_t id = nextu();
+                ip->types[id] = TypeVoid {};
                 if(ip->verbose) {
                     std::cout << "TypeVoid " << id << "\n";
                 }
@@ -1662,8 +1669,8 @@ struct Interpreter
 
             case SpvOpTypeFloat: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                uint32_t width = insn->words[opds[1].offset];
+                uint32_t id = nextu();
+                uint32_t width = nextu();
                 assert(width <= 32); // XXX deal with larger later
                 ip->types[id] = TypeFloat {width};
                 if(ip->verbose) {
@@ -1674,9 +1681,9 @@ struct Interpreter
 
             case SpvOpTypeInt: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                uint32_t width = insn->words[opds[1].offset];
-                uint32_t signedness = insn->words[opds[2].offset];
+                uint32_t id = nextu();
+                uint32_t width = nextu();
+                uint32_t signedness = nextu();
                 assert(width <= 32); // XXX deal with larger later
                 ip->types[id] = TypeInt {width, signedness};
                 if(ip->verbose) {
@@ -1687,12 +1694,11 @@ struct Interpreter
 
             case SpvOpTypeFunction: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                uint32_t returnType = insn->words[opds[1].offset];
+                uint32_t id = nextu();
+                uint32_t returnType = nextu();
                 std::vector<uint32_t> params;
                 if(insn->num_operands > 2) {
-                    for(int i = 0; i < opds[2].num_words; i++)
-                        params.push_back(insn->words[opds[2].offset + i]);
+                    params = restv();
                 }
                 ip->types[id] = TypeFunction {returnType, params};
                 if(ip->verbose) {
@@ -1709,9 +1715,9 @@ struct Interpreter
 
             case SpvOpTypeVector: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                uint32_t type = insn->words[opds[1].offset];
-                uint32_t count = insn->words[opds[2].offset];
+                uint32_t id = nextu();
+                uint32_t type = nextu();
+                uint32_t count = nextu();
                 ip->types[id] = TypeVector {type, count};
                 if(ip->verbose) {
                     std::cout << "TypeVector " << id << " of " << type << " count " << count << "\n";
@@ -1721,9 +1727,9 @@ struct Interpreter
 
             case SpvOpTypePointer: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                uint32_t storageClass = insn->words[opds[1].offset];
-                uint32_t type = insn->words[opds[2].offset];
+                uint32_t id = nextu();
+                uint32_t storageClass = nextu();
+                uint32_t type = nextu();
                 ip->types[id] = TypePointer {storageClass, type};
                 if(ip->verbose) {
                     std::cout << "TypePointer " << id << " class " << storageClass << " type " << type << "\n";
@@ -1733,14 +1739,12 @@ struct Interpreter
 
             case SpvOpTypeStruct: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                std::vector<uint32_t> memberTypes;
-                for(int i = 1; i < insn->num_operands; i++)
-                    memberTypes.push_back(insn->words[opds[i].offset]);
+                uint32_t id = nextu();
+                std::vector<uint32_t> memberTypes = restv();
                 ip->types[id] = TypeStruct {memberTypes};
                 if(ip->verbose) {
                     std::cout << "TypeStruct " << id;
-                    if(memberTypes.size() > 1) {
+                    if(memberTypes.size() > 0) {
                         std::cout << " members"; 
                         for(int i = 0; i < memberTypes.size(); i++)
                             std::cout << " " << memberTypes[i];
@@ -1752,10 +1756,10 @@ struct Interpreter
 
             case SpvOpVariable: {
                 // XXX result id
-                uint32_t type = insn->words[opds[0].offset];
-                uint32_t id = insn->words[opds[1].offset];
-                uint32_t storageClass = insn->words[opds[2].offset];
-                uint32_t initializer = (insn->num_operands > 3) ? insn->words[opds[3].offset] : NO_INITIALIZER;
+                uint32_t type = nextu();
+                uint32_t id = nextu();
+                uint32_t storageClass = nextu();
+                uint32_t initializer = (insn->num_operands > 3) ? nextu() : NO_INITIALIZER;
                 ip->variables[id] = {type, storageClass, initializer};
                 if(ip->verbose) {
                     std::cout << "Variable " << id << " type " << type << " storageClass " << storageClass;
@@ -1768,10 +1772,10 @@ struct Interpreter
 
             case SpvOpConstant: {
                 // XXX result id
-                uint32_t typeId = insn->words[opds[0].offset];
-                uint32_t id = insn->words[opds[1].offset];
+                uint32_t typeId = nextu();
+                uint32_t id = nextu();
                 assert(opds[2].num_words == 1); // XXX limit to 32 bits for now
-                uint32_t value = insn->words[opds[2].offset];
+                uint32_t value = nextu();
                 ip->constants[id] = { typeId, value };
                 std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
                 break;
@@ -1779,8 +1783,8 @@ struct Interpreter
 
             case SpvOpTypeSampledImage: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                uint32_t imageType = insn->words[opds[1].offset];
+                uint32_t id = nextu();
+                uint32_t imageType = nextu();
                 ip->types[id] = TypeSampledImage { imageType };
                 std::cout << "TypeSampledImage " << id
                     << " imageType " << imageType
@@ -1790,15 +1794,15 @@ struct Interpreter
 
             case SpvOpTypeImage: {
                 // XXX result id
-                uint32_t id = insn->words[opds[0].offset];
-                uint32_t sampledType = insn->words[opds[1].offset];
-                uint32_t dim = insn->words[opds[2].offset];
-                uint32_t depth = insn->words[opds[3].offset];
-                uint32_t arrayed = insn->words[opds[4].offset];
-                uint32_t ms = insn->words[opds[5].offset];
-                uint32_t sampled = insn->words[opds[6].offset];
-                uint32_t imageFormat = insn->words[opds[7].offset];
-                uint32_t accessQualifier = (insn->num_operands > 8) ? insn->words[opds[8].offset] : NO_ACCESS_QUALIFIER;
+                uint32_t id = nextu();
+                uint32_t sampledType = nextu();
+                uint32_t dim = nextu();
+                uint32_t depth = nextu();
+                uint32_t arrayed = nextu();
+                uint32_t ms = nextu();
+                uint32_t sampled = nextu();
+                uint32_t imageFormat = nextu();
+                uint32_t accessQualifier = (insn->num_operands > 8) ? nextu() : NO_ACCESS_QUALIFIER;
                 ip->types[id] = TypeImage { sampledType, dim, depth, arrayed, ms, sampled, imageFormat, accessQualifier };
                 std::cout << "TypeImage " << id
                     << " sampledType " << sampledType
