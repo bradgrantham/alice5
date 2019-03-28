@@ -1424,7 +1424,22 @@ struct FunctionParameter
     uint32_t id;
 };
 
-typedef std::variant<uint32_t> Instruction; // XXX TBD
+struct InsnLoad {
+    uint32_t type;
+    uint32_t id;
+    uint32_t pointer;
+    uint32_t memoryAccess;
+};
+
+struct InsnStore {
+    uint32_t pointer;
+    uint32_t object;
+    uint32_t memoryAccess;
+};
+
+const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
+
+typedef std::variant<InsnLoad, InsnStore> Instruction;
 
 struct Function {
     uint32_t id;
@@ -1882,6 +1897,36 @@ struct Interpreter
             case SpvOpFunctionEnd: {
                 ip->currentFunction = NULL;
                 std::cout << "FunctionEnd\n";
+                break;
+            }
+
+            case SpvOpLoad: {
+                uint32_t type = nextu();
+                uint32_t id = nextu();
+                uint32_t pointer = nextu();
+                uint32_t memoryAccess = (insn->num_operands > 3) ? nextu() : NO_MEMORY_ACCESS_SEMANTIC;
+                ip->currentFunction->code.push_back(InsnLoad{type, id, pointer, memoryAccess});
+                std::cout << "Load "
+                    << " type " << type
+                    << " id " << id
+                    << " pointer " << pointer;
+                if(memoryAccess != NO_MEMORY_ACCESS_SEMANTIC)
+                    std::cout << " type " << memoryAccess;
+                std::cout << "\n";
+                break;
+            }
+
+            case SpvOpStore: {
+                uint32_t pointer = nextu();
+                uint32_t object = nextu();
+                uint32_t memoryAccess = (insn->num_operands > 3) ? nextu() : NO_MEMORY_ACCESS_SEMANTIC;
+                ip->currentFunction->code.push_back(InsnStore{pointer, object, memoryAccess});
+                std::cout << "Store "
+                    << " pointer " << pointer
+                    << " object " << object;
+                if(memoryAccess != NO_MEMORY_ACCESS_SEMANTIC)
+                    std::cout << " type " << memoryAccess;
+                std::cout << "\n";
                 break;
             }
 
