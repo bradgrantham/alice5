@@ -1393,7 +1393,24 @@ struct TypePointer
     uint32_t type;
 };
 
-typedef std::variant<TypeVoid, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct> Type;
+struct TypeImage
+{
+    uint32_t sampledType;
+    uint32_t dim;
+    uint32_t depth;
+    uint32_t arrayed;
+    uint32_t ms;
+    uint32_t sampled;
+    uint32_t imageFormat;
+    uint32_t accessQualifier;
+};
+
+struct TypeSampledImage
+{
+    uint32_t imageType;
+};
+
+typedef std::variant<TypeVoid, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
 
 struct Constant
 {
@@ -1407,6 +1424,7 @@ typedef std::array<int32_t,4> vec4i;
 
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
+const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
 
 struct Interpreter 
 {
@@ -1756,6 +1774,42 @@ struct Interpreter
                 uint32_t value = insn->words[opds[2].offset];
                 ip->constants[id] = { typeId, value };
                 std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
+                break;
+            }
+
+            case SpvOpTypeSampledImage: {
+                // XXX result id
+                uint32_t id = insn->words[opds[0].offset];
+                uint32_t imageType = insn->words[opds[1].offset];
+                ip->types[id] = TypeSampledImage { imageType };
+                std::cout << "TypeSampledImage " << id
+                    << " imageType " << imageType
+                    << "\n";
+                break;
+            }
+
+            case SpvOpTypeImage: {
+                // XXX result id
+                uint32_t id = insn->words[opds[0].offset];
+                uint32_t sampledType = insn->words[opds[1].offset];
+                uint32_t dim = insn->words[opds[2].offset];
+                uint32_t depth = insn->words[opds[3].offset];
+                uint32_t arrayed = insn->words[opds[4].offset];
+                uint32_t ms = insn->words[opds[5].offset];
+                uint32_t sampled = insn->words[opds[6].offset];
+                uint32_t imageFormat = insn->words[opds[7].offset];
+                uint32_t accessQualifier = (insn->num_operands > 8) ? insn->words[opds[8].offset] : NO_ACCESS_QUALIFIER;
+                ip->types[id] = TypeImage { sampledType, dim, depth, arrayed, ms, sampled, imageFormat, accessQualifier };
+                std::cout << "TypeImage " << id
+                    << " sampledType " << sampledType
+                    << " dim " << dim
+                    << " depth " << depth
+                    << " arrayed " << arrayed
+                    << " ms " << ms
+                    << " sampled " << sampled
+                    << " imageFormat " << imageFormat
+                    << " accessQualifier " << accessQualifier
+                    << "\n";
                 break;
             }
 
