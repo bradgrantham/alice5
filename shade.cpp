@@ -1382,13 +1382,22 @@ struct TypeFunction
     std::vector<uint32_t> parameterTypes;
 };
 
+struct TypeStruct
+{
+    std::vector<uint32_t> memberTypes;
+};
+
 struct TypePointer
 {
     uint32_t storageClass;
     uint32_t type;
 };
 
-typedef std::variant<TypeVoid, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt> Type;
+typedef std::variant<TypeVoid, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct> Type;
+
+typedef std::array<float,4> vec4f;
+typedef std::array<uint32_t,4> vec4u;
+typedef std::array<int32_t,4> vec4i;
 
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
@@ -1630,6 +1639,7 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = insn->words[opds[0].offset];
                 uint32_t width = insn->words[opds[1].offset];
+                assert(width <= 32); // XXX deal with larger later
                 ip->types[id] = TypeFloat {width};
                 if(ip->verbose) {
                     std::cout << "TypeFloat " << id << " " << width << "\n";
@@ -1642,6 +1652,7 @@ struct Interpreter
                 uint32_t id = insn->words[opds[0].offset];
                 uint32_t width = insn->words[opds[1].offset];
                 uint32_t signedness = insn->words[opds[2].offset];
+                assert(width <= 32); // XXX deal with larger later
                 ip->types[id] = TypeInt {width, signedness};
                 if(ip->verbose) {
                     std::cout << "TypeInt " << id << " width " << width << " signedness " << signedness << "\n";
@@ -1691,6 +1702,25 @@ struct Interpreter
                 ip->types[id] = TypePointer {storageClass, type};
                 if(ip->verbose) {
                     std::cout << "TypePointer " << id << " class " << storageClass << " type " << type << "\n";
+                }
+                break;
+            }
+
+            case SpvOpTypeStruct: {
+                // XXX result id
+                uint32_t id = insn->words[opds[0].offset];
+                std::vector<uint32_t> memberTypes;
+                for(int i = 1; i < insn->num_operands; i++)
+                    memberTypes.push_back(insn->words[opds[i].offset]);
+                ip->types[id] = TypeStruct {memberTypes};
+                if(ip->verbose) {
+                    std::cout << "TypeStruct " << id;
+                    if(memberTypes.size() > 1) {
+                        std::cout << " members"; 
+                        for(int i = 0; i < memberTypes.size(); i++)
+                            std::cout << " " << memberTypes[i];
+                    }
+                    std::cout << "\n";
                 }
                 break;
             }
