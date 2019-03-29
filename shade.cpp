@@ -1332,6 +1332,13 @@ struct Variable
     size_t offset;
 };
 
+struct Pointer
+{
+    uint32_t type;
+    uint32_t storageClass;
+    size_t offset;
+};
+
 struct EntryPoint
 {
     uint32_t executionModel;
@@ -1497,23 +1504,12 @@ struct Function {
     uint32_t functionControl;
     uint32_t functionType;
     std::vector<FunctionParameter> parameters;
-    std::vector<Instruction> code;
-};
-
-struct Label {
-    Function *function;
-    size_t instruction;
+    size_t start;
 };
 
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
-
-struct InstructionAddress
-{
-    Function *function;
-    uint32_t address;
-};
 
 struct MemoryRegion
 {
@@ -1559,12 +1555,14 @@ struct Interpreter
     std::map<uint32_t, Type> types;
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
+    std::map<uint32_t, Pointer> pointers;
     std::map<uint32_t, size_t> intermediates;
     std::map<uint32_t, Constant> constants;
     std::map<uint32_t, Function> functions;
+    std::vector<Instruction> code;
 
     Function* currentFunction;
-    std::map<uint32_t, Label> labels;
+    std::map<uint32_t, uint32_t> labels;
     Function* mainFunction; 
 
     std::map<uint32_t, MemoryRegion> memoryRegions;
@@ -1623,6 +1621,72 @@ struct Interpreter
     void copy(uint32_t type, size_t src, size_t dst)
     {
         std::copy(memory + src, memory + src + typeSizes[type], memory + dst);
+    }
+
+    template <class T>
+    T& objectInClassAt(SpvStorageClass clss, size_t offset)
+    {
+        return *reinterpret_cast<T*>(memory + memoryRegions[clss].base + offset);
+    }
+
+    template <class T>
+    T& objectAt(size_t offset)
+    {
+        return *reinterpret_cast<T*>(memory + offset);
+    }
+
+    uint32_t getConstituentType(uint32_t t, int i)
+    {
+        const Type& type = types[t];
+        if(std::holds_alternative<TypeVector>(type)) {
+            return std::get<TypeVector>(type).type;
+        } else if (std::holds_alternative<TypeStruct>(type)) {
+            return std::get<TypeStruct>(type).memberTypes[i];
+        // XXX } else if (std::holds_alternative<TypeArray>(type)) {
+        } else {
+            assert(false && "getConstituentType of invalid type?!");
+        }
+        return 0; // not reached
+    }
+
+
+    void dumpTypeAt(const Type& type, size_t offset)
+    {
+        std::visit(overloaded {
+            [&](const TypeVoid& type) { std::cout << "{}"; },
+            [&](const TypeFloat& type) { std::cout << objectAt<float>(offset); },
+            [&](const TypeInt& type) {
+                if(type.signedness) {
+                    std::cout << objectAt<int32_t>(offset);
+                } else {
+                    std::cout << objectAt<uint32_t>(offset);
+                }
+            },
+            [&](const TypePointer& type) { std::cout << "(ptr)" << objectAt<uint32_t>(offset); },
+            [&](const TypeFunction& type) { std::cout << "function"; },
+            [&](const TypeImage& type) { std::cout << "image"; },
+            [&](const TypeSampledImage& type) { std::cout << "sampledimage"; },
+            [&](const TypeVector& type) {
+                std::cout << "<";
+                for(int i = 0; i < type.count; i++) {
+                    dumpTypeAt(types[type.type], offset);
+                    offset += typeSizes[type.type];
+                    if(i < type.count - 1)
+                        std::cout << ", ";
+                }
+                std::cout << ">";
+            },
+            [&](const TypeStruct& type) {
+                std::cout << "{";
+                for(int i = 0; i < type.memberTypes.size(); i++) {
+                    dumpTypeAt(types[type.memberTypes[i]], offset);
+                    offset += typeSizes[type.memberTypes[i]];
+                    if(i < type.memberTypes.size() - 1)
+                        std::cout << ", ";
+                }
+                std::cout << "}";
+            },
+        }, type);
     }
 
     static spv_result_t handleHeader(void* user_data, spv_endianness_t endian,
@@ -1994,7 +2058,7 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t functionControl = nextu();
                 uint32_t functionType = nextu();
-                ip->functions[id] = Function {id, resultType, functionControl, functionType };
+                ip->functions[id] = Function {id, resultType, functionControl, functionType, {}, ip->code.size() };
                 ip->currentFunction = &ip->functions[id];
                 std::cout << "Function " << id
                     << " resultType " << resultType
@@ -2017,10 +2081,9 @@ struct Interpreter
 
             case SpvOpLabel: {
                 uint32_t id = nextu();
-                ip->labels[id] = {ip->currentFunction, ip->currentFunction->code.size()};
+                ip->labels[id] = ip->code.size();
                 std::cout << "Label " << id
-                    << " is Function " << ip->labels[id].function->id
-                    << " at " << ip->labels[id].instruction
+                    << " at " << ip->labels[id]
                     << "\n";
                 break;
             }
@@ -2032,7 +2095,7 @@ struct Interpreter
             }
 
             case SpvOpReturn: {
-                ip->currentFunction->code.push_back(InsnReturn{});
+                ip->code.push_back(InsnReturn{});
                 std::cout << "Return\n";
                 break;
             }
@@ -2042,7 +2105,7 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t pointer = nextu();
                 uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
-                ip->currentFunction->code.push_back(InsnLoad{type, id, pointer, memoryAccess});
+                ip->code.push_back(InsnLoad{type, id, pointer, memoryAccess});
                 std::cout << "Load"
                     << " type " << type
                     << " id " << id
@@ -2057,7 +2120,7 @@ struct Interpreter
                 uint32_t pointer = nextu();
                 uint32_t object = nextu();
                 uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
-                ip->currentFunction->code.push_back(InsnStore{pointer, object, memoryAccess});
+                ip->code.push_back(InsnStore{pointer, object, memoryAccess});
                 std::cout << "Store"
                     << " pointer " << pointer
                     << " object " << object;
@@ -2072,7 +2135,7 @@ struct Interpreter
                 uint32_t resultId = nextu();
                 uint32_t basePointerId = nextu();
                 auto indexes = restv();
-                ip->currentFunction->code.push_back(InsnAccessChain{type, resultId, basePointerId, indexes});
+                ip->code.push_back(InsnAccessChain{type, resultId, basePointerId, indexes});
                 std::cout << "AccessChain"
                     << " type " << type
                     << " resultId " << resultId
@@ -2088,7 +2151,7 @@ struct Interpreter
                 uint32_t type = nextu();
                 uint32_t resultId = nextu();
                 auto constituentIds = restv();
-                ip->currentFunction->code.push_back(InsnCompositeConstruct{type, resultId, constituentIds});
+                ip->code.push_back(InsnCompositeConstruct{type, resultId, constituentIds});
                 std::cout << "CompositeConstruct"
                     << " type " << type
                     << " resultId " << resultId;
@@ -2104,7 +2167,7 @@ struct Interpreter
                 uint32_t resultId = nextu();
                 uint32_t compositeId = nextu();
                 auto indexes = restv();
-                ip->currentFunction->code.push_back(InsnCompositeExtract{type, resultId, compositeId, indexes});
+                ip->code.push_back(InsnCompositeExtract{type, resultId, compositeId, indexes});
                 std::cout << "CompositeExtract"
                     << " type " << type
                     << " resultId " << resultId
@@ -2120,7 +2183,7 @@ struct Interpreter
                 uint32_t type = nextu();
                 uint32_t resultId = nextu();
                 uint32_t sourceId = nextu();
-                ip->currentFunction->code.push_back(InsnConvertSToF{type, resultId, sourceId});
+                ip->code.push_back(InsnConvertSToF{type, resultId, sourceId});
                 std::cout << "ConvertSToF"
                     << " type " << type
                     << " resultId " << resultId
@@ -2134,7 +2197,7 @@ struct Interpreter
                 uint32_t resultId = nextu();
                 uint32_t operand1Id = nextu();
                 uint32_t operand2Id = nextu();
-                ip->currentFunction->code.push_back(InsnFDiv{type, resultId, operand1Id, operand2Id});
+                ip->code.push_back(InsnFDiv{type, resultId, operand1Id, operand2Id});
                 std::cout << "FDiv"
                     << " type " << type
                     << " resultId " << resultId
@@ -2148,7 +2211,7 @@ struct Interpreter
                 uint32_t resultId = nextu();
                 uint32_t functionId = nextu();
                 auto argumentIds = restv();
-                ip->currentFunction->code.push_back(InsnFunctionCall{type, resultId, functionId, argumentIds});
+                ip->code.push_back(InsnFunctionCall{type, resultId, functionId, argumentIds});
                 std::cout << "FunctionCall"
                     << " type " << type
                     << " resultId " << resultId
@@ -2183,20 +2246,25 @@ struct Interpreter
         }
     }
 
-    InstructionAddress pc;
-    std::vector<InstructionAddress> callstack;
+    size_t pc;
+    std::vector<size_t> callstack;
 
     void stepLoad(const InsnLoad& insn)
     {
-        Variable& var = variables[insn.pointerId];
+        Pointer& ptr = pointers[insn.pointerId];
         intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
-        copy(insn.type, variables[insn.pointerId].offset, intermediates[insn.resultId]);
+        copy(insn.type, ptr.offset, intermediates[insn.resultId]);
+        if(true) {
+            std::cout << "load result is";
+            dumpTypeAt(types[insn.type], intermediates[insn.resultId]);
+            std::cout << "\n";
+        }
     }
 
     void stepStore(const InsnStore& insn)
     {
-        Variable& var = variables[insn.pointerId];
-        copy(variables[insn.pointerId].type, intermediates[insn.objectId], variables[insn.pointerId].offset);
+        Pointer& ptr = pointers[insn.pointerId];
+        copy(ptr.type, intermediates[insn.objectId], ptr.offset);
     }
 
     void stepCompositeExtract(const InsnCompositeExtract& insn)
@@ -2220,16 +2288,16 @@ struct Interpreter
 
             if constexpr (std::is_same_v<T, TypeFloat>) {
 
-                float dividend = objectAt<float>(SpvStorageClassPrivate, intermediates[insn.operand1Id]);
-                float divisor = objectAt<float>(SpvStorageClassPrivate, intermediates[insn.operand1Id]);
+                float dividend = objectAt<float>(intermediates[insn.operand1Id]);
+                float divisor = objectAt<float>(intermediates[insn.operand1Id]);
                 float quotient = dividend / divisor;
-                objectAt<float>(SpvStorageClassPrivate, intermediates[insn.resultId]) = quotient;
+                objectAt<float>(intermediates[insn.resultId]) = quotient;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-                float* dividend = &objectAt<float>(SpvStorageClassPrivate, intermediates[insn.operand1Id]);
-                float* divisor = &objectAt<float>(SpvStorageClassPrivate, intermediates[insn.operand1Id]);
-                float* result = &objectAt<float>(SpvStorageClassPrivate, intermediates[insn.resultId]);
+                float* dividend = &objectAt<float>(intermediates[insn.operand1Id]);
+                float* divisor = &objectAt<float>(intermediates[insn.operand1Id]);
+                float* result = &objectAt<float>(intermediates[insn.resultId]);
                 for(int i = 0; i < type.count; i++) {
                     result[i] = dividend[i] / divisor[i];
                 }
@@ -2247,25 +2315,73 @@ struct Interpreter
 
     void stepAccessChain(const InsnAccessChain& insn)
     {
-        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
-        /* walk from base through children */
+        Pointer& basePointer = pointers[insn.basePointerId];
+        uint32_t type = basePointer.type;
+        size_t offset = basePointer.offset;
+        for(auto& j: insn.indexes) {
+            for(int i = 0; i < j - 1; i++)
+                offset += typeSizes[getConstituentType(type, i)];
+            type = getConstituentType(type, j);
+        }
+        if(true) {
+            std::cout << "accesschain of " << basePointer.offset << " yielded " << offset << "\n";
+        }
+        pointers[insn.resultId] = { type, basePointer.storageClass, offset };
     }
 
     void stepFunctionCall(const InsnFunctionCall& insn)
     {
+#if 0
+// struct TypeFunction
+// {
+    // uint32_t returnType;
+    // std::vector<uint32_t> parameterTypes;
+// };
+// struct InsnFunctionCall {
+    // uint32_t type;
+    // uint32_t resultId;
+    // uint32_t functionId;
+    // std::vector<uint32_t> argumentIds;
+// };
+// struct FunctionParameter
+// {
+    // uint32_t type;
+    // uint32_t id;
+// };
+// struct Function {
+    // uint32_t id;
+    // uint32_t resultType;
+    // uint32_t functionControl;
+    // uint32_t functionType;
+    // std::vector<FunctionParameter> parameters;
+    // std::vector<Instruction> code;
+// };
         intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
-        /* copy call parameters to function parameter inputs */
-        /* push current pc on callstack */
-        /* set pc to new function and 0 */
+
+        const Function& function = functions[functionId];
+
+        for(int i = 0; i < function.parameters.size(); i++) {
+            const FunctionParameter& param = function.parameters[i];
+            assert(std::holds_alternative<TypePointer>(types[param.type]));
+            uint32_t src = insn.argumentIds[i];
+            Pointer& ptr = pointers[param.id];
+            copy(ptr.type, intermediates[src], ptr.offset);
+        }
+        callstack.push_back(/* return pc, result id, parameters */
+        pc = function->start;
+#endif
     }
 
     bool step()
     {
-        std::cout << "address " << pc.address << "\n";
-        Instruction insn = pc.function->code[pc.address++];
+        std::cout << "address " << pc << "\n";
         bool executionDone = false;
+
+        Instruction insn = code[pc++];
+
         std::visit(overloaded {
-            [&](const InsnReturn& insn) { if(callstack.size() == 0) { executionDone = true; } else { pc = callstack.back(); callstack.pop_back(); } } ,
+            [&](const InsnReturn& insn) { if(callstack.size() == 0) { executionDone = true; } else { /* pop parameters */ pc = callstack.back(); callstack.pop_back(); } } ,
+            // [&](const InsnReturnValue& insn) { if(callstack.size() == 0) { executionDone = true; } else { /* pop parameters */ /* copy result to callstack.back().second */ pc = callstack.back().first; callstack.pop_back(); } } ,
             [&](const InsnLoad& insn) { stepLoad(insn); },
             [&](const InsnStore& insn) { stepStore(insn); },
             [&](const InsnAccessChain& insn) { stepAccessChain(insn); },
@@ -2279,21 +2395,15 @@ struct Interpreter
     }
 
     template <class T>
-    T& objectAt(SpvStorageClass clss, size_t offset)
-    {
-        return *reinterpret_cast<T*>(memory + memoryRegions[clss].base + offset);
-    }
-
-    template <class T>
     void set(SpvStorageClass clss, size_t offset, const T& v)
     {
-        objectAt<T>(clss, offset) = v;
+        objectInClassAt<T>(clss, offset) = v;
     }
 
     template <class T>
     void get(SpvStorageClass clss, size_t offset, T& v)
     {
-        v = objectAt<T>(clss, offset);
+        v = objectInClassAt<T>(clss, offset);
     }
 
     void run()
@@ -2301,17 +2411,21 @@ struct Interpreter
         // init Function variables with initializers before each invocation
         // XXX also need to initialize within function calls?
         for(auto v: variables) {
+            const Variable& var = v.second;
+            pointers[v.first] = { var.type, var.storageClass, var.offset };
             if(v.second.storageClass == SpvStorageClassFunction) {
                 assert(v.second.initializer == NO_INITIALIZER); // XXX will do initializers later
             }
         }
 
         size_t oldTop = memoryRegions[SpvStorageClassPrivate].top;
-        pc = { mainFunction, 0 };
+        pc = mainFunction->start;
 
         while(step());
 
         memoryRegions[SpvStorageClassPrivate].top = oldTop;
+
+        pointers.clear();
     }
 };
 
