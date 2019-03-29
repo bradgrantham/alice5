@@ -1324,6 +1324,7 @@ struct Variable
     uint32_t type;
     uint32_t storageClass;
     uint32_t initializer;
+    size_t offset;
 };
 
 struct EntryPoint
@@ -1513,60 +1514,6 @@ struct InstructionAddress
     uint32_t address;
 };
 
-struct Object 
-{
-    Type type;
-    size_t size;
-    unsigned char *storage;
-    Object() :
-        type(TypeVoid { }),
-        size(0),
-        storage(nullptr)
-    {}
-    Object(const Type& type_, size_t size_) :
-        type(type_),
-        size(size_),
-        storage(new unsigned char[size])
-    {}
-    Object(Object&& other)
-    {
-        type = other.type;
-        size = other.size;
-        storage = other.storage;
-        other.type = TypeVoid { } ;
-        other.size = 0;
-        other.storage = nullptr;
-    }
-    Object& operator=(Object&& other)
-    {
-        if(this != &other) {
-            delete[] storage;
-
-            type = other.type;
-            size = other.size;
-            storage = other.storage;
-
-            other.type = TypeVoid { };
-            other.size = 0;
-            other.storage = nullptr;
-        }
-        return *this;
-    }
-
-    Object &copyContents(const Object& src)
-    {
-        // assert(type == src.type);
-        assert(size == src.size);
-        std::copy(src.storage, src.storage + size, storage);
-        return *this;
-    }
-    virtual ~Object()
-    {
-        delete[] storage;
-    }
-    uint32_t getAsPointer() const { return *reinterpret_cast<const uint32_t*>(storage); } 
-};
-
 // helper type for visitor
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
@@ -1592,25 +1539,37 @@ struct Interpreter
     std::map<uint32_t, std::map<uint32_t, std::string> > memberNames;
     std::map<uint32_t, std::map<uint32_t, Decoration> > memberDecorations;
     std::map<uint32_t, Type> types;
-    std::map<uint32_t, size_t> typeSizes;
+    std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
+    std::map<uint32_t, size_t> intermediates;
     std::map<uint32_t, Constant> constants;
     std::map<uint32_t, Function> functions;
     Function* currentFunction;
     std::map<uint32_t, Label> labels;
     Function* mainFunction; 
 
-    std::map<uint32_t, Object> uniformconstants;
-    std::map<uint32_t, Object> uniforms;
-    std::map<uint32_t, Object> inputs;
-    std::map<uint32_t, Object> outputs;
-    std::map<uint32_t, Object> locals;
-    std::map<uint32_t, Object> temps;
+    unsigned char memory[65536];
+    size_t memoryTop;
+
+    size_t allocate(uint32_t type)
+    {
+        assert(memoryTop + typeSizes[type] <= sizeof(memory));
+        size_t offset = memoryTop;
+        memoryTop += typeSizes[type];
+        return offset;
+    }
+
+    void copy(uint32_t type, size_t src, size_t dst)
+    {
+        std::copy(memory + src, memory + src + typeSizes[type], memory + dst);
+    }
+
 
     Interpreter(bool throwOnUnimplemented_, bool verbose_) :
         throwOnUnimplemented(throwOnUnimplemented_),
         verbose(verbose_),
-        currentFunction(nullptr)
+        currentFunction(nullptr),
+        memoryTop(0)
     { }
 
     static spv_result_t handleHeader(void* user_data, spv_endianness_t endian,
@@ -1919,7 +1878,8 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t storageClass = nextu();
                 uint32_t initializer = nextu(NO_INITIALIZER);
-                ip->variables[id] = {type, storageClass, initializer};
+                size_t offset = ip->allocate(type);
+                ip->variables[id] = {type, storageClass, initializer, offset};
                 if(ip->verbose) {
                     std::cout << "Variable " << id << " type " << type << " storageClass " << storageClass;
                     if(initializer != NO_INITIALIZER)
@@ -2173,100 +2133,69 @@ struct Interpreter
     InstructionAddress pc;
     std::vector<InstructionAddress> callstack;
 
-    void loadThroughPointer(const Object& ptr, Object& obj)
-    {
-        const TypePointer& t = std::get<TypePointer>(ptr.type);
-        switch (t.storageClass) {
-            case SpvStorageClassUniformConstant:
-                obj.copyContents(uniformconstants[ptr.getAsPointer()]);
-                break;
-            case SpvStorageClassInput:
-                obj.copyContents(inputs[ptr.getAsPointer()]);
-                break;
-            case SpvStorageClassUniform:
-                obj.copyContents(uniforms[ptr.getAsPointer()]);
-                break;
-            case SpvStorageClassOutput:
-                obj.copyContents(outputs[ptr.getAsPointer()]);
-                break;
-            case SpvStorageClassFunction:
-                obj.copyContents(locals[ptr.getAsPointer()]);
-                break;
-            case SpvStorageClassImage:
-                // XXX ?? 
-                assert(false && "dereferenced pointer to storage class Image");
-                break;
-        }
-    }
-
-    void storeThroughPointer(const Object& obj, Object& ptr)
-    {
-        const TypePointer& t = std::get<TypePointer>(ptr.type);
-        switch (t.storageClass) {
-            case SpvStorageClassUniformConstant:
-                uniformconstants[ptr.getAsPointer()].copyContents(obj);
-                break;
-            case SpvStorageClassInput:
-                inputs[ptr.getAsPointer()].copyContents(obj);
-                break;
-            case SpvStorageClassUniform:
-                uniforms[ptr.getAsPointer()].copyContents(obj);
-                break;
-            case SpvStorageClassOutput:
-                outputs[ptr.getAsPointer()].copyContents(obj);
-                break;
-            case SpvStorageClassFunction:
-                locals[ptr.getAsPointer()].copyContents(obj);
-                assert(false && "stored through pointer to storage class Function");
-                break;
-            case SpvStorageClassImage:
-                // XXX ?? 
-                assert(false && "stored through pointer to storage class Image");
-                break;
-        }
-    }
-
     void stepLoad(const InsnLoad& insn)
     {
         Variable& var = variables[insn.pointerId];
-        temps.emplace(insn.resultId, Object { types[insn.type], typeSizes[insn.resultId] } );
-        loadThroughPointer(temps[insn.pointerId], temps[insn.resultId]);
+        intermediates[insn.resultId] = allocate(insn.type);
+        copy(insn.type, variables[insn.pointerId].offset, intermediates[insn.resultId]);
     }
 
     void stepStore(const InsnStore& insn)
     {
-        storeThroughPointer(temps[insn.objectId], locals[insn.pointerId]);
+        Variable& var = variables[insn.pointerId];
+        copy(variables[insn.pointerId].type, intermediates[insn.objectId], variables[insn.pointerId].offset);
     }
 
     void stepCompositeExtract(const InsnCompositeExtract& insn)
     {
-        /* use constituents to walk blob */
+        intermediates[insn.resultId] = allocate(insn.type);
+        /* use indexes to walk blob */
     }
 
     void stepCompositeConstruct(const InsnCompositeConstruct& insn)
     {
+        intermediates[insn.resultId] = allocate(insn.type);
         /* use constituents to walk blob */
     }
 
     void stepFDiv(const InsnFDiv& insn)
     {
+#if 0
+        intermediates[insn.resultId] = allocate(insn.type);
+        float* op1 = reinterpret_cast<float*>(memory + intermediates[insn.operand1Id]);
+        float* op2 = reinterpret_cast<float*>(memory + intermediates[insn.operand2Id]);
+        std::visit(overloaded {
+            [&](const TypeFloat& type) { if(callstack.size() == 0) { executionDone = true; } else { pc = callstack.back(); callstack.pop_back(); } } ,
+            [&](const InsnLoad& insn) { stepLoad(insn); },
+            [&](const InsnStore& insn) { stepStore(insn); },
+            [&](const InsnAccessChain& insn) { stepAccessChain(insn); },
+            [&](const InsnCompositeConstruct& insn) { stepCompositeConstruct(insn); },
+            [&](const InsnCompositeExtract& insn) { stepCompositeExtract(insn); },
+            [&](const InsnConvertSToF& insn) { stepConvertSToF(insn); },
+            [&](const InsnFDiv& insn) { stepFDiv(insn); },
+            [&](const InsnFunctionCall& insn) { stepFunctionCall(insn); },
+        }, types[insn.type]);
+#endif
         /* can assume scalar or vector */
         /* divide op1 by op2, store in result */
     }
 
     void stepConvertSToF(const InsnConvertSToF& insn)
     {
+        intermediates[insn.resultId] = allocate(insn.type);
         /* can assume scalar or vector of float */
         /* convert signed int to float */
     }
 
     void stepAccessChain(const InsnAccessChain& insn)
     {
+        intermediates[insn.resultId] = allocate(insn.type);
         /* walk from base through children */
     }
 
     void stepFunctionCall(const InsnFunctionCall& insn)
     {
+        intermediates[insn.resultId] = allocate(insn.type);
         /* copy call parameters to function parameter inputs */
         /* push current pc on callstack */
         /* set pc to new function and 0 */
@@ -2293,16 +2222,19 @@ struct Interpreter
 
     void run()
     {
-        temps.clear();
-        locals.clear();
         for(auto v: variables) {
             if(v.second.storageClass == SpvStorageClassFunction) {
-                locals.emplace(v.first, Object {types[v.second.type], v.second.storageClass});
                 assert(v.second.initializer == NO_INITIALIZER); // XXX will do initializers later
             }
         }
+
+        size_t oldTop = memoryTop;
+
         pc = { mainFunction, 0 };
+
         while(step());
+
+        memoryTop = oldTop;
     }
 };
 
