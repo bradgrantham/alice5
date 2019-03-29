@@ -15,13 +15,18 @@ const int imageWidth = 256;
 const int imageHeight = 256;
 unsigned char imageBuffer[imageHeight][imageWidth][3];
 
-struct fvec4
-{
-    float v[4];
-    float& operator[](int b) {
-        return v[b];
-    }
-};
+typedef std::array<float,1> v1float;
+typedef std::array<uint32_t,1> v1uint;
+typedef std::array<int32_t,1> v1int;
+typedef std::array<float,2> v2float;
+typedef std::array<uint32_t,2> v2uint;
+typedef std::array<int32_t,2> v2int;
+typedef std::array<float,3> v3float;
+typedef std::array<uint32_t,3> v3uint;
+typedef std::array<int32_t,3> v3int;
+typedef std::array<float,4> v4float;
+typedef std::array<uint32_t,4> v4uint;
+typedef std::array<int32_t,4> v4int;
 
 std::map<uint32_t, std::string> OpcodeToString = {
     {0, "Nop"},
@@ -1500,10 +1505,6 @@ struct Label {
     size_t instruction;
 };
 
-typedef std::array<float,4> vec4f;
-typedef std::array<uint32_t,4> vec4u;
-typedef std::array<int32_t,4> vec4i;
-
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
@@ -1512,6 +1513,23 @@ struct InstructionAddress
 {
     Function *function;
     uint32_t address;
+};
+
+struct MemoryRegion
+{
+    size_t base;
+    size_t size;
+    size_t top;
+    MemoryRegion() :
+        base(0),
+        size(0),
+        top(0)
+    {}
+    MemoryRegion(size_t base_, size_t size_) :
+        base(base_),
+        size(size_),
+        top(base_)
+    {}
 };
 
 // helper type for visitor
@@ -1544,33 +1562,68 @@ struct Interpreter
     std::map<uint32_t, size_t> intermediates;
     std::map<uint32_t, Constant> constants;
     std::map<uint32_t, Function> functions;
+
     Function* currentFunction;
     std::map<uint32_t, Label> labels;
     Function* mainFunction; 
 
-    unsigned char memory[65536];
-    size_t memoryTop;
+    std::map<uint32_t, MemoryRegion> memoryRegions;
+    unsigned char *memory;
 
-    size_t allocate(uint32_t type)
+    Interpreter(bool throwOnUnimplemented_, bool verbose_) :
+        throwOnUnimplemented(throwOnUnimplemented_),
+        verbose(verbose_),
+        currentFunction(nullptr)
     {
-        assert(memoryTop + typeSizes[type] <= sizeof(memory));
-        size_t offset = memoryTop;
-        memoryTop += typeSizes[type];
+        size_t base = 0;
+        auto anotherRegion = [&base](size_t size){MemoryRegion r(base, size); base += size; return r;};
+        memoryRegions[SpvStorageClassUniformConstant] = anotherRegion(1024);
+        memoryRegions[SpvStorageClassInput] = anotherRegion(1024);
+        memoryRegions[SpvStorageClassUniform] = anotherRegion(1024);
+        memoryRegions[SpvStorageClassOutput] = anotherRegion(1024);
+        memoryRegions[SpvStorageClassWorkgroup] = anotherRegion(0);
+        memoryRegions[SpvStorageClassCrossWorkgroup] = anotherRegion(0);
+            // I'll put intermediates in "Private" storage:
+        memoryRegions[SpvStorageClassPrivate] = anotherRegion(65536);
+        memoryRegions[SpvStorageClassFunction] = anotherRegion(16384);
+        memoryRegions[SpvStorageClassGeneric] = anotherRegion(0);
+        memoryRegions[SpvStorageClassPushConstant] = anotherRegion(0);
+        memoryRegions[SpvStorageClassAtomicCounter] = anotherRegion(0);
+        memoryRegions[SpvStorageClassImage] = anotherRegion(0);
+        memoryRegions[SpvStorageClassStorageBuffer] = anotherRegion(0);
+        for(auto& r: memoryRegions) {
+            std::cout << "region for class " << r.first << " at " << r.second.base << " size " << r.second.size << " top " << r.second.top << "\n";
+        }
+        memory = new unsigned char[base];
+    }
+
+    ~Interpreter()
+    {
+        delete[] memory;
+    }
+
+    size_t allocate(SpvStorageClass clss, uint32_t type)
+    {
+        MemoryRegion& reg = memoryRegions[clss];
+        if(false) {
+            std::cout << "allocate from " << clss << " type " << type << "\n";
+            std::cout << "region at " << reg.base << " size " << reg.size << " top " << reg.top << "\n";
+            std::cout << "object is size " << typeSizes[type] << "\n";
+        }
+        assert(reg.top + typeSizes[type] <= reg.base + reg.size);
+        size_t offset = reg.top;
+        reg.top += typeSizes[type];
         return offset;
+    }
+    size_t allocate(uint32_t clss, uint32_t type)
+    {
+        return allocate(static_cast<SpvStorageClass>(clss), type);
     }
 
     void copy(uint32_t type, size_t src, size_t dst)
     {
         std::copy(memory + src, memory + src + typeSizes[type], memory + dst);
     }
-
-
-    Interpreter(bool throwOnUnimplemented_, bool verbose_) :
-        throwOnUnimplemented(throwOnUnimplemented_),
-        verbose(verbose_),
-        currentFunction(nullptr),
-        memoryTop(0)
-    { }
 
     static spv_result_t handleHeader(void* user_data, spv_endianness_t endian,
                                uint32_t /* magic */, uint32_t version,
@@ -1784,7 +1837,7 @@ struct Interpreter
                 uint32_t width = nextu();
                 assert(width <= 32); // XXX deal with larger later
                 ip->types[id] = TypeFloat {width};
-                ip->typeSizes[id] = (((width + 31) / 32) * 32) * 4;
+                ip->typeSizes[id] = ((width + 31) / 32) * 4;
                 if(ip->verbose) {
                     std::cout << "TypeFloat " << id << " " << width << "\n";
                 }
@@ -1798,7 +1851,7 @@ struct Interpreter
                 uint32_t signedness = nextu();
                 assert(width <= 32); // XXX deal with larger later
                 ip->types[id] = TypeInt {width, signedness};
-                ip->typeSizes[id] = (((width + 31) / 32) * 32) * 4;
+                ip->typeSizes[id] = ((width + 31) / 32) * 4;
                 if(ip->verbose) {
                     std::cout << "TypeInt " << id << " width " << width << " signedness " << signedness << "\n";
                 }
@@ -1878,7 +1931,7 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t storageClass = nextu();
                 uint32_t initializer = nextu(NO_INITIALIZER);
-                size_t offset = ip->allocate(type);
+                size_t offset = ip->allocate(storageClass, type);
                 ip->variables[id] = {type, storageClass, initializer, offset};
                 if(ip->verbose) {
                     std::cout << "Variable " << id << " type " << type << " storageClass " << storageClass;
@@ -2136,7 +2189,7 @@ struct Interpreter
     void stepLoad(const InsnLoad& insn)
     {
         Variable& var = variables[insn.pointerId];
-        intermediates[insn.resultId] = allocate(insn.type);
+        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
         copy(insn.type, variables[insn.pointerId].offset, intermediates[insn.resultId]);
     }
 
@@ -2148,54 +2201,59 @@ struct Interpreter
 
     void stepCompositeExtract(const InsnCompositeExtract& insn)
     {
-        intermediates[insn.resultId] = allocate(insn.type);
+        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
         /* use indexes to walk blob */
     }
 
     void stepCompositeConstruct(const InsnCompositeConstruct& insn)
     {
-        intermediates[insn.resultId] = allocate(insn.type);
+        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
         /* use constituents to walk blob */
     }
 
     void stepFDiv(const InsnFDiv& insn)
     {
-#if 0
-        intermediates[insn.resultId] = allocate(insn.type);
-        float* op1 = reinterpret_cast<float*>(memory + intermediates[insn.operand1Id]);
-        float* op2 = reinterpret_cast<float*>(memory + intermediates[insn.operand2Id]);
-        std::visit(overloaded {
-            [&](const TypeFloat& type) { if(callstack.size() == 0) { executionDone = true; } else { pc = callstack.back(); callstack.pop_back(); } } ,
-            [&](const InsnLoad& insn) { stepLoad(insn); },
-            [&](const InsnStore& insn) { stepStore(insn); },
-            [&](const InsnAccessChain& insn) { stepAccessChain(insn); },
-            [&](const InsnCompositeConstruct& insn) { stepCompositeConstruct(insn); },
-            [&](const InsnCompositeExtract& insn) { stepCompositeExtract(insn); },
-            [&](const InsnConvertSToF& insn) { stepConvertSToF(insn); },
-            [&](const InsnFDiv& insn) { stepFDiv(insn); },
-            [&](const InsnFunctionCall& insn) { stepFunctionCall(insn); },
+        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float dividend = objectAt<float>(SpvStorageClassPrivate, intermediates[insn.operand1Id]);
+                float divisor = objectAt<float>(SpvStorageClassPrivate, intermediates[insn.operand1Id]);
+                float quotient = dividend / divisor;
+                objectAt<float>(SpvStorageClassPrivate, intermediates[insn.resultId]) = quotient;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* dividend = &objectAt<float>(SpvStorageClassPrivate, intermediates[insn.operand1Id]);
+                float* divisor = &objectAt<float>(SpvStorageClassPrivate, intermediates[insn.operand1Id]);
+                float* result = &objectAt<float>(SpvStorageClassPrivate, intermediates[insn.resultId]);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = dividend[i] / divisor[i];
+                }
+
+            }
         }, types[insn.type]);
-#endif
-        /* can assume scalar or vector */
-        /* divide op1 by op2, store in result */
     }
 
     void stepConvertSToF(const InsnConvertSToF& insn)
     {
-        intermediates[insn.resultId] = allocate(insn.type);
+        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
         /* can assume scalar or vector of float */
         /* convert signed int to float */
     }
 
     void stepAccessChain(const InsnAccessChain& insn)
     {
-        intermediates[insn.resultId] = allocate(insn.type);
+        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
         /* walk from base through children */
     }
 
     void stepFunctionCall(const InsnFunctionCall& insn)
     {
-        intermediates[insn.resultId] = allocate(insn.type);
+        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
         /* copy call parameters to function parameter inputs */
         /* push current pc on callstack */
         /* set pc to new function and 0 */
@@ -2220,35 +2278,54 @@ struct Interpreter
         return !executionDone;
     }
 
+    template <class T>
+    T& objectAt(SpvStorageClass clss, size_t offset)
+    {
+        return *reinterpret_cast<T*>(memory + memoryRegions[clss].base + offset);
+    }
+
+    template <class T>
+    void set(SpvStorageClass clss, size_t offset, const T& v)
+    {
+        objectAt<T>(clss, offset) = v;
+    }
+
+    template <class T>
+    void get(SpvStorageClass clss, size_t offset, T& v)
+    {
+        v = objectAt<T>(clss, offset);
+    }
+
     void run()
     {
+        // init Function variables with initializers before each invocation
+        // XXX also need to initialize within function calls?
         for(auto v: variables) {
             if(v.second.storageClass == SpvStorageClassFunction) {
                 assert(v.second.initializer == NO_INITIALIZER); // XXX will do initializers later
             }
         }
 
-        size_t oldTop = memoryTop;
-
+        size_t oldTop = memoryRegions[SpvStorageClassPrivate].top;
         pc = { mainFunction, 0 };
 
         while(step());
 
-        memoryTop = oldTop;
+        memoryRegions[SpvStorageClassPrivate].top = oldTop;
     }
 };
 
-void eval(Interpreter& ip, float u, float v, fvec4& color)
+void eval(Interpreter& ip, float x, float y, v4float& color)
 {
     if(0) {
-        color[0] = u;
-        color[1] = v;
+        color[0] = x / imageWidth;
+        color[1] = y / imageHeight;
         color[2] = 0.5f;
         color[3] = 1.0f;
     } else {
-        /* set pipeline vars */
+        ip.set(SpvStorageClassInput, 0, v2float {x, y}); // fragCoord is in #0 in preamble
         ip.run();
-        /* get fragcolor */
+        ip.get(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
     }
 }
 
@@ -2400,13 +2477,12 @@ int main(int argc, char **argv)
     spvBinaryParse(context, &ip, spirv.data(), spirv.size(), Interpreter::handleHeader, Interpreter::handleInstruction, nullptr);
 
     ip.prepare();
-    /* set uniforms */
+    ip.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight}); // iResolution is uniform @0 in preamble
+    ip.set(SpvStorageClassUniform, 8, 0.0f); // iTime is uniform @8 in preamble
     for(int y = 0; y < imageHeight; y++)
         for(int x = 0; x < imageWidth; x++) {
-            fvec4 color;
-            float u = (x + .5) / imageWidth;
-            float v = (y + .5) / imageHeight;
-            eval(ip, u, v, color);
+            v4float color;
+            eval(ip, x + 0.5f, y + 0.5f, color);
             for(int c = 0; c < 3; c++) {
                 imageBuffer[y][x][c] = color[c] * 255;
             }
