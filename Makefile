@@ -19,3 +19,7 @@ simple.spv: simple.frag
 .PHONY: clean
 clean:
 	if [ -f simple.spv ]; then rm simple.spv; fi
+
+.PHONY: dis
+dis:
+	~/trees/glslang/build/External/spirv-tools/tools/spirv-dis simple.spv | cat
