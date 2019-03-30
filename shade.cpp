@@ -1726,6 +1726,7 @@ struct Interpreter
             return std::get<TypeStruct>(type).memberTypes[i];
         // XXX } else if (std::holds_alternative<TypeArray>(type)) {
         } else {
+            std::cout << type.index() << "\n";
             assert(false && "getConstituentType of invalid type?!");
         }
         return 0; // not reached
@@ -2391,9 +2392,28 @@ struct Interpreter
 
     void stepConvertSToF(const InsnConvertSToF& insn)
     {
+    // uint32_t type;
+    // uint32_t resultId;
+    // uint32_t sourceId;
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
-        /* can assume scalar or vector of float */
-        /* convert signed int to float */
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                int32_t src = registerAs<int32_t>(insn.sourceId);
+                registerAs<float>(insn.resultId) = src;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                int32_t* src = &registerAs<int32_t>(insn.sourceId);
+                float* dst = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    dst[i] = src[i];
+                }
+            }
+        }, types[insn.type]);
     }
 
     void stepAccessChain(const InsnAccessChain& insn)
@@ -2401,15 +2421,18 @@ struct Interpreter
         RegisterPointer& basePointer = std::get<RegisterPointer>(registers[insn.basePointerId]);
         uint32_t type = basePointer.type;
         size_t offset = basePointer.offset;
-        for(auto& j: insn.indexes) {
-            for(int i = 0; i < j - 1; i++)
+        for(auto& id: insn.indexes) {
+            int32_t j = registerAs<int32_t>(id);
+            for(int i = 0; i < j - 1; i++) {
                 offset += typeSizes[getConstituentType(type, i)];
+            }
             type = getConstituentType(type, j);
         }
-        if(true) {
+        if(false) {
             std::cout << "accesschain of " << basePointer.offset << " yielded " << offset << "\n";
         }
-        registers[insn.resultId] = RegisterPointer { type, basePointer.storageClass, offset };
+        uint32_t pointedType = std::get<TypePointer>(types[insn.type]).type;
+        registers[insn.resultId] = RegisterPointer { pointedType, basePointer.storageClass, offset };
     }
 
     void stepFunctionParameter(const InsnFunctionParameter& insn)
@@ -2480,7 +2503,8 @@ struct Interpreter
         // XXX also need to initialize within function calls?
         for(auto v: variables) {
             const Variable& var = v.second;
-            registers[v.first] = RegisterPointer { var.type, var.storageClass, var.offset };
+            uint32_t pointedType = std::get<TypePointer>(types[var.type]).type;
+            registers[v.first] = RegisterPointer { pointedType, var.storageClass, var.offset };
             if(v.second.storageClass == SpvStorageClassFunction) {
                 assert(v.second.initializer == NO_INITIALIZER); // XXX will do initializers later
             }
@@ -2488,9 +2512,9 @@ struct Interpreter
 
         for(auto c: constants) {
             const Constant& constant = c.second;
-            // RegisterObject& r = allocRegisterObject(c.first, constant.type);
-            // const unsigned char *data = reinterpret_cast<const unsigned char*>(&constant.value);
-            // std::copy(data, data + typeSizes[constant.type], r.data);
+            RegisterObject& r = allocRegisterObject(c.first, constant.type);
+            const unsigned char *data = reinterpret_cast<const unsigned char*>(&constant.value);
+            std::copy(data, data + typeSizes[constant.type], r.data);
         }
 
         size_t oldTop = memoryRegions[SpvStorageClassPrivate].top;
