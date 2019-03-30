@@ -1568,6 +1568,15 @@ struct InsnConvertSToF {
     uint32_t sourceId;
 };
 
+struct InsnFMul {
+    uint32_t type;
+
+    // SSA register to write result to.
+    uint32_t resultId;
+    uint32_t operand1Id;
+    uint32_t operand2Id;
+};
+
 struct InsnFDiv {
     uint32_t type;
 
@@ -1597,7 +1606,7 @@ struct InsnReturn {
 
 const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
 
-typedef std::variant<InsnLoad, InsnStore, InsnAccessChain, InsnCompositeConstruct, InsnCompositeExtract, InsnConvertSToF, InsnFDiv, InsnFunctionCall, InsnReturn, InsnFunctionParameter> Instruction;
+typedef std::variant<InsnLoad, InsnStore, InsnAccessChain, InsnCompositeConstruct, InsnCompositeExtract, InsnConvertSToF, InsnFMul, InsnFDiv, InsnFunctionCall, InsnReturn, InsnFunctionParameter> Instruction;
 
 struct Function
 {
@@ -2401,6 +2410,22 @@ struct Interpreter
                 break;
             }
 
+            case SpvOpFMul: {
+                uint32_t type = nextu();
+                uint32_t resultId = nextu();
+                uint32_t operand1Id = nextu();
+                uint32_t operand2Id = nextu();
+                ip->code.push_back(InsnFMul{type, resultId, operand1Id, operand2Id});
+                if(ip->verbose) {
+                    std::cout << "FMul"
+                        << " type " << type
+                        << " resultId " << resultId
+                        << " operand2Id " << operand2Id
+                        << "\n";
+                }
+                break;
+            }
+
             case SpvOpFDiv: {
                 uint32_t type = nextu();
                 uint32_t resultId = nextu();
@@ -2520,6 +2545,33 @@ struct Interpreter
         }
     }
 
+    void stepFMul(const InsnFMul& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                float quotient = operand1 * operand2;
+                registerAs<float>(insn.resultId) = quotient;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] * operand2[i];
+                }
+
+            }
+        }, types[insn.type]);
+    }
+
     void stepFDiv(const InsnFDiv& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
@@ -2631,6 +2683,7 @@ struct Interpreter
             [&](const InsnCompositeConstruct& insn) { stepCompositeConstruct(insn); },
             [&](const InsnCompositeExtract& insn) { stepCompositeExtract(insn); },
             [&](const InsnConvertSToF& insn) { stepConvertSToF(insn); },
+            [&](const InsnFMul& insn) { stepFMul(insn); },
             [&](const InsnFDiv& insn) { stepFDiv(insn); },
             [&](const InsnFunctionParameter& insn) { stepFunctionParameter(insn); },
             [&](const InsnFunctionCall& insn) { stepFunctionCall(insn); },
@@ -2852,7 +2905,11 @@ int main(int argc, char **argv)
             v4float color;
             eval(ip, x + 0.5f, y + 0.5f, color);
             for(int c = 0; c < 3; c++) {
-                imageBuffer[y][x][c] = color[c] * 255;
+                // ShaderToy clamps the color.
+                int byteColor = color[c]*255.99;
+                if (byteColor < 0) byteColor = 0;
+                if (byteColor > 255) byteColor = 255;
+                imageBuffer[imageHeight - 1 - y][x][c] = byteColor;
             }
         }
 
