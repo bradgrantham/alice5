@@ -2335,8 +2335,10 @@ void usage(const char* progname)
     printf("usage: %s [options] shader.frag\n", progname);
     printf("provide \"-\" as a filename to read from stdin\n");
     printf("options:\n");
+    printf("\t-v    Print opcodes as they are parsed\n");
     printf("\t-g    Generate debugging information\n");
     printf("\t-O    Run optimizing passes\n");
+    printf("\t-t    Throw an exception on first unimplemented opcode\n");
 }
 
 int main(int argc, char **argv)
