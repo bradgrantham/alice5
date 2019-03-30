@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <fstream>
 #include <variant>
+#include <chrono>
 
 #include <StandAlone/ResourceLimits.h>
 #include <glslang/MachineIndependent/localintermediate.h>
@@ -2306,6 +2307,8 @@ int main(int argc, char **argv)
     spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
     spvBinaryParse(context, &ip, spirv.data(), spirv.size(), Interpreter::handleHeader, Interpreter::handleInstruction, nullptr);
 
+    auto start_time = std::chrono::steady_clock::now();
+
     ip.prepare();
     ip.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight}); // iResolution is uniform @0 in preamble
     ip.set(SpvStorageClassUniform, 8, 0.0f); // iTime is uniform @8 in preamble
@@ -2321,6 +2324,14 @@ int main(int argc, char **argv)
                 imageBuffer[imageHeight - 1 - y][x][c] = byteColor;
             }
         }
+
+    auto end_time = std::chrono::steady_clock::now();
+    auto elapsed_time = end_time - start_time;
+    auto elapsed_seconds = double(elapsed_time.count())*
+        std::chrono::steady_clock::period::num/
+        std::chrono::steady_clock::period::den;
+    std::cout << "Shading took " << elapsed_seconds << " seconds ("
+        << long(imageWidth*imageHeight/elapsed_seconds) << " pixels per second)\n";
 
     std::ofstream imageFile("shaded.ppm", std::ios::out | std::ios::binary);
     imageFile << "P6 " << imageWidth << " " << imageHeight << " 255\n";
