@@ -1478,6 +1478,12 @@ struct InsnFDiv {
     uint32_t operand2Id; // divisor
 };
 
+struct InsnFunctionParameter
+{
+    uint32_t type;
+    uint32_t resultId;
+};
+
 struct InsnFunctionCall {
     uint32_t type;
     uint32_t resultId;
@@ -1490,7 +1496,7 @@ struct InsnReturn {
 
 const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
 
-typedef std::variant<InsnLoad, InsnStore, InsnAccessChain, InsnCompositeConstruct, InsnCompositeExtract, InsnConvertSToF, InsnFDiv, InsnFunctionCall, InsnReturn> Instruction;
+typedef std::variant<InsnLoad, InsnStore, InsnAccessChain, InsnCompositeConstruct, InsnCompositeExtract, InsnConvertSToF, InsnFDiv, InsnFunctionCall, InsnReturn, InsnFunctionParameter> Instruction;
 
 struct Function
 {
@@ -1498,15 +1504,14 @@ struct Function
     uint32_t resultType;
     uint32_t functionControl;
     uint32_t functionType;
-    std::vector<FunctionParameter> parameters;
-    size_t start;
+    uint32_t start;
 };
 
 struct RegisterPointer
 {
     uint32_t type;
     uint32_t storageClass;
-    size_t offset;
+    size_t offset; // offset into memory, not into Region
 };
 
 struct RegisterObject
@@ -1567,6 +1572,8 @@ typedef std::variant<RegisterPointer, RegisterObject> Register;
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
+const uint32_t EXECUTION_ENDED = 0xFFFFFFFF;
+const uint32_t NO_RETURN_REGISTER = 0xFFFFFFFF;
 
 struct MemoryRegion
 {
@@ -2006,7 +2013,7 @@ struct Interpreter
                 if(ip->verbose) {
                     std::cout << "TypeFunction " << id << " returning " << returnType;
                     if(params.size() > 1) {
-                        std::cout << " with parameters"; 
+                        std::cout << " with parameter types"; 
                         for(int i = 0; i < params.size(); i++)
                             std::cout << " " << params[i];
                     }
@@ -2132,7 +2139,8 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t functionControl = nextu();
                 uint32_t functionType = nextu();
-                ip->functions[id] = Function {id, resultType, functionControl, functionType, {}, ip->code.size() };
+                uint32_t start = ip->code.size();
+                ip->functions[id] = Function {id, resultType, functionControl, functionType, start };
                 ip->currentFunction = &ip->functions[id];
                 std::cout << "Function " << id
                     << " resultType " << resultType
@@ -2146,7 +2154,7 @@ struct Interpreter
                 assert(ip->currentFunction != nullptr);
                 uint32_t type = nextu();
                 uint32_t id = nextu();
-                ip->currentFunction->parameters.push_back({type, id});
+                ip->code.push_back(InsnFunctionParameter{type, id});
                 std::cout << "FunctionParameter " << id
                     << " type " << type
                     << "\n";
@@ -2320,7 +2328,7 @@ struct Interpreter
         }
     }
 
-    size_t pc;
+    uint32_t pc;
     std::vector<size_t> callstack;
 
     void stepLoad(const InsnLoad& insn)
@@ -2390,9 +2398,7 @@ struct Interpreter
 
     void stepAccessChain(const InsnAccessChain& insn)
     {
-#if 0
-        // registers.emplace(insn.resultId, RegisterObject {insn.type, typeSizes[insn.type]})
-        Pointer& basePointer = pointers[insn.basePointerId];
+        RegisterPointer& basePointer = std::get<RegisterPointer>(registers[insn.basePointerId]);
         uint32_t type = basePointer.type;
         size_t offset = basePointer.offset;
         for(auto& j: insn.indexes) {
@@ -2403,63 +2409,46 @@ struct Interpreter
         if(true) {
             std::cout << "accesschain of " << basePointer.offset << " yielded " << offset << "\n";
         }
-        pointers[insn.resultId] = { type, basePointer.storageClass, offset };
-#endif
+        registers[insn.resultId] = RegisterPointer { type, basePointer.storageClass, offset };
+    }
+
+    void stepFunctionParameter(const InsnFunctionParameter& insn)
+    {
+        uint32_t sourceId = callstack.back();  callstack.pop_back();
+        registers[insn.resultId] = registers[sourceId];
+        std::cout << "function parameter " << insn.resultId << " receives " << sourceId << "\n";
+    }
+
+    void stepReturn(const InsnReturn& insn)
+    {
+         callstack.pop_back(); // return parameter not used.
+         pc = callstack.back(); callstack.pop_back();
     }
 
     void stepFunctionCall(const InsnFunctionCall& insn)
     {
-#if 0
-// struct TypeFunction
-// {
-    // uint32_t returnType;
-    // std::vector<uint32_t> parameterTypes;
-// };
-// struct InsnFunctionCall {
-    // uint32_t type;
-    // uint32_t resultId;
-    // uint32_t functionId;
-    // std::vector<uint32_t> argumentIds;
-// };
-// struct FunctionParameter
-// {
-    // uint32_t type;
-    // uint32_t id;
-// };
-// struct Function {
-    // uint32_t id;
-    // uint32_t resultType;
-    // uint32_t functionControl;
-    // uint32_t functionType;
-    // std::vector<FunctionParameter> parameters;
-    // std::vector<Instruction> code;
-// };
-        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
+        const Function& function = functions[insn.functionId];
 
-        const Function& function = functions[functionId];
-
-        for(int i = 0; i < function.parameters.size(); i++) {
-            const FunctionParameter& param = function.parameters[i];
-            assert(std::holds_alternative<TypePointer>(types[param.type]));
-            uint32_t src = insn.argumentIds[i];
-            Pointer& ptr = pointers[param.id];
-            copy(ptr.type, intermediates[src], ptr.offset);
+        callstack.push_back(pc);
+        callstack.push_back(insn.resultId);
+        for(int i = insn.argumentIds.size() - 1; i >= 0; i--) {
+            uint32_t argument = insn.argumentIds[i];
+            assert(std::holds_alternative<RegisterPointer>(registers[argument]));
+            std::cout << "argument " << argument << "\n";
+            callstack.push_back(argument);
         }
-        callstack.push_back(/* return pc, result id, parameters */
-        pc = function->start;
-#endif
+        pc = function.start;
     }
 
-    bool step()
+    void step()
     {
         std::cout << "address " << pc << "\n";
-        bool executionDone = false;
 
         Instruction insn = code[pc++];
 
         std::visit(overloaded {
-            [&](const InsnReturn& insn) { if(callstack.size() == 0) { executionDone = true; } else { /* pop parameters */ pc = callstack.back(); callstack.pop_back(); } } ,
-            // [&](const InsnReturnValue& insn) { if(callstack.size() == 0) { executionDone = true; } else { /* pop parameters */ /* copy result to callstack.back().second */ pc = callstack.back().first; callstack.pop_back(); } } ,
+            [&](const InsnReturn& insn) { stepReturn(insn); },
+            // [&](const InsnReturnValue& insn) { stepReturnValue(insn); },
             [&](const InsnLoad& insn) { stepLoad(insn); },
             [&](const InsnStore& insn) { stepStore(insn); },
             [&](const InsnAccessChain& insn) { stepAccessChain(insn); },
@@ -2467,9 +2456,9 @@ struct Interpreter
             [&](const InsnCompositeExtract& insn) { stepCompositeExtract(insn); },
             [&](const InsnConvertSToF& insn) { stepConvertSToF(insn); },
             [&](const InsnFDiv& insn) { stepFDiv(insn); },
+            [&](const InsnFunctionParameter& insn) { stepFunctionParameter(insn); },
             [&](const InsnFunctionCall& insn) { stepFunctionCall(insn); },
         }, insn);
-        return !executionDone;
     }
 
     template <class T>
@@ -2505,9 +2494,13 @@ struct Interpreter
         }
 
         size_t oldTop = memoryRegions[SpvStorageClassPrivate].top;
+        callstack.push_back(EXECUTION_ENDED); // caller PC
+        callstack.push_back(NO_RETURN_REGISTER); // return register
         pc = mainFunction->start;
 
-        while(step());
+        do {
+            step();
+        } while(pc != EXECUTION_ENDED);
 
         memoryRegions[SpvStorageClassPrivate].top = oldTop;
     }
