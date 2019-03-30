@@ -2859,6 +2859,7 @@ int main(int argc, char **argv)
     std::ofstream imageFile("shaded.ppm", std::ios::out | std::ios::binary);
     imageFile << "P6 " << imageWidth << " " << imageHeight << " 255\n";
     imageFile.write(reinterpret_cast<const char *>(imageBuffer), sizeof(imageBuffer));
+    imageFile.close();
 
     exit(EXIT_SUCCESS);
 }
