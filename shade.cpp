@@ -29,338 +29,7 @@ typedef std::array<uint32_t,4> v4uint;
 typedef std::array<int32_t,4> v4int;
 
 std::map<uint32_t, std::string> OpcodeToString = {
-    {0, "Nop"},
-    {1, "Undef"},
-    {2, "SourceContinued"},
-    {3, "Source"},
-    {4, "SourceExtension"},
-    {5, "Name"},
-    {6, "MemberName"},
-    {7, "String"},
-    {8, "Line"},
-    {10, "Extension"},
-    {11, "ExtInstImport"},
-    {12, "ExtInst"},
-    {14, "MemoryModel"},
-    {15, "EntryPoint"},
-    {16, "ExecutionMode"},
-    {17, "Capability"},
-    {19, "TypeVoid"},
-    {20, "TypeBool"},
-    {21, "TypeInt"},
-    {22, "TypeFloat"},
-    {23, "TypeVector"},
-    {24, "TypeMatrix"},
-    {25, "TypeImage"},
-    {26, "TypeSampler"},
-    {27, "TypeSampledImage"},
-    {28, "TypeArray"},
-    {29, "TypeRuntimeArray"},
-    {30, "TypeStruct"},
-    {31, "TypeOpaque"},
-    {32, "TypePointer"},
-    {33, "TypeFunction"},
-    {34, "TypeEvent"},
-    {35, "TypeDeviceEvent"},
-    {36, "TypeReserveId"},
-    {37, "TypeQueue"},
-    {38, "TypePipe"},
-    {39, "TypeForwardPointer"},
-    {41, "ConstantTrue"},
-    {42, "ConstantFalse"},
-    {43, "Constant"},
-    {44, "ConstantComposite"},
-    {45, "ConstantSampler"},
-    {46, "ConstantNull"},
-    {48, "SpecConstantTrue"},
-    {49, "SpecConstantFalse"},
-    {50, "SpecConstant"},
-    {51, "SpecConstantComposite"},
-    {52, "SpecConstantOp"},
-    {54, "Function"},
-    {55, "FunctionParameter"},
-    {56, "FunctionEnd"},
-    {57, "FunctionCall"},
-    {59, "Variable"},
-    {60, "ImageTexelPointer"},
-    {61, "Load"},
-    {62, "Store"},
-    {63, "CopyMemory"},
-    {64, "CopyMemorySized"},
-    {65, "AccessChain"},
-    {66, "InBoundsAccessChain"},
-    {67, "PtrAccessChain"},
-    {68, "ArrayLength"},
-    {69, "GenericPtrMemSemantics"},
-    {70, "InBoundsPtrAccessChain"},
-    {71, "Decorate"},
-    {72, "MemberDecorate"},
-    {73, "DecorationGroup"},
-    {74, "GroupDecorate"},
-    {75, "GroupMemberDecorate"},
-    {77, "VectorExtractDynamic"},
-    {78, "VectorInsertDynamic"},
-    {79, "VectorShuffle"},
-    {80, "CompositeConstruct"},
-    {81, "CompositeExtract"},
-    {82, "CompositeInsert"},
-    {83, "CopyObject"},
-    {84, "Transpose"},
-    {86, "SampledImage"},
-    {87, "ImageSampleImplicitLod"},
-    {88, "ImageSampleExplicitLod"},
-    {89, "ImageSampleDrefImplicitLod"},
-    {90, "ImageSampleDrefExplicitLod"},
-    {91, "ImageSampleProjImplicitLod"},
-    {92, "ImageSampleProjExplicitLod"},
-    {93, "ImageSampleProjDrefImplicitLod"},
-    {94, "ImageSampleProjDrefExplicitLod"},
-    {95, "ImageFetch"},
-    {96, "ImageGather"},
-    {97, "ImageDrefGather"},
-    {98, "ImageRead"},
-    {99, "ImageWrite"},
-    {100, "Image"},
-    {101, "ImageQueryFormat"},
-    {102, "ImageQueryOrder"},
-    {103, "ImageQuerySizeLod"},
-    {104, "ImageQuerySize"},
-    {105, "ImageQueryLod"},
-    {106, "ImageQueryLevels"},
-    {107, "ImageQuerySamples"},
-    {109, "ConvertFToU"},
-    {110, "ConvertFToS"},
-    {111, "ConvertSToF"},
-    {112, "ConvertUToF"},
-    {113, "UConvert"},
-    {114, "SConvert"},
-    {115, "FConvert"},
-    {116, "QuantizeToF16"},
-    {117, "ConvertPtrToU"},
-    {118, "SatConvertSToU"},
-    {119, "SatConvertUToS"},
-    {120, "ConvertUToPtr"},
-    {121, "PtrCastToGeneric"},
-    {122, "GenericCastToPtr"},
-    {123, "GenericCastToPtrExplicit"},
-    {124, "Bitcast"},
-    {126, "SNegate"},
-    {127, "FNegate"},
-    {128, "IAdd"},
-    {129, "FAdd"},
-    {130, "ISub"},
-    {131, "FSub"},
-    {132, "IMul"},
-    {133, "FMul"},
-    {134, "UDiv"},
-    {135, "SDiv"},
-    {136, "FDiv"},
-    {137, "UMod"},
-    {138, "SRem"},
-    {139, "SMod"},
-    {140, "FRem"},
-    {141, "FMod"},
-    {142, "VectorTimesScalar"},
-    {143, "MatrixTimesScalar"},
-    {144, "VectorTimesMatrix"},
-    {145, "MatrixTimesVector"},
-    {146, "MatrixTimesMatrix"},
-    {147, "OuterProduct"},
-    {148, "Dot"},
-    {149, "IAddCarry"},
-    {150, "ISubBorrow"},
-    {151, "UMulExtended"},
-    {152, "SMulExtended"},
-    {154, "Any"},
-    {155, "All"},
-    {156, "IsNan"},
-    {157, "IsInf"},
-    {158, "IsFinite"},
-    {159, "IsNormal"},
-    {160, "SignBitSet"},
-    {161, "LessOrGreater"},
-    {162, "Ordered"},
-    {163, "Unordered"},
-    {164, "LogicalEqual"},
-    {165, "LogicalNotEqual"},
-    {166, "LogicalOr"},
-    {167, "LogicalAnd"},
-    {168, "LogicalNot"},
-    {169, "Select"},
-    {170, "IEqual"},
-    {171, "INotEqual"},
-    {172, "UGreaterThan"},
-    {173, "SGreaterThan"},
-    {174, "UGreaterThanEqual"},
-    {175, "SGreaterThanEqual"},
-    {176, "ULessThan"},
-    {177, "SLessThan"},
-    {178, "ULessThanEqual"},
-    {179, "SLessThanEqual"},
-    {180, "FOrdEqual"},
-    {181, "FUnordEqual"},
-    {182, "FOrdNotEqual"},
-    {183, "FUnordNotEqual"},
-    {184, "FOrdLessThan"},
-    {185, "FUnordLessThan"},
-    {186, "FOrdGreaterThan"},
-    {187, "FUnordGreaterThan"},
-    {188, "FOrdLessThanEqual"},
-    {189, "FUnordLessThanEqual"},
-    {190, "FOrdGreaterThanEqual"},
-    {191, "FUnordGreaterThanEqual"},
-    {194, "ShiftRightLogical"},
-    {195, "ShiftRightArithmetic"},
-    {196, "ShiftLeftLogical"},
-    {197, "BitwiseOr"},
-    {198, "BitwiseXor"},
-    {199, "BitwiseAnd"},
-    {200, "Not"},
-    {201, "BitFieldInsert"},
-    {202, "BitFieldSExtract"},
-    {203, "BitFieldUExtract"},
-    {204, "BitReverse"},
-    {205, "BitCount"},
-    {207, "DPdx"},
-    {208, "DPdy"},
-    {209, "Fwidth"},
-    {210, "DPdxFine"},
-    {211, "DPdyFine"},
-    {212, "FwidthFine"},
-    {213, "DPdxCoarse"},
-    {214, "DPdyCoarse"},
-    {215, "FwidthCoarse"},
-    {218, "EmitVertex"},
-    {219, "EndPrimitive"},
-    {220, "EmitStreamVertex"},
-    {221, "EndStreamPrimitive"},
-    {224, "ControlBarrier"},
-    {225, "MemoryBarrier"},
-    {227, "AtomicLoad"},
-    {228, "AtomicStore"},
-    {229, "AtomicExchange"},
-    {230, "AtomicCompareExchange"},
-    {231, "AtomicCompareExchangeWeak"},
-    {232, "AtomicIIncrement"},
-    {233, "AtomicIDecrement"},
-    {234, "AtomicIAdd"},
-    {235, "AtomicISub"},
-    {236, "AtomicSMin"},
-    {237, "AtomicUMin"},
-    {238, "AtomicSMax"},
-    {239, "AtomicUMax"},
-    {240, "AtomicAnd"},
-    {241, "AtomicOr"},
-    {242, "AtomicXor"},
-    {245, "Phi"},
-    {246, "LoopMerge"},
-    {247, "SelectionMerge"},
-    {248, "Label"},
-    {249, "Branch"},
-    {250, "BranchConditional"},
-    {251, "Switch"},
-    {252, "Kill"},
-    {253, "Return"},
-    {254, "ReturnValue"},
-    {255, "Unreachable"},
-    {256, "LifetimeStart"},
-    {257, "LifetimeStop"},
-    {259, "GroupAsyncCopy"},
-    {260, "GroupWaitEvents"},
-    {261, "GroupAll"},
-    {262, "GroupAny"},
-    {263, "GroupBroadcast"},
-    {264, "GroupIAdd"},
-    {265, "GroupFAdd"},
-    {266, "GroupFMin"},
-    {267, "GroupUMin"},
-    {268, "GroupSMin"},
-    {269, "GroupFMax"},
-    {270, "GroupUMax"},
-    {271, "GroupSMax"},
-    {274, "ReadPipe"},
-    {275, "WritePipe"},
-    {276, "ReservedReadPipe"},
-    {277, "ReservedWritePipe"},
-    {278, "ReserveReadPipePackets"},
-    {279, "ReserveWritePipePackets"},
-    {280, "CommitReadPipe"},
-    {281, "CommitWritePipe"},
-    {282, "IsValidReserveId"},
-    {283, "GetNumPipePackets"},
-    {284, "GetMaxPipePackets"},
-    {285, "GroupReserveReadPipePackets"},
-    {286, "GroupReserveWritePipePackets"},
-    {287, "GroupCommitReadPipe"},
-    {288, "GroupCommitWritePipe"},
-    {291, "EnqueueMarker"},
-    {292, "EnqueueKernel"},
-    {293, "GetKernelNDrangeSubGroupCount"},
-    {294, "GetKernelNDrangeMaxSubGroupSize"},
-    {295, "GetKernelWorkGroupSize"},
-    {296, "GetKernelPreferredWorkGroupSizeMultiple"},
-    {297, "RetainEvent"},
-    {298, "ReleaseEvent"},
-    {299, "CreateUserEvent"},
-    {300, "IsValidEvent"},
-    {301, "SetUserEventStatus"},
-    {302, "CaptureEventProfilingInfo"},
-    {303, "GetDefaultQueue"},
-    {304, "BuildNDRange"},
-    {305, "ImageSparseSampleImplicitLod"},
-    {306, "ImageSparseSampleExplicitLod"},
-    {307, "ImageSparseSampleDrefImplicitLod"},
-    {308, "ImageSparseSampleDrefExplicitLod"},
-    {309, "ImageSparseSampleProjImplicitLod"},
-    {310, "ImageSparseSampleProjExplicitLod"},
-    {311, "ImageSparseSampleProjDrefImplicitLod"},
-    {312, "ImageSparseSampleProjDrefExplicitLod"},
-    {313, "ImageSparseFetch"},
-    {314, "ImageSparseGather"},
-    {315, "ImageSparseDrefGather"},
-    {316, "ImageSparseTexelsResident"},
-    {317, "NoLine"},
-    {318, "AtomicFlagTestAndSet"},
-    {319, "AtomicFlagClear"},
-    {320, "ImageSparseRead"},
-    {321, "SizeOf"},
-    {322, "TypePipeStorage"},
-    {323, "ConstantPipeStorage"},
-    {324, "CreatePipeFromPipeStorage"},
-    {325, "GetKernelLocalSizeForSubgroupCount"},
-    {326, "GetKernelMaxNumSubgroups"},
-    {327, "TypeNamedBarrier"},
-    {328, "NamedBarrierInitialize"},
-    {329, "MemoryNamedBarrier"},
-    {330, "ModuleProcessed"},
-    {331, "ExecutionModeId"},
-    {332, "DecorateId"},
-    {4421, "SubgroupBallotKHR"},
-    {4422, "SubgroupFirstInvocationKHR"},
-    {4428, "SubgroupAllKHR"},
-    {4429, "SubgroupAnyKHR"},
-    {4430, "SubgroupAllEqualKHR"},
-    {4432, "SubgroupReadInvocationKHR"},
-    {5000, "GroupIAddNonUniformAMD"},
-    {5001, "GroupFAddNonUniformAMD"},
-    {5002, "GroupFMinNonUniformAMD"},
-    {5003, "GroupUMinNonUniformAMD"},
-    {5004, "GroupSMinNonUniformAMD"},
-    {5005, "GroupFMaxNonUniformAMD"},
-    {5006, "GroupUMaxNonUniformAMD"},
-    {5007, "GroupSMaxNonUniformAMD"},
-    {5011, "FragmentMaskFetchAMD"},
-    {5012, "FragmentFetchAMD"},
-    {5571, "SubgroupShuffleINTEL"},
-    {5572, "SubgroupShuffleDownINTEL"},
-    {5573, "SubgroupShuffleUpINTEL"},
-    {5574, "SubgroupShuffleXorINTEL"},
-    {5575, "SubgroupBlockReadINTEL"},
-    {5576, "SubgroupBlockWriteINTEL"},
-    {5577, "SubgroupImageBlockReadINTEL"},
-    {5578, "SubgroupImageBlockWriteINTEL"},
-    {5632, "DecorateStringGOOGLE"},
-    {5633, "MemberDecorateStringGOOGLE"},
+#include "opcode_to_string.h"
 };
 
 std::map<glslang::TOperator, std::string> OperatorToString = {
@@ -1499,114 +1168,13 @@ struct FunctionParameter
     uint32_t id;
 };
 
-// A "Load" instruction. This loads data from memory into an SSA register.
-struct InsnLoad {
-    // Type of data being loaded. This is a key in the "types" map.
-    uint32_t type;
-
-    // SSA register to write result to.
-    uint32_t resultId;
-
-    // SSA register of pointer to dereference.
-    uint32_t pointerId;
-
-    // Memory access semantics, or NO_MEMORY_ACCESS_SEMANTIC.
-    uint32_t memoryAccess;
-};
-
-// A "Store" instruction. Stores data from an SSA register to memory.
-struct InsnStore {
-    // SSA register of pointer to dereference for writing.
-    uint32_t pointerId;
-
-    // SSA register to copy from.
-    uint32_t objectId;
-
-    // Memory access semantics, or NO_MEMORY_ACCESS_SEMANTIC.
-    uint32_t memoryAccess;
-};
-
-// An "AccessChain" instruction. It dereferences a struct's field. XXX probably
-// arrays too, and maybe vectors and matrices.
-struct InsnAccessChain {
-    // The return type of this access. This is a key in the "types" map. This
-    // could be a pointer type even if the field is a vector.
-    uint32_t type;
-
-    // SSA register to write result to.
-    uint32_t resultId;
-
-    // XXX Don't know.
-    uint32_t basePointerId;
-
-    // List of indices. These are keys into the "registers" map.
-    std::vector<uint32_t> indexes;
-};
-
-struct InsnCompositeConstruct {
-    uint32_t type;
-
-    // SSA register to write result to.
-    uint32_t resultId;
-    std::vector<uint32_t> constituentIds;
-};
-
-struct InsnCompositeExtract {
-    uint32_t type;
-
-    // SSA register to write result to.
-    uint32_t resultId;
-    uint32_t compositeId;
-    std::vector<uint32_t> indexes;
-};
-
-struct InsnConvertSToF {
-    uint32_t type;
-
-    // SSA register to write result to.
-    uint32_t resultId;
-    uint32_t sourceId;
-};
-
-struct InsnFMul {
-    uint32_t type;
-
-    // SSA register to write result to.
-    uint32_t resultId;
-    uint32_t operand1Id;
-    uint32_t operand2Id;
-};
-
-struct InsnFDiv {
-    uint32_t type;
-
-    // SSA register to write result to.
-    uint32_t resultId;
-    uint32_t operand1Id; // dividend
-    uint32_t operand2Id; // divisor
-};
-
-struct InsnFunctionParameter
-{
-    uint32_t type;
-    uint32_t resultId;
-};
-
-struct InsnFunctionCall {
-    uint32_t type;
-
-    // SSA register to write result to.
-    uint32_t resultId;
-    uint32_t functionId;
-    std::vector<uint32_t> argumentIds;
-};
-
-struct InsnReturn {
-};
+#include "opcode_structs.h"
 
 const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
 
-typedef std::variant<InsnLoad, InsnStore, InsnAccessChain, InsnCompositeConstruct, InsnCompositeExtract, InsnConvertSToF, InsnFMul, InsnFDiv, InsnFunctionCall, InsnReturn, InsnFunctionParameter> Instruction;
+typedef std::variant<
+InsnLoad, InsnStore, InsnAccessChain, InsnCompositeConstruct, InsnCompositeExtract, InsnConvertSToF, InsnFMul, InsnFDiv, InsnFunctionCall, InsnReturn, InsnFunctionParameter
+> Instruction;
 
 struct Function
 {
@@ -2343,17 +1911,17 @@ struct Interpreter
             case SpvOpAccessChain: {
                 uint32_t type = nextu();
                 uint32_t resultId = nextu();
-                uint32_t basePointerId = nextu();
-                auto indexes = restv();
-                ip->code.push_back(InsnAccessChain{type, resultId, basePointerId, indexes});
+                uint32_t baseId = nextu();
+                auto indexesId = restv();
+                ip->code.push_back(InsnAccessChain{type, resultId, baseId, indexesId});
                 if(ip->verbose) {
                     std::cout << "AccessChain"
                         << " type " << type
                         << " resultId " << resultId
-                        << " basePointerId " << basePointerId;
-                    std::cout << " indexes"; 
-                    for(int i = 0; i < indexes.size(); i++)
-                        std::cout << " " << indexes[i];
+                        << " baseId " << baseId;
+                    std::cout << " indexesId"; 
+                    for(int i = 0; i < indexesId.size(); i++)
+                        std::cout << " " << indexesId[i];
                     std::cout << "\n";
                 }
                 break;
@@ -2362,15 +1930,15 @@ struct Interpreter
             case SpvOpCompositeConstruct: {
                 uint32_t type = nextu();
                 uint32_t resultId = nextu();
-                auto constituentIds = restv();
-                ip->code.push_back(InsnCompositeConstruct{type, resultId, constituentIds});
+                auto constituentsId = restv();
+                ip->code.push_back(InsnCompositeConstruct{type, resultId, constituentsId});
                 if(ip->verbose) {
                     std::cout << "CompositeConstruct"
                         << " type " << type
                         << " resultId " << resultId;
-                    std::cout << " constituentIds"; 
-                    for(int i = 0; i < constituentIds.size(); i++)
-                        std::cout << " " << constituentIds[i];
+                    std::cout << " constituentsId"; 
+                    for(int i = 0; i < constituentsId.size(); i++)
+                        std::cout << " " << constituentsId[i];
                     std::cout << "\n";
                 }
                 break;
@@ -2380,16 +1948,16 @@ struct Interpreter
                 uint32_t type = nextu();
                 uint32_t resultId = nextu();
                 uint32_t compositeId = nextu();
-                auto indexes = restv();
-                ip->code.push_back(InsnCompositeExtract{type, resultId, compositeId, indexes});
+                auto indexesId = restv();
+                ip->code.push_back(InsnCompositeExtract{type, resultId, compositeId, indexesId});
                 if(ip->verbose) {
                     std::cout << "CompositeExtract"
                         << " type " << type
                         << " resultId " << resultId
                         << " compositeId " << compositeId;
-                    std::cout << " indexes"; 
-                    for(int i = 0; i < indexes.size(); i++)
-                        std::cout << " " << indexes[i];
+                    std::cout << " indexesId"; 
+                    for(int i = 0; i < indexesId.size(); i++)
+                        std::cout << " " << indexesId[i];
                     std::cout << "\n";
                 }
                 break;
@@ -2398,13 +1966,13 @@ struct Interpreter
             case SpvOpConvertSToF: {
                 uint32_t type = nextu();
                 uint32_t resultId = nextu();
-                uint32_t sourceId = nextu();
-                ip->code.push_back(InsnConvertSToF{type, resultId, sourceId});
+                uint32_t signedValueId = nextu();
+                ip->code.push_back(InsnConvertSToF{type, resultId, signedValueId});
                 if(ip->verbose) {
                     std::cout << "ConvertSToF"
                         << " type " << type
                         << " resultId " << resultId
-                        << " sourceId " << sourceId
+                        << " signedValueId " << signedValueId
                         << "\n";
                 }
                 break;
@@ -2446,16 +2014,16 @@ struct Interpreter
                 uint32_t type = nextu();
                 uint32_t resultId = nextu();
                 uint32_t functionId = nextu();
-                auto argumentIds = restv();
-                ip->code.push_back(InsnFunctionCall{type, resultId, functionId, argumentIds});
+                auto operandId = restv();
+                ip->code.push_back(InsnFunctionCall{type, resultId, functionId, operandId});
                 if(ip->verbose) {
                     std::cout << "FunctionCall"
                         << " type " << type
                         << " resultId " << resultId
                         << " functionId " << functionId;
-                    std::cout << " argumentIds"; 
-                    for(int i = 0; i < argumentIds.size(); i++)
-                        std::cout << " " << argumentIds[i];
+                    std::cout << " operandId"; 
+                    for(int i = 0; i < operandId.size(); i++)
+                        std::cout << " " << operandId[i];
                     std::cout << "\n";
                 }
                 break;
@@ -2513,7 +2081,7 @@ struct Interpreter
         /* use indexes to walk blob */
         uint32_t type = src.type;
         size_t offset = 0;
-        for(auto& j: insn.indexes) {
+        for(auto& j: insn.indexesId) {
             for(int i = 0; i < j; i++) {
                 offset += typeSizes[getConstituentType(type, i)];
             }
@@ -2533,7 +2101,7 @@ struct Interpreter
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
         size_t offset = 0;
-        for(auto& j: insn.constituentIds) {
+        for(auto& j: insn.constituentsId) {
             RegisterObject& src = std::get<RegisterObject>(registers[j]);
             std::copy(src.data, src.data + typeSizes[src.type], obj.data + offset);
             offset += typeSizes[src.type];
@@ -2608,12 +2176,12 @@ struct Interpreter
 
             if constexpr (std::is_same_v<T, TypeFloat>) {
 
-                int32_t src = registerAs<int32_t>(insn.sourceId);
+                int32_t src = registerAs<int32_t>(insn.signedValueId);
                 registerAs<float>(insn.resultId) = src;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-                int32_t* src = &registerAs<int32_t>(insn.sourceId);
+                int32_t* src = &registerAs<int32_t>(insn.signedValueId);
                 float* dst = &registerAs<float>(insn.resultId);
                 for(int i = 0; i < type.count; i++) {
                     dst[i] = src[i];
@@ -2624,10 +2192,10 @@ struct Interpreter
 
     void stepAccessChain(const InsnAccessChain& insn)
     {
-        RegisterPointer& basePointer = std::get<RegisterPointer>(registers[insn.basePointerId]);
+        RegisterPointer& basePointer = std::get<RegisterPointer>(registers[insn.baseId]);
         uint32_t type = basePointer.type;
         size_t offset = basePointer.offset;
-        for(auto& id: insn.indexes) {
+        for(auto& id: insn.indexesId) {
             int32_t j = registerAs<int32_t>(id);
             for(int i = 0; i < j; i++) {
                 offset += typeSizes[getConstituentType(type, i)];
@@ -2660,8 +2228,8 @@ struct Interpreter
 
         callstack.push_back(pc);
         callstack.push_back(insn.resultId);
-        for(int i = insn.argumentIds.size() - 1; i >= 0; i--) {
-            uint32_t argument = insn.argumentIds[i];
+        for(int i = insn.operandId.size() - 1; i >= 0; i--) {
+            uint32_t argument = insn.operandId[i];
             assert(std::holds_alternative<RegisterPointer>(registers[argument]));
             callstack.push_back(argument);
         }

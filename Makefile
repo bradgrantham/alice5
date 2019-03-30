@@ -1,7 +1,8 @@
 # Or, GLSLANG_BINARY_DIR = $(WHERE_PACKAGE_UNPACKED)/bin
-GLSLANG_BINARY_DIR     :=       $(HOME)/trees/glslang/build/StandAlone
-GLSLANG_SOURCE_DIR     :=       $(HOME)/trees/glslang
-SPIRV_TOOLS_SOURCE_DIR     :=       $(HOME)/trees/glslang/External/spirv-tools
+TREES := $(HOME)/trees
+GLSLANG_SOURCE_DIR     :=       $(TREES)/glslang
+GLSLANG_BINARY_DIR     :=       $(GLSLANG_SOURCE_DIR)/build/StandAlone
+SPIRV_TOOLS_SOURCE_DIR     :=       $(GLSLANG_SOURCE_DIR)/External/spirv-tools
 
 GLSLANG_CC_OPTIONS     :=      -g -DAMD_EXTENSIONS -DENABLE_HLSL -DENABLE_OPT=1 -DGLSLANG_OSINCLUDE_UNIX -DNV_EXTENSIONS -DSPIRV_CHECK_CONTEXT -DSPIRV_COLOR_TERMINAL -DSPIRV_MAC -DSPIRV_TOOLS_IMPLEMENTATION -DSPIRV_TOOLS_SHAREDLIB -DSPIRV_Tools_shared_EXPORTS
 
@@ -16,6 +17,10 @@ default: shade
 simple.spv: simple.frag
 	cat preamble.frag simple.frag epilogue.frag | $(GLSLANG_BINARY_DIR)/glslangValidator -H -V100 -d -o simple.spv --stdin -S frag
 
+.PHONY: generate
+generate:
+	python3 generate_ops.py $(GLSLANG_SOURCE_DIR)/External/spirv-tools/external/spirv-headers/include/spirv/1.2/spirv.core.grammar.json
+
 .PHONY: clean
 clean:
 	if [ -f simple.spv ]; then rm simple.spv; fi
@@ -23,4 +28,4 @@ clean:
 
 .PHONY: dis
 dis:
-	~/trees/glslang/build/External/spirv-tools/tools/spirv-dis simple.spv | cat
+	$(GLSLANG_SOURCE_DIR)/build/External/spirv-tools/tools/spirv-dis simple.spv | cat
