@@ -1173,7 +1173,7 @@ struct FunctionParameter
 const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
 
 typedef std::variant<
-InsnLoad, InsnStore, InsnAccessChain, InsnCompositeConstruct, InsnCompositeExtract, InsnConvertSToF, InsnFMul, InsnFDiv, InsnFunctionCall, InsnReturn, InsnFunctionParameter
+#include "opcode_variant.h"
 > Instruction;
 
 struct Function
@@ -2236,6 +2236,10 @@ struct Interpreter
         pc = function.start;
     }
 
+    // Unimplemented instructions. To implement one, move the function from this
+    // header into this file just above this comment.
+#include "opcode_impl.h"
+
     void step()
     {
         if(false) std::cout << "address " << pc << "\n";
@@ -2243,18 +2247,7 @@ struct Interpreter
         Instruction insn = code[pc++];
 
         std::visit(overloaded {
-            [&](const InsnReturn& insn) { stepReturn(insn); },
-            // [&](const InsnReturnValue& insn) { stepReturnValue(insn); },
-            [&](const InsnLoad& insn) { stepLoad(insn); },
-            [&](const InsnStore& insn) { stepStore(insn); },
-            [&](const InsnAccessChain& insn) { stepAccessChain(insn); },
-            [&](const InsnCompositeConstruct& insn) { stepCompositeConstruct(insn); },
-            [&](const InsnCompositeExtract& insn) { stepCompositeExtract(insn); },
-            [&](const InsnConvertSToF& insn) { stepConvertSToF(insn); },
-            [&](const InsnFMul& insn) { stepFMul(insn); },
-            [&](const InsnFDiv& insn) { stepFDiv(insn); },
-            [&](const InsnFunctionParameter& insn) { stepFunctionParameter(insn); },
-            [&](const InsnFunctionCall& insn) { stepFunctionCall(insn); },
+#include "opcode_dispatch.h"
         }, insn);
     }
 
