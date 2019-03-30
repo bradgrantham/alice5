@@ -1760,9 +1760,6 @@ struct Interpreter
         memoryRegions[SpvStorageClassAtomicCounter] = anotherRegion(0);
         memoryRegions[SpvStorageClassImage] = anotherRegion(0);
         memoryRegions[SpvStorageClassStorageBuffer] = anotherRegion(0);
-        for(auto& r: memoryRegions) {
-            std::cout << "region for class " << r.first << " at " << r.second.base << " size " << r.second.size << " top " << r.second.top << "\n";
-        }
         memory = new unsigned char[base];
     }
 
@@ -2196,7 +2193,9 @@ struct Interpreter
                 assert(opds[2].num_words == 1); // XXX limit to 32 bits for now
                 uint32_t value = nextu();
                 ip->constants[id] = { typeId, value };
-                std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
+                if(ip->verbose) {
+                    std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
+                }
                 break;
             }
 
@@ -2205,9 +2204,11 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t imageType = nextu();
                 ip->types[id] = TypeSampledImage { imageType };
-                std::cout << "TypeSampledImage " << id
-                    << " imageType " << imageType
-                    << "\n";
+                if(ip->verbose) {
+                    std::cout << "TypeSampledImage " << id
+                        << " imageType " << imageType
+                        << "\n";
+                }
                 break;
             }
 
@@ -2223,16 +2224,18 @@ struct Interpreter
                 uint32_t imageFormat = nextu();
                 uint32_t accessQualifier = nextu(NO_ACCESS_QUALIFIER);
                 ip->types[id] = TypeImage { sampledType, dim, depth, arrayed, ms, sampled, imageFormat, accessQualifier };
-                std::cout << "TypeImage " << id
-                    << " sampledType " << sampledType
-                    << " dim " << dim
-                    << " depth " << depth
-                    << " arrayed " << arrayed
-                    << " ms " << ms
-                    << " sampled " << sampled
-                    << " imageFormat " << imageFormat
-                    << " accessQualifier " << accessQualifier
-                    << "\n";
+                if(ip->verbose) {
+                    std::cout << "TypeImage " << id
+                        << " sampledType " << sampledType
+                        << " dim " << dim
+                        << " depth " << depth
+                        << " arrayed " << arrayed
+                        << " ms " << ms
+                        << " sampled " << sampled
+                        << " imageFormat " << imageFormat
+                        << " accessQualifier " << accessQualifier
+                        << "\n";
+                }
                 break;
             }
 
@@ -2244,11 +2247,13 @@ struct Interpreter
                 uint32_t start = ip->code.size();
                 ip->functions[id] = Function {id, resultType, functionControl, functionType, start };
                 ip->currentFunction = &ip->functions[id];
-                std::cout << "Function " << id
-                    << " resultType " << resultType
-                    << " functionControl " << functionControl
-                    << " functionType " << functionType
-                    << "\n";
+                if(ip->verbose) {
+                    std::cout << "Function " << id
+                        << " resultType " << resultType
+                        << " functionControl " << functionControl
+                        << " functionType " << functionType
+                        << "\n";
+                }
                 break;
             }
 
@@ -2257,30 +2262,38 @@ struct Interpreter
                 uint32_t type = nextu();
                 uint32_t id = nextu();
                 ip->code.push_back(InsnFunctionParameter{type, id});
-                std::cout << "FunctionParameter " << id
-                    << " type " << type
-                    << "\n";
+                if(ip->verbose) {
+                    std::cout << "FunctionParameter " << id
+                        << " type " << type
+                        << "\n";
+                }
                 break;
             }
 
             case SpvOpLabel: {
                 uint32_t id = nextu();
                 ip->labels[id] = ip->code.size();
-                std::cout << "Label " << id
-                    << " at " << ip->labels[id]
-                    << "\n";
+                if(ip->verbose) {
+                    std::cout << "Label " << id
+                        << " at " << ip->labels[id]
+                        << "\n";
+                }
                 break;
             }
 
             case SpvOpFunctionEnd: {
                 ip->currentFunction = NULL;
-                std::cout << "FunctionEnd\n";
+                if(ip->verbose) {
+                    std::cout << "FunctionEnd\n";
+                }
                 break;
             }
 
             case SpvOpReturn: {
                 ip->code.push_back(InsnReturn{});
-                std::cout << "Return\n";
+                if(ip->verbose) {
+                    std::cout << "Return\n";
+                }
                 break;
             }
 
@@ -2290,13 +2303,15 @@ struct Interpreter
                 uint32_t pointer = nextu();
                 uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
                 ip->code.push_back(InsnLoad{type, id, pointer, memoryAccess});
-                std::cout << "Load"
-                    << " type " << type
-                    << " id " << id
-                    << " pointer " << pointer;
-                if(memoryAccess != NO_MEMORY_ACCESS_SEMANTIC)
-                    std::cout << " type " << memoryAccess;
-                std::cout << "\n";
+                if(ip->verbose) {
+                    std::cout << "Load"
+                        << " type " << type
+                        << " id " << id
+                        << " pointer " << pointer;
+                    if(memoryAccess != NO_MEMORY_ACCESS_SEMANTIC)
+                        std::cout << " type " << memoryAccess;
+                    std::cout << "\n";
+                }
                 break;
             }
 
@@ -2305,12 +2320,14 @@ struct Interpreter
                 uint32_t object = nextu();
                 uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
                 ip->code.push_back(InsnStore{pointer, object, memoryAccess});
-                std::cout << "Store"
-                    << " pointer " << pointer
-                    << " object " << object;
-                if(memoryAccess != NO_MEMORY_ACCESS_SEMANTIC)
-                    std::cout << " type " << memoryAccess;
-                std::cout << "\n";
+                if(ip->verbose) {
+                    std::cout << "Store"
+                        << " pointer " << pointer
+                        << " object " << object;
+                    if(memoryAccess != NO_MEMORY_ACCESS_SEMANTIC)
+                        std::cout << " type " << memoryAccess;
+                    std::cout << "\n";
+                }
                 break;
             }
             
@@ -2320,14 +2337,16 @@ struct Interpreter
                 uint32_t basePointerId = nextu();
                 auto indexes = restv();
                 ip->code.push_back(InsnAccessChain{type, resultId, basePointerId, indexes});
-                std::cout << "AccessChain"
-                    << " type " << type
-                    << " resultId " << resultId
-                    << " basePointerId " << basePointerId;
-                std::cout << " indexes"; 
-                for(int i = 0; i < indexes.size(); i++)
-                    std::cout << " " << indexes[i];
-                std::cout << "\n";
+                if(ip->verbose) {
+                    std::cout << "AccessChain"
+                        << " type " << type
+                        << " resultId " << resultId
+                        << " basePointerId " << basePointerId;
+                    std::cout << " indexes"; 
+                    for(int i = 0; i < indexes.size(); i++)
+                        std::cout << " " << indexes[i];
+                    std::cout << "\n";
+                }
                 break;
             }
             
@@ -2336,13 +2355,15 @@ struct Interpreter
                 uint32_t resultId = nextu();
                 auto constituentIds = restv();
                 ip->code.push_back(InsnCompositeConstruct{type, resultId, constituentIds});
-                std::cout << "CompositeConstruct"
-                    << " type " << type
-                    << " resultId " << resultId;
-                std::cout << " constituentIds"; 
-                for(int i = 0; i < constituentIds.size(); i++)
-                    std::cout << " " << constituentIds[i];
-                std::cout << "\n";
+                if(ip->verbose) {
+                    std::cout << "CompositeConstruct"
+                        << " type " << type
+                        << " resultId " << resultId;
+                    std::cout << " constituentIds"; 
+                    for(int i = 0; i < constituentIds.size(); i++)
+                        std::cout << " " << constituentIds[i];
+                    std::cout << "\n";
+                }
                 break;
             }
             
@@ -2352,14 +2373,16 @@ struct Interpreter
                 uint32_t compositeId = nextu();
                 auto indexes = restv();
                 ip->code.push_back(InsnCompositeExtract{type, resultId, compositeId, indexes});
-                std::cout << "CompositeExtract"
-                    << " type " << type
-                    << " resultId " << resultId
-                    << " compositeId " << compositeId;
-                std::cout << " indexes"; 
-                for(int i = 0; i < indexes.size(); i++)
-                    std::cout << " " << indexes[i];
-                std::cout << "\n";
+                if(ip->verbose) {
+                    std::cout << "CompositeExtract"
+                        << " type " << type
+                        << " resultId " << resultId
+                        << " compositeId " << compositeId;
+                    std::cout << " indexes"; 
+                    for(int i = 0; i < indexes.size(); i++)
+                        std::cout << " " << indexes[i];
+                    std::cout << "\n";
+                }
                 break;
             }
             
@@ -2368,11 +2391,13 @@ struct Interpreter
                 uint32_t resultId = nextu();
                 uint32_t sourceId = nextu();
                 ip->code.push_back(InsnConvertSToF{type, resultId, sourceId});
-                std::cout << "ConvertSToF"
-                    << " type " << type
-                    << " resultId " << resultId
-                    << " sourceId " << sourceId
-                    << "\n";
+                if(ip->verbose) {
+                    std::cout << "ConvertSToF"
+                        << " type " << type
+                        << " resultId " << resultId
+                        << " sourceId " << sourceId
+                        << "\n";
+                }
                 break;
             }
 
@@ -2382,11 +2407,13 @@ struct Interpreter
                 uint32_t operand1Id = nextu();
                 uint32_t operand2Id = nextu();
                 ip->code.push_back(InsnFDiv{type, resultId, operand1Id, operand2Id});
-                std::cout << "FDiv"
-                    << " type " << type
-                    << " resultId " << resultId
-                    << " operand2Id " << operand2Id
-                    << "\n";
+                if(ip->verbose) {
+                    std::cout << "FDiv"
+                        << " type " << type
+                        << " resultId " << resultId
+                        << " operand2Id " << operand2Id
+                        << "\n";
+                }
                 break;
             }
 
@@ -2396,14 +2423,16 @@ struct Interpreter
                 uint32_t functionId = nextu();
                 auto argumentIds = restv();
                 ip->code.push_back(InsnFunctionCall{type, resultId, functionId, argumentIds});
-                std::cout << "FunctionCall"
-                    << " type " << type
-                    << " resultId " << resultId
-                    << " functionId " << functionId;
-                std::cout << " argumentIds"; 
-                for(int i = 0; i < argumentIds.size(); i++)
-                    std::cout << " " << argumentIds[i];
-                std::cout << "\n";
+                if(ip->verbose) {
+                    std::cout << "FunctionCall"
+                        << " type " << type
+                        << " resultId " << resultId
+                        << " functionId " << functionId;
+                    std::cout << " argumentIds"; 
+                    for(int i = 0; i < argumentIds.size(); i++)
+                        std::cout << " " << argumentIds[i];
+                    std::cout << "\n";
+                }
                 break;
             }
             
@@ -2438,7 +2467,7 @@ struct Interpreter
         RegisterPointer& ptr = std::get<RegisterPointer>(registers[insn.pointerId]);
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
         std::copy(memory + ptr.offset, memory + ptr.offset + typeSizes[insn.type], obj.data);
-        if(true) {
+        if(false) {
             std::cout << "load result is";
             dumpTypeAt(types[insn.type], obj.data);
             std::cout << "\n";
@@ -2455,13 +2484,40 @@ struct Interpreter
     void stepCompositeExtract(const InsnCompositeExtract& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        RegisterObject& src = std::get<RegisterObject>(registers[insn.compositeId]);
         /* use indexes to walk blob */
+        uint32_t type = src.type;
+        size_t offset = 0;
+        for(auto& j: insn.indexes) {
+            for(int i = 0; i < j; i++) {
+                offset += typeSizes[getConstituentType(type, i)];
+            }
+            type = getConstituentType(type, j);
+        }
+        std::copy(src.data + offset, src.data + offset + typeSizes[obj.type], obj.data);
+        if(false) {
+            std::cout << "extracted from ";
+            dumpTypeAt(types[src.type], src.data);
+            std::cout << " result is ";
+            dumpTypeAt(types[insn.type], obj.data);
+            std::cout << "\n";
+        }
     }
 
     void stepCompositeConstruct(const InsnCompositeConstruct& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
-        /* use constituents to walk blob */
+        size_t offset = 0;
+        for(auto& j: insn.constituentIds) {
+            RegisterObject& src = std::get<RegisterObject>(registers[j]);
+            std::copy(src.data, src.data + typeSizes[src.type], obj.data + offset);
+            offset += typeSizes[src.type];
+        }
+        if(false) {
+            std::cout << "constructed ";
+            dumpTypeAt(types[obj.type], obj.data);
+            std::cout << "\n";
+        }
     }
 
     void stepFDiv(const InsnFDiv& insn)
@@ -2493,9 +2549,6 @@ struct Interpreter
 
     void stepConvertSToF(const InsnConvertSToF& insn)
     {
-    // uint32_t type;
-    // uint32_t resultId;
-    // uint32_t sourceId;
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
         std::visit([this, &insn](auto&& type) {
 
@@ -2524,7 +2577,7 @@ struct Interpreter
         size_t offset = basePointer.offset;
         for(auto& id: insn.indexes) {
             int32_t j = registerAs<int32_t>(id);
-            for(int i = 0; i < j - 1; i++) {
+            for(int i = 0; i < j; i++) {
                 offset += typeSizes[getConstituentType(type, i)];
             }
             type = getConstituentType(type, j);
@@ -2540,7 +2593,7 @@ struct Interpreter
     {
         uint32_t sourceId = callstack.back();  callstack.pop_back();
         registers[insn.resultId] = registers[sourceId];
-        std::cout << "function parameter " << insn.resultId << " receives " << sourceId << "\n";
+        if(false) std::cout << "function parameter " << insn.resultId << " receives " << sourceId << "\n";
     }
 
     void stepReturn(const InsnReturn& insn)
@@ -2558,7 +2611,6 @@ struct Interpreter
         for(int i = insn.argumentIds.size() - 1; i >= 0; i--) {
             uint32_t argument = insn.argumentIds[i];
             assert(std::holds_alternative<RegisterPointer>(registers[argument]));
-            std::cout << "argument " << argument << "\n";
             callstack.push_back(argument);
         }
         pc = function.start;
@@ -2566,7 +2618,7 @@ struct Interpreter
 
     void step()
     {
-        std::cout << "address " << pc << "\n";
+        if(false) std::cout << "address " << pc << "\n";
 
         Instruction insn = code[pc++];
 
