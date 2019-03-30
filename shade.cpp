@@ -1332,12 +1332,6 @@ struct Variable
     size_t offset;
 };
 
-struct Pointer
-{
-    uint32_t type;
-    uint32_t storageClass;
-    size_t offset;
-};
 
 struct EntryPoint
 {
@@ -1498,7 +1492,8 @@ const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
 
 typedef std::variant<InsnLoad, InsnStore, InsnAccessChain, InsnCompositeConstruct, InsnCompositeExtract, InsnConvertSToF, InsnFDiv, InsnFunctionCall, InsnReturn> Instruction;
 
-struct Function {
+struct Function
+{
     uint32_t id;
     uint32_t resultType;
     uint32_t functionControl;
@@ -1506,6 +1501,68 @@ struct Function {
     std::vector<FunctionParameter> parameters;
     size_t start;
 };
+
+struct RegisterPointer
+{
+    uint32_t type;
+    uint32_t storageClass;
+    size_t offset;
+};
+
+struct RegisterObject
+{
+    uint32_t type;
+    size_t size;
+    unsigned char *data;
+    
+    RegisterObject(const RegisterObject &other) 
+    {
+        if(false)std::cout << "move ctor allocated to " << this << " as " << &data << "\n";
+        type = other.type;
+        size = other.size;
+        data = new unsigned char[size];
+        std::copy(other.data, other.data + size, data);
+    }
+
+    RegisterObject(uint32_t type_, size_t size_) :
+        type(type_),
+        size(size_),
+        data(new unsigned char[size_])
+    {
+        if(false)std::cout << "ctor allocated to " << this << " as " << &data << "\n";
+    }
+
+    RegisterObject() :
+        type(0xFFFFFFFF),
+        size(0),
+        data(nullptr)
+    {
+        if(false)std::cout << "ctor empty RegisterObject " << this << " \n";
+    }
+
+    ~RegisterObject()
+    {
+        if(false)std::cout << "dtor deleting from " << this << " as " << &data << "\n";
+        delete[] data;
+    }
+
+    RegisterObject& operator=(const RegisterObject &other)
+    {
+        if(false)std::cout << "operator=\n";
+        if(this != &other) {
+            if(false)std::cout << "op= deleting from " << this << " as " << &data << "\n";
+            delete[] data;
+            type = other.type;
+            size = other.size;
+            data = new unsigned char[size];
+            if(false)std::cout << "op= allocated to " << this << " as " << &data << "\n";
+            std::copy(other.data, other.data + size, data);
+        }
+        return *this;
+    }
+};
+
+typedef std::variant<RegisterPointer, RegisterObject> Register;
 
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
@@ -1554,10 +1611,8 @@ struct Interpreter
     std::map<uint32_t, std::map<uint32_t, Decoration> > memberDecorations;
     std::map<uint32_t, Type> types;
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
-    std::map<uint32_t, Variable> variables;
-    std::map<uint32_t, Pointer> pointers;
-    std::map<uint32_t, size_t> intermediates;
     std::map<uint32_t, Constant> constants;
+    std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
     std::vector<Instruction> code;
 
@@ -1567,6 +1622,14 @@ struct Interpreter
 
     std::map<uint32_t, MemoryRegion> memoryRegions;
     unsigned char *memory;
+
+    std::map<uint32_t, Register> registers;
+    RegisterObject& allocRegisterObject(uint32_t id, uint32_t type)
+    {
+        RegisterObject r {type, typeSizes[type]};
+        registers[id] = r;
+        return std::get<RegisterObject>(registers[id]);
+    }
 
     Interpreter(bool throwOnUnimplemented_, bool verbose_) :
         throwOnUnimplemented(throwOnUnimplemented_),
@@ -1635,6 +1698,18 @@ struct Interpreter
         return *reinterpret_cast<T*>(memory + offset);
     }
 
+    template <class T>
+    T& objectAt(unsigned char* data)
+    {
+        return *reinterpret_cast<T*>(data);
+    }
+
+    template <class T>
+    T& registerAs(int id)
+    {
+        return *reinterpret_cast<T*>(std::get<RegisterObject>(registers[id]).data);
+    }
+
     uint32_t getConstituentType(uint32_t t, int i)
     {
         const Type& type = types[t];
@@ -1649,28 +1724,27 @@ struct Interpreter
         return 0; // not reached
     }
 
-
-    void dumpTypeAt(const Type& type, size_t offset)
+    void dumpTypeAt(const Type& type, unsigned char *ptr)
     {
         std::visit(overloaded {
             [&](const TypeVoid& type) { std::cout << "{}"; },
-            [&](const TypeFloat& type) { std::cout << objectAt<float>(offset); },
+            [&](const TypeFloat& type) { std::cout << objectAt<float>(ptr); },
             [&](const TypeInt& type) {
                 if(type.signedness) {
-                    std::cout << objectAt<int32_t>(offset);
+                    std::cout << objectAt<int32_t>(ptr);
                 } else {
-                    std::cout << objectAt<uint32_t>(offset);
+                    std::cout << objectAt<uint32_t>(ptr);
                 }
             },
-            [&](const TypePointer& type) { std::cout << "(ptr)" << objectAt<uint32_t>(offset); },
+            [&](const TypePointer& type) { std::cout << "(ptr)" << objectAt<uint32_t>(ptr); },
             [&](const TypeFunction& type) { std::cout << "function"; },
             [&](const TypeImage& type) { std::cout << "image"; },
             [&](const TypeSampledImage& type) { std::cout << "sampledimage"; },
             [&](const TypeVector& type) {
                 std::cout << "<";
                 for(int i = 0; i < type.count; i++) {
-                    dumpTypeAt(types[type.type], offset);
-                    offset += typeSizes[type.type];
+                    dumpTypeAt(types[type.type], ptr);
+                    ptr += typeSizes[type.type];
                     if(i < type.count - 1)
                         std::cout << ", ";
                 }
@@ -1679,8 +1753,8 @@ struct Interpreter
             [&](const TypeStruct& type) {
                 std::cout << "{";
                 for(int i = 0; i < type.memberTypes.size(); i++) {
-                    dumpTypeAt(types[type.memberTypes[i]], offset);
-                    offset += typeSizes[type.memberTypes[i]];
+                    dumpTypeAt(types[type.memberTypes[i]], ptr);
+                    ptr += typeSizes[type.memberTypes[i]];
                     if(i < type.memberTypes.size() - 1)
                         std::cout << ", ";
                 }
@@ -2251,53 +2325,54 @@ struct Interpreter
 
     void stepLoad(const InsnLoad& insn)
     {
-        Pointer& ptr = pointers[insn.pointerId];
-        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
-        copy(insn.type, ptr.offset, intermediates[insn.resultId]);
+        RegisterPointer& ptr = std::get<RegisterPointer>(registers[insn.pointerId]);
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::copy(memory + ptr.offset, memory + ptr.offset + typeSizes[insn.type], obj.data);
         if(true) {
             std::cout << "load result is";
-            dumpTypeAt(types[insn.type], intermediates[insn.resultId]);
+            dumpTypeAt(types[insn.type], obj.data);
             std::cout << "\n";
         }
     }
 
     void stepStore(const InsnStore& insn)
     {
-        Pointer& ptr = pointers[insn.pointerId];
-        copy(ptr.type, intermediates[insn.objectId], ptr.offset);
+        RegisterPointer& ptr = std::get<RegisterPointer>(registers[insn.pointerId]);
+        RegisterObject& obj = std::get<RegisterObject>(registers[insn.objectId]);
+        std::copy(obj.data, obj.data + obj.size, memory + ptr.offset);
     }
 
     void stepCompositeExtract(const InsnCompositeExtract& insn)
     {
-        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
         /* use indexes to walk blob */
     }
 
     void stepCompositeConstruct(const InsnCompositeConstruct& insn)
     {
-        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
         /* use constituents to walk blob */
     }
 
     void stepFDiv(const InsnFDiv& insn)
     {
-        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
         std::visit([this, &insn](auto&& type) {
 
             using T = std::decay_t<decltype(type)>;
 
             if constexpr (std::is_same_v<T, TypeFloat>) {
 
-                float dividend = objectAt<float>(intermediates[insn.operand1Id]);
-                float divisor = objectAt<float>(intermediates[insn.operand1Id]);
+                float dividend = registerAs<float>(insn.operand1Id);
+                float divisor = registerAs<float>(insn.operand2Id);
                 float quotient = dividend / divisor;
-                objectAt<float>(intermediates[insn.resultId]) = quotient;
+                registerAs<float>(insn.resultId) = quotient;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-                float* dividend = &objectAt<float>(intermediates[insn.operand1Id]);
-                float* divisor = &objectAt<float>(intermediates[insn.operand1Id]);
-                float* result = &objectAt<float>(intermediates[insn.resultId]);
+                float* dividend = &registerAs<float>(insn.operand1Id);
+                float* divisor = &registerAs<float>(insn.operand2Id);
+                float* result = &registerAs<float>(insn.resultId);
                 for(int i = 0; i < type.count; i++) {
                     result[i] = dividend[i] / divisor[i];
                 }
@@ -2308,13 +2383,15 @@ struct Interpreter
 
     void stepConvertSToF(const InsnConvertSToF& insn)
     {
-        intermediates[insn.resultId] = allocate(SpvStorageClassPrivate, insn.type);
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
         /* can assume scalar or vector of float */
         /* convert signed int to float */
     }
 
     void stepAccessChain(const InsnAccessChain& insn)
     {
+#if 0
+        // registers.emplace(insn.resultId, RegisterObject {insn.type, typeSizes[insn.type]})
         Pointer& basePointer = pointers[insn.basePointerId];
         uint32_t type = basePointer.type;
         size_t offset = basePointer.offset;
@@ -2327,6 +2404,7 @@ struct Interpreter
             std::cout << "accesschain of " << basePointer.offset << " yielded " << offset << "\n";
         }
         pointers[insn.resultId] = { type, basePointer.storageClass, offset };
+#endif
     }
 
     void stepFunctionCall(const InsnFunctionCall& insn)
@@ -2408,14 +2486,22 @@ struct Interpreter
 
     void run()
     {
+        registers.clear();
         // init Function variables with initializers before each invocation
         // XXX also need to initialize within function calls?
         for(auto v: variables) {
             const Variable& var = v.second;
-            pointers[v.first] = { var.type, var.storageClass, var.offset };
+            registers[v.first] = RegisterPointer { var.type, var.storageClass, var.offset };
             if(v.second.storageClass == SpvStorageClassFunction) {
                 assert(v.second.initializer == NO_INITIALIZER); // XXX will do initializers later
             }
+        }
+
+        for(auto c: constants) {
+            const Constant& constant = c.second;
+            // RegisterObject& r = allocRegisterObject(c.first, constant.type);
+            // const unsigned char *data = reinterpret_cast<const unsigned char*>(&constant.value);
+            // std::copy(data, data + typeSizes[constant.type], r.data);
         }
 
         size_t oldTop = memoryRegions[SpvStorageClassPrivate].top;
@@ -2424,8 +2510,6 @@ struct Interpreter
         while(step());
 
         memoryRegions[SpvStorageClassPrivate].top = oldTop;
-
-        pointers.clear();
     }
 };
 
