@@ -1463,16 +1463,19 @@ struct Interpreter
 
         int which = 0;
 
+        // Read the next uint32_t.
         auto nextu = [insn, opds, &which](uint32_t deflt = 0xFFFFFFFF) {
             return (which < insn->num_operands) ? insn->words[opds[which++].offset] : deflt;
         };
 
+        // Read the next string.
         auto nexts = [insn, opds, &which]() {
             const char *s = reinterpret_cast<const char *>(&insn->words[opds[which].offset]);
             which++;
             return s;
         };
 
+        // Read the next vector.
         auto nextv = [insn, opds, &which]() {
             std::vector<uint32_t> v;
             if(which < insn->num_operands) {
@@ -1480,10 +1483,11 @@ struct Interpreter
             } else {
                 v = {};
             }
-            which++;
+            which++; // XXX advance by opds[which].num_words? And move up into the "if"?
             return v;
         };
 
+        // Read the rest of the operands as uint32_t.
         auto restv = [insn, opds, &which]() {
             std::vector<uint32_t> v;
             while(which < insn->num_operands) {
@@ -1834,6 +1838,7 @@ struct Interpreter
                 break;
             }
 
+                                /*
             case SpvOpFunctionParameter: {
                 assert(ip->currentFunction != nullptr);
                 uint32_t type = nextu();
@@ -1846,6 +1851,7 @@ struct Interpreter
                 }
                 break;
             }
+            */
 
             case SpvOpLabel: {
                 uint32_t id = nextu();
@@ -1866,168 +1872,8 @@ struct Interpreter
                 break;
             }
 
-            case SpvOpReturn: {
-                ip->code.push_back(InsnReturn{});
-                if(ip->verbose) {
-                    std::cout << "Return\n";
-                }
-                break;
-            }
-
-            case SpvOpLoad: {
-                uint32_t type = nextu();
-                uint32_t id = nextu();
-                uint32_t pointer = nextu();
-                uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
-                ip->code.push_back(InsnLoad{type, id, pointer, memoryAccess});
-                if(ip->verbose) {
-                    std::cout << "Load"
-                        << " type " << type
-                        << " id " << id
-                        << " pointer " << pointer;
-                    if(memoryAccess != NO_MEMORY_ACCESS_SEMANTIC)
-                        std::cout << " type " << memoryAccess;
-                    std::cout << "\n";
-                }
-                break;
-            }
-
-            case SpvOpStore: {
-                uint32_t pointer = nextu();
-                uint32_t object = nextu();
-                uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
-                ip->code.push_back(InsnStore{pointer, object, memoryAccess});
-                if(ip->verbose) {
-                    std::cout << "Store"
-                        << " pointer " << pointer
-                        << " object " << object;
-                    if(memoryAccess != NO_MEMORY_ACCESS_SEMANTIC)
-                        std::cout << " type " << memoryAccess;
-                    std::cout << "\n";
-                }
-                break;
-            }
-            
-            case SpvOpAccessChain: {
-                uint32_t type = nextu();
-                uint32_t resultId = nextu();
-                uint32_t baseId = nextu();
-                auto indexesId = restv();
-                ip->code.push_back(InsnAccessChain{type, resultId, baseId, indexesId});
-                if(ip->verbose) {
-                    std::cout << "AccessChain"
-                        << " type " << type
-                        << " resultId " << resultId
-                        << " baseId " << baseId;
-                    std::cout << " indexesId"; 
-                    for(int i = 0; i < indexesId.size(); i++)
-                        std::cout << " " << indexesId[i];
-                    std::cout << "\n";
-                }
-                break;
-            }
-            
-            case SpvOpCompositeConstruct: {
-                uint32_t type = nextu();
-                uint32_t resultId = nextu();
-                auto constituentsId = restv();
-                ip->code.push_back(InsnCompositeConstruct{type, resultId, constituentsId});
-                if(ip->verbose) {
-                    std::cout << "CompositeConstruct"
-                        << " type " << type
-                        << " resultId " << resultId;
-                    std::cout << " constituentsId"; 
-                    for(int i = 0; i < constituentsId.size(); i++)
-                        std::cout << " " << constituentsId[i];
-                    std::cout << "\n";
-                }
-                break;
-            }
-            
-            case SpvOpCompositeExtract: {
-                uint32_t type = nextu();
-                uint32_t resultId = nextu();
-                uint32_t compositeId = nextu();
-                auto indexesId = restv();
-                ip->code.push_back(InsnCompositeExtract{type, resultId, compositeId, indexesId});
-                if(ip->verbose) {
-                    std::cout << "CompositeExtract"
-                        << " type " << type
-                        << " resultId " << resultId
-                        << " compositeId " << compositeId;
-                    std::cout << " indexesId"; 
-                    for(int i = 0; i < indexesId.size(); i++)
-                        std::cout << " " << indexesId[i];
-                    std::cout << "\n";
-                }
-                break;
-            }
-            
-            case SpvOpConvertSToF: {
-                uint32_t type = nextu();
-                uint32_t resultId = nextu();
-                uint32_t signedValueId = nextu();
-                ip->code.push_back(InsnConvertSToF{type, resultId, signedValueId});
-                if(ip->verbose) {
-                    std::cout << "ConvertSToF"
-                        << " type " << type
-                        << " resultId " << resultId
-                        << " signedValueId " << signedValueId
-                        << "\n";
-                }
-                break;
-            }
-
-            case SpvOpFMul: {
-                uint32_t type = nextu();
-                uint32_t resultId = nextu();
-                uint32_t operand1Id = nextu();
-                uint32_t operand2Id = nextu();
-                ip->code.push_back(InsnFMul{type, resultId, operand1Id, operand2Id});
-                if(ip->verbose) {
-                    std::cout << "FMul"
-                        << " type " << type
-                        << " resultId " << resultId
-                        << " operand2Id " << operand2Id
-                        << "\n";
-                }
-                break;
-            }
-
-            case SpvOpFDiv: {
-                uint32_t type = nextu();
-                uint32_t resultId = nextu();
-                uint32_t operand1Id = nextu();
-                uint32_t operand2Id = nextu();
-                ip->code.push_back(InsnFDiv{type, resultId, operand1Id, operand2Id});
-                if(ip->verbose) {
-                    std::cout << "FDiv"
-                        << " type " << type
-                        << " resultId " << resultId
-                        << " operand2Id " << operand2Id
-                        << "\n";
-                }
-                break;
-            }
-
-            case SpvOpFunctionCall: {
-                uint32_t type = nextu();
-                uint32_t resultId = nextu();
-                uint32_t functionId = nextu();
-                auto operandId = restv();
-                ip->code.push_back(InsnFunctionCall{type, resultId, functionId, operandId});
-                if(ip->verbose) {
-                    std::cout << "FunctionCall"
-                        << " type " << type
-                        << " resultId " << resultId
-                        << " functionId " << functionId;
-                    std::cout << " operandId"; 
-                    for(int i = 0; i < operandId.size(); i++)
-                        std::cout << " " << operandId[i];
-                    std::cout << "\n";
-                }
-                break;
-            }
+            // Decode the instructions.
+#include "opcode_decode.h"
             
             default: {
                 if(ip->throwOnUnimplemented) {
