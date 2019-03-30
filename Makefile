@@ -19,6 +19,7 @@ simple.spv: simple.frag
 .PHONY: clean
 clean:
 	if [ -f simple.spv ]; then rm simple.spv; fi
+	if [ -f shade ]; then rm shade; fi
 
 .PHONY: dis
 dis:
