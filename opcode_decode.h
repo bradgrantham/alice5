@@ -262,6 +262,27 @@ case SpvOpVectorTimesScalar: {
     break;
 }
 
+case SpvOpFOrdLessThan: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnFOrdLessThan{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "FOrdLessThan";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpReturn: {
     ip->code.push_back(InsnReturn{});
     if(ip->verbose) {
