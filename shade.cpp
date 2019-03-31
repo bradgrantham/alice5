@@ -1963,6 +1963,33 @@ struct Interpreter
         }
     }
 
+    void stepFAdd(const InsnFAdd& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                float quotient = operand1 + operand2;
+                registerAs<float>(insn.resultId) = quotient;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] + operand2[i];
+                }
+
+            }
+        }, types[insn.type]);
+    }
+
     void stepFSub(const InsnFSub& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);

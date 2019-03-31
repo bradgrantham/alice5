@@ -550,11 +550,6 @@
         std::cerr << "stepIAdd() not implemented\n";
     }
 
-    void stepFAdd(const InsnFAdd& insn)
-    {
-        std::cerr << "stepFAdd() not implemented\n";
-    }
-
     void stepISub(const InsnISub& insn)
     {
         std::cerr << "stepISub() not implemented\n";
