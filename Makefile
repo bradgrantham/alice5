@@ -27,5 +27,5 @@ clean:
 	if [ -f shade ]; then rm shade; fi
 
 .PHONY: dis
-dis:
+dis: simple.spv
 	$(GLSLANG_SOURCE_DIR)/build/External/spirv-tools/tools/spirv-dis simple.spv | cat
