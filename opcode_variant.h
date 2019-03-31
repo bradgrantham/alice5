@@ -8,6 +8,7 @@ InsnAccessChain,
 InsnCompositeConstruct,
 InsnCompositeExtract,
 InsnConvertSToF,
+InsnFSub,
 InsnFMul,
 InsnFDiv,
 InsnReturn

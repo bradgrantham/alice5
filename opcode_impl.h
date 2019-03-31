@@ -560,11 +560,6 @@
         std::cerr << "stepISub() not implemented\n";
     }
 
-    void stepFSub(const InsnFSub& insn)
-    {
-        std::cerr << "stepFSub() not implemented\n";
-    }
-
     void stepIMul(const InsnIMul& insn)
     {
         std::cerr << "stepIMul() not implemented\n";
