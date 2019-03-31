@@ -1915,6 +1915,13 @@ struct Interpreter
 
             case SpvOpSelectionMerge: {
                 // We don't do anything with this information.
+                // https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.html#StructuredControlFlow
+                break;
+            }
+
+            case SpvOpLoopMerge: {
+                // We don't do anything with this information.
+                // https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.html#StructuredControlFlow
                 break;
             }
 
@@ -2004,6 +2011,33 @@ struct Interpreter
             dumpTypeAt(types[obj.type], obj.data);
             std::cout << "\n";
         }
+    }
+
+    void stepIAdd(const InsnIAdd& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeInt>) {
+
+                uint32_t operand1 = registerAs<uint32_t>(insn.operand1Id);
+                uint32_t operand2 = registerAs<uint32_t>(insn.operand2Id);
+                uint32_t result = operand1 + operand2;
+                registerAs<uint32_t>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                uint32_t* operand1 = &registerAs<uint32_t>(insn.operand1Id);
+                uint32_t* operand2 = &registerAs<uint32_t>(insn.operand2Id);
+                uint32_t* result = &registerAs<uint32_t>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] + operand2[i];
+                }
+
+            }
+        }, types[insn.type]);
     }
 
     void stepFAdd(const InsnFAdd& insn)
@@ -2233,6 +2267,37 @@ struct Interpreter
             } else {
 
                 std::cout << "Unknown type for FOrdGreaterThanEqual\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepSLessThan(const InsnSLessThan& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeInt>) {
+
+                int32_t operand1 = registerAs<int32_t>(insn.operand1Id);
+                int32_t operand2 = registerAs<int32_t>(insn.operand2Id);
+                bool result = operand1 < operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                int32_t* operand1 = &registerAs<int32_t>(insn.operand1Id);
+                int32_t* operand2 = &registerAs<int32_t>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] < operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for SLessThan\n";
 
             }
         }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);

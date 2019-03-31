@@ -545,11 +545,6 @@
         std::cerr << "stepFNegate() not implemented\n";
     }
 
-    void stepIAdd(const InsnIAdd& insn)
-    {
-        std::cerr << "stepIAdd() not implemented\n";
-    }
-
     void stepISub(const InsnISub& insn)
     {
         std::cerr << "stepISub() not implemented\n";
@@ -753,11 +748,6 @@
     void stepULessThan(const InsnULessThan& insn)
     {
         std::cerr << "stepULessThan() not implemented\n";
-    }
-
-    void stepSLessThan(const InsnSLessThan& insn)
-    {
-        std::cerr << "stepSLessThan() not implemented\n";
     }
 
     void stepULessThanEqual(const InsnULessThanEqual& insn)

@@ -157,6 +157,27 @@ case SpvOpConvertSToF: {
     break;
 }
 
+case SpvOpIAdd: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnIAdd{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "IAdd";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpFAdd: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
@@ -281,6 +302,27 @@ case SpvOpSelect: {
         std::cout << object1Id;
         std::cout << " object2Id ";
         std::cout << object2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpSLessThan: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnSLessThan{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "SLessThan";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
         std::cout << "\n";
     }
     break;
