@@ -2496,7 +2496,7 @@ struct Interpreter
                 }
                 registerAs<float>(insn.resultId) = sqrtf(radicand);
             }
-        }, types[insn.type]);
+        }, types[std::get<RegisterObject>(registers[insn.p0Id]).type]);
     }
 
     void stepBranch(const InsnBranch& insn)
