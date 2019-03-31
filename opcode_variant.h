@@ -23,4 +23,5 @@ InsnFOrdGreaterThanEqual,
 InsnBranch,
 InsnBranchConditional,
 InsnReturn,
+InsnReturnValue,
 InsnGLSLstd450Distance

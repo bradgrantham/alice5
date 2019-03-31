@@ -23,4 +23,5 @@
 [&](const InsnBranch& insn) { stepBranch(insn); },
 [&](const InsnBranchConditional& insn) { stepBranchConditional(insn); },
 [&](const InsnReturn& insn) { stepReturn(insn); },
+[&](const InsnReturnValue& insn) { stepReturnValue(insn); },
 [&](const InsnGLSLstd450Distance& insn) { stepGLSLstd450Distance(insn); },

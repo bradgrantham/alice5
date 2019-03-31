@@ -1045,11 +1045,6 @@
         std::cerr << "stepKill() not implemented\n";
     }
 
-    void stepReturnValue(const InsnReturnValue& insn)
-    {
-        std::cerr << "stepReturnValue() not implemented\n";
-    }
-
     void stepUnreachable(const InsnUnreachable& insn)
     {
         std::cerr << "stepUnreachable() not implemented\n";

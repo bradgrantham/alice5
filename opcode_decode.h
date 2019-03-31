@@ -455,6 +455,18 @@ case SpvOpReturn: {
     break;
 }
 
+case SpvOpReturnValue: {
+    uint32_t valueId = nextu();
+    ip->code.push_back(InsnReturnValue{valueId});
+    if(ip->verbose) {
+        std::cout << "ReturnValue";
+        std::cout << " valueId ";
+        std::cout << valueId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpExtInst: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();

@@ -1,3 +1,9 @@
+
+float foo()
+{
+    return 0.5;
+}
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 uv = (fragCoord - iResolution.xy/2.0)/iResolution.y;
@@ -8,7 +14,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     float d = distance(uv, vec2(0.0));
     uv = vec2(0.0);
     for (int i = 0; i < 10; i++) {
-        if (d <= 0.5) {
+        if (d <= foo()) {
             uv += inside*0.1;
         } else {
             uv += outside*0.1;

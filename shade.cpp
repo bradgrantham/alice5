@@ -1445,15 +1445,24 @@ struct Interpreter
 
     void stepFunctionParameter(const InsnFunctionParameter& insn)
     {
-        uint32_t sourceId = callstack.back();  callstack.pop_back();
+        uint32_t sourceId = callstack.back(); callstack.pop_back();
         registers[insn.resultId] = registers[sourceId];
         if(false) std::cout << "function parameter " << insn.resultId << " receives " << sourceId << "\n";
     }
 
     void stepReturn(const InsnReturn& insn)
     {
-         callstack.pop_back(); // return parameter not used.
-         pc = callstack.back(); callstack.pop_back();
+        callstack.pop_back(); // return parameter not used.
+        pc = callstack.back(); callstack.pop_back();
+    }
+
+    void stepReturnValue(const InsnReturnValue& insn)
+    {
+        // Return value.
+        uint32_t returnId = callstack.back(); callstack.pop_back();
+        registers[returnId] = registers[insn.valueId];
+
+        pc = callstack.back(); callstack.pop_back();
     }
 
     void stepFunctionCall(const InsnFunctionCall& insn)
