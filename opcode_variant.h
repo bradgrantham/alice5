@@ -18,4 +18,6 @@ InsnFOrdLessThan,
 InsnFOrdGreaterThan,
 InsnFOrdLessThanEqual,
 InsnFOrdGreaterThanEqual,
+InsnBranch,
+InsnBranchConditional,
 InsnReturn

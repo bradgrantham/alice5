@@ -1179,6 +1179,8 @@ struct Function
     uint32_t resultType;
     uint32_t functionControl;
     uint32_t functionType;
+
+    // Index into the "code" array.
     uint32_t start;
 };
 
@@ -1777,7 +1779,7 @@ struct Interpreter
                 uint32_t pointedType = std::get<TypePointer>(ip->types[type]).type;
                 size_t offset = ip->allocate(storageClass, pointedType);
                 ip->variables[id] = {pointedType, storageClass, initializer, offset};
-                if(ip->verbose || true) {
+                if(ip->verbose) {
                     std::cout << "Variable " << id << " type " << type << " to type " << pointedType << " storageClass " << storageClass << " offset " << offset;
                     if(initializer != NO_INITIALIZER)
                         std::cout << " initializer " << initializer;
@@ -1908,6 +1910,11 @@ struct Interpreter
                 if(ip->verbose) {
                     std::cout << "FunctionEnd\n";
                 }
+                break;
+            }
+
+            case SpvOpSelectionMerge: {
+                // We don't do anything with this information.
                 break;
             }
 
@@ -2344,6 +2351,17 @@ struct Interpreter
             callstack.push_back(argument);
         }
         pc = function.start;
+    }
+
+    void stepBranch(const InsnBranch& insn)
+    {
+        pc = labels[insn.targetLabelId];
+    }
+
+    void stepBranchConditional(const InsnBranchConditional& insn)
+    {
+        bool condition = registerAs<bool>(insn.conditionId);
+        pc = labels[condition ? insn.trueLabelId : insn.falseLabelId];
     }
 
     // Unimplemented instructions. To implement one, move the function from this

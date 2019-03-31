@@ -370,6 +370,40 @@ case SpvOpFOrdGreaterThanEqual: {
     break;
 }
 
+case SpvOpBranch: {
+    uint32_t targetLabelId = nextu();
+    ip->code.push_back(InsnBranch{targetLabelId});
+    if(ip->verbose) {
+        std::cout << "Branch";
+        std::cout << " targetLabelId ";
+        std::cout << targetLabelId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpBranchConditional: {
+    uint32_t conditionId = nextu();
+    uint32_t trueLabelId = nextu();
+    uint32_t falseLabelId = nextu();
+    std::vector<uint32_t> branchweightsId = restv();
+    ip->code.push_back(InsnBranchConditional{conditionId, trueLabelId, falseLabelId, branchweightsId});
+    if(ip->verbose) {
+        std::cout << "BranchConditional";
+        std::cout << " conditionId ";
+        std::cout << conditionId;
+        std::cout << " trueLabelId ";
+        std::cout << trueLabelId;
+        std::cout << " falseLabelId ";
+        std::cout << falseLabelId;
+        std::cout << " branchweightsId ";
+        for(int i = 0; i < branchweightsId.size(); i++)
+            std::cout << branchweightsId[i] << " ";
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpReturn: {
     ip->code.push_back(InsnReturn{});
     if(ip->verbose) {

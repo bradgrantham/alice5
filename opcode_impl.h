@@ -1045,16 +1045,6 @@
         std::cerr << "stepLabel() not implemented\n";
     }
 
-    void stepBranch(const InsnBranch& insn)
-    {
-        std::cerr << "stepBranch() not implemented\n";
-    }
-
-    void stepBranchConditional(const InsnBranchConditional& insn)
-    {
-        std::cerr << "stepBranchConditional() not implemented\n";
-    }
-
     void stepSwitch(const InsnSwitch& insn)
     {
         std::cerr << "stepSwitch() not implemented\n";
