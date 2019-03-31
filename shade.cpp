@@ -997,7 +997,7 @@ std::map<glslang::TBasicType, std::string> BasicTypeToString = {
 // A variable in memory, either global or within a function's frame.
 struct Variable
 {
-    // Key into the "types" map.
+    // Type of variable (not the pointer to it). Key into the "types" map.
     uint32_t type;
 
     // One of the values of SpvStorageClass (input, output, uniform, function, etc.).
@@ -1774,10 +1774,11 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t storageClass = nextu();
                 uint32_t initializer = nextu(NO_INITIALIZER);
-                size_t offset = ip->allocate(storageClass, type);
-                ip->variables[id] = {type, storageClass, initializer, offset};
-                if(ip->verbose) {
-                    std::cout << "Variable " << id << " type " << type << " storageClass " << storageClass;
+                uint32_t pointedType = std::get<TypePointer>(ip->types[type]).type;
+                size_t offset = ip->allocate(storageClass, pointedType);
+                ip->variables[id] = {pointedType, storageClass, initializer, offset};
+                if(ip->verbose || true) {
+                    std::cout << "Variable " << id << " type " << type << " to type " << pointedType << " storageClass " << storageClass << " offset " << offset;
                     if(initializer != NO_INITIALIZER)
                         std::cout << " initializer " << initializer;
                     std::cout << "\n";
@@ -2240,6 +2241,7 @@ struct Interpreter
             if constexpr (std::is_same_v<T, TypeFloat>) {
 
                 bool condition = registerAs<bool>(insn.conditionId);
+                // XXX shouldn't assume floats here. Any data is valid.
                 float object1 = registerAs<float>(insn.object1Id);
                 float object2 = registerAs<float>(insn.object2Id);
                 float result = condition ? object1 : object2;
@@ -2248,6 +2250,7 @@ struct Interpreter
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
                 bool* condition = &registerAs<bool>(insn.conditionId);
+                // XXX shouldn't assume floats here. Any data is valid.
                 float* object1 = &registerAs<float>(insn.object1Id);
                 float* object2 = &registerAs<float>(insn.object2Id);
                 float* result = &registerAs<float>(insn.resultId);
@@ -2379,8 +2382,7 @@ struct Interpreter
         // XXX also need to initialize within function calls?
         for(auto v: variables) {
             const Variable& var = v.second;
-            uint32_t pointedType = std::get<TypePointer>(types[var.type]).type;
-            registers[v.first] = RegisterPointer { pointedType, var.storageClass, var.offset };
+            registers[v.first] = RegisterPointer { var.type, var.storageClass, var.offset };
             if(v.second.storageClass == SpvStorageClassFunction) {
                 assert(v.second.initializer == NO_INITIALIZER); // XXX will do initializers later
             }
