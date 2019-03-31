@@ -1069,6 +1069,12 @@ struct TypeVoid
     int foo;
 };
 
+// Represents an "bool" type.
+struct TypeBool
+{
+    // No fields. It's a freakin' bool.
+};
+
 // Represents an "int" type.
 struct TypeInt
 {
@@ -1146,7 +1152,7 @@ struct TypeSampledImage
 };
 
 // Union of all known types.
-typedef std::variant<TypeVoid, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
+typedef std::variant<TypeVoid, TypeBool, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
 
 // A function parameter. This is on the receiving side, to set aside an SSA slot
 // for the value received from the caller.
@@ -1411,6 +1417,7 @@ struct Interpreter
     {
         std::visit(overloaded {
             [&](const TypeVoid& type) { std::cout << "{}"; },
+            [&](const TypeBool& type) { std::cout << objectAt<bool>(ptr); },
             [&](const TypeFloat& type) { std::cout << objectAt<float>(ptr); },
             [&](const TypeInt& type) {
                 if(type.signedness) {
@@ -1652,6 +1659,17 @@ struct Interpreter
                 ip->typeSizes[id] = 0;
                 if(ip->verbose) {
                     std::cout << "TypeVoid " << id << "\n";
+                }
+                break;
+            }
+
+            case SpvOpTypeBool: {
+                // XXX result id
+                uint32_t id = nextu();
+                ip->types[id] = TypeBool {};
+                ip->typeSizes[id] = 32; // Use up a full int.
+                if(ip->verbose) {
+                    std::cout << "TypeBool " << id << "\n";
                 }
                 break;
             }
