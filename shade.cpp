@@ -1278,6 +1278,7 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 struct Interpreter 
 {
     bool throwOnUnimplemented;
+    bool hasUnimplemented;
     bool verbose;
     std::set<uint32_t> capabilities;
 
@@ -1319,6 +1320,7 @@ struct Interpreter
 
     Interpreter(bool throwOnUnimplemented_, bool verbose_) :
         throwOnUnimplemented(throwOnUnimplemented_),
+        hasUnimplemented(false),
         verbose(verbose_),
         currentFunction(nullptr)
     {
@@ -1881,6 +1883,7 @@ struct Interpreter
                     throw std::runtime_error("unimplemented opcode " + OpcodeToString[insn->opcode] + " (" + std::to_string(insn->opcode) + ")");
                 } else {
                     std::cout << "unimplemented opcode " << OpcodeToString[insn->opcode] << " (" << insn->opcode << ")\n";
+                    ip->hasUnimplemented = true;
                 }
                 break;
             }
@@ -2186,6 +2189,7 @@ void usage(const char* progname)
     printf("\t-g    Generate debugging information\n");
     printf("\t-O    Run optimizing passes\n");
     printf("\t-t    Throw an exception on first unimplemented opcode\n");
+    printf("\t-n    Compile and load shader, but do not shade an image\n");
 }
 
 int main(int argc, char **argv)
@@ -2194,6 +2198,7 @@ int main(int argc, char **argv)
     bool optimize = false;
     bool beVerbose = false;
     bool throwOnUnimplemented = false;
+    bool doNotShade = false;
 
     char *progname = argv[0];
     argv++; argc--;
@@ -2217,6 +2222,11 @@ int main(int argc, char **argv)
         } else if(strcmp(argv[0], "-O") == 0) {
 
             optimize = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "-n") == 0) {
+
+            doNotShade = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-h") == 0) {
@@ -2306,6 +2316,14 @@ int main(int argc, char **argv)
     Interpreter ip(throwOnUnimplemented, beVerbose);
     spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
     spvBinaryParse(context, &ip, spirv.data(), spirv.size(), Interpreter::handleHeader, Interpreter::handleInstruction, nullptr);
+
+    if (ip.hasUnimplemented) {
+        exit(1);
+    }
+
+    if (doNotShade) {
+        exit(EXIT_SUCCESS);
+    }
 
     auto start_time = std::chrono::steady_clock::now();
 
