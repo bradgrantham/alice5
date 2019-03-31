@@ -1669,7 +1669,7 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = nextu();
                 ip->types[id] = TypeBool {};
-                ip->typeSizes[id] = sizeof(bool)*8;
+                ip->typeSizes[id] = sizeof(bool);
                 if(ip->verbose) {
                     std::cout << "TypeBool " << id << "\n";
                 }
@@ -2248,7 +2248,6 @@ struct Interpreter
             if constexpr (std::is_same_v<T, TypeFloat>) {
 
                 bool condition = registerAs<bool>(insn.conditionId);
-                // XXX shouldn't assume floats here. Any data is valid.
                 float object1 = registerAs<float>(insn.object1Id);
                 float object2 = registerAs<float>(insn.object2Id);
                 float result = condition ? object1 : object2;
@@ -2264,6 +2263,10 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = condition[i] ? object1[i] : object2[i];
                 }
+
+            } else {
+
+                std::cout << "Unknown type for stepSelect\n";
 
             }
         }, types[insn.type]);
