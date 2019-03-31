@@ -1390,6 +1390,7 @@ struct Interpreter
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
 
+        // XXX assumes floats.
         float* vector = &registerAs<float>(insn.vectorId);
         float scalar = registerAs<float>(insn.scalarId);
         float* result = &registerAs<float>(insn.resultId);
@@ -1398,6 +1399,24 @@ struct Interpreter
 
         for(int i = 0; i < type.count; i++) {
             result[i] = vector[i] * scalar;
+        }
+    }
+
+    void stepVectorShuffle(const InsnVectorShuffle& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        const RegisterObject &r1 = std::get<RegisterObject>(registers[insn.vector1Id]);
+        const RegisterObject &r2 = std::get<RegisterObject>(registers[insn.vector2Id]);
+        const TypeVector &t1 = std::get<TypeVector>(types[r1.type]);
+        uint32_t n1 = t1.count;
+        uint32_t elementSize = typeSizes[t1.type];
+
+        for(int i = 0; i < insn.componentsId.size(); i++) {
+            uint32_t component = insn.componentsId[i];
+            unsigned char *src = component < n1
+                ? r1.data + component*elementSize
+                : r2.data + (component - n1)*elementSize;
+            std::copy(src, src + elementSize, obj.data + i*elementSize);
         }
     }
 

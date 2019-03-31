@@ -98,6 +98,31 @@ case SpvOpAccessChain: {
     break;
 }
 
+case SpvOpVectorShuffle: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t vector1Id = nextu();
+    uint32_t vector2Id = nextu();
+    std::vector<uint32_t> componentsId = restv();
+    ip->code.push_back(InsnVectorShuffle{type, resultId, vector1Id, vector2Id, componentsId});
+    if(ip->verbose) {
+        std::cout << "VectorShuffle";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " vector1Id ";
+        std::cout << vector1Id;
+        std::cout << " vector2Id ";
+        std::cout << vector2Id;
+        std::cout << " componentsId ";
+        for(int i = 0; i < componentsId.size(); i++)
+            std::cout << componentsId[i] << " ";
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpCompositeConstruct: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();

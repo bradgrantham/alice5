@@ -330,11 +330,6 @@
         std::cerr << "stepVectorInsertDynamic() not implemented\n";
     }
 
-    void stepVectorShuffle(const InsnVectorShuffle& insn)
-    {
-        std::cerr << "stepVectorShuffle() not implemented\n";
-    }
-
     void stepCompositeInsert(const InsnCompositeInsert& insn)
     {
         std::cerr << "stepCompositeInsert() not implemented\n";

@@ -5,6 +5,7 @@
 [&](const InsnLoad& insn) { stepLoad(insn); },
 [&](const InsnStore& insn) { stepStore(insn); },
 [&](const InsnAccessChain& insn) { stepAccessChain(insn); },
+[&](const InsnVectorShuffle& insn) { stepVectorShuffle(insn); },
 [&](const InsnCompositeConstruct& insn) { stepCompositeConstruct(insn); },
 [&](const InsnCompositeExtract& insn) { stepCompositeExtract(insn); },
 [&](const InsnConvertSToF& insn) { stepConvertSToF(insn); },
