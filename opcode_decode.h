@@ -241,6 +241,27 @@ case SpvOpFDiv: {
     break;
 }
 
+case SpvOpVectorTimesScalar: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t vectorId = nextu();
+    uint32_t scalarId = nextu();
+    ip->code.push_back(InsnVectorTimesScalar{type, resultId, vectorId, scalarId});
+    if(ip->verbose) {
+        std::cout << "VectorTimesScalar";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " vectorId ";
+        std::cout << vectorId;
+        std::cout << " scalarId ";
+        std::cout << scalarId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpReturn: {
     ip->code.push_back(InsnReturn{});
     if(ip->verbose) {

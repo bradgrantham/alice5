@@ -12,4 +12,5 @@
 [&](const InsnFSub& insn) { stepFSub(insn); },
 [&](const InsnFMul& insn) { stepFMul(insn); },
 [&](const InsnFDiv& insn) { stepFDiv(insn); },
+[&](const InsnVectorTimesScalar& insn) { stepVectorTimesScalar(insn); },
 [&](const InsnReturn& insn) { stepReturn(insn); },

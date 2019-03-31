@@ -12,4 +12,5 @@ InsnFAdd,
 InsnFSub,
 InsnFMul,
 InsnFDiv,
+InsnVectorTimesScalar,
 InsnReturn

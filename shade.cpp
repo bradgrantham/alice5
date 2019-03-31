@@ -2088,6 +2088,21 @@ struct Interpreter
         }, types[insn.type]);
     }
 
+    void stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+
+        float* vector = &registerAs<float>(insn.vectorId);
+        float scalar = registerAs<float>(insn.scalarId);
+        float* result = &registerAs<float>(insn.resultId);
+
+        const TypeVector &type = std::get<TypeVector>(types[insn.type]);
+
+        for(int i = 0; i < type.count; i++) {
+            result[i] = vector[i] * scalar;
+        }
+    }
+
     void stepConvertSToF(const InsnConvertSToF& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
