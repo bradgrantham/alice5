@@ -262,6 +262,30 @@ case SpvOpVectorTimesScalar: {
     break;
 }
 
+case SpvOpSelect: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t conditionId = nextu();
+    uint32_t object1Id = nextu();
+    uint32_t object2Id = nextu();
+    ip->code.push_back(InsnSelect{type, resultId, conditionId, object1Id, object2Id});
+    if(ip->verbose) {
+        std::cout << "Select";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " conditionId ";
+        std::cout << conditionId;
+        std::cout << " object1Id ";
+        std::cout << object1Id;
+        std::cout << " object2Id ";
+        std::cout << object2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpFOrdLessThan: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();

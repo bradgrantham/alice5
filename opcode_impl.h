@@ -720,11 +720,6 @@
         std::cerr << "stepLogicalNot() not implemented\n";
     }
 
-    void stepSelect(const InsnSelect& insn)
-    {
-        std::cerr << "stepSelect() not implemented\n";
-    }
-
     void stepIEqual(const InsnIEqual& insn)
     {
         std::cerr << "stepIEqual() not implemented\n";

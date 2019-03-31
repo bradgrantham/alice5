@@ -13,5 +13,6 @@ InsnFSub,
 InsnFMul,
 InsnFDiv,
 InsnVectorTimesScalar,
+InsnSelect,
 InsnFOrdLessThan,
 InsnReturn

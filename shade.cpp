@@ -1667,7 +1667,7 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = nextu();
                 ip->types[id] = TypeBool {};
-                ip->typeSizes[id] = 32; // Use up a full int.
+                ip->typeSizes[id] = sizeof(bool)*8;
                 if(ip->verbose) {
                     std::cout << "TypeBool " << id << "\n";
                 }
@@ -2117,16 +2117,49 @@ struct Interpreter
 
                 float operand1 = registerAs<float>(insn.operand1Id);
                 float operand2 = registerAs<float>(insn.operand2Id);
-                float quotient = operand1 < operand2;
-                registerAs<float>(insn.resultId) = quotient;
+                bool result = operand1 < operand2;
+                registerAs<bool>(insn.resultId) = result;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
                 float* operand1 = &registerAs<float>(insn.operand1Id);
                 float* operand2 = &registerAs<float>(insn.operand2Id);
-                float* result = &registerAs<float>(insn.resultId);
+                bool* result = &registerAs<bool>(insn.resultId);
                 for(int i = 0; i < type.count; i++) {
                     result[i] = operand1[i] < operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for FOrdLessThan\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepSelect(const InsnSelect& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                bool condition = registerAs<bool>(insn.conditionId);
+                float object1 = registerAs<float>(insn.object1Id);
+                float object2 = registerAs<float>(insn.object2Id);
+                float result = condition ? object1 : object2;
+                registerAs<float>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                bool* condition = &registerAs<bool>(insn.conditionId);
+                float* object1 = &registerAs<float>(insn.object1Id);
+                float* object2 = &registerAs<float>(insn.object2Id);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = condition[i] ? object1[i] : object2[i];
                 }
 
             }

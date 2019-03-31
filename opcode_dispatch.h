@@ -13,5 +13,6 @@
 [&](const InsnFMul& insn) { stepFMul(insn); },
 [&](const InsnFDiv& insn) { stepFDiv(insn); },
 [&](const InsnVectorTimesScalar& insn) { stepVectorTimesScalar(insn); },
+[&](const InsnSelect& insn) { stepSelect(insn); },
 [&](const InsnFOrdLessThan& insn) { stepFOrdLessThan(insn); },
 [&](const InsnReturn& insn) { stepReturn(insn); },
