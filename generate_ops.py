@@ -107,6 +107,9 @@ def main():
     json_pathname = sys.argv[1]
     grammar = json.load(open(json_pathname))
 
+    glsl_std_450_json_pathname = sys.argv[2]
+    glsl_std_450_grammar = json.load(open(glsl_std_450_json_pathname))
+
     # Create map from operand kind name ("FPFastMathMode") to info about the kind.
     operand_kind_map = dict((kind["kind"], kind) for kind in grammar["operand_kinds"])
 
@@ -116,6 +119,9 @@ def main():
     # Output files.
     opcode_to_string_f = open("opcode_to_string.h", "w")
     opcode_to_string_f.write(WARNING);
+
+    GLSLstd450_opcode_to_string_f = open("GLSLstd450_opcode_to_string.h", "w")
+    GLSLstd450_opcode_to_string_f.write(WARNING);
 
     opcode_structs_f = open("opcode_structs.h", "w")
     opcode_structs_f.write(WARNING);
@@ -133,6 +139,7 @@ def main():
     opcode_decode_f = open("opcode_decode.h", "w")
     opcode_decode_f.write(WARNING);
 
+    # Output instructions for core SPIR-V
     for instruction in grammar["instructions"]:
         opcode = instruction["opcode"]
         opname = instruction["opname"]
@@ -195,9 +202,97 @@ def main():
             opcode_impl_f.write("    void step%s(const %s& insn)\n    {\n        std::cerr << \"step%s() not implemented\\n\";\n    }\n\n"
                     % (short_opname, struct_opname, short_opname))
 
+    # Emit opcode decode preamble for extinst
+    opcode_decode_f.write("case SpvOpExtInst: {\n")
+    opcode_decode_f.write("    uint32_t type = nextu();\n")
+    opcode_decode_f.write("    uint32_t resultId = nextu();\n")
+    opcode_decode_f.write("    uint32_t ext = nextu();\n")
+    opcode_decode_f.write("    uint32_t opcode = nextu();\n")
+    opcode_decode_f.write("    if(ext == ip->ExtInstGLSL_std_450_id) {\n")
+    opcode_decode_f.write("        switch(opcode) {\n")
+
+    type_json_operand = {"kind" : "IdResultType" }
+    resultid_json_operand = { "kind" : "IdResult" }
+    for instruction in glsl_std_450_grammar["instructions"]:
+        opcode = instruction["opcode"]
+        opname = "GLSLstd450" + instruction["opname"]
+        struct_opname = "Insn" + opname
+
+        # Set up 2 operands from OpExtInst that are handled by the extension instruction
+        extinst_operands = [Operand(type_json_operand, operand_kind_map, 0, opname), Operand(resultid_json_operand, operand_kind_map, 1, opname)]
+
+        # Process the operands, adding our own custom fields to them.
+        operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
+                for operand_index, json_operand in enumerate(instruction.get("operands", []))]
+
+        # Opcode to string file.
+        GLSLstd450_opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, opname))
+
+        # Struct file.
+        opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
+        opcode_structs_f.write("struct %s {\n" % (struct_opname, ))
+        for operand in extinst_operands + operands:
+            opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
+                operand.cpp_name, operand.cpp_comment,
+                " (optional)" if operand.quantifier == "?" else ""));
+        opcode_structs_f.write("};\n\n")
+
+        # Takes too long to compile if you add them all.
+        if opname in already_implemented:
+            # Decode file.
+            opcode_decode_f.write("case %s: {\n" % opname)
+            for operand in operands:
+                opcode_decode_f.write("    %s %s = %s(%s);\n" %
+                        (operand.cpp_type, operand.cpp_name,
+                            operand.decode_function, operand.default_value))
+            opcode_decode_f.write("    ip->code.push_back(%s{%s});\n" %
+                    (struct_opname, ", ".join(operand.cpp_name for operand in extinst_operands + operands)))
+            opcode_decode_f.write("    if(ip->verbose) {\n")
+            opcode_decode_f.write("        std::cout << \"%s\";\n" % opname)
+            for operand in extinst_operands + operands:
+                opcode_decode_f.write("        std::cout << \" %s \";\n" % operand.cpp_name)
+                if operand.quantifier == "*":
+                    opcode_decode_f.write("        for(int i = 0; i < %s.size(); i++)\n"
+                            % operand.cpp_name)
+                    opcode_decode_f.write("            std::cout << %s[i] << \" \";\n" % operand.cpp_name)
+                else:
+                    opcode_decode_f.write("        std::cout << %s;\n" % operand.cpp_name)
+            opcode_decode_f.write("        std::cout << \"\\n\";\n")
+            opcode_decode_f.write("    }\n")
+            opcode_decode_f.write("    break;\n")
+            opcode_decode_f.write("}\n\n")
+
+            # Variant file.
+            variant_entries.append(struct_opname)
+
+            # Dispatch file.
+            opcode_dispatch_f.write("[&](const %s& insn) { step%s(insn); },\n" % (struct_opname, opname))
+
+        # Generate a stub if it's not already implemented in the C++ file.
+        if opname not in already_implemented:
+            opcode_impl_f.write("    void step%s(const %s& insn)\n    {\n        std::cerr << \"step%s() not implemented\\n\";\n    }\n\n"
+                    % (opname, struct_opname, opname))
+
+    opcode_decode_f.write("            default: {\n")
+    opcode_decode_f.write("                if(ip->throwOnUnimplemented) {\n")
+    opcode_decode_f.write("                    throw std::runtime_error(\"unimplemented GLSLstd450 opcode \" + GLSLstd450OpcodeToString[opcode] + \" (\" + std::to_string(opcode) + \")\");\n")
+    opcode_decode_f.write("                } else {\n")
+    opcode_decode_f.write("                    std::cout << \"unimplemented GLSLstd450 opcode \" << GLSLstd450OpcodeToString[opcode] << \" (\" << opcode << \")\\n\";\n")
+    opcode_decode_f.write("                    ip->hasUnimplemented = true;\n")
+    opcode_decode_f.write("                }\n")
+    opcode_decode_f.write("                break;\n")
+    opcode_decode_f.write("            }\n")
+    opcode_decode_f.write("        }\n")
+    opcode_decode_f.write("    } else {\n")
+    opcode_decode_f.write("        throw std::runtime_error(\"unimplemented instruction \" + std::to_string(opcode) + \" from extension set \" + std::to_string(ext));\n")
+    opcode_decode_f.write("    }\n")
+    opcode_decode_f.write("    break;\n")
+    opcode_decode_f.write("}\n")
+
     opcode_variant_f.write(",\n".join(variant_entries))
 
     opcode_to_string_f.close()
+    GLSLstd450_opcode_to_string_f.close()
     opcode_structs_f.close()
     opcode_variant_f.close()
     opcode_dispatch_f.close()

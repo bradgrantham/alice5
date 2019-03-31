@@ -11,6 +11,7 @@
 #include <SPIRV/GlslangToSpv.h>
 #include <spirv-tools/libspirv.h>
 #include "spirv.h"
+#include "GLSL.std.450.h"
 
 const int imageWidth = 256;
 const int imageHeight = 256;
@@ -31,6 +32,10 @@ typedef std::array<int32_t,4> v4int;
 
 std::map<uint32_t, std::string> OpcodeToString = {
 #include "opcode_to_string.h"
+};
+
+std::map<uint32_t, std::string> GLSLstd450OpcodeToString = {
+#include "GLSLstd450_opcode_to_string.h"
 };
 
 std::map<glslang::TOperator, std::string> OperatorToString = {
@@ -1276,6 +1281,7 @@ struct Interpreter
     // secondary maps of entryPoint, decorations, names, etc
 
     std::map<uint32_t, std::string> extInstSets;
+    uint32_t ExtInstGLSL_std_450_id;
     std::map<uint32_t, std::string> strings;
     uint32_t memoryModel;
     uint32_t addressingModel;
@@ -1498,6 +1504,47 @@ struct Interpreter
 
         switch(insn->opcode) {
 
+#if 0
+            case SpvOpExtInst: {
+                uint32_t type = nextu();
+                uint32_t resultId = nextu();
+                uint32_t ext = nextu();
+                uint32_t opcode = nextu();
+                if(ext == ip->ExtInstGLSL_std_450_id)) {
+                    switch(opcode) {
+                        case GLSLstd450Distance: {
+                            uint32_t p0 = nextu();
+                            uint32_t p1 = nextu();
+                            ip->code.push_back(InsnGLSLstd450Distance{type, resultId, p0, p1});
+                            if(ip->verbose) {
+                                std::cout << "Distance ";
+                                std::cout << " type ";
+                                std::cout << type;
+                                std::cout << " resultId ";
+                                std::cout << resultId;
+                                std::cout << " p0 ";
+                                std::cout << p0;
+                                std::cout << " p1 ";
+                                std::cout << p1;
+                                std::cout << "\n";
+                            }
+                            break;
+                        }
+                        default: {
+                            if(ip->throwOnUnimplemented) {
+                                throw std::runtime_error("unimplemented opcode " + GLSLstd450OpcodeToString[opcode] + " (" + std::to_string(opcode) + ")");
+                            } else {
+                                std::cout << "unimplemented opcode " << GLSLstd450OpcodeToString[opcode] << " (" << opcode << ")\n";
+                                ip->hasUnimplemented = true;
+                            }
+                            break;
+                        }
+                } else {
+                    throw std::runtime_error("unimplemented instruction " + std::to_string(opcode) + " from extension set " + std::to_string(ext));
+                }
+                break;
+            }
+#endif
             case SpvOpCapability: {
                 uint32_t cap = nextu();
                 assert(cap == SpvCapabilityShader);
@@ -1512,7 +1559,11 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = nextu();
                 const char *name = nexts();
-                assert(strcmp(name, "GLSL.std.450") == 0);
+                if(strcmp(name, "GLSL.std.450") == 0) {
+                    ip->ExtInstGLSL_std_450_id = id;
+                } else {
+                    throw std::runtime_error("unimplemented extension instruction set \"" + std::string(name) + "\"");
+                }
                 ip->extInstSets[id] = name;
                 if(ip->verbose) {
                     std::cout << "OpExtInstImport " << insn->words[opds[0].offset] << " " << name << "\n";
@@ -2155,6 +2206,33 @@ struct Interpreter
             callstack.push_back(argument);
         }
         pc = function.start;
+    }
+
+    void stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float p0 = registerAs<float>(insn.p0Id);
+                float p1 = registerAs<float>(insn.p1Id);
+                float radicand = (p1 - p0) * (p1 - p0);
+                registerAs<float>(insn.resultId) = sqrtf(radicand);
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* p0 = &registerAs<float>(insn.p0Id);
+                float* p1 = &registerAs<float>(insn.p1Id);
+                float radicand = 0;
+                for(int i = 0; i < type.count; i++) {
+                    radicand += (p1[i] - p0[i]) * (p1[i] - p0[i]);
+                }
+                registerAs<float>(insn.resultId) = sqrtf(radicand);
+            }
+        }, types[insn.type]);
     }
 
     // Unimplemented instructions. To implement one, move the function from this
