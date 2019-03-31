@@ -795,29 +795,14 @@
         std::cerr << "stepFUnordLessThan() not implemented\n";
     }
 
-    void stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
-    {
-        std::cerr << "stepFOrdGreaterThan() not implemented\n";
-    }
-
     void stepFUnordGreaterThan(const InsnFUnordGreaterThan& insn)
     {
         std::cerr << "stepFUnordGreaterThan() not implemented\n";
     }
 
-    void stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
-    {
-        std::cerr << "stepFOrdLessThanEqual() not implemented\n";
-    }
-
     void stepFUnordLessThanEqual(const InsnFUnordLessThanEqual& insn)
     {
         std::cerr << "stepFUnordLessThanEqual() not implemented\n";
-    }
-
-    void stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
-    {
-        std::cerr << "stepFOrdGreaterThanEqual() not implemented\n";
     }
 
     void stepFUnordGreaterThanEqual(const InsnFUnordGreaterThanEqual& insn)

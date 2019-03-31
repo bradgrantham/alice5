@@ -15,4 +15,7 @@ InsnFDiv,
 InsnVectorTimesScalar,
 InsnSelect,
 InsnFOrdLessThan,
+InsnFOrdGreaterThan,
+InsnFOrdLessThanEqual,
+InsnFOrdGreaterThanEqual,
 InsnReturn

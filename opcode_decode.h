@@ -307,6 +307,69 @@ case SpvOpFOrdLessThan: {
     break;
 }
 
+case SpvOpFOrdGreaterThan: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnFOrdGreaterThan{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "FOrdGreaterThan";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpFOrdLessThanEqual: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnFOrdLessThanEqual{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "FOrdLessThanEqual";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpFOrdGreaterThanEqual: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnFOrdGreaterThanEqual{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "FOrdGreaterThanEqual";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpReturn: {
     ip->code.push_back(InsnReturn{});
     if(ip->verbose) {

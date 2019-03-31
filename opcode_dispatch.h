@@ -15,4 +15,7 @@
 [&](const InsnVectorTimesScalar& insn) { stepVectorTimesScalar(insn); },
 [&](const InsnSelect& insn) { stepSelect(insn); },
 [&](const InsnFOrdLessThan& insn) { stepFOrdLessThan(insn); },
+[&](const InsnFOrdGreaterThan& insn) { stepFOrdGreaterThan(insn); },
+[&](const InsnFOrdLessThanEqual& insn) { stepFOrdLessThanEqual(insn); },
+[&](const InsnFOrdGreaterThanEqual& insn) { stepFOrdGreaterThanEqual(insn); },
 [&](const InsnReturn& insn) { stepReturn(insn); },

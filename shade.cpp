@@ -2009,8 +2009,8 @@ struct Interpreter
 
                 float operand1 = registerAs<float>(insn.operand1Id);
                 float operand2 = registerAs<float>(insn.operand2Id);
-                float quotient = operand1 + operand2;
-                registerAs<float>(insn.resultId) = quotient;
+                float result = operand1 + operand2;
+                registerAs<float>(insn.resultId) = result;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
@@ -2036,8 +2036,8 @@ struct Interpreter
 
                 float operand1 = registerAs<float>(insn.operand1Id);
                 float operand2 = registerAs<float>(insn.operand2Id);
-                float quotient = operand1 - operand2;
-                registerAs<float>(insn.resultId) = quotient;
+                float result = operand1 - operand2;
+                registerAs<float>(insn.resultId) = result;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
@@ -2063,8 +2063,8 @@ struct Interpreter
 
                 float operand1 = registerAs<float>(insn.operand1Id);
                 float operand2 = registerAs<float>(insn.operand2Id);
-                float quotient = operand1 * operand2;
-                registerAs<float>(insn.resultId) = quotient;
+                float result = operand1 * operand2;
+                registerAs<float>(insn.resultId) = result;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
@@ -2088,18 +2088,18 @@ struct Interpreter
 
             if constexpr (std::is_same_v<T, TypeFloat>) {
 
-                float dividend = registerAs<float>(insn.operand1Id);
-                float divisor = registerAs<float>(insn.operand2Id);
-                float quotient = dividend / divisor;
-                registerAs<float>(insn.resultId) = quotient;
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                float result = operand1 / operand2;
+                registerAs<float>(insn.resultId) = result;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-                float* dividend = &registerAs<float>(insn.operand1Id);
-                float* divisor = &registerAs<float>(insn.operand2Id);
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
                 float* result = &registerAs<float>(insn.resultId);
                 for(int i = 0; i < type.count; i++) {
-                    result[i] = dividend[i] / divisor[i];
+                    result[i] = operand1[i] / operand2[i];
                 }
 
             }
@@ -2132,6 +2132,99 @@ struct Interpreter
             } else {
 
                 std::cout << "Unknown type for FOrdLessThan\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                bool result = operand1 > operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] > operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for FOrdGreaterThan\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                bool result = operand1 <= operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] <= operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for FOrdLessThanEqual\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                bool result = operand1 >= operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] >= operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for FOrdGreaterThanEqual\n";
 
             }
         }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
