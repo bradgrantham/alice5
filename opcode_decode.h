@@ -157,6 +157,27 @@ case SpvOpConvertSToF: {
     break;
 }
 
+case SpvOpIAdd: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnIAdd{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "IAdd";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpFAdd: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
@@ -236,6 +257,190 @@ case SpvOpFDiv: {
         std::cout << operand1Id;
         std::cout << " operand2Id ";
         std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpVectorTimesScalar: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t vectorId = nextu();
+    uint32_t scalarId = nextu();
+    ip->code.push_back(InsnVectorTimesScalar{type, resultId, vectorId, scalarId});
+    if(ip->verbose) {
+        std::cout << "VectorTimesScalar";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " vectorId ";
+        std::cout << vectorId;
+        std::cout << " scalarId ";
+        std::cout << scalarId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpSelect: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t conditionId = nextu();
+    uint32_t object1Id = nextu();
+    uint32_t object2Id = nextu();
+    ip->code.push_back(InsnSelect{type, resultId, conditionId, object1Id, object2Id});
+    if(ip->verbose) {
+        std::cout << "Select";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " conditionId ";
+        std::cout << conditionId;
+        std::cout << " object1Id ";
+        std::cout << object1Id;
+        std::cout << " object2Id ";
+        std::cout << object2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpSLessThan: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnSLessThan{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "SLessThan";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpFOrdLessThan: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnFOrdLessThan{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "FOrdLessThan";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpFOrdGreaterThan: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnFOrdGreaterThan{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "FOrdGreaterThan";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpFOrdLessThanEqual: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnFOrdLessThanEqual{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "FOrdLessThanEqual";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpFOrdGreaterThanEqual: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnFOrdGreaterThanEqual{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "FOrdGreaterThanEqual";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpBranch: {
+    uint32_t targetLabelId = nextu();
+    ip->code.push_back(InsnBranch{targetLabelId});
+    if(ip->verbose) {
+        std::cout << "Branch";
+        std::cout << " targetLabelId ";
+        std::cout << targetLabelId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpBranchConditional: {
+    uint32_t conditionId = nextu();
+    uint32_t trueLabelId = nextu();
+    uint32_t falseLabelId = nextu();
+    std::vector<uint32_t> branchweightsId = restv();
+    ip->code.push_back(InsnBranchConditional{conditionId, trueLabelId, falseLabelId, branchweightsId});
+    if(ip->verbose) {
+        std::cout << "BranchConditional";
+        std::cout << " conditionId ";
+        std::cout << conditionId;
+        std::cout << " trueLabelId ";
+        std::cout << trueLabelId;
+        std::cout << " falseLabelId ";
+        std::cout << falseLabelId;
+        std::cout << " branchweightsId ";
+        for(int i = 0; i < branchweightsId.size(); i++)
+            std::cout << branchweightsId[i] << " ";
         std::cout << "\n";
     }
     break;

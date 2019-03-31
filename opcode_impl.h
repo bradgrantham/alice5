@@ -545,11 +545,6 @@
         std::cerr << "stepFNegate() not implemented\n";
     }
 
-    void stepIAdd(const InsnIAdd& insn)
-    {
-        std::cerr << "stepIAdd() not implemented\n";
-    }
-
     void stepISub(const InsnISub& insn)
     {
         std::cerr << "stepISub() not implemented\n";
@@ -593,11 +588,6 @@
     void stepFMod(const InsnFMod& insn)
     {
         std::cerr << "stepFMod() not implemented\n";
-    }
-
-    void stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
-    {
-        std::cerr << "stepVectorTimesScalar() not implemented\n";
     }
 
     void stepMatrixTimesScalar(const InsnMatrixTimesScalar& insn)
@@ -725,11 +715,6 @@
         std::cerr << "stepLogicalNot() not implemented\n";
     }
 
-    void stepSelect(const InsnSelect& insn)
-    {
-        std::cerr << "stepSelect() not implemented\n";
-    }
-
     void stepIEqual(const InsnIEqual& insn)
     {
         std::cerr << "stepIEqual() not implemented\n";
@@ -765,11 +750,6 @@
         std::cerr << "stepULessThan() not implemented\n";
     }
 
-    void stepSLessThan(const InsnSLessThan& insn)
-    {
-        std::cerr << "stepSLessThan() not implemented\n";
-    }
-
     void stepULessThanEqual(const InsnULessThanEqual& insn)
     {
         std::cerr << "stepULessThanEqual() not implemented\n";
@@ -800,19 +780,9 @@
         std::cerr << "stepFUnordNotEqual() not implemented\n";
     }
 
-    void stepFOrdLessThan(const InsnFOrdLessThan& insn)
-    {
-        std::cerr << "stepFOrdLessThan() not implemented\n";
-    }
-
     void stepFUnordLessThan(const InsnFUnordLessThan& insn)
     {
         std::cerr << "stepFUnordLessThan() not implemented\n";
-    }
-
-    void stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
-    {
-        std::cerr << "stepFOrdGreaterThan() not implemented\n";
     }
 
     void stepFUnordGreaterThan(const InsnFUnordGreaterThan& insn)
@@ -820,19 +790,9 @@
         std::cerr << "stepFUnordGreaterThan() not implemented\n";
     }
 
-    void stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
-    {
-        std::cerr << "stepFOrdLessThanEqual() not implemented\n";
-    }
-
     void stepFUnordLessThanEqual(const InsnFUnordLessThanEqual& insn)
     {
         std::cerr << "stepFUnordLessThanEqual() not implemented\n";
-    }
-
-    void stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
-    {
-        std::cerr << "stepFOrdGreaterThanEqual() not implemented\n";
     }
 
     void stepFUnordGreaterThanEqual(const InsnFUnordGreaterThanEqual& insn)
@@ -1073,16 +1033,6 @@
     void stepLabel(const InsnLabel& insn)
     {
         std::cerr << "stepLabel() not implemented\n";
-    }
-
-    void stepBranch(const InsnBranch& insn)
-    {
-        std::cerr << "stepBranch() not implemented\n";
-    }
-
-    void stepBranchConditional(const InsnBranchConditional& insn)
-    {
-        std::cerr << "stepBranchConditional() not implemented\n";
     }
 
     void stepSwitch(const InsnSwitch& insn)

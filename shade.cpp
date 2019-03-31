@@ -1002,7 +1002,7 @@ std::map<glslang::TBasicType, std::string> BasicTypeToString = {
 // A variable in memory, either global or within a function's frame.
 struct Variable
 {
-    // Key into the "types" map.
+    // Type of variable (not the pointer to it). Key into the "types" map.
     uint32_t type;
 
     // One of the values of SpvStorageClass (input, output, uniform, function, etc.).
@@ -1072,6 +1072,12 @@ struct TypeVoid
 {
     // XXX Not sure why we need this. Not allowed to have an empty struct?
     int foo;
+};
+
+// Represents an "bool" type.
+struct TypeBool
+{
+    // No fields. It's a freakin' bool.
 };
 
 // Represents an "int" type.
@@ -1151,7 +1157,7 @@ struct TypeSampledImage
 };
 
 // Union of all known types.
-typedef std::variant<TypeVoid, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
+typedef std::variant<TypeVoid, TypeBool, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
 
 // A function parameter. This is on the receiving side, to set aside an SSA slot
 // for the value received from the caller.
@@ -1178,6 +1184,8 @@ struct Function
     uint32_t resultType;
     uint32_t functionControl;
     uint32_t functionType;
+
+    // Index into the "code" array.
     uint32_t start;
 };
 
@@ -1417,6 +1425,7 @@ struct Interpreter
     {
         std::visit(overloaded {
             [&](const TypeVoid& type) { std::cout << "{}"; },
+            [&](const TypeBool& type) { std::cout << objectAt<bool>(ptr); },
             [&](const TypeFloat& type) { std::cout << objectAt<float>(ptr); },
             [&](const TypeInt& type) {
                 if(type.signedness) {
@@ -1707,6 +1716,17 @@ struct Interpreter
                 break;
             }
 
+            case SpvOpTypeBool: {
+                // XXX result id
+                uint32_t id = nextu();
+                ip->types[id] = TypeBool {};
+                ip->typeSizes[id] = sizeof(bool);
+                if(ip->verbose) {
+                    std::cout << "TypeBool " << id << "\n";
+                }
+                break;
+            }
+
             case SpvOpTypeFloat: {
                 // XXX result id
                 uint32_t id = nextu();
@@ -1807,10 +1827,11 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t storageClass = nextu();
                 uint32_t initializer = nextu(NO_INITIALIZER);
-                size_t offset = ip->allocate(storageClass, type);
-                ip->variables[id] = {type, storageClass, initializer, offset};
+                uint32_t pointedType = std::get<TypePointer>(ip->types[type]).type;
+                size_t offset = ip->allocate(storageClass, pointedType);
+                ip->variables[id] = {pointedType, storageClass, initializer, offset};
                 if(ip->verbose) {
-                    std::cout << "Variable " << id << " type " << type << " storageClass " << storageClass;
+                    std::cout << "Variable " << id << " type " << type << " to type " << pointedType << " storageClass " << storageClass << " offset " << offset;
                     if(initializer != NO_INITIALIZER)
                         std::cout << " initializer " << initializer;
                     std::cout << "\n";
@@ -1943,6 +1964,18 @@ struct Interpreter
                 break;
             }
 
+            case SpvOpSelectionMerge: {
+                // We don't do anything with this information.
+                // https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.html#StructuredControlFlow
+                break;
+            }
+
+            case SpvOpLoopMerge: {
+                // We don't do anything with this information.
+                // https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.html#StructuredControlFlow
+                break;
+            }
+
             // Decode the instructions.
 #include "opcode_decode.h"
             
@@ -2031,6 +2064,33 @@ struct Interpreter
         }
     }
 
+    void stepIAdd(const InsnIAdd& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeInt>) {
+
+                uint32_t operand1 = registerAs<uint32_t>(insn.operand1Id);
+                uint32_t operand2 = registerAs<uint32_t>(insn.operand2Id);
+                uint32_t result = operand1 + operand2;
+                registerAs<uint32_t>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                uint32_t* operand1 = &registerAs<uint32_t>(insn.operand1Id);
+                uint32_t* operand2 = &registerAs<uint32_t>(insn.operand2Id);
+                uint32_t* result = &registerAs<uint32_t>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] + operand2[i];
+                }
+
+            }
+        }, types[insn.type]);
+    }
+
     void stepFAdd(const InsnFAdd& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
@@ -2042,8 +2102,8 @@ struct Interpreter
 
                 float operand1 = registerAs<float>(insn.operand1Id);
                 float operand2 = registerAs<float>(insn.operand2Id);
-                float quotient = operand1 + operand2;
-                registerAs<float>(insn.resultId) = quotient;
+                float result = operand1 + operand2;
+                registerAs<float>(insn.resultId) = result;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
@@ -2069,8 +2129,8 @@ struct Interpreter
 
                 float operand1 = registerAs<float>(insn.operand1Id);
                 float operand2 = registerAs<float>(insn.operand2Id);
-                float quotient = operand1 - operand2;
-                registerAs<float>(insn.resultId) = quotient;
+                float result = operand1 - operand2;
+                registerAs<float>(insn.resultId) = result;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
@@ -2096,8 +2156,8 @@ struct Interpreter
 
                 float operand1 = registerAs<float>(insn.operand1Id);
                 float operand2 = registerAs<float>(insn.operand2Id);
-                float quotient = operand1 * operand2;
-                registerAs<float>(insn.resultId) = quotient;
+                float result = operand1 * operand2;
+                registerAs<float>(insn.resultId) = result;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
@@ -2121,22 +2181,226 @@ struct Interpreter
 
             if constexpr (std::is_same_v<T, TypeFloat>) {
 
-                float dividend = registerAs<float>(insn.operand1Id);
-                float divisor = registerAs<float>(insn.operand2Id);
-                float quotient = dividend / divisor;
-                registerAs<float>(insn.resultId) = quotient;
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                float result = operand1 / operand2;
+                registerAs<float>(insn.resultId) = result;
 
             } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-                float* dividend = &registerAs<float>(insn.operand1Id);
-                float* divisor = &registerAs<float>(insn.operand2Id);
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
                 float* result = &registerAs<float>(insn.resultId);
                 for(int i = 0; i < type.count; i++) {
-                    result[i] = dividend[i] / divisor[i];
+                    result[i] = operand1[i] / operand2[i];
                 }
 
             }
         }, types[insn.type]);
+    }
+
+    void stepFOrdLessThan(const InsnFOrdLessThan& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                bool result = operand1 < operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] < operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for FOrdLessThan\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                bool result = operand1 > operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] > operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for FOrdGreaterThan\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                bool result = operand1 <= operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] <= operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for FOrdLessThanEqual\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float operand1 = registerAs<float>(insn.operand1Id);
+                float operand2 = registerAs<float>(insn.operand2Id);
+                bool result = operand1 >= operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand1 = &registerAs<float>(insn.operand1Id);
+                float* operand2 = &registerAs<float>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] >= operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for FOrdGreaterThanEqual\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepSLessThan(const InsnSLessThan& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeInt>) {
+
+                int32_t operand1 = registerAs<int32_t>(insn.operand1Id);
+                int32_t operand2 = registerAs<int32_t>(insn.operand2Id);
+                bool result = operand1 < operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                int32_t* operand1 = &registerAs<int32_t>(insn.operand1Id);
+                int32_t* operand2 = &registerAs<int32_t>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] < operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for SLessThan\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
+    void stepSelect(const InsnSelect& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                bool condition = registerAs<bool>(insn.conditionId);
+                float object1 = registerAs<float>(insn.object1Id);
+                float object2 = registerAs<float>(insn.object2Id);
+                float result = condition ? object1 : object2;
+                registerAs<float>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                bool* condition = &registerAs<bool>(insn.conditionId);
+                // XXX shouldn't assume floats here. Any data is valid.
+                float* object1 = &registerAs<float>(insn.object1Id);
+                float* object2 = &registerAs<float>(insn.object2Id);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = condition[i] ? object1[i] : object2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for stepSelect\n";
+
+            }
+        }, types[insn.type]);
+    }
+
+    void stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+
+        float* vector = &registerAs<float>(insn.vectorId);
+        float scalar = registerAs<float>(insn.scalarId);
+        float* result = &registerAs<float>(insn.resultId);
+
+        const TypeVector &type = std::get<TypeVector>(types[insn.type]);
+
+        for(int i = 0; i < type.count; i++) {
+            result[i] = vector[i] * scalar;
+        }
     }
 
     void stepConvertSToF(const InsnConvertSToF& insn)
@@ -2235,6 +2499,17 @@ struct Interpreter
         }, types[insn.type]);
     }
 
+    void stepBranch(const InsnBranch& insn)
+    {
+        pc = labels[insn.targetLabelId];
+    }
+
+    void stepBranchConditional(const InsnBranchConditional& insn)
+    {
+        bool condition = registerAs<bool>(insn.conditionId);
+        pc = labels[condition ? insn.trueLabelId : insn.falseLabelId];
+    }
+
     // Unimplemented instructions. To implement one, move the function from this
     // header into this file just above this comment.
 #include "opcode_impl.h"
@@ -2271,8 +2546,7 @@ struct Interpreter
         // XXX also need to initialize within function calls?
         for(auto v: variables) {
             const Variable& var = v.second;
-            uint32_t pointedType = std::get<TypePointer>(types[var.type]).type;
-            registers[v.first] = RegisterPointer { pointedType, var.storageClass, var.offset };
+            registers[v.first] = RegisterPointer { var.type, var.storageClass, var.offset };
             if(v.second.storageClass == SpvStorageClassFunction) {
                 assert(v.second.initializer == NO_INITIALIZER); // XXX will do initializers later
             }
