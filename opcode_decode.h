@@ -455,3 +455,44 @@ case SpvOpReturn: {
     break;
 }
 
+case SpvOpExtInst: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t ext = nextu();
+    uint32_t opcode = nextu();
+    if(ext == ip->ExtInstGLSL_std_450_id) {
+        switch(opcode) {
+case GLSLstd450Distance: {
+    uint32_t p0Id = nextu();
+    uint32_t p1Id = nextu();
+    ip->code.push_back(InsnGLSLstd450Distance{type, resultId, p0Id, p1Id});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450Distance";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " p0Id ";
+        std::cout << p0Id;
+        std::cout << " p1Id ";
+        std::cout << p1Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+            default: {
+                if(ip->throwOnUnimplemented) {
+                    throw std::runtime_error("unimplemented GLSLstd450 opcode " + GLSLstd450OpcodeToString[opcode] + " (" + std::to_string(opcode) + ")");
+                } else {
+                    std::cout << "unimplemented GLSLstd450 opcode " << GLSLstd450OpcodeToString[opcode] << " (" << opcode << ")\n";
+                    ip->hasUnimplemented = true;
+                }
+                break;
+            }
+        }
+    } else {
+        throw std::runtime_error("unimplemented instruction " + std::to_string(opcode) + " from extension set " + std::to_string(ext));
+    }
+    break;
+}

@@ -2571,3 +2571,609 @@ struct InsnMemberDecorateStringGOOGLE {
     uint32_t decoration; // Decoration
 };
 
+// GLSLstd450Round instruction (code 1).
+struct InsnGLSLstd450Round {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450RoundEven instruction (code 2).
+struct InsnGLSLstd450RoundEven {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Trunc instruction (code 3).
+struct InsnGLSLstd450Trunc {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450FAbs instruction (code 4).
+struct InsnGLSLstd450FAbs {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450SAbs instruction (code 5).
+struct InsnGLSLstd450SAbs {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450FSign instruction (code 6).
+struct InsnGLSLstd450FSign {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450SSign instruction (code 7).
+struct InsnGLSLstd450SSign {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Floor instruction (code 8).
+struct InsnGLSLstd450Floor {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Ceil instruction (code 9).
+struct InsnGLSLstd450Ceil {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Fract instruction (code 10).
+struct InsnGLSLstd450Fract {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Radians instruction (code 11).
+struct InsnGLSLstd450Radians {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t degreesId; // operand from register
+};
+
+// GLSLstd450Degrees instruction (code 12).
+struct InsnGLSLstd450Degrees {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t radiansId; // operand from register
+};
+
+// GLSLstd450Sin instruction (code 13).
+struct InsnGLSLstd450Sin {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Cos instruction (code 14).
+struct InsnGLSLstd450Cos {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Tan instruction (code 15).
+struct InsnGLSLstd450Tan {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Asin instruction (code 16).
+struct InsnGLSLstd450Asin {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Acos instruction (code 17).
+struct InsnGLSLstd450Acos {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Atan instruction (code 18).
+struct InsnGLSLstd450Atan {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t y_over_xId; // operand from register
+};
+
+// GLSLstd450Sinh instruction (code 19).
+struct InsnGLSLstd450Sinh {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Cosh instruction (code 20).
+struct InsnGLSLstd450Cosh {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Tanh instruction (code 21).
+struct InsnGLSLstd450Tanh {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Asinh instruction (code 22).
+struct InsnGLSLstd450Asinh {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Acosh instruction (code 23).
+struct InsnGLSLstd450Acosh {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Atanh instruction (code 24).
+struct InsnGLSLstd450Atanh {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Atan2 instruction (code 25).
+struct InsnGLSLstd450Atan2 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t yId; // operand from register
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Pow instruction (code 26).
+struct InsnGLSLstd450Pow {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450Exp instruction (code 27).
+struct InsnGLSLstd450Exp {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Log instruction (code 28).
+struct InsnGLSLstd450Log {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Exp2 instruction (code 29).
+struct InsnGLSLstd450Exp2 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Log2 instruction (code 30).
+struct InsnGLSLstd450Log2 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Sqrt instruction (code 31).
+struct InsnGLSLstd450Sqrt {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450InverseSqrt instruction (code 32).
+struct InsnGLSLstd450InverseSqrt {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Determinant instruction (code 33).
+struct InsnGLSLstd450Determinant {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450MatrixInverse instruction (code 34).
+struct InsnGLSLstd450MatrixInverse {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Modf instruction (code 35).
+struct InsnGLSLstd450Modf {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t iId; // operand from register
+};
+
+// GLSLstd450ModfStruct instruction (code 36).
+struct InsnGLSLstd450ModfStruct {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450FMin instruction (code 37).
+struct InsnGLSLstd450FMin {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450UMin instruction (code 38).
+struct InsnGLSLstd450UMin {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450SMin instruction (code 39).
+struct InsnGLSLstd450SMin {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450FMax instruction (code 40).
+struct InsnGLSLstd450FMax {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450UMax instruction (code 41).
+struct InsnGLSLstd450UMax {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450SMax instruction (code 42).
+struct InsnGLSLstd450SMax {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450FClamp instruction (code 43).
+struct InsnGLSLstd450FClamp {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t minValId; // operand from register
+    uint32_t maxValId; // operand from register
+};
+
+// GLSLstd450UClamp instruction (code 44).
+struct InsnGLSLstd450UClamp {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t minValId; // operand from register
+    uint32_t maxValId; // operand from register
+};
+
+// GLSLstd450SClamp instruction (code 45).
+struct InsnGLSLstd450SClamp {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t minValId; // operand from register
+    uint32_t maxValId; // operand from register
+};
+
+// GLSLstd450FMix instruction (code 46).
+struct InsnGLSLstd450FMix {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+    uint32_t aId; // operand from register
+};
+
+// GLSLstd450IMix instruction (code 47).
+struct InsnGLSLstd450IMix {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+    uint32_t aId; // operand from register
+};
+
+// GLSLstd450Step instruction (code 48).
+struct InsnGLSLstd450Step {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t edgeId; // operand from register
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450SmoothStep instruction (code 49).
+struct InsnGLSLstd450SmoothStep {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t edge0Id; // operand from register
+    uint32_t edge1Id; // operand from register
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Fma instruction (code 50).
+struct InsnGLSLstd450Fma {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t aId; // operand from register
+    uint32_t bId; // operand from register
+    uint32_t cId; // operand from register
+};
+
+// GLSLstd450Frexp instruction (code 51).
+struct InsnGLSLstd450Frexp {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t expId; // operand from register
+};
+
+// GLSLstd450FrexpStruct instruction (code 52).
+struct InsnGLSLstd450FrexpStruct {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Ldexp instruction (code 53).
+struct InsnGLSLstd450Ldexp {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t expId; // operand from register
+};
+
+// GLSLstd450PackSnorm4x8 instruction (code 54).
+struct InsnGLSLstd450PackSnorm4x8 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vId; // operand from register
+};
+
+// GLSLstd450PackUnorm4x8 instruction (code 55).
+struct InsnGLSLstd450PackUnorm4x8 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vId; // operand from register
+};
+
+// GLSLstd450PackSnorm2x16 instruction (code 56).
+struct InsnGLSLstd450PackSnorm2x16 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vId; // operand from register
+};
+
+// GLSLstd450PackUnorm2x16 instruction (code 57).
+struct InsnGLSLstd450PackUnorm2x16 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vId; // operand from register
+};
+
+// GLSLstd450PackHalf2x16 instruction (code 58).
+struct InsnGLSLstd450PackHalf2x16 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vId; // operand from register
+};
+
+// GLSLstd450PackDouble2x32 instruction (code 59).
+struct InsnGLSLstd450PackDouble2x32 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vId; // operand from register
+};
+
+// GLSLstd450UnpackSnorm2x16 instruction (code 60).
+struct InsnGLSLstd450UnpackSnorm2x16 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t pId; // operand from register
+};
+
+// GLSLstd450UnpackUnorm2x16 instruction (code 61).
+struct InsnGLSLstd450UnpackUnorm2x16 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t pId; // operand from register
+};
+
+// GLSLstd450UnpackHalf2x16 instruction (code 62).
+struct InsnGLSLstd450UnpackHalf2x16 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vId; // operand from register
+};
+
+// GLSLstd450UnpackSnorm4x8 instruction (code 63).
+struct InsnGLSLstd450UnpackSnorm4x8 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t pId; // operand from register
+};
+
+// GLSLstd450UnpackUnorm4x8 instruction (code 64).
+struct InsnGLSLstd450UnpackUnorm4x8 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t pId; // operand from register
+};
+
+// GLSLstd450UnpackDouble2x32 instruction (code 65).
+struct InsnGLSLstd450UnpackDouble2x32 {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vId; // operand from register
+};
+
+// GLSLstd450Length instruction (code 66).
+struct InsnGLSLstd450Length {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450Distance instruction (code 67).
+struct InsnGLSLstd450Distance {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t p0Id; // operand from register
+    uint32_t p1Id; // operand from register
+};
+
+// GLSLstd450Cross instruction (code 68).
+struct InsnGLSLstd450Cross {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450Normalize instruction (code 69).
+struct InsnGLSLstd450Normalize {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+};
+
+// GLSLstd450FaceForward instruction (code 70).
+struct InsnGLSLstd450FaceForward {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t nId; // operand from register
+    uint32_t iId; // operand from register
+    uint32_t nrefId; // operand from register
+};
+
+// GLSLstd450Reflect instruction (code 71).
+struct InsnGLSLstd450Reflect {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t iId; // operand from register
+    uint32_t nId; // operand from register
+};
+
+// GLSLstd450Refract instruction (code 72).
+struct InsnGLSLstd450Refract {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t iId; // operand from register
+    uint32_t nId; // operand from register
+    uint32_t etaId; // operand from register
+};
+
+// GLSLstd450FindILsb instruction (code 73).
+struct InsnGLSLstd450FindILsb {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t valueId; // operand from register
+};
+
+// GLSLstd450FindSMsb instruction (code 74).
+struct InsnGLSLstd450FindSMsb {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t valueId; // operand from register
+};
+
+// GLSLstd450FindUMsb instruction (code 75).
+struct InsnGLSLstd450FindUMsb {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t valueId; // operand from register
+};
+
+// GLSLstd450InterpolateAtCentroid instruction (code 76).
+struct InsnGLSLstd450InterpolateAtCentroid {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t interpolantId; // operand from register
+};
+
+// GLSLstd450InterpolateAtSample instruction (code 77).
+struct InsnGLSLstd450InterpolateAtSample {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t interpolantId; // operand from register
+    uint32_t sampleId; // operand from register
+};
+
+// GLSLstd450InterpolateAtOffset instruction (code 78).
+struct InsnGLSLstd450InterpolateAtOffset {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t interpolantId; // operand from register
+    uint32_t offsetId; // operand from register
+};
+
+// GLSLstd450NMin instruction (code 79).
+struct InsnGLSLstd450NMin {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450NMax instruction (code 80).
+struct InsnGLSLstd450NMax {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+};
+
+// GLSLstd450NClamp instruction (code 81).
+struct InsnGLSLstd450NClamp {
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t minValId; // operand from register
+    uint32_t maxValId; // operand from register
+};
+
