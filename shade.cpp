@@ -1148,16 +1148,6 @@ struct TypeSampledImage
 // Union of all known types.
 typedef std::variant<TypeVoid, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
 
-// A constant value hard-coded in the program or implicitly used by the compiler.
-struct Constant
-{
-    // Type of the constant. This is a key in the "types" map.
-    uint32_t type;
-
-    // Value of the bits. Floats are presented bitwise.
-    uint32_t value;
-};
-
 // A function parameter. This is on the receiving side, to set aside an SSA slot
 // for the value received from the caller.
 struct FunctionParameter
@@ -1298,7 +1288,6 @@ struct Interpreter
     std::map<uint32_t, std::map<uint32_t, Decoration> > memberDecorations;
     std::map<uint32_t, Type> types;
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
-    std::map<uint32_t, Constant> constants;
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
     std::vector<Instruction> code;
@@ -1316,6 +1305,14 @@ struct Interpreter
         RegisterObject r {type, typeSizes[type]};
         registers[id] = r;
         return std::get<RegisterObject>(registers[id]);
+    }
+
+    std::map<uint32_t, Register> constants;
+    RegisterObject& allocConstantObject(uint32_t id, uint32_t type)
+    {
+        RegisterObject r {type, typeSizes[type]};
+        constants[id] = r;
+        return std::get<RegisterObject>(constants[id]);
     }
 
     Interpreter(bool throwOnUnimplemented_, bool verbose_) :
@@ -1776,10 +1773,30 @@ struct Interpreter
                 uint32_t id = nextu();
                 assert(opds[2].num_words == 1); // XXX limit to 32 bits for now
                 uint32_t value = nextu();
-                ip->constants[id] = { typeId, value };
+                RegisterObject& r = ip->allocConstantObject(id, typeId);
+                const unsigned char *data = reinterpret_cast<const unsigned char*>(&value);
+                std::copy(data, data + ip->typeSizes[typeId], r.data);
                 if(ip->verbose) {
                     std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
                 }
+                break;
+            }
+
+            case SpvOpConstantComposite: {
+                // XXX result id
+                uint32_t typeId = nextu();
+                uint32_t id = nextu();
+                std::vector<uint32_t> operands = restv();
+                RegisterObject& r = ip->allocConstantObject(id, typeId);
+                uint32_t offset = 0;
+                for(uint32_t operand : operands) {
+                    // Copy each operand from a constant into our new composite constant.
+                    const RegisterObject &src = std::get<RegisterObject>(ip->constants[operand]);
+                    uint32_t size = ip->typeSizes[src.type];
+                    std::copy(src.data, src.data + size, r.data + offset);
+                    offset += size;
+                }
+                assert(offset = ip->typeSizes[typeId]);
                 break;
             }
 
@@ -2169,7 +2186,9 @@ struct Interpreter
 
     void run()
     {
-        registers.clear();
+        // Copy constants to memory. They're treated like variables.
+        registers = constants;
+
         // init Function variables with initializers before each invocation
         // XXX also need to initialize within function calls?
         for(auto v: variables) {
@@ -2179,13 +2198,6 @@ struct Interpreter
             if(v.second.storageClass == SpvStorageClassFunction) {
                 assert(v.second.initializer == NO_INITIALIZER); // XXX will do initializers later
             }
-        }
-
-        for(auto c: constants) {
-            const Constant& constant = c.second;
-            RegisterObject& r = allocRegisterObject(c.first, constant.type);
-            const unsigned char *data = reinterpret_cast<const unsigned char*>(&constant.value);
-            std::copy(data, data + typeSizes[constant.type], r.data);
         }
 
         size_t oldTop = memoryRegions[SpvStorageClassPrivate].top;
