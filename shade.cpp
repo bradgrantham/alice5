@@ -1513,47 +1513,6 @@ struct Interpreter
 
         switch(insn->opcode) {
 
-#if 0
-            case SpvOpExtInst: {
-                uint32_t type = nextu();
-                uint32_t resultId = nextu();
-                uint32_t ext = nextu();
-                uint32_t opcode = nextu();
-                if(ext == ip->ExtInstGLSL_std_450_id)) {
-                    switch(opcode) {
-                        case GLSLstd450Distance: {
-                            uint32_t p0 = nextu();
-                            uint32_t p1 = nextu();
-                            ip->code.push_back(InsnGLSLstd450Distance{type, resultId, p0, p1});
-                            if(ip->verbose) {
-                                std::cout << "Distance ";
-                                std::cout << " type ";
-                                std::cout << type;
-                                std::cout << " resultId ";
-                                std::cout << resultId;
-                                std::cout << " p0 ";
-                                std::cout << p0;
-                                std::cout << " p1 ";
-                                std::cout << p1;
-                                std::cout << "\n";
-                            }
-                            break;
-                        }
-                        default: {
-                            if(ip->throwOnUnimplemented) {
-                                throw std::runtime_error("unimplemented opcode " + GLSLstd450OpcodeToString[opcode] + " (" + std::to_string(opcode) + ")");
-                            } else {
-                                std::cout << "unimplemented opcode " << GLSLstd450OpcodeToString[opcode] << " (" << opcode << ")\n";
-                                ip->hasUnimplemented = true;
-                            }
-                            break;
-                        }
-                } else {
-                    throw std::runtime_error("unimplemented instruction " + std::to_string(opcode) + " from extension set " + std::to_string(ext));
-                }
-                break;
-            }
-#endif
             case SpvOpCapability: {
                 uint32_t cap = nextu();
                 assert(cap == SpvCapabilityShader);
