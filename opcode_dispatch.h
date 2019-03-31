@@ -9,6 +9,7 @@
 [&](const InsnCompositeConstruct& insn) { stepCompositeConstruct(insn); },
 [&](const InsnCompositeExtract& insn) { stepCompositeExtract(insn); },
 [&](const InsnConvertSToF& insn) { stepConvertSToF(insn); },
+[&](const InsnFNegate& insn) { stepFNegate(insn); },
 [&](const InsnIAdd& insn) { stepIAdd(insn); },
 [&](const InsnFAdd& insn) { stepFAdd(insn); },
 [&](const InsnFSub& insn) { stepFSub(insn); },

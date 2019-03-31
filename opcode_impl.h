@@ -535,11 +535,6 @@
         std::cerr << "stepSNegate() not implemented\n";
     }
 
-    void stepFNegate(const InsnFNegate& insn)
-    {
-        std::cerr << "stepFNegate() not implemented\n";
-    }
-
     void stepISub(const InsnISub& insn)
     {
         std::cerr << "stepISub() not implemented\n";

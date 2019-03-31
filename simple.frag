@@ -23,7 +23,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
     */
 
-    uv = uv.yx;
+    uv.x = -uv.x;
 
     fragColor = vec4(uv, 0.0, 1.0);
 }

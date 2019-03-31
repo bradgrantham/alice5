@@ -1290,6 +1290,29 @@ struct Interpreter
         }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
     }
 
+    void stepFNegate(const InsnFNegate& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                registerAs<float>(insn.resultId) = -registerAs<float>(insn.operandId);
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* operand = &registerAs<float>(insn.operandId);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = -operand[i];
+                }
+
+            }
+        }, types[insn.type]);
+    }
+
     void stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);

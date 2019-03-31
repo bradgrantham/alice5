@@ -182,6 +182,24 @@ case SpvOpConvertSToF: {
     break;
 }
 
+case SpvOpFNegate: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operandId = nextu();
+    ip->code.push_back(InsnFNegate{type, resultId, operandId});
+    if(ip->verbose) {
+        std::cout << "FNegate";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operandId ";
+        std::cout << operandId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpIAdd: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
