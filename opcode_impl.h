@@ -570,11 +570,6 @@
         std::cerr << "stepFRem() not implemented\n";
     }
 
-    void stepFMod(const InsnFMod& insn)
-    {
-        std::cerr << "stepFMod() not implemented\n";
-    }
-
     void stepMatrixTimesScalar(const InsnMatrixTimesScalar& insn)
     {
         std::cerr << "stepMatrixTimesScalar() not implemented\n";
