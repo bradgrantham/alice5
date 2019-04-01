@@ -23,7 +23,14 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
     */
 
-    uv.x = -uv.x;
+    float d = distance(uv, vec2(0.0, 0.0));
+    uv /= d;
+
+    uv.x = dot(uv, vec2(1.0, 1.0));
+    if (uv.x < 0) {
+        uv.x = -uv.x;
+    }
+    uv.y = 0.0;
 
     fragColor = vec4(uv, 0.0, 1.0);
 }

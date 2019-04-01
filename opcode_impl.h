@@ -605,11 +605,6 @@
         std::cerr << "stepOuterProduct() not implemented\n";
     }
 
-    void stepDot(const InsnDot& insn)
-    {
-        std::cerr << "stepDot() not implemented\n";
-    }
-
     void stepIAddCarry(const InsnIAddCarry& insn)
     {
         std::cerr << "stepIAddCarry() not implemented\n";

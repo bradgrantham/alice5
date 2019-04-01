@@ -1313,6 +1313,34 @@ struct Interpreter
         }, types[insn.type]);
     }
 
+    void stepDot(const InsnDot& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            const RegisterObject &r1 = std::get<RegisterObject>(registers[insn.vector1Id]);
+            const TypeVector &t1 = std::get<TypeVector>(types[r1.type]);
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float* vector1 = &registerAs<float>(insn.vector1Id);
+                float* vector2 = &registerAs<float>(insn.vector2Id);
+                float sum = 0;
+                for(int i = 0; i < t1.count; i++) {
+                    sum += vector1[i] * vector2[i];
+                }
+                registerAs<float>(insn.resultId) = sum;
+
+            } else {
+
+                std::cout << "Unknown type for Dot\n";
+
+            }
+        }, types[insn.type]);
+    }
+
     void stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
