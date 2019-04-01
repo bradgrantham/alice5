@@ -23,6 +23,7 @@
 [&](const InsnSelect& insn) { stepSelect(insn); },
 [&](const InsnIEqual& insn) { stepIEqual(insn); },
 [&](const InsnSLessThan& insn) { stepSLessThan(insn); },
+[&](const InsnFOrdEqual& insn) { stepFOrdEqual(insn); },
 [&](const InsnFOrdLessThan& insn) { stepFOrdLessThan(insn); },
 [&](const InsnFOrdGreaterThan& insn) { stepFOrdGreaterThan(insn); },
 [&](const InsnFOrdLessThanEqual& insn) { stepFOrdLessThanEqual(insn); },
