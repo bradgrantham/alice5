@@ -4,6 +4,7 @@
 #include <variant>
 #include <chrono>
 #include <thread>
+#include <algorithm>
 
 #include <StandAlone/ResourceLimits.h>
 #include <glslang/MachineIndependent/localintermediate.h>
@@ -449,7 +450,7 @@ struct Interpreter
         memoryRegions[SpvStorageClassOutput] = anotherRegion(1024);
         memoryRegions[SpvStorageClassWorkgroup] = anotherRegion(0);
         memoryRegions[SpvStorageClassCrossWorkgroup] = anotherRegion(0);
-        memoryRegions[SpvStorageClassPrivate] = anotherRegion(65536);
+        memoryRegions[SpvStorageClassPrivate] = anotherRegion(65536); // XXX still needed?
         memoryRegions[SpvStorageClassFunction] = anotherRegion(16384);
         memoryRegions[SpvStorageClassGeneric] = anotherRegion(0);
         memoryRegions[SpvStorageClassPushConstant] = anotherRegion(0);
@@ -1064,6 +1065,8 @@ struct Interpreter
         return SPV_SUCCESS;
     }
 
+    typedef std::pair<uint32_t,uint32_t> IndexLabelId;
+
     // Post-parsing work.
     void postParse() {
         // Find the main function.
@@ -1075,23 +1078,25 @@ struct Interpreter
         }
 
         // Make a parallel array to "code" recording the block ID for each
-        // instructions.
+        // instruction. First create a list of <index,labelId> pairs. These
+        // are the same pairs as in the "labels" map but with the two elements
+        // switched.
+        std::vector<IndexLabelId> labels_in_order;
+        for (auto label : labels) {
+            labels_in_order.push_back(IndexLabelId{label.second, label.first});
+        }
+        // Add pseudo-entry for end of code.
+        labels_in_order.push_back(IndexLabelId{code.size(), NO_BLOCK_ID});
+        // Sort by code index.
+        std::sort(labels_in_order.begin(), labels_in_order.end());
+
+        // Create parallel array. Each entry in the "labels_in_order" vector is
+        // a range of code indices.
         blockId.clear();
-        for (int pc = 0; pc < code.size(); pc++) {
-            uint32_t id = NO_BLOCK_ID;
-
-            for (auto label : labels) {
-                if (pc >= label.second) {
-                    id = label.first;
-                }
+        for (int i = 0; i < labels_in_order.size() - 1; i++) {
+            for (int j = labels_in_order[i].first; j < labels_in_order[i + 1].first; j++) {
+                blockId.push_back(labels_in_order[i].second);
             }
-
-            if (id == NO_BLOCK_ID) {
-                std::cout << "Can't find block for PC " << pc << "\n";
-                exit(EXIT_FAILURE);
-            }
-
-            blockId.push_back(id);
         }
     }
 };
@@ -2207,7 +2212,11 @@ void State::stepPhi(const InsnPhi& insn)
     }
 
     if (!found) {
-        std::cout << "Error: Phi didn't find any label " << previousBlockId << "\n";
+        std::cout << "Error: Phi didn't find any label, previous " << previousBlockId
+            << ", current " << currentBlockId << "\n";
+        for(int i = 0; i < insn.operandId.size(); i += 2) {
+            std::cout << "    " << insn.operandId[i + 1] << "\n";
+        }
     }
 }
 
@@ -2224,6 +2233,10 @@ void State::step()
         // point to a block within the current function. I don't think that
         // matters in practice because of the restricted locations where Phi
         // is placed.
+        if(false) {
+            std::cout << "Previous " << previousBlockId << ", current "
+                << currentBlockId << ", new " << ip->blockId.at(pc) << "\n";
+        }
         previousBlockId = currentBlockId;
         currentBlockId = ip->blockId.at(pc);
     }
@@ -2326,6 +2339,8 @@ void render(const Interpreter *ip, int startRow, int skip)
     state.set(SpvStorageClassUniform, 8, 0.0f);
 
     for(int y = startRow; y < imageHeight; y += skip) {
+        std::cout << y << "\r";
+        std::cout.flush();
         for(int x = 0; x < imageWidth; x++) {
             v4float color;
             eval(state, x + 0.5f, y + 0.5f, color);
