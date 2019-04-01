@@ -14,23 +14,12 @@
 #include <spirv-tools/libspirv.h>
 #include "spirv.h"
 #include "GLSL.std.450.h"
+#include "basic_types.h"
+#include "state.h"
 
 const int imageWidth = 256;
 const int imageHeight = 256;
 unsigned char imageBuffer[imageHeight][imageWidth][3];
-
-typedef std::array<float,1> v1float;
-typedef std::array<uint32_t,1> v1uint;
-typedef std::array<int32_t,1> v1int;
-typedef std::array<float,2> v2float;
-typedef std::array<uint32_t,2> v2uint;
-typedef std::array<int32_t,2> v2int;
-typedef std::array<float,3> v3float;
-typedef std::array<uint32_t,3> v3uint;
-typedef std::array<int32_t,3> v3int;
-typedef std::array<float,4> v4float;
-typedef std::array<uint32_t,4> v4uint;
-typedef std::array<int32_t,4> v4int;
 
 std::map<uint32_t, std::string> OpcodeToString = {
 #include "opcode_to_string.h"
@@ -40,269 +29,9 @@ std::map<uint32_t, std::string> GLSLstd450OpcodeToString = {
 #include "GLSLstd450_opcode_to_string.h"
 };
 
-// A variable in memory, either global or within a function's frame.
-struct Variable
-{
-    // Type of variable (not the pointer to it). Key into the "types" map.
-    uint32_t type;
-
-    // One of the values of SpvStorageClass (input, output, uniform, function, etc.).
-    uint32_t storageClass;
-
-    // XXX Not sure, or NO_INITIALIZER.
-    uint32_t initializer;
-
-    // Offset into the memory for the specific storage class.
-    size_t offset;
-};
-
-
-// Entry point for the shader.
-struct EntryPoint
-{
-    // What kind of shader. Must be SpvExecutionModelFragment.
-    uint32_t executionModel;
-
-    // Name of the function to call. This is typically "main".
-    std::string name;
-
-    // XXX Don't know.
-    std::vector<uint32_t> interfaceIds;
-
-    // XXX Don't know what an execution mode is.
-    std::map<uint32_t, std::vector<uint32_t>> executionModesToOperands;
-};
-
-// XXX A decoration tells us something about a type or variable, but I'm not sure what, maybe
-// how to access it from outside the shader and the offset of fields within a struct.
-struct Decoration
-{
-    // The ID of a type or variable.
-    uint32_t decoration;
-
-    // XXX Specific operands for this decoration.
-    std::vector<uint32_t> operands;
-};
-
-// Information about the source code for the shader.
-struct Source
-{
-    // What language the shader was written in.
-    uint32_t language;
-
-    // XXX Version of the shading language.
-    uint32_t version;
-
-    // XXX Dunno.
-    uint32_t file;
-
-    // XXX Filename of the shader source?
-    std::string source;
-};
-
-// XXX Unused.
-struct MemberName
-{
-    uint32_t type;
-    uint32_t member;
-    std::string name;
-};
-
-// Represents a "void" type.
-struct TypeVoid
-{
-    // XXX Not sure why we need this. Not allowed to have an empty struct?
-    int foo;
-};
-
-// Represents an "bool" type.
-struct TypeBool
-{
-    // No fields. It's a freakin' bool.
-};
-
-// Represents an "int" type.
-struct TypeInt
-{
-    // Number of bits in the int.
-    uint32_t width;
-
-    // Whether signed.
-    uint32_t signedness;
-};
-
-// Represents a "float" type.
-struct TypeFloat
-{
-    // Number of bits in the float.
-    uint32_t width;
-};
-
-// Represents a vector type.
-struct TypeVector
-{
-    // Type of the element. This is a key in the "types" map.
-    uint32_t type;
-
-    // Number of elements.
-    uint32_t count;
-};
-
-// Represents a matrix type. Each matrix is a sequence of column vectors.
-// Matrix data is stored starting at the upper-left, going down the first
-// column, then the next column, etc.
-struct TypeMatrix
-{
-    // Type of the column vector. This is a key in the "types" map.
-    uint32_t columnType;
-
-    // Number of columns.
-    uint32_t columnCount;
-};
-
-// Represents a function type.
-struct TypeFunction
-{
-    // Type of the return value. This is a key in the "types" map.
-    uint32_t returnType;
-
-    // Type of each parameter, in order from left to right. These are keys in the "types" map.
-    std::vector<uint32_t> parameterTypes;
-};
-
-// Represents a struct type.
-struct TypeStruct
-{
-    // Type of each element, in order. These are keys in the "types" map.
-    std::vector<uint32_t> memberTypes;
-};
-
-// Represents a pointer type.
-struct TypePointer
-{
-    // Type of the data being pointed to. This is a key in the "types" map.
-    uint32_t type;
-
-    // Storage class of the data. One of the values of SpvStorageClass (input,
-    // output, uniform, function, etc.).
-    uint32_t storageClass;
-};
-
-// Represents an image type.
-struct TypeImage
-{
-    // XXX document these.
-    uint32_t sampledType;
-    uint32_t dim;
-    uint32_t depth;
-    uint32_t arrayed;
-    uint32_t ms;
-    uint32_t sampled;
-    uint32_t imageFormat;
-    uint32_t accessQualifier;
-};
-
-// XXX Dunno.
-struct TypeSampledImage
-{
-    // Type of the image. This is a key in the "types" map. XXX yes?
-    uint32_t imageType;
-};
-
-// Union of all known types.
-typedef std::variant<TypeVoid, TypeBool, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeMatrix, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
-
-// A function parameter. This is on the receiving side, to set aside an SSA slot
-// for the value received from the caller.
-struct FunctionParameter
-{
-    // Type of the parameter. This is a key in the "types" map.
-    uint32_t type;
-
-    // Name of the parameter. This is a key in the "names" array.
-    uint32_t id;
-};
-
 #include "opcode_structs.h"
 
 const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
-
-typedef std::variant<
-#include "opcode_variant.h"
-> Instruction;
-
-struct Function
-{
-    uint32_t id;
-    uint32_t resultType;
-    uint32_t functionControl;
-    uint32_t functionType;
-
-    // Index into the "code" array.
-    uint32_t start;
-};
-
-struct RegisterPointer
-{
-    uint32_t type;
-    uint32_t storageClass;
-    size_t offset; // offset into memory, not into Region
-};
-
-struct RegisterObject
-{
-    uint32_t type;
-    size_t size;
-    unsigned char *data;
-    
-    RegisterObject(const RegisterObject &other) 
-    {
-        if(false)std::cout << "move ctor allocated to " << this << " as " << &data << "\n";
-        type = other.type;
-        size = other.size;
-        data = new unsigned char[size];
-        std::copy(other.data, other.data + size, data);
-    }
-
-    RegisterObject(uint32_t type_, size_t size_) :
-        type(type_),
-        size(size_),
-        data(new unsigned char[size_])
-    {
-        if(false)std::cout << "ctor allocated to " << this << " as " << &data << "\n";
-    }
-
-    RegisterObject() :
-        type(0xFFFFFFFF),
-        size(0),
-        data(nullptr)
-    {
-        if(false)std::cout << "ctor empty RegisterObject " << this << " \n";
-    }
-
-    ~RegisterObject()
-    {
-        if(false)std::cout << "dtor deleting from " << this << " as " << &data << "\n";
-        delete[] data;
-    }
-
-    RegisterObject& operator=(const RegisterObject &other)
-    {
-        if(false)std::cout << "operator=\n";
-        if(this != &other) {
-            if(false)std::cout << "op= deleting from " << this << " as " << &data << "\n";
-            delete[] data;
-            type = other.type;
-            size = other.size;
-            data = new unsigned char[size];
-            if(false)std::cout << "op= allocated to " << this << " as " << &data << "\n";
-            std::copy(other.data, other.data + size, data);
-        }
-        return *this;
-    }
-};
-
-typedef std::variant<RegisterPointer, RegisterObject> Register;
 
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
@@ -332,62 +61,11 @@ struct MemoryRegion
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-struct Interpreter;
-
 template <class T>
 T& objectAt(unsigned char* data)
 {
     return *reinterpret_cast<T*>(data);
 }
-
-// Dynamic state of the program (registers, call stack, ...).
-struct State
-{
-    uint32_t pc;
-    std::vector<size_t> callstack;
-
-    // These values are label IDs identifying blocks within a function. The current block
-    // is the block we're executing. The previous block was the block we came from.
-    // These are NO_BLOCK_ID if not yet set.
-    uint32_t currentBlockId;
-    uint32_t previousBlockId;
-
-    unsigned char *memory;
-
-    const Interpreter *ip;
-
-    State(const Interpreter *ip_);
-
-    virtual ~State()
-    {
-        delete[] memory;
-    }
-
-    std::map<uint32_t, Register> registers;
-    RegisterObject& allocRegisterObject(uint32_t id, uint32_t type);
-
-    // Copy a variable of type "type" from "src" to "dst" in memory.
-    void copy(uint32_t type, size_t src, size_t dst);
-
-    // Pointer to object in memory in specified storage class at specified offset.
-    template <class T>
-    T& objectInClassAt(SpvStorageClass clss, size_t offset);
-
-    // Get a register's data by ID as the specified type.
-    template <class T>
-    T& registerAs(int id);
-
-    template <class T>
-    void set(SpvStorageClass clss, size_t offset, const T& v);
-    template <class T>
-    void get(SpvStorageClass clss, size_t offset, T& v);
-
-    void step();
-    void run();
-
-    // Opcode step declarations.
-#include "opcode_decl.h"
-};
 
 // Interpreter and the static state of the program.
 struct Interpreter 
@@ -416,7 +94,7 @@ struct Interpreter
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
-    std::vector<Instruction> code;
+    std::vector<Instruction *> code;
     std::vector<uint32_t> blockId; // Parallel to "code".
 
     Function* currentFunction;
@@ -457,6 +135,13 @@ struct Interpreter
         memoryRegions[SpvStorageClassAtomicCounter] = anotherRegion(0);
         memoryRegions[SpvStorageClassImage] = anotherRegion(0);
         memoryRegions[SpvStorageClassStorageBuffer] = anotherRegion(0);
+    }
+
+    ~Interpreter()
+    {
+        for (auto insn : code) {
+            delete insn;
+        }
     }
 
     size_t allocate(SpvStorageClass clss, uint32_t type)
@@ -2240,11 +1925,9 @@ void State::step()
         currentBlockId = ip->blockId.at(pc);
     }
 
-    Instruction insn = ip->code.at(pc++);
+    Instruction *insn = ip->code.at(pc++);
 
-    std::visit(overloaded {
-#include "opcode_dispatch.h"
-    }, insn);
+    insn->step(this);
 }
 
 template <class T>

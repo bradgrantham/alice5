@@ -125,13 +125,14 @@ def main():
 
     opcode_structs_f = open("opcode_structs.h", "w")
     opcode_structs_f.write(WARNING);
+    opcode_structs_f.write("#include \"state.h\"\n\n")
+
+    opcode_struct_decl_f = open("opcode_struct_decl.h", "w")
+    opcode_struct_decl_f.write(WARNING);
 
     opcode_variant_f = open("opcode_variant.h", "w")
     opcode_variant_f.write(WARNING);
     variant_entries = []
-
-    opcode_dispatch_f = open("opcode_dispatch.h", "w")
-    opcode_dispatch_f.write(WARNING);
 
     opcode_impl_f = open("opcode_impl.h", "w")
     opcode_impl_f.write(WARNING);
@@ -160,24 +161,37 @@ def main():
         # Opcode to string file.
         opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, short_opname))
 
-        # Struct file.
-        opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
-        opcode_structs_f.write("struct %s {\n" % (struct_opname, ))
-        for operand in operands:
-            opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
-                operand.cpp_name, operand.cpp_comment,
-                " (optional)" if operand.quantifier == "?" else ""));
-        opcode_structs_f.write("};\n\n")
-
-        # Takes too long to compile if you add them all.
         if short_opname in already_implemented:
+            # Struct file.
+            opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
+            opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
+            params = []
+            inits = []
+            for operand in operands:
+                params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
+                inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
+            opcode_structs_f.write("    %s(%s)%s%s {}\n" %
+                    (struct_opname,
+                        ", ".join(params),
+                        " : " if params else "",
+                        ", ".join(inits)))
+            for operand in operands:
+                opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
+                    operand.cpp_name, operand.cpp_comment,
+                    " (optional)" if operand.quantifier == "?" else ""));
+            opcode_structs_f.write("    virtual void step(State *state) { state->step%s(*this); }\n" % short_opname)
+            opcode_structs_f.write("};\n\n")
+
+            # Struct declaration file.
+            opcode_struct_decl_f.write("struct %s;\n" % (struct_opname, ))
+
             # Decode file.
             opcode_decode_f.write("case Spv%s: {\n" % opname)
             for operand in operands:
                 opcode_decode_f.write("    %s %s = %s(%s);\n" %
                         (operand.cpp_type, operand.cpp_name,
                             operand.decode_function, operand.default_value))
-            opcode_decode_f.write("    ip->code.push_back(%s{%s});\n" %
+            opcode_decode_f.write("    ip->code.push_back(new %s{%s});\n" %
                     (struct_opname, ", ".join(operand.cpp_name for operand in operands)))
             opcode_decode_f.write("    if(ip->verbose) {\n")
             opcode_decode_f.write("        std::cout << \"%s\";\n" % short_opname)
@@ -196,9 +210,6 @@ def main():
 
             # Variant file.
             variant_entries.append(struct_opname)
-
-            # Dispatch file.
-            opcode_dispatch_f.write("[&](const %s& insn) { step%s(insn); },\n" % (struct_opname, short_opname))
 
             # Declaration file.
             opcode_decl_f.write("void step%s(const %s& insn);\n" % (short_opname, struct_opname))
@@ -234,24 +245,37 @@ def main():
         # Opcode to string file.
         GLSLstd450_opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, opname))
 
-        # Struct file.
-        opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
-        opcode_structs_f.write("struct %s {\n" % (struct_opname, ))
-        for operand in extinst_operands + operands:
-            opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
-                operand.cpp_name, operand.cpp_comment,
-                " (optional)" if operand.quantifier == "?" else ""));
-        opcode_structs_f.write("};\n\n")
-
-        # Takes too long to compile if you add them all.
         if opname in already_implemented:
+            # Struct file.
+            opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
+            opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
+            params = []
+            inits = []
+            for operand in extinst_operands + operands:
+                params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
+                inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
+            opcode_structs_f.write("    %s(%s)%s%s {}\n" %
+                    (struct_opname,
+                        ", ".join(params),
+                        " : " if params else "",
+                        ", ".join(inits)))
+            for operand in extinst_operands + operands:
+                opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
+                    operand.cpp_name, operand.cpp_comment,
+                    " (optional)" if operand.quantifier == "?" else ""));
+            opcode_structs_f.write("    virtual void step(State *state) { state->step%s(*this); }\n" % opname)
+            opcode_structs_f.write("};\n\n")
+
+            # Struct declaration file.
+            opcode_struct_decl_f.write("struct %s;\n" % (struct_opname, ))
+
             # Decode file.
             opcode_decode_f.write("case %s: {\n" % opname)
             for operand in operands:
                 opcode_decode_f.write("    %s %s = %s(%s);\n" %
                         (operand.cpp_type, operand.cpp_name,
                             operand.decode_function, operand.default_value))
-            opcode_decode_f.write("    ip->code.push_back(%s{%s});\n" %
+            opcode_decode_f.write("    ip->code.push_back(new %s{%s});\n" %
                     (struct_opname, ", ".join(operand.cpp_name for operand in extinst_operands + operands)))
             opcode_decode_f.write("    if(ip->verbose) {\n")
             opcode_decode_f.write("        std::cout << \"%s\";\n" % opname)
@@ -270,9 +294,6 @@ def main():
 
             # Variant file.
             variant_entries.append(struct_opname)
-
-            # Dispatch file.
-            opcode_dispatch_f.write("[&](const %s& insn) { step%s(insn); },\n" % (struct_opname, opname))
 
             # Declaration file.
             opcode_decl_f.write("void step%s(const %s& insn);\n" % (opname, struct_opname))
@@ -303,8 +324,8 @@ def main():
     opcode_to_string_f.close()
     GLSLstd450_opcode_to_string_f.close()
     opcode_structs_f.close()
+    opcode_struct_decl_f.close()
     opcode_variant_f.close()
-    opcode_dispatch_f.close()
     opcode_impl_f.close()
     opcode_decode_f.close()
     opcode_decl_f.close()
