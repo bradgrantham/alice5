@@ -1,13 +1,13 @@
-#ifndef STATE_H
-#define STATE_H
+#ifndef INTERPRETER_H
+#define INTERPRETER_H
 
 #include "basic_types.h"
 #include "opcode_struct_decl.h"
 
-struct Interpreter;
+struct Program;
 
 // Dynamic state of the program (registers, call stack, ...).
-struct State
+struct Interpreter
 {
     uint32_t pc;
     std::vector<size_t> callstack;
@@ -20,11 +20,11 @@ struct State
 
     unsigned char *memory;
 
-    const Interpreter *ip;
+    const Program *pgm;
 
-    State(const Interpreter *ip);
+    Interpreter(const Program *pgm);
 
-    virtual ~State()
+    virtual ~Interpreter()
     {
         delete[] memory;
     }
@@ -55,4 +55,4 @@ struct State
 #include "opcode_decl.h"
 };
 
-#endif // STATE_H
+#endif // INTERPRETER_H

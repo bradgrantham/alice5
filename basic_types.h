@@ -267,12 +267,12 @@ struct RegisterObject
     }
 };
 
-class State;
+class Interpreter;
 
 struct Instruction {
     virtual ~Instruction() {};
 
-    virtual void step(State *state) = 0;
+    virtual void step(Interpreter *interpreter) = 0;
 };
 
 typedef std::variant<RegisterPointer, RegisterObject> Register;

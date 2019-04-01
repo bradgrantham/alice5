@@ -15,7 +15,7 @@
 #include "spirv.h"
 #include "GLSL.std.450.h"
 #include "basic_types.h"
-#include "state.h"
+#include "interpreter.h"
 
 const int imageWidth = 256;
 const int imageHeight = 256;
@@ -67,8 +67,8 @@ T& objectAt(unsigned char* data)
     return *reinterpret_cast<T*>(data);
 }
 
-// Interpreter and the static state of the program.
-struct Interpreter 
+// The static state of the program.
+struct Program 
 {
     bool throwOnUnimplemented;
     bool hasUnimplemented;
@@ -114,7 +114,7 @@ struct Interpreter
         return std::get<RegisterObject>(constants[id]);
     }
 
-    Interpreter(bool throwOnUnimplemented_, bool verbose_) :
+    Program(bool throwOnUnimplemented_, bool verbose_) :
         throwOnUnimplemented(throwOnUnimplemented_),
         hasUnimplemented(false),
         verbose(verbose_),
@@ -137,7 +137,7 @@ struct Interpreter
         memoryRegions[SpvStorageClassStorageBuffer] = anotherRegion(0);
     }
 
-    ~Interpreter()
+    ~Program()
     {
         for (auto insn : code) {
             delete insn;
@@ -238,13 +238,13 @@ struct Interpreter
                                uint32_t generator, uint32_t id_bound,
                                uint32_t schema)
     {
-        // auto ip = static_cast<Interpreter*>(user_data);
+        // auto pgm = static_cast<Program*>(user_data);
         return SPV_SUCCESS;
     }
 
     static spv_result_t handleInstruction(void* user_data, const spv_parsed_instruction_t* insn)
     {
-        auto ip = static_cast<Interpreter*>(user_data);
+        auto pgm = static_cast<Program*>(user_data);
 
         auto opds = insn->operands;
 
@@ -288,8 +288,8 @@ struct Interpreter
             case SpvOpCapability: {
                 uint32_t cap = nextu();
                 assert(cap == SpvCapabilityShader);
-                ip->capabilities.insert(cap);
-                if(ip->verbose) {
+                pgm->capabilities.insert(cap);
+                if(pgm->verbose) {
                     std::cout << "OpCapability " << cap << " \n";
                 }
                 break;
@@ -300,24 +300,24 @@ struct Interpreter
                 uint32_t id = nextu();
                 const char *name = nexts();
                 if(strcmp(name, "GLSL.std.450") == 0) {
-                    ip->ExtInstGLSL_std_450_id = id;
+                    pgm->ExtInstGLSL_std_450_id = id;
                 } else {
                     throw std::runtime_error("unimplemented extension instruction set \"" + std::string(name) + "\"");
                 }
-                ip->extInstSets[id] = name;
-                if(ip->verbose) {
+                pgm->extInstSets[id] = name;
+                if(pgm->verbose) {
                     std::cout << "OpExtInstImport " << insn->words[opds[0].offset] << " " << name << "\n";
                 }
                 break;
             }
 
             case SpvOpMemoryModel: {
-                ip->addressingModel = nextu();
-                ip->memoryModel = nextu();
-                assert(ip->addressingModel == SpvAddressingModelLogical);
-                assert(ip->memoryModel == SpvMemoryModelGLSL450);
-                if(ip->verbose) {
-                    std::cout << "OpMemoryModel " << ip->addressingModel << " " << ip->memoryModel << "\n";
+                pgm->addressingModel = nextu();
+                pgm->memoryModel = nextu();
+                assert(pgm->addressingModel == SpvAddressingModelLogical);
+                assert(pgm->memoryModel == SpvMemoryModelGLSL450);
+                if(pgm->verbose) {
+                    std::cout << "OpMemoryModel " << pgm->addressingModel << " " << pgm->memoryModel << "\n";
                 }
                 break;
             }
@@ -329,8 +329,8 @@ struct Interpreter
                 std::string name = nexts();
                 std::vector<uint32_t> interfaceIds = restv();
                 assert(executionModel == SpvExecutionModelFragment);
-                ip->entryPoints[id] = {executionModel, name, interfaceIds};
-                if(ip->verbose) {
+                pgm->entryPoints[id] = {executionModel, name, interfaceIds};
+                if(pgm->verbose) {
                     std::cout << "OpEntryPoint " << executionModel << " " << id << " " << name;
                     for(auto& i: interfaceIds)
                         std::cout << " " << i;
@@ -343,11 +343,11 @@ struct Interpreter
                 uint32_t entryPointId = nextu();
                 uint32_t executionMode = nextu();
                 std::vector<uint32_t> operands = nextv();
-                ip->entryPoints[entryPointId].executionModesToOperands[executionMode] = operands;
+                pgm->entryPoints[entryPointId].executionModesToOperands[executionMode] = operands;
 
-                if(ip->verbose) {
+                if(pgm->verbose) {
                     std::cout << "OpExecutionMode " << entryPointId << " " << executionMode;
-                    for(auto& i: ip->entryPoints[entryPointId].executionModesToOperands[executionMode])
+                    for(auto& i: pgm->entryPoints[entryPointId].executionModesToOperands[executionMode])
                         std::cout << " " << i;
                     std::cout << "\n";
                 }
@@ -358,8 +358,8 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = nextu();
                 std::string name = nexts();
-                ip->strings[id] = name;
-                if(ip->verbose) {
+                pgm->strings[id] = name;
+                if(pgm->verbose) {
                     std::cout << "OpString " << id << " " << name << "\n";
                 }
                 break;
@@ -368,8 +368,8 @@ struct Interpreter
             case SpvOpName: {
                 uint32_t id = nextu();
                 std::string name = nexts();
-                ip->names[id] = name;
-                if(ip->verbose) {
+                pgm->names[id] = name;
+                if(pgm->verbose) {
                     std::cout << "OpName " << id << " " << name << "\n";
                 }
                 break;
@@ -380,8 +380,8 @@ struct Interpreter
                 uint32_t version = nextu();
                 uint32_t file = nextu(SOURCE_NO_FILE);
                 std::string source = (insn->num_operands > 3) ? nexts() : "";
-                ip->sources.push_back({language, version, file, source});
-                if(ip->verbose) {
+                pgm->sources.push_back({language, version, file, source});
+                if(pgm->verbose) {
                     std::cout << "OpSource " << language << " " << version << " " << file << " " << ((source.size() > 0) ? "with source" : "without source") << "\n";
                 }
                 break;
@@ -391,8 +391,8 @@ struct Interpreter
                 uint32_t type = nextu();
                 uint32_t member = nextu();
                 std::string name = nexts();
-                ip->memberNames[type][member] = name;
-                if(ip->verbose) {
+                pgm->memberNames[type][member] = name;
+                if(pgm->verbose) {
                     std::cout << "OpMemberName " << type << " " << member << " " << name << "\n";
                 }
                 break;
@@ -400,8 +400,8 @@ struct Interpreter
 
             case SpvOpModuleProcessed: {
                 std::string process = nexts();
-                ip->processes.push_back(process);
-                if(ip->verbose) {
+                pgm->processes.push_back(process);
+                if(pgm->verbose) {
                     std::cout << "OpModulesProcessed " << process << "\n";
                 }
                 break;
@@ -411,10 +411,10 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t decoration = nextu();
                 std::vector<uint32_t> operands = nextv();
-                ip->decorations[id] = {decoration, operands};
-                if(ip->verbose) {
+                pgm->decorations[id] = {decoration, operands};
+                if(pgm->verbose) {
                     std::cout << "OpDecorate " << id << " " << decoration;
-                    for(auto& i: ip->decorations[id].operands)
+                    for(auto& i: pgm->decorations[id].operands)
                         std::cout << " " << i;
                     std::cout << "\n";
                 }
@@ -426,10 +426,10 @@ struct Interpreter
                 uint32_t member = nextu();
                 uint32_t decoration = nextu();
                 std::vector<uint32_t> operands = nextv();
-                ip->memberDecorations[id][member] = {decoration, operands};
-                if(ip->verbose) {
+                pgm->memberDecorations[id][member] = {decoration, operands};
+                if(pgm->verbose) {
                     std::cout << "OpMemberDecorate " << id << " " << member << " " << decoration;
-                    for(auto& i: ip->memberDecorations[id][member].operands)
+                    for(auto& i: pgm->memberDecorations[id][member].operands)
                         std::cout << " " << i;
                     std::cout << "\n";
                 }
@@ -439,9 +439,9 @@ struct Interpreter
             case SpvOpTypeVoid: {
                 // XXX result id
                 uint32_t id = nextu();
-                ip->types[id] = TypeVoid {};
-                ip->typeSizes[id] = 0;
-                if(ip->verbose) {
+                pgm->types[id] = TypeVoid {};
+                pgm->typeSizes[id] = 0;
+                if(pgm->verbose) {
                     std::cout << "TypeVoid " << id << "\n";
                 }
                 break;
@@ -450,9 +450,9 @@ struct Interpreter
             case SpvOpTypeBool: {
                 // XXX result id
                 uint32_t id = nextu();
-                ip->types[id] = TypeBool {};
-                ip->typeSizes[id] = sizeof(bool);
-                if(ip->verbose) {
+                pgm->types[id] = TypeBool {};
+                pgm->typeSizes[id] = sizeof(bool);
+                if(pgm->verbose) {
                     std::cout << "TypeBool " << id << "\n";
                 }
                 break;
@@ -463,9 +463,9 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t width = nextu();
                 assert(width <= 32); // XXX deal with larger later
-                ip->types[id] = TypeFloat {width};
-                ip->typeSizes[id] = ((width + 31) / 32) * 4;
-                if(ip->verbose) {
+                pgm->types[id] = TypeFloat {width};
+                pgm->typeSizes[id] = ((width + 31) / 32) * 4;
+                if(pgm->verbose) {
                     std::cout << "TypeFloat " << id << " " << width << "\n";
                 }
                 break;
@@ -477,9 +477,9 @@ struct Interpreter
                 uint32_t width = nextu();
                 uint32_t signedness = nextu();
                 assert(width <= 32); // XXX deal with larger later
-                ip->types[id] = TypeInt {width, signedness};
-                ip->typeSizes[id] = ((width + 31) / 32) * 4;
-                if(ip->verbose) {
+                pgm->types[id] = TypeInt {width, signedness};
+                pgm->typeSizes[id] = ((width + 31) / 32) * 4;
+                if(pgm->verbose) {
                     std::cout << "TypeInt " << id << " width " << width << " signedness " << signedness << "\n";
                 }
                 break;
@@ -490,9 +490,9 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t returnType = nextu();
                 std::vector<uint32_t> params = restv();
-                ip->types[id] = TypeFunction {returnType, params};
-                ip->typeSizes[id] = 4; // XXX ?!?!?
-                if(ip->verbose) {
+                pgm->types[id] = TypeFunction {returnType, params};
+                pgm->typeSizes[id] = 4; // XXX ?!?!?
+                if(pgm->verbose) {
                     std::cout << "TypeFunction " << id << " returning " << returnType;
                     if(params.size() > 1) {
                         std::cout << " with parameter types"; 
@@ -509,9 +509,9 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t type = nextu();
                 uint32_t count = nextu();
-                ip->types[id] = TypeVector {type, count};
-                ip->typeSizes[id] = ip->typeSizes[type] * count;
-                if(ip->verbose) {
+                pgm->types[id] = TypeVector {type, count};
+                pgm->typeSizes[id] = pgm->typeSizes[type] * count;
+                if(pgm->verbose) {
                     std::cout << "TypeVector " << id << " of " << type << " count " << count << "\n";
                 }
                 break;
@@ -522,9 +522,9 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t columnType = nextu();
                 uint32_t columnCount = nextu();
-                ip->types[id] = TypeMatrix {columnType, columnCount};
-                ip->typeSizes[id] = ip->typeSizes[columnType] * columnCount;
-                if(ip->verbose) {
+                pgm->types[id] = TypeMatrix {columnType, columnCount};
+                pgm->typeSizes[id] = pgm->typeSizes[columnType] * columnCount;
+                if(pgm->verbose) {
                     std::cout << "TypeMatrix " << id << " of " << columnType << " count " << columnCount << "\n";
                 }
                 break;
@@ -535,9 +535,9 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t storageClass = nextu();
                 uint32_t type = nextu();
-                ip->types[id] = TypePointer {type, storageClass};
-                ip->typeSizes[id] = sizeof(uint32_t);
-                if(ip->verbose) {
+                pgm->types[id] = TypePointer {type, storageClass};
+                pgm->typeSizes[id] = sizeof(uint32_t);
+                if(pgm->verbose) {
                     std::cout << "TypePointer " << id << " class " << storageClass << " type " << type << "\n";
                 }
                 break;
@@ -547,13 +547,13 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = nextu();
                 std::vector<uint32_t> memberTypes = restv();
-                ip->types[id] = TypeStruct {memberTypes};
+                pgm->types[id] = TypeStruct {memberTypes};
                 size_t size = 0;
                 for(auto& t: memberTypes) {
-                    size += ip->typeSizes[t];
+                    size += pgm->typeSizes[t];
                 }
-                ip->typeSizes[id] = size;
-                if(ip->verbose) {
+                pgm->typeSizes[id] = size;
+                if(pgm->verbose) {
                     std::cout << "TypeStruct " << id;
                     if(memberTypes.size() > 0) {
                         std::cout << " members"; 
@@ -571,10 +571,10 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t storageClass = nextu();
                 uint32_t initializer = nextu(NO_INITIALIZER);
-                uint32_t pointedType = std::get<TypePointer>(ip->types[type]).type;
-                size_t offset = ip->allocate(storageClass, pointedType);
-                ip->variables[id] = {pointedType, storageClass, initializer, offset};
-                if(ip->verbose) {
+                uint32_t pointedType = std::get<TypePointer>(pgm->types[type]).type;
+                size_t offset = pgm->allocate(storageClass, pointedType);
+                pgm->variables[id] = {pointedType, storageClass, initializer, offset};
+                if(pgm->verbose) {
                     std::cout << "Variable " << id << " type " << type << " to type " << pointedType << " storageClass " << storageClass << " offset " << offset;
                     if(initializer != NO_INITIALIZER)
                         std::cout << " initializer " << initializer;
@@ -589,10 +589,10 @@ struct Interpreter
                 uint32_t id = nextu();
                 assert(opds[2].num_words == 1); // XXX limit to 32 bits for now
                 uint32_t value = nextu();
-                RegisterObject& r = ip->allocConstantObject(id, typeId);
+                RegisterObject& r = pgm->allocConstantObject(id, typeId);
                 const unsigned char *data = reinterpret_cast<const unsigned char*>(&value);
-                std::copy(data, data + ip->typeSizes[typeId], r.data);
-                if(ip->verbose) {
+                std::copy(data, data + pgm->typeSizes[typeId], r.data);
+                if(pgm->verbose) {
                     std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
                 }
                 break;
@@ -602,11 +602,11 @@ struct Interpreter
                 // XXX result id
                 uint32_t typeId = nextu();
                 uint32_t id = nextu();
-                RegisterObject& r = ip->allocConstantObject(id, typeId);
+                RegisterObject& r = pgm->allocConstantObject(id, typeId);
                 bool value = true;
                 const unsigned char *data = reinterpret_cast<const unsigned char*>(&value);
-                std::copy(data, data + ip->typeSizes[typeId], r.data);
-                if(ip->verbose) {
+                std::copy(data, data + pgm->typeSizes[typeId], r.data);
+                if(pgm->verbose) {
                     std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
                 }
                 break;
@@ -616,11 +616,11 @@ struct Interpreter
                 // XXX result id
                 uint32_t typeId = nextu();
                 uint32_t id = nextu();
-                RegisterObject& r = ip->allocConstantObject(id, typeId);
+                RegisterObject& r = pgm->allocConstantObject(id, typeId);
                 bool value = false;
                 const unsigned char *data = reinterpret_cast<const unsigned char*>(&value);
-                std::copy(data, data + ip->typeSizes[typeId], r.data);
-                if(ip->verbose) {
+                std::copy(data, data + pgm->typeSizes[typeId], r.data);
+                if(pgm->verbose) {
                     std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
                 }
                 break;
@@ -631,16 +631,16 @@ struct Interpreter
                 uint32_t typeId = nextu();
                 uint32_t id = nextu();
                 std::vector<uint32_t> operands = restv();
-                RegisterObject& r = ip->allocConstantObject(id, typeId);
+                RegisterObject& r = pgm->allocConstantObject(id, typeId);
                 uint32_t offset = 0;
                 for(uint32_t operand : operands) {
                     // Copy each operand from a constant into our new composite constant.
-                    const RegisterObject &src = std::get<RegisterObject>(ip->constants[operand]);
-                    uint32_t size = ip->typeSizes[src.type];
+                    const RegisterObject &src = std::get<RegisterObject>(pgm->constants[operand]);
+                    uint32_t size = pgm->typeSizes[src.type];
                     std::copy(src.data, src.data + size, r.data + offset);
                     offset += size;
                 }
-                assert(offset = ip->typeSizes[typeId]);
+                assert(offset = pgm->typeSizes[typeId]);
                 break;
             }
 
@@ -648,8 +648,8 @@ struct Interpreter
                 // XXX result id
                 uint32_t id = nextu();
                 uint32_t imageType = nextu();
-                ip->types[id] = TypeSampledImage { imageType };
-                if(ip->verbose) {
+                pgm->types[id] = TypeSampledImage { imageType };
+                if(pgm->verbose) {
                     std::cout << "TypeSampledImage " << id
                         << " imageType " << imageType
                         << "\n";
@@ -668,8 +668,8 @@ struct Interpreter
                 uint32_t sampled = nextu();
                 uint32_t imageFormat = nextu();
                 uint32_t accessQualifier = nextu(NO_ACCESS_QUALIFIER);
-                ip->types[id] = TypeImage { sampledType, dim, depth, arrayed, ms, sampled, imageFormat, accessQualifier };
-                if(ip->verbose) {
+                pgm->types[id] = TypeImage { sampledType, dim, depth, arrayed, ms, sampled, imageFormat, accessQualifier };
+                if(pgm->verbose) {
                     std::cout << "TypeImage " << id
                         << " sampledType " << sampledType
                         << " dim " << dim
@@ -689,10 +689,10 @@ struct Interpreter
                 uint32_t id = nextu();
                 uint32_t functionControl = nextu();
                 uint32_t functionType = nextu();
-                uint32_t start = ip->code.size();
-                ip->functions[id] = Function {id, resultType, functionControl, functionType, start };
-                ip->currentFunction = &ip->functions[id];
-                if(ip->verbose) {
+                uint32_t start = pgm->code.size();
+                pgm->functions[id] = Function {id, resultType, functionControl, functionType, start };
+                pgm->currentFunction = &pgm->functions[id];
+                if(pgm->verbose) {
                     std::cout << "Function " << id
                         << " resultType " << resultType
                         << " functionControl " << functionControl
@@ -704,18 +704,18 @@ struct Interpreter
 
             case SpvOpLabel: {
                 uint32_t id = nextu();
-                ip->labels[id] = ip->code.size();
-                if(ip->verbose) {
+                pgm->labels[id] = pgm->code.size();
+                if(pgm->verbose) {
                     std::cout << "Label " << id
-                        << " at " << ip->labels[id]
+                        << " at " << pgm->labels[id]
                         << "\n";
                 }
                 break;
             }
 
             case SpvOpFunctionEnd: {
-                ip->currentFunction = NULL;
-                if(ip->verbose) {
+                pgm->currentFunction = NULL;
+                if(pgm->verbose) {
                     std::cout << "FunctionEnd\n";
                 }
                 break;
@@ -737,11 +737,11 @@ struct Interpreter
 #include "opcode_decode.h"
             
             default: {
-                if(ip->throwOnUnimplemented) {
+                if(pgm->throwOnUnimplemented) {
                     throw std::runtime_error("unimplemented opcode " + OpcodeToString[insn->opcode] + " (" + std::to_string(insn->opcode) + ")");
                 } else {
                     std::cout << "unimplemented opcode " << OpcodeToString[insn->opcode] << " (" << insn->opcode << ")\n";
-                    ip->hasUnimplemented = true;
+                    pgm->hasUnimplemented = true;
                 }
                 break;
             }
@@ -785,56 +785,56 @@ struct Interpreter
     }
 };
 
-State::State(const Interpreter *ip_)
-    : ip(ip_)
+Interpreter::Interpreter(const Program *pgm)
+    : pgm(pgm)
 {
-    memory = new unsigned char[ip->memorySize];
+    memory = new unsigned char[pgm->memorySize];
 }
 
-RegisterObject& State::allocRegisterObject(uint32_t id, uint32_t type)
+RegisterObject& Interpreter::allocRegisterObject(uint32_t id, uint32_t type)
 {
-    RegisterObject r {type, ip->typeSizes.at(type)};
+    RegisterObject r {type, pgm->typeSizes.at(type)};
     registers[id] = r;
     return std::get<RegisterObject>(registers[id]);
 }
 
-void State::copy(uint32_t type, size_t src, size_t dst)
+void Interpreter::copy(uint32_t type, size_t src, size_t dst)
 {
-    std::copy(memory + src, memory + src + ip->typeSizes.at(type), memory + dst);
+    std::copy(memory + src, memory + src + pgm->typeSizes.at(type), memory + dst);
 }
 
 template <class T>
-T& State::objectInClassAt(SpvStorageClass clss, size_t offset)
+T& Interpreter::objectInClassAt(SpvStorageClass clss, size_t offset)
 {
-    return *reinterpret_cast<T*>(memory + ip->memoryRegions.at(clss).base + offset);
+    return *reinterpret_cast<T*>(memory + pgm->memoryRegions.at(clss).base + offset);
 }
 
 template <class T>
-T& State::registerAs(int id)
+T& Interpreter::registerAs(int id)
 {
     return *reinterpret_cast<T*>(std::get<RegisterObject>(registers[id]).data);
 }
 
-void State::stepLoad(const InsnLoad& insn)
+void Interpreter::stepLoad(const InsnLoad& insn)
 {
     RegisterPointer& ptr = std::get<RegisterPointer>(registers[insn.pointerId]);
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
-    std::copy(memory + ptr.offset, memory + ptr.offset + ip->typeSizes.at(insn.type), obj.data);
+    std::copy(memory + ptr.offset, memory + ptr.offset + pgm->typeSizes.at(insn.type), obj.data);
     if(false) {
         std::cout << "load result is";
-        ip->dumpTypeAt(ip->types.at(insn.type), obj.data);
+        pgm->dumpTypeAt(pgm->types.at(insn.type), obj.data);
         std::cout << "\n";
     }
 }
 
-void State::stepStore(const InsnStore& insn)
+void Interpreter::stepStore(const InsnStore& insn)
 {
     RegisterPointer& ptr = std::get<RegisterPointer>(registers[insn.pointerId]);
     RegisterObject& obj = std::get<RegisterObject>(registers[insn.objectId]);
     std::copy(obj.data, obj.data + obj.size, memory + ptr.offset);
 }
 
-void State::stepCompositeExtract(const InsnCompositeExtract& insn)
+void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     RegisterObject& src = std::get<RegisterObject>(registers[insn.compositeId]);
@@ -843,37 +843,37 @@ void State::stepCompositeExtract(const InsnCompositeExtract& insn)
     size_t offset = 0;
     for(auto& j: insn.indexesId) {
         for(int i = 0; i < j; i++) {
-            offset += ip->typeSizes.at(ip->getConstituentType(type, i));
+            offset += pgm->typeSizes.at(pgm->getConstituentType(type, i));
         }
-        type = ip->getConstituentType(type, j);
+        type = pgm->getConstituentType(type, j);
     }
-    std::copy(src.data + offset, src.data + offset + ip->typeSizes.at(obj.type), obj.data);
+    std::copy(src.data + offset, src.data + offset + pgm->typeSizes.at(obj.type), obj.data);
     if(false) {
         std::cout << "extracted from ";
-        ip->dumpTypeAt(ip->types.at(src.type), src.data);
+        pgm->dumpTypeAt(pgm->types.at(src.type), src.data);
         std::cout << " result is ";
-        ip->dumpTypeAt(ip->types.at(insn.type), obj.data);
+        pgm->dumpTypeAt(pgm->types.at(insn.type), obj.data);
         std::cout << "\n";
     }
 }
 
-void State::stepCompositeConstruct(const InsnCompositeConstruct& insn)
+void Interpreter::stepCompositeConstruct(const InsnCompositeConstruct& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     size_t offset = 0;
     for(auto& j: insn.constituentsId) {
         RegisterObject& src = std::get<RegisterObject>(registers[j]);
-        std::copy(src.data, src.data + ip->typeSizes.at(src.type), obj.data + offset);
-        offset += ip->typeSizes.at(src.type);
+        std::copy(src.data, src.data + pgm->typeSizes.at(src.type), obj.data + offset);
+        offset += pgm->typeSizes.at(src.type);
     }
     if(false) {
         std::cout << "constructed ";
-        ip->dumpTypeAt(ip->types.at(obj.type), obj.data);
+        pgm->dumpTypeAt(pgm->types.at(obj.type), obj.data);
         std::cout << "\n";
     }
 }
 
-void State::stepIAdd(const InsnIAdd& insn)
+void Interpreter::stepIAdd(const InsnIAdd& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -901,10 +901,10 @@ void State::stepIAdd(const InsnIAdd& insn)
             std::cout << "Unknown type for IAdd\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepFAdd(const InsnFAdd& insn)
+void Interpreter::stepFAdd(const InsnFAdd& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -932,10 +932,10 @@ void State::stepFAdd(const InsnFAdd& insn)
             std::cout << "Unknown type for FAdd\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepFSub(const InsnFSub& insn)
+void Interpreter::stepFSub(const InsnFSub& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -963,10 +963,10 @@ void State::stepFSub(const InsnFSub& insn)
             std::cout << "Unknown type for FSub\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepFMul(const InsnFMul& insn)
+void Interpreter::stepFMul(const InsnFMul& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -994,10 +994,10 @@ void State::stepFMul(const InsnFMul& insn)
             std::cout << "Unknown type for FMul\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepFDiv(const InsnFDiv& insn)
+void Interpreter::stepFDiv(const InsnFDiv& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1025,10 +1025,10 @@ void State::stepFDiv(const InsnFDiv& insn)
             std::cout << "Unknown type for FDiv\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepFMod(const InsnFMod& insn)
+void Interpreter::stepFMod(const InsnFMod& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1056,10 +1056,10 @@ void State::stepFMod(const InsnFMod& insn)
             std::cout << "Unknown type for FMod\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepFOrdLessThan(const InsnFOrdLessThan& insn)
+void Interpreter::stepFOrdLessThan(const InsnFOrdLessThan& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1087,10 +1087,10 @@ void State::stepFOrdLessThan(const InsnFOrdLessThan& insn)
             std::cout << "Unknown type for FOrdLessThan\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
 }
 
-void State::stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
+void Interpreter::stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1118,10 +1118,10 @@ void State::stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
             std::cout << "Unknown type for FOrdGreaterThan\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
 }
 
-void State::stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
+void Interpreter::stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1149,10 +1149,10 @@ void State::stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
             std::cout << "Unknown type for FOrdLessThanEqual\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
 }
 
-void State::stepFOrdEqual(const InsnFOrdEqual& insn)
+void Interpreter::stepFOrdEqual(const InsnFOrdEqual& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1182,10 +1182,10 @@ void State::stepFOrdEqual(const InsnFOrdEqual& insn)
             std::cout << "Unknown type for FOrdEqual\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
 }
 
-void State::stepFNegate(const InsnFNegate& insn)
+void Interpreter::stepFNegate(const InsnFNegate& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1213,10 +1213,10 @@ void State::stepFNegate(const InsnFNegate& insn)
             std::cout << "Unknown type for FNegate\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepDot(const InsnDot& insn)
+void Interpreter::stepDot(const InsnDot& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1224,7 +1224,7 @@ void State::stepDot(const InsnDot& insn)
         using T = std::decay_t<decltype(type)>;
 
         const RegisterObject &r1 = std::get<RegisterObject>(registers[insn.vector1Id]);
-        const TypeVector &t1 = std::get<TypeVector>(ip->types.at(r1.type));
+        const TypeVector &t1 = std::get<TypeVector>(pgm->types.at(r1.type));
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
@@ -1241,10 +1241,10 @@ void State::stepDot(const InsnDot& insn)
             std::cout << "Unknown type for Dot\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
+void Interpreter::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1272,10 +1272,10 @@ void State::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
             std::cout << "Unknown type for FOrdGreaterThanEqual\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
 }
 
-void State::stepSLessThan(const InsnSLessThan& insn)
+void Interpreter::stepSLessThan(const InsnSLessThan& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1303,10 +1303,10 @@ void State::stepSLessThan(const InsnSLessThan& insn)
             std::cout << "Unknown type for SLessThan\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
 }
 
-void State::stepIEqual(const InsnIEqual& insn)
+void Interpreter::stepIEqual(const InsnIEqual& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1334,10 +1334,10 @@ void State::stepIEqual(const InsnIEqual& insn)
             std::cout << "Unknown type for IEqual\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
 }
 
-void State::stepLogicalNot(const InsnLogicalNot& insn)
+void Interpreter::stepLogicalNot(const InsnLogicalNot& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1361,10 +1361,10 @@ void State::stepLogicalNot(const InsnLogicalNot& insn)
             std::cout << "Unknown type for LogicalNot\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.operandId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.operandId]).type));
 }
 
-void State::stepSelect(const InsnSelect& insn)
+void Interpreter::stepSelect(const InsnSelect& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1395,10 +1395,10 @@ void State::stepSelect(const InsnSelect& insn)
             std::cout << "Unknown type for stepSelect\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
+void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
 
@@ -1407,21 +1407,21 @@ void State::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
     float scalar = registerAs<float>(insn.scalarId);
     float* result = &registerAs<float>(insn.resultId);
 
-    const TypeVector &type = std::get<TypeVector>(ip->types.at(insn.type));
+    const TypeVector &type = std::get<TypeVector>(pgm->types.at(insn.type));
 
     for(int i = 0; i < type.count; i++) {
         result[i] = vector[i] * scalar;
     }
 }
 
-void State::stepVectorShuffle(const InsnVectorShuffle& insn)
+void Interpreter::stepVectorShuffle(const InsnVectorShuffle& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     const RegisterObject &r1 = std::get<RegisterObject>(registers[insn.vector1Id]);
     const RegisterObject &r2 = std::get<RegisterObject>(registers[insn.vector2Id]);
-    const TypeVector &t1 = std::get<TypeVector>(ip->types.at(r1.type));
+    const TypeVector &t1 = std::get<TypeVector>(pgm->types.at(r1.type));
     uint32_t n1 = t1.count;
-    uint32_t elementSize = ip->typeSizes.at(t1.type);
+    uint32_t elementSize = pgm->typeSizes.at(t1.type);
 
     for(int i = 0; i < insn.componentsId.size(); i++) {
         uint32_t component = insn.componentsId[i];
@@ -1432,7 +1432,7 @@ void State::stepVectorShuffle(const InsnVectorShuffle& insn)
     }
 }
 
-void State::stepConvertSToF(const InsnConvertSToF& insn)
+void Interpreter::stepConvertSToF(const InsnConvertSToF& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1457,10 +1457,10 @@ void State::stepConvertSToF(const InsnConvertSToF& insn)
             std::cout << "Unknown type for ConvertSToF\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepConvertFToS(const InsnConvertFToS& insn)
+void Interpreter::stepConvertFToS(const InsnConvertFToS& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1485,10 +1485,10 @@ void State::stepConvertFToS(const InsnConvertFToS& insn)
             std::cout << "Unknown type for ConvertFToS\n";
 
         }
-    }, ip->types.at(insn.type));
+    }, pgm->types.at(insn.type));
 }
 
-void State::stepAccessChain(const InsnAccessChain& insn)
+void Interpreter::stepAccessChain(const InsnAccessChain& insn)
 {
     RegisterPointer& basePointer = std::get<RegisterPointer>(registers[insn.baseId]);
     uint32_t type = basePointer.type;
@@ -1496,31 +1496,31 @@ void State::stepAccessChain(const InsnAccessChain& insn)
     for(auto& id: insn.indexesId) {
         int32_t j = registerAs<int32_t>(id);
         for(int i = 0; i < j; i++) {
-            offset += ip->typeSizes.at(ip->getConstituentType(type, i));
+            offset += pgm->typeSizes.at(pgm->getConstituentType(type, i));
         }
-        type = ip->getConstituentType(type, j);
+        type = pgm->getConstituentType(type, j);
     }
     if(false) {
         std::cout << "accesschain of " << basePointer.offset << " yielded " << offset << "\n";
     }
-    uint32_t pointedType = std::get<TypePointer>(ip->types.at(insn.type)).type;
+    uint32_t pointedType = std::get<TypePointer>(pgm->types.at(insn.type)).type;
     registers[insn.resultId] = RegisterPointer { pointedType, basePointer.storageClass, offset };
 }
 
-void State::stepFunctionParameter(const InsnFunctionParameter& insn)
+void Interpreter::stepFunctionParameter(const InsnFunctionParameter& insn)
 {
     uint32_t sourceId = callstack.back(); callstack.pop_back();
     registers[insn.resultId] = registers[sourceId];
     if(false) std::cout << "function parameter " << insn.resultId << " receives " << sourceId << "\n";
 }
 
-void State::stepReturn(const InsnReturn& insn)
+void Interpreter::stepReturn(const InsnReturn& insn)
 {
     callstack.pop_back(); // return parameter not used.
     pc = callstack.back(); callstack.pop_back();
 }
 
-void State::stepReturnValue(const InsnReturnValue& insn)
+void Interpreter::stepReturnValue(const InsnReturnValue& insn)
 {
     // Return value.
     uint32_t returnId = callstack.back(); callstack.pop_back();
@@ -1529,9 +1529,9 @@ void State::stepReturnValue(const InsnReturnValue& insn)
     pc = callstack.back(); callstack.pop_back();
 }
 
-void State::stepFunctionCall(const InsnFunctionCall& insn)
+void Interpreter::stepFunctionCall(const InsnFunctionCall& insn)
 {
-    const Function& function = ip->functions.at(insn.functionId);
+    const Function& function = pgm->functions.at(insn.functionId);
 
     callstack.push_back(pc);
     callstack.push_back(insn.resultId);
@@ -1543,7 +1543,7 @@ void State::stepFunctionCall(const InsnFunctionCall& insn)
     pc = function.start;
 }
 
-void State::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
+void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1572,10 +1572,10 @@ void State::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
             std::cout << "Unknown type for Distance\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.p0Id]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.p0Id]).type));
 }
 
-void State::stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
+void Interpreter::stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1601,10 +1601,10 @@ void State::stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
             std::cout << "Unknown type for Length\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
+void Interpreter::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1631,10 +1631,10 @@ void State::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
             std::cout << "Unknown type for FMax\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
+void Interpreter::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1661,10 +1661,10 @@ void State::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
             std::cout << "Unknown type for FMin\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
+void Interpreter::stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1691,10 +1691,10 @@ void State::stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
             std::cout << "Unknown type for Pow\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
+void Interpreter::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1725,10 +1725,10 @@ void State::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
             std::cout << "Unknown type for Normalize\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
+void Interpreter::stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1753,10 +1753,10 @@ void State::stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
             std::cout << "Unknown type for Sin\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
+void Interpreter::stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1781,10 +1781,10 @@ void State::stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
             std::cout << "Unknown type for Cos\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
+void Interpreter::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1809,10 +1809,10 @@ void State::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
             std::cout << "Unknown type for FAbs\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
+void Interpreter::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1837,10 +1837,10 @@ void State::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
             std::cout << "Unknown type for Floor\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
+void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
@@ -1864,24 +1864,24 @@ void State::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
             std::cout << "Unknown type for Cross\n";
 
         }
-    }, ip->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
-void State::stepBranch(const InsnBranch& insn)
+void Interpreter::stepBranch(const InsnBranch& insn)
 {
-    pc = ip->labels.at(insn.targetLabelId);
+    pc = pgm->labels.at(insn.targetLabelId);
 }
 
-void State::stepBranchConditional(const InsnBranchConditional& insn)
+void Interpreter::stepBranchConditional(const InsnBranchConditional& insn)
 {
     bool condition = registerAs<bool>(insn.conditionId);
-    pc = ip->labels.at(condition ? insn.trueLabelId : insn.falseLabelId);
+    pc = pgm->labels.at(condition ? insn.trueLabelId : insn.falseLabelId);
 }
 
-void State::stepPhi(const InsnPhi& insn)
+void Interpreter::stepPhi(const InsnPhi& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
-    uint32_t size = ip->typeSizes.at(obj.type);
+    uint32_t size = pgm->typeSizes.at(obj.type);
 
     bool found = false;
     for(int i = 0; !found && i < insn.operandId.size(); i += 2) {
@@ -1904,13 +1904,13 @@ void State::stepPhi(const InsnPhi& insn)
     }
 }
 
-void State::step()
+void Interpreter::step()
 {
     if(false) std::cout << "address " << pc << "\n";
 
     // Update our idea of what block we're in. If we just switched blocks,
     // remember the previous one (for Phi).
-    if (ip->blockId.at(pc) != currentBlockId) {
+    if (pgm->blockId.at(pc) != currentBlockId) {
         // I'm not sure this is fully correct. For example, when returning
         // from a function this will set previousBlockId to a block in
         // the called function, but that's not right, it should always
@@ -1919,40 +1919,40 @@ void State::step()
         // is placed.
         if(false) {
             std::cout << "Previous " << previousBlockId << ", current "
-                << currentBlockId << ", new " << ip->blockId.at(pc) << "\n";
+                << currentBlockId << ", new " << pgm->blockId.at(pc) << "\n";
         }
         previousBlockId = currentBlockId;
-        currentBlockId = ip->blockId.at(pc);
+        currentBlockId = pgm->blockId.at(pc);
     }
 
-    Instruction *insn = ip->code.at(pc++);
+    Instruction *insn = pgm->code.at(pc++);
 
     insn->step(this);
 }
 
 template <class T>
-void State::set(SpvStorageClass clss, size_t offset, const T& v)
+void Interpreter::set(SpvStorageClass clss, size_t offset, const T& v)
 {
     objectInClassAt<T>(clss, offset) = v;
 }
 
 template <class T>
-void State::get(SpvStorageClass clss, size_t offset, T& v)
+void Interpreter::get(SpvStorageClass clss, size_t offset, T& v)
 {
     v = objectInClassAt<T>(clss, offset);
 }
 
-void State::run()
+void Interpreter::run()
 {
     currentBlockId = NO_BLOCK_ID;
     previousBlockId = NO_BLOCK_ID;
 
     // Copy constants to memory. They're treated like variables.
-    registers = ip->constants;
+    registers = pgm->constants;
 
     // init Function variables with initializers before each invocation
     // XXX also need to initialize within function calls?
-    for(auto v: ip->variables) {
+    for(auto v: pgm->variables) {
         const Variable& var = v.second;
         registers[v.first] = RegisterPointer { var.type, var.storageClass, var.offset };
         if(v.second.storageClass == SpvStorageClassFunction) {
@@ -1962,7 +1962,7 @@ void State::run()
 
     callstack.push_back(EXECUTION_ENDED); // caller PC
     callstack.push_back(NO_RETURN_REGISTER); // return register
-    pc = ip->mainFunction->start;
+    pc = pgm->mainFunction->start;
 
     do {
         step();
@@ -1971,11 +1971,11 @@ void State::run()
 
 // -----------------------------------------------------------------------------------
 
-void eval(State &state, float x, float y, v4float& color)
+void eval(Interpreter &interpreter, float x, float y, v4float& color)
 {
-    state.set(SpvStorageClassInput, 0, v2float {x, y}); // fragCoord is in #0 in preamble
-    state.run();
-    state.get(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
+    interpreter.set(SpvStorageClassInput, 0, v2float {x, y}); // fragCoord is in #0 in preamble
+    interpreter.run();
+    interpreter.get(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
 }
 
 
@@ -2010,22 +2010,22 @@ void usage(const char* progname)
 }
 
 // Render rows starting at "startRow" every "skip".
-void render(const Interpreter *ip, int startRow, int skip)
+void render(const Program *pgm, int startRow, int skip)
 {
-    State state(ip);
+    Interpreter interpreter(pgm);
 
     // iResolution is uniform @0 in preamble
-    state.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight});
+    interpreter.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight});
 
     // iTime is uniform @8 in preamble
-    state.set(SpvStorageClassUniform, 8, 0.0f);
+    interpreter.set(SpvStorageClassUniform, 8, 0.0f);
 
     for(int y = startRow; y < imageHeight; y += skip) {
         std::cout << y << "\r";
         std::cout.flush();
         for(int x = 0; x < imageWidth; x++) {
             v4float color;
-            eval(state, x + 0.5f, y + 0.5f, color);
+            eval(interpreter, x + 0.5f, y + 0.5f, color);
             for(int c = 0; c < 3; c++) {
                 // ShaderToy clamps the color.
                 int byteColor = color[c]*255.99;
@@ -2158,15 +2158,15 @@ int main(int argc, char **argv)
         fclose(fp);
     }
 
-    Interpreter ip(throwOnUnimplemented, beVerbose);
+    Program pgm(throwOnUnimplemented, beVerbose);
     spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
-    spvBinaryParse(context, &ip, spirv.data(), spirv.size(), Interpreter::handleHeader, Interpreter::handleInstruction, nullptr);
+    spvBinaryParse(context, &pgm, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
 
-    if (ip.hasUnimplemented) {
+    if (pgm.hasUnimplemented) {
         exit(1);
     }
 
-    ip.postParse();
+    pgm.postParse();
 
     if (doNotShade) {
         exit(EXIT_SUCCESS);
@@ -2180,7 +2180,7 @@ int main(int argc, char **argv)
     // Generate the rows on multiple threads.
     std::vector<std::thread *> thread;
     for (int t = 0; t < threadCount; t++) {
-        thread.push_back(new std::thread(render, &ip, t, threadCount));
+        thread.push_back(new std::thread(render, &pgm, t, threadCount));
     }
 
     // Wait for worker threads to quit.
