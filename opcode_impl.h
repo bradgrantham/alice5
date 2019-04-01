@@ -1600,11 +1600,6 @@
         std::cerr << "stepGLSLstd450Atan2() not implemented\n";
     }
 
-    void stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
-    {
-        std::cerr << "stepGLSLstd450Pow() not implemented\n";
-    }
-
     void stepGLSLstd450Exp(const InsnGLSLstd450Exp& insn)
     {
         std::cerr << "stepGLSLstd450Exp() not implemented\n";

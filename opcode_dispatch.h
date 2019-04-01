@@ -37,6 +37,7 @@
 [&](const InsnGLSLstd450Floor& insn) { stepGLSLstd450Floor(insn); },
 [&](const InsnGLSLstd450Sin& insn) { stepGLSLstd450Sin(insn); },
 [&](const InsnGLSLstd450Cos& insn) { stepGLSLstd450Cos(insn); },
+[&](const InsnGLSLstd450Pow& insn) { stepGLSLstd450Pow(insn); },
 [&](const InsnGLSLstd450FMin& insn) { stepGLSLstd450FMin(insn); },
 [&](const InsnGLSLstd450FMax& insn) { stepGLSLstd450FMax(insn); },
 [&](const InsnGLSLstd450Length& insn) { stepGLSLstd450Length(insn); },

@@ -1917,6 +1917,36 @@ struct Interpreter
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
 
+    void stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float x = registerAs<float>(insn.xId);
+                float y = registerAs<float>(insn.yId);
+                registerAs<float>(insn.resultId) = powf(x, y);
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float* y = &registerAs<float>(insn.yId);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = powf(x[i], y[i]);
+                }
+
+            } else {
+
+                std::cout << "Unknown type for Pow\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
     void stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
