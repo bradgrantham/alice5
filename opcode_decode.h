@@ -793,6 +793,25 @@ case GLSLstd450Distance: {
     break;
 }
 
+case GLSLstd450Cross: {
+    uint32_t xId = nextu();
+    uint32_t yId = nextu();
+    ip->code.push_back(InsnGLSLstd450Cross{type, resultId, xId, yId});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450Cross";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << " yId ";
+        std::cout << yId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Normalize: {
     uint32_t xId = nextu();
     ip->code.push_back(InsnGLSLstd450Normalize{type, resultId, xId});

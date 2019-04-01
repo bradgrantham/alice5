@@ -1819,6 +1819,11 @@ struct Interpreter
                     radicand += (p1[i] - p0[i]) * (p1[i] - p0[i]);
                 }
                 registerAs<float>(insn.resultId) = sqrtf(radicand);
+
+            } else {
+
+                std::cout << "Unknown type for Distance\n";
+
             }
         }, types[std::get<RegisterObject>(registers[insn.p0Id]).type]);
     }
@@ -1843,6 +1848,11 @@ struct Interpreter
                     length += x[i]*x[i];
                 }
                 registerAs<float>(insn.resultId) = sqrtf(length);
+
+            } else {
+
+                std::cout << "Unknown type for Length\n";
+
             }
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
@@ -1868,6 +1878,11 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = x[i] < y[i] ? y[i] : x[i];
                 }
+
+            } else {
+
+                std::cout << "Unknown type for FMax\n";
+
             }
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
@@ -1893,6 +1908,11 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = x[i] > y[i] ? y[i] : x[i];
                 }
+
+            } else {
+
+                std::cout << "Unknown type for FMin\n";
+
             }
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
@@ -1922,6 +1942,11 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = length == 0 ? 0 : x[i]/length;
                 }
+
+            } else {
+
+                std::cout << "Unknown type for Normalize\n";
+
             }
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
@@ -1945,6 +1970,11 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = sin(x[i]);
                 }
+
+            } else {
+
+                std::cout << "Unknown type for Sin\n";
+
             }
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
@@ -1968,6 +1998,11 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = cos(x[i]);
                 }
+
+            } else {
+
+                std::cout << "Unknown type for Cos\n";
+
             }
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
@@ -1991,6 +2026,11 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = fabsf(x[i]);
                 }
+
+            } else {
+
+                std::cout << "Unknown type for FAbs\n";
+
             }
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
@@ -2014,6 +2054,38 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = floor(x[i]);
                 }
+
+            } else {
+
+                std::cout << "Unknown type for Floor\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
+    void stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float* y = &registerAs<float>(insn.yId);
+                float* result = &registerAs<float>(insn.resultId);
+
+                assert(type.count == 3);
+
+                result[0] = x[1]*y[2] - y[1]*x[2];
+                result[1] = x[2]*y[0] - y[2]*x[0];
+                result[2] = x[0]*y[1] - y[0]*x[1];
+
+            } else {
+
+                std::cout << "Unknown type for Cross\n";
+
             }
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }

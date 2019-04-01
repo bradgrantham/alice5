@@ -1790,11 +1790,6 @@
         std::cerr << "stepGLSLstd450UnpackDouble2x32() not implemented\n";
     }
 
-    void stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
-    {
-        std::cerr << "stepGLSLstd450Cross() not implemented\n";
-    }
-
     void stepGLSLstd450FaceForward(const InsnGLSLstd450FaceForward& insn)
     {
         std::cerr << "stepGLSLstd450FaceForward() not implemented\n";

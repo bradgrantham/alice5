@@ -41,4 +41,5 @@ InsnGLSLstd450FMin,
 InsnGLSLstd450FMax,
 InsnGLSLstd450Length,
 InsnGLSLstd450Distance,
+InsnGLSLstd450Cross,
 InsnGLSLstd450Normalize

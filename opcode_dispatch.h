@@ -41,4 +41,5 @@
 [&](const InsnGLSLstd450FMax& insn) { stepGLSLstd450FMax(insn); },
 [&](const InsnGLSLstd450Length& insn) { stepGLSLstd450Length(insn); },
 [&](const InsnGLSLstd450Distance& insn) { stepGLSLstd450Distance(insn); },
+[&](const InsnGLSLstd450Cross& insn) { stepGLSLstd450Cross(insn); },
 [&](const InsnGLSLstd450Normalize& insn) { stepGLSLstd450Normalize(insn); },
