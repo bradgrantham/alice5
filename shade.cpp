@@ -1823,6 +1823,56 @@ struct Interpreter
         }, types[std::get<RegisterObject>(registers[insn.p0Id]).type]);
     }
 
+    void stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float x = registerAs<float>(insn.xId);
+                float y = registerAs<float>(insn.yId);
+                registerAs<float>(insn.resultId) = x < y ? y : x;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float* y = &registerAs<float>(insn.yId);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = x[i] < y[i] ? y[i] : x[i];
+                }
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
+    void stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float x = registerAs<float>(insn.xId);
+                float y = registerAs<float>(insn.yId);
+                registerAs<float>(insn.resultId) = x > y ? y : x;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float* y = &registerAs<float>(insn.yId);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = x[i] > y[i] ? y[i] : x[i];
+                }
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
     void stepBranch(const InsnBranch& insn)
     {
         pc = labels[insn.targetLabelId];

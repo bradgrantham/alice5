@@ -656,6 +656,44 @@ case SpvOpExtInst: {
     uint32_t opcode = nextu();
     if(ext == ip->ExtInstGLSL_std_450_id) {
         switch(opcode) {
+case GLSLstd450FMin: {
+    uint32_t xId = nextu();
+    uint32_t yId = nextu();
+    ip->code.push_back(InsnGLSLstd450FMin{type, resultId, xId, yId});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450FMin";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << " yId ";
+        std::cout << yId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450FMax: {
+    uint32_t xId = nextu();
+    uint32_t yId = nextu();
+    ip->code.push_back(InsnGLSLstd450FMax{type, resultId, xId, yId});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450FMax";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << " yId ";
+        std::cout << yId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Distance: {
     uint32_t p0Id = nextu();
     uint32_t p1Id = nextu();

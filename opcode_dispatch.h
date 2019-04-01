@@ -33,4 +33,6 @@
 [&](const InsnBranchConditional& insn) { stepBranchConditional(insn); },
 [&](const InsnReturn& insn) { stepReturn(insn); },
 [&](const InsnReturnValue& insn) { stepReturnValue(insn); },
+[&](const InsnGLSLstd450FMin& insn) { stepGLSLstd450FMin(insn); },
+[&](const InsnGLSLstd450FMax& insn) { stepGLSLstd450FMax(insn); },
 [&](const InsnGLSLstd450Distance& insn) { stepGLSLstd450Distance(insn); },

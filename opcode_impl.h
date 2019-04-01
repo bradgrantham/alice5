@@ -1675,11 +1675,6 @@
         std::cerr << "stepGLSLstd450ModfStruct() not implemented\n";
     }
 
-    void stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
-    {
-        std::cerr << "stepGLSLstd450FMin() not implemented\n";
-    }
-
     void stepGLSLstd450UMin(const InsnGLSLstd450UMin& insn)
     {
         std::cerr << "stepGLSLstd450UMin() not implemented\n";
@@ -1688,11 +1683,6 @@
     void stepGLSLstd450SMin(const InsnGLSLstd450SMin& insn)
     {
         std::cerr << "stepGLSLstd450SMin() not implemented\n";
-    }
-
-    void stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
-    {
-        std::cerr << "stepGLSLstd450FMax() not implemented\n";
     }
 
     void stepGLSLstd450UMax(const InsnGLSLstd450UMax& insn)

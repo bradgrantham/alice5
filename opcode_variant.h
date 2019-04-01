@@ -33,4 +33,6 @@ InsnBranch,
 InsnBranchConditional,
 InsnReturn,
 InsnReturnValue,
+InsnGLSLstd450FMin,
+InsnGLSLstd450FMax,
 InsnGLSLstd450Distance
