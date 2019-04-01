@@ -3,6 +3,7 @@
 #include <fstream>
 #include <variant>
 #include <chrono>
+#include <thread>
 
 #include <StandAlone/ResourceLimits.h>
 #include <glslang/MachineIndependent/localintermediate.h>
@@ -2313,6 +2314,32 @@ void usage(const char* progname)
     printf("\t-n    Compile and load shader, but do not shade an image\n");
 }
 
+// Render rows starting at "startRow" every "skip".
+void render(const Interpreter *ip, int startRow, int skip)
+{
+    State state(ip);
+
+    // iResolution is uniform @0 in preamble
+    state.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight});
+
+    // iTime is uniform @8 in preamble
+    state.set(SpvStorageClassUniform, 8, 0.0f);
+
+    for(int y = startRow; y < imageHeight; y += skip) {
+        for(int x = 0; x < imageWidth; x++) {
+            v4float color;
+            eval(state, x + 0.5f, y + 0.5f, color);
+            for(int c = 0; c < 3; c++) {
+                // ShaderToy clamps the color.
+                int byteColor = color[c]*255.99;
+                if (byteColor < 0) byteColor = 0;
+                if (byteColor > 255) byteColor = 255;
+                imageBuffer[imageHeight - 1 - y][x][c] = byteColor;
+            }
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     bool debug = false;
@@ -2450,21 +2477,21 @@ int main(int argc, char **argv)
 
     auto start_time = std::chrono::steady_clock::now();
 
-    State state(&ip);
-    state.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight}); // iResolution is uniform @0 in preamble
-    state.set(SpvStorageClassUniform, 8, 0.0f); // iTime is uniform @8 in preamble
-    for(int y = 0; y < imageHeight; y++)
-        for(int x = 0; x < imageWidth; x++) {
-            v4float color;
-            eval(state, x + 0.5f, y + 0.5f, color);
-            for(int c = 0; c < 3; c++) {
-                // ShaderToy clamps the color.
-                int byteColor = color[c]*255.99;
-                if (byteColor < 0) byteColor = 0;
-                if (byteColor > 255) byteColor = 255;
-                imageBuffer[imageHeight - 1 - y][x][c] = byteColor;
-            }
-        }
+    int threadCount = std::thread::hardware_concurrency();
+    std::cout << "Using " << threadCount << " threads.\n";
+
+    // Generate the rows on multiple threads.
+    std::vector<std::thread *> thread;
+    for (int t = 0; t < threadCount; t++) {
+        thread.push_back(new std::thread(render, &ip, t, threadCount));
+    }
+
+    // Wait for worker threads to quit.
+    for (int t = 0; t < threadCount; t++) {
+        thread[t]->join();
+        delete thread[t];
+        thread[t] = nullptr;
+    }
 
     auto end_time = std::chrono::steady_clock::now();
     auto elapsed_time = end_time - start_time;
