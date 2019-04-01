@@ -575,6 +575,25 @@ case SpvOpFOrdGreaterThanEqual: {
     break;
 }
 
+case SpvOpPhi: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    std::vector<uint32_t> operandId = restv();
+    ip->code.push_back(InsnPhi{type, resultId, operandId});
+    if(ip->verbose) {
+        std::cout << "Phi";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operandId ";
+        for(int i = 0; i < operandId.size(); i++)
+            std::cout << operandId[i] << " ";
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpBranch: {
     uint32_t targetLabelId = nextu();
     ip->code.push_back(InsnBranch{targetLabelId});

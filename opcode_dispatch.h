@@ -28,6 +28,7 @@
 [&](const InsnFOrdGreaterThan& insn) { stepFOrdGreaterThan(insn); },
 [&](const InsnFOrdLessThanEqual& insn) { stepFOrdLessThanEqual(insn); },
 [&](const InsnFOrdGreaterThanEqual& insn) { stepFOrdGreaterThanEqual(insn); },
+[&](const InsnPhi& insn) { stepPhi(insn); },
 [&](const InsnBranch& insn) { stepBranch(insn); },
 [&](const InsnBranchConditional& insn) { stepBranchConditional(insn); },
 [&](const InsnReturn& insn) { stepReturn(insn); },

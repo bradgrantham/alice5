@@ -336,6 +336,12 @@ struct Interpreter
     bool verbose;
     std::set<uint32_t> capabilities;
 
+    // These values are label IDs identifying blocks within a function. The current block
+    // is the block we're executing. The previous block was the block we came from.
+    // These are 0xFFFFFFFF if not yet set.
+    uint32_t currentBlockId;
+    uint32_t previousBlockId;
+
     // main id-to-thingie map containing extinstsets, types, variables, etc
     // secondary maps of entryPoint, decorations, names, etc
 
@@ -356,8 +362,10 @@ struct Interpreter
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
     std::vector<Instruction> code;
+    std::vector<uint32_t> blockId; // Parallel to "code".
 
     Function* currentFunction;
+    // Map from label ID to index into code vector.
     std::map<uint32_t, uint32_t> labels;
     Function* mainFunction; 
 
@@ -384,7 +392,9 @@ struct Interpreter
         throwOnUnimplemented(throwOnUnimplemented_),
         hasUnimplemented(false),
         verbose(verbose_),
-        currentFunction(nullptr)
+        currentFunction(nullptr),
+        currentBlockId(0xFFFFFFFF),
+        previousBlockId(0xFFFFFFFF)
     {
         size_t base = 0;
         auto anotherRegion = [&base](size_t size){MemoryRegion r(base, size); base += size; return r;};
@@ -996,21 +1006,6 @@ struct Interpreter
                 }
                 break;
             }
-
-                                /*
-            case SpvOpFunctionParameter: {
-                assert(ip->currentFunction != nullptr);
-                uint32_t type = nextu();
-                uint32_t id = nextu();
-                ip->code.push_back(InsnFunctionParameter{type, id});
-                if(ip->verbose) {
-                    std::cout << "FunctionParameter " << id
-                        << " type " << type
-                        << "\n";
-                }
-                break;
-            }
-            */
 
             case SpvOpLabel: {
                 uint32_t id = nextu();
@@ -1839,6 +1834,28 @@ struct Interpreter
         pc = labels[condition ? insn.trueLabelId : insn.falseLabelId];
     }
 
+    void stepPhi(const InsnPhi& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        uint32_t size = typeSizes[obj.type];
+
+        bool found = false;
+        for(int i = 0; !found && i < insn.operandId.size(); i += 2) {
+            uint32_t srcId = insn.operandId[i];
+            uint32_t parentId = insn.operandId[i + 1];
+
+            if (parentId == previousBlockId) {
+                const RegisterObject &src = std::get<RegisterObject>(registers[srcId]);
+                std::copy(src.data, src.data + size, obj.data);
+                found = true;
+            }
+        }
+
+        if (!found) {
+            std::cout << "Error: Phi didn't find any label " << previousBlockId << "\n";
+        }
+    }
+
     // Unimplemented instructions. To implement one, move the function from this
     // header into this file just above this comment.
 #include "opcode_impl.h"
@@ -1846,6 +1863,19 @@ struct Interpreter
     void step()
     {
         if(false) std::cout << "address " << pc << "\n";
+
+        // Update our idea of what block we're in. If we just switched blocks,
+        // remember the previous one (for Phi).
+        if (blockId[pc] != currentBlockId) {
+            // I'm not sure this is fully correct. For example, when returning
+            // from a function this will set previousBlockId to a block in
+            // the called function, but that's not right, it should always
+            // point to a block within the current function. I don't think that
+            // matters in practice because of the restricted locations where Phi
+            // is placed.
+            previousBlockId = currentBlockId;
+            currentBlockId = blockId[pc];
+        }
 
         Instruction insn = code[pc++];
 
@@ -1866,8 +1896,34 @@ struct Interpreter
         v = objectInClassAt<T>(clss, offset);
     }
 
+    // Post-parsing work.
+    void postParse() {
+        // Make a parallel array to "code" recording the block ID for each
+        // instructions.
+        blockId.clear();
+        for (int pc = 0; pc < code.size(); pc++) {
+            uint32_t id = 0xFFFFFFFF;
+
+            for (auto label : labels) {
+                if (pc >= label.second) {
+                    id = label.first;
+                }
+            }
+
+            if (id == 0xFFFFFFFF) {
+                std::cout << "Can't find block for PC " << pc << "\n";
+                exit(EXIT_FAILURE);
+            }
+
+            blockId.push_back(id);
+        }
+    }
+
     void run()
     {
+        currentBlockId = 0xFFFFFFFF;
+        previousBlockId = 0xFFFFFFFF;
+
         // Copy constants to memory. They're treated like variables.
         registers = constants;
 
@@ -2067,6 +2123,8 @@ int main(int argc, char **argv)
     if (ip.hasUnimplemented) {
         exit(1);
     }
+
+    ip.postParse();
 
     if (doNotShade) {
         exit(EXIT_SUCCESS);

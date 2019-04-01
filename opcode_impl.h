@@ -975,11 +975,6 @@
         std::cerr << "stepAtomicXor() not implemented\n";
     }
 
-    void stepPhi(const InsnPhi& insn)
-    {
-        std::cerr << "stepPhi() not implemented\n";
-    }
-
     void stepLoopMerge(const InsnLoopMerge& insn)
     {
         std::cerr << "stepLoopMerge() not implemented\n";
