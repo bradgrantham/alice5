@@ -758,6 +758,22 @@ case GLSLstd450FMax: {
     break;
 }
 
+case GLSLstd450Length: {
+    uint32_t xId = nextu();
+    ip->code.push_back(InsnGLSLstd450Length{type, resultId, xId});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450Length";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Distance: {
     uint32_t p0Id = nextu();
     uint32_t p1Id = nextu();

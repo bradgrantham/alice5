@@ -39,5 +39,6 @@ InsnGLSLstd450Sin,
 InsnGLSLstd450Cos,
 InsnGLSLstd450FMin,
 InsnGLSLstd450FMax,
+InsnGLSLstd450Length,
 InsnGLSLstd450Distance,
 InsnGLSLstd450Normalize

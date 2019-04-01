@@ -1823,6 +1823,30 @@ struct Interpreter
         }, types[std::get<RegisterObject>(registers[insn.p0Id]).type]);
     }
 
+    void stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float x = registerAs<float>(insn.xId);
+                registerAs<float>(insn.resultId) = fabsf(x);
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float length = 0;
+                for(int i = 0; i < type.count; i++) {
+                    length += x[i]*x[i];
+                }
+                registerAs<float>(insn.resultId) = sqrtf(length);
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
     void stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
