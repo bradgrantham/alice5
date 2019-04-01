@@ -1902,6 +1902,98 @@ struct Interpreter
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
 
+    void stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float x = registerAs<float>(insn.xId);
+                registerAs<float>(insn.resultId) = sin(x);
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = sin(x[i]);
+                }
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
+    void stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float x = registerAs<float>(insn.xId);
+                registerAs<float>(insn.resultId) = cos(x);
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = cos(x[i]);
+                }
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
+    void stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float x = registerAs<float>(insn.xId);
+                registerAs<float>(insn.resultId) = fabsf(x);
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = fabsf(x[i]);
+                }
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
+    void stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float x = registerAs<float>(insn.xId);
+                registerAs<float>(insn.resultId) = floor(x);
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = floor(x[i]);
+                }
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
     void stepBranch(const InsnBranch& insn)
     {
         pc = labels[insn.targetLabelId];

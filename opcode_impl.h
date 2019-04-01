@@ -1510,11 +1510,6 @@
         std::cerr << "stepGLSLstd450Trunc() not implemented\n";
     }
 
-    void stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
-    {
-        std::cerr << "stepGLSLstd450FAbs() not implemented\n";
-    }
-
     void stepGLSLstd450SAbs(const InsnGLSLstd450SAbs& insn)
     {
         std::cerr << "stepGLSLstd450SAbs() not implemented\n";
@@ -1528,11 +1523,6 @@
     void stepGLSLstd450SSign(const InsnGLSLstd450SSign& insn)
     {
         std::cerr << "stepGLSLstd450SSign() not implemented\n";
-    }
-
-    void stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
-    {
-        std::cerr << "stepGLSLstd450Floor() not implemented\n";
     }
 
     void stepGLSLstd450Ceil(const InsnGLSLstd450Ceil& insn)
@@ -1553,16 +1543,6 @@
     void stepGLSLstd450Degrees(const InsnGLSLstd450Degrees& insn)
     {
         std::cerr << "stepGLSLstd450Degrees() not implemented\n";
-    }
-
-    void stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
-    {
-        std::cerr << "stepGLSLstd450Sin() not implemented\n";
-    }
-
-    void stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
-    {
-        std::cerr << "stepGLSLstd450Cos() not implemented\n";
     }
 
     void stepGLSLstd450Tan(const InsnGLSLstd450Tan& insn)

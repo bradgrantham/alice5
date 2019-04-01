@@ -656,6 +656,70 @@ case SpvOpExtInst: {
     uint32_t opcode = nextu();
     if(ext == ip->ExtInstGLSL_std_450_id) {
         switch(opcode) {
+case GLSLstd450FAbs: {
+    uint32_t xId = nextu();
+    ip->code.push_back(InsnGLSLstd450FAbs{type, resultId, xId});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450FAbs";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Floor: {
+    uint32_t xId = nextu();
+    ip->code.push_back(InsnGLSLstd450Floor{type, resultId, xId});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450Floor";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Sin: {
+    uint32_t xId = nextu();
+    ip->code.push_back(InsnGLSLstd450Sin{type, resultId, xId});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450Sin";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Cos: {
+    uint32_t xId = nextu();
+    ip->code.push_back(InsnGLSLstd450Cos{type, resultId, xId});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450Cos";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450FMin: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
