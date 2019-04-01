@@ -146,6 +146,18 @@ struct TypeVector
     uint32_t count;
 };
 
+// Represents a matrix type. Each matrix is a sequence of column vectors.
+// Matrix data is stored starting at the upper-left, going down the first
+// column, then the next column, etc.
+struct TypeMatrix
+{
+    // Type of the column vector. This is a key in the "types" map.
+    uint32_t columnType;
+
+    // Number of columns.
+    uint32_t columnCount;
+};
+
 // Represents a function type.
 struct TypeFunction
 {
@@ -196,7 +208,7 @@ struct TypeSampledImage
 };
 
 // Union of all known types.
-typedef std::variant<TypeVoid, TypeBool, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
+typedef std::variant<TypeVoid, TypeBool, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeMatrix, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
 
 // A function parameter. This is on the receiving side, to set aside an SSA slot
 // for the value received from the caller.
@@ -445,11 +457,17 @@ struct Interpreter
         return *reinterpret_cast<T*>(std::get<RegisterObject>(registers[id]).data);
     }
 
+    // Returns the type of the member of "t" at index "i". For vectors,
+    // "i" is ignored and the type of any element is returned. For matrices,
+    // "i" is ignored and the type of any column is returned. For structs,
+    // the type of field "i" (0-indexed) is returned.
     uint32_t getConstituentType(uint32_t t, int i)
     {
         const Type& type = types[t];
         if(std::holds_alternative<TypeVector>(type)) {
             return std::get<TypeVector>(type).type;
+        } else if(std::holds_alternative<TypeMatrix>(type)) {
+            return std::get<TypeMatrix>(type).columnType;
         } else if (std::holds_alternative<TypeStruct>(type)) {
             return std::get<TypeStruct>(type).memberTypes[i];
         // XXX } else if (std::holds_alternative<TypeArray>(type)) {
@@ -483,6 +501,16 @@ struct Interpreter
                     dumpTypeAt(types[type.type], ptr);
                     ptr += typeSizes[type.type];
                     if(i < type.count - 1)
+                        std::cout << ", ";
+                }
+                std::cout << ">";
+            },
+            [&](const TypeMatrix& type) {
+                std::cout << "<";
+                for(int i = 0; i < type.columnCount; i++) {
+                    dumpTypeAt(types[type.columnType], ptr);
+                    ptr += typeSizes[type.columnType];
+                    if(i < type.columnCount - 1)
                         std::cout << ", ";
                 }
                 std::cout << ">";
@@ -780,6 +808,19 @@ struct Interpreter
                 ip->typeSizes[id] = ip->typeSizes[type] * count;
                 if(ip->verbose) {
                     std::cout << "TypeVector " << id << " of " << type << " count " << count << "\n";
+                }
+                break;
+            }
+
+            case SpvOpTypeMatrix: {
+                // XXX result id
+                uint32_t id = nextu();
+                uint32_t columnType = nextu();
+                uint32_t columnCount = nextu();
+                ip->types[id] = TypeMatrix {columnType, columnCount};
+                ip->typeSizes[id] = ip->typeSizes[columnType] * columnCount;
+                if(ip->verbose) {
+                    std::cout << "TypeMatrix " << id << " of " << columnType << " count " << columnCount << "\n";
                 }
                 break;
             }
@@ -1085,6 +1126,10 @@ struct Interpreter
                     result[i] = operand1[i] + operand2[i];
                 }
 
+            } else {
+
+                std::cout << "Unknown type for IAdd\n";
+
             }
         }, types[insn.type]);
     }
@@ -1111,6 +1156,10 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = operand1[i] + operand2[i];
                 }
+
+            } else {
+
+                std::cout << "Unknown type for FAdd\n";
 
             }
         }, types[insn.type]);
@@ -1139,6 +1188,10 @@ struct Interpreter
                     result[i] = operand1[i] - operand2[i];
                 }
 
+            } else {
+
+                std::cout << "Unknown type for FSub\n";
+
             }
         }, types[insn.type]);
     }
@@ -1166,6 +1219,10 @@ struct Interpreter
                     result[i] = operand1[i] * operand2[i];
                 }
 
+            } else {
+
+                std::cout << "Unknown type for FMul\n";
+
             }
         }, types[insn.type]);
     }
@@ -1192,6 +1249,10 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = operand1[i] / operand2[i];
                 }
+
+            } else {
+
+                std::cout << "Unknown type for FDiv\n";
 
             }
         }, types[insn.type]);
@@ -1308,6 +1369,14 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     result[i] = -operand[i];
                 }
+
+            } else {
+
+                // Doesn't seem necessary to do matrices, the assembly
+                // extracts the vectors and negates them and contructs
+                // a new matrix.
+
+                std::cout << "Unknown type for FNegate\n";
 
             }
         }, types[insn.type]);
