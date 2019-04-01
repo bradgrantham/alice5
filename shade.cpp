@@ -307,6 +307,7 @@ const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
 const uint32_t EXECUTION_ENDED = 0xFFFFFFFF;
 const uint32_t NO_RETURN_REGISTER = 0xFFFFFFFF;
+const uint32_t NO_BLOCK_ID = 0xFFFFFFFF;
 
 struct MemoryRegion
 {
@@ -338,7 +339,7 @@ struct Interpreter
 
     // These values are label IDs identifying blocks within a function. The current block
     // is the block we're executing. The previous block was the block we came from.
-    // These are 0xFFFFFFFF if not yet set.
+    // These are NO_BLOCK_ID if not yet set.
     uint32_t currentBlockId;
     uint32_t previousBlockId;
 
@@ -393,8 +394,8 @@ struct Interpreter
         hasUnimplemented(false),
         verbose(verbose_),
         currentFunction(nullptr),
-        currentBlockId(0xFFFFFFFF),
-        previousBlockId(0xFFFFFFFF)
+        currentBlockId(NO_BLOCK_ID),
+        previousBlockId(NO_BLOCK_ID)
     {
         size_t base = 0;
         auto anotherRegion = [&base](size_t size){MemoryRegion r(base, size); base += size; return r;};
@@ -1053,16 +1054,6 @@ struct Interpreter
         }
 
         return SPV_SUCCESS;
-    }
-
-    void prepare()
-    {
-        mainFunction = nullptr;
-        for(auto& e: entryPoints) {
-            if(e.second.name == "main") {
-                mainFunction = &functions[e.first];
-            }
-        }
     }
 
     uint32_t pc;
@@ -2195,11 +2186,19 @@ struct Interpreter
 
     // Post-parsing work.
     void postParse() {
+        // Find the main function.
+        mainFunction = nullptr;
+        for(auto& e: entryPoints) {
+            if(e.second.name == "main") {
+                mainFunction = &functions[e.first];
+            }
+        }
+
         // Make a parallel array to "code" recording the block ID for each
         // instructions.
         blockId.clear();
         for (int pc = 0; pc < code.size(); pc++) {
-            uint32_t id = 0xFFFFFFFF;
+            uint32_t id = NO_BLOCK_ID;
 
             for (auto label : labels) {
                 if (pc >= label.second) {
@@ -2207,7 +2206,7 @@ struct Interpreter
                 }
             }
 
-            if (id == 0xFFFFFFFF) {
+            if (id == NO_BLOCK_ID) {
                 std::cout << "Can't find block for PC " << pc << "\n";
                 exit(EXIT_FAILURE);
             }
@@ -2218,8 +2217,8 @@ struct Interpreter
 
     void run()
     {
-        currentBlockId = 0xFFFFFFFF;
-        previousBlockId = 0xFFFFFFFF;
+        currentBlockId = NO_BLOCK_ID;
+        previousBlockId = NO_BLOCK_ID;
 
         // Copy constants to memory. They're treated like variables.
         registers = constants;
@@ -2249,16 +2248,9 @@ struct Interpreter
 
 void eval(Interpreter& ip, float x, float y, v4float& color)
 {
-    if(0) {
-        color[0] = x / imageWidth;
-        color[1] = y / imageHeight;
-        color[2] = 0.5f;
-        color[3] = 1.0f;
-    } else {
-        ip.set(SpvStorageClassInput, 0, v2float {x, y}); // fragCoord is in #0 in preamble
-        ip.run();
-        ip.get(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
-    }
+    ip.set(SpvStorageClassInput, 0, v2float {x, y}); // fragCoord is in #0 in preamble
+    ip.run();
+    ip.get(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
 }
 
 
@@ -2429,7 +2421,6 @@ int main(int argc, char **argv)
 
     auto start_time = std::chrono::steady_clock::now();
 
-    ip.prepare();
     ip.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight}); // iResolution is uniform @0 in preamble
     ip.set(SpvStorageClassUniform, 8, 0.0f); // iTime is uniform @8 in preamble
     for(int y = 0; y < imageHeight; y++)
