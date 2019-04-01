@@ -1820,11 +1820,6 @@
         std::cerr << "stepGLSLstd450Cross() not implemented\n";
     }
 
-    void stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
-    {
-        std::cerr << "stepGLSLstd450Normalize() not implemented\n";
-    }
-
     void stepGLSLstd450FaceForward(const InsnGLSLstd450FaceForward& insn)
     {
         std::cerr << "stepGLSLstd450FaceForward() not implemented\n";

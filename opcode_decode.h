@@ -713,6 +713,22 @@ case GLSLstd450Distance: {
     break;
 }
 
+case GLSLstd450Normalize: {
+    uint32_t xId = nextu();
+    ip->code.push_back(InsnGLSLstd450Normalize{type, resultId, xId});
+    if(ip->verbose) {
+        std::cout << "GLSLstd450Normalize";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
             default: {
                 if(ip->throwOnUnimplemented) {
                     throw std::runtime_error("unimplemented GLSLstd450 opcode " + GLSLstd450OpcodeToString[opcode] + " (" + std::to_string(opcode) + ")");

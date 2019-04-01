@@ -1873,6 +1873,35 @@ struct Interpreter
         }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
     }
 
+    void stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeFloat>) {
+
+                float x = registerAs<float>(insn.xId);
+                registerAs<float>(insn.resultId) = x < 0 ? -1 : 1;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* x = &registerAs<float>(insn.xId);
+                float length = 0;
+                for(int i = 0; i < type.count; i++) {
+                    length += x[i]*x[i];
+                }
+                length = sqrtf(length);
+
+                float* result = &registerAs<float>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = length == 0 ? 0 : x[i]/length;
+                }
+            }
+        }, types[std::get<RegisterObject>(registers[insn.xId]).type]);
+    }
+
     void stepBranch(const InsnBranch& insn)
     {
         pc = labels[insn.targetLabelId];
