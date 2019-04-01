@@ -92,7 +92,7 @@ vec3 normal(vec3 p) {
 
 vec3 shade(vec3 rd, vec3 p, int oid) {
     vec3 l = vec3(0.0, 10.0, 0.0);
-    l.xz += vec2(sin(iTime), cos(iTime))*10.0;
+    l.xz += vec2(sin(iTime+3.0), cos(iTime+3.0))*10.0;
     
     vec3 to_l = normalize(l - p);
     vec3 n = normal(p);
@@ -132,7 +132,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 xy = (fragCoord - iResolution.xy/2.0)/iResolution.y;
     
-    vec3 eye = vec3(sin(iTime/10.0)*10.0, 7.0, cos(iTime/10.0)*10.0);
+    vec3 eye = vec3(sin((iTime + 3.0)/10.0)*10.0, 7.0, cos((iTime + 3.0)/10.0)*10.0);
     vec3 lookat = vec3(0.0, 0.0, 0.0);
     mat3 cam = makeCamera(eye, lookat);
         

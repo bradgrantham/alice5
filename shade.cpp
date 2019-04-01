@@ -1065,8 +1065,6 @@ struct Interpreter
         return SPV_SUCCESS;
     }
 
-    typedef std::pair<uint32_t,uint32_t> IndexLabelId;
-
     // Post-parsing work.
     void postParse() {
         // Find the main function.
@@ -1081,6 +1079,7 @@ struct Interpreter
         // instruction. First create a list of <index,labelId> pairs. These
         // are the same pairs as in the "labels" map but with the two elements
         // switched.
+        typedef std::pair<uint32_t,uint32_t> IndexLabelId;
         std::vector<IndexLabelId> labels_in_order;
         for (auto label : labels) {
             labels_in_order.push_back(IndexLabelId{label.second, label.first});
