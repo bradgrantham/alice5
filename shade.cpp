@@ -893,6 +893,34 @@ struct Interpreter
                 break;
             }
 
+            case SpvOpConstantTrue: {
+                // XXX result id
+                uint32_t typeId = nextu();
+                uint32_t id = nextu();
+                RegisterObject& r = ip->allocConstantObject(id, typeId);
+                bool value = true;
+                const unsigned char *data = reinterpret_cast<const unsigned char*>(&value);
+                std::copy(data, data + ip->typeSizes[typeId], r.data);
+                if(ip->verbose) {
+                    std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
+                }
+                break;
+            }
+
+            case SpvOpConstantFalse: {
+                // XXX result id
+                uint32_t typeId = nextu();
+                uint32_t id = nextu();
+                RegisterObject& r = ip->allocConstantObject(id, typeId);
+                bool value = false;
+                const unsigned char *data = reinterpret_cast<const unsigned char*>(&value);
+                std::copy(data, data + ip->typeSizes[typeId], r.data);
+                if(ip->verbose) {
+                    std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
+                }
+                break;
+            }
+
             case SpvOpConstantComposite: {
                 // XXX result id
                 uint32_t typeId = nextu();
