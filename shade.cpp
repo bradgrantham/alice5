@@ -1472,6 +1472,37 @@ struct Interpreter
         }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
     }
 
+    void stepIEqual(const InsnIEqual& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeInt>) {
+
+                uint32_t operand1 = registerAs<uint32_t>(insn.operand1Id);
+                uint32_t operand2 = registerAs<uint32_t>(insn.operand2Id);
+                bool result = operand1 == operand2;
+                registerAs<bool>(insn.resultId) = result;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                uint32_t* operand1 = &registerAs<uint32_t>(insn.operand1Id);
+                uint32_t* operand2 = &registerAs<uint32_t>(insn.operand2Id);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = operand1[i] == operand2[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for IEqual\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
+    }
+
     void stepSelect(const InsnSelect& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
@@ -1559,6 +1590,39 @@ struct Interpreter
                 for(int i = 0; i < type.count; i++) {
                     dst[i] = src[i];
                 }
+
+            } else {
+
+                std::cout << "Unknown type for ConvertSToF\n";
+
+            }
+        }, types[insn.type]);
+    }
+
+    void stepConvertFToS(const InsnConvertFToS& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeInt>) {
+
+                float src = registerAs<float>(insn.floatValueId);
+                registerAs<uint32_t>(insn.resultId) = src;
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                float* src = &registerAs<float>(insn.floatValueId);
+                uint32_t* dst = &registerAs<uint32_t>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    dst[i] = src[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for ConvertFToS\n";
+
             }
         }, types[insn.type]);
     }

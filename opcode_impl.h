@@ -460,11 +460,6 @@
         std::cerr << "stepConvertFToU() not implemented\n";
     }
 
-    void stepConvertFToS(const InsnConvertFToS& insn)
-    {
-        std::cerr << "stepConvertFToS() not implemented\n";
-    }
-
     void stepConvertUToF(const InsnConvertUToF& insn)
     {
         std::cerr << "stepConvertUToF() not implemented\n";
@@ -698,11 +693,6 @@
     void stepLogicalNot(const InsnLogicalNot& insn)
     {
         std::cerr << "stepLogicalNot() not implemented\n";
-    }
-
-    void stepIEqual(const InsnIEqual& insn)
-    {
-        std::cerr << "stepIEqual() not implemented\n";
     }
 
     void stepINotEqual(const InsnINotEqual& insn)

@@ -164,6 +164,24 @@ case SpvOpCompositeExtract: {
     break;
 }
 
+case SpvOpConvertFToS: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t floatValueId = nextu();
+    ip->code.push_back(InsnConvertFToS{type, resultId, floatValueId});
+    if(ip->verbose) {
+        std::cout << "ConvertFToS";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " floatValueId ";
+        std::cout << floatValueId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpConvertSToF: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
@@ -366,6 +384,27 @@ case SpvOpSelect: {
         std::cout << object1Id;
         std::cout << " object2Id ";
         std::cout << object2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpIEqual: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    ip->code.push_back(InsnIEqual{type, resultId, operand1Id, operand2Id});
+    if(ip->verbose) {
+        std::cout << "IEqual";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
         std::cout << "\n";
     }
     break;
