@@ -386,6 +386,24 @@ case SpvOpDot: {
     break;
 }
 
+case SpvOpLogicalNot: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operandId = nextu();
+    ip->code.push_back(InsnLogicalNot{type, resultId, operandId});
+    if(ip->verbose) {
+        std::cout << "LogicalNot";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operandId ";
+        std::cout << operandId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpSelect: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();

@@ -8,7 +8,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 uv = (fragCoord - iResolution.xy/2.0)/iResolution.y;
 
-    uv.x = mod(uv.x*10.0, 1.0);
+    if (!(uv.x > 0)) {
+        uv.x = -uv.x;
+    }
 
     fragColor = vec4(uv, 0.0, 1.0);
 }

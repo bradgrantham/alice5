@@ -685,11 +685,6 @@
         std::cerr << "stepLogicalAnd() not implemented\n";
     }
 
-    void stepLogicalNot(const InsnLogicalNot& insn)
-    {
-        std::cerr << "stepLogicalNot() not implemented\n";
-    }
-
     void stepINotEqual(const InsnINotEqual& insn)
     {
         std::cerr << "stepINotEqual() not implemented\n";

@@ -1534,6 +1534,33 @@ struct Interpreter
         }, types[std::get<RegisterObject>(registers[insn.operand1Id]).type]);
     }
 
+    void stepLogicalNot(const InsnLogicalNot& insn)
+    {
+        RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+        std::visit([this, &insn](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeBool>) {
+
+                registerAs<bool>(insn.resultId) = !registerAs<bool>(insn.operandId);
+
+            } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+                bool* operand = &registerAs<bool>(insn.operandId);
+                bool* result = &registerAs<bool>(insn.resultId);
+                for(int i = 0; i < type.count; i++) {
+                    result[i] = !operand[i];
+                }
+
+            } else {
+
+                std::cout << "Unknown type for LogicalNot\n";
+
+            }
+        }, types[std::get<RegisterObject>(registers[insn.operandId]).type]);
+    }
+
     void stepSelect(const InsnSelect& insn)
     {
         RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);

@@ -19,6 +19,7 @@
 [&](const InsnFMod& insn) { stepFMod(insn); },
 [&](const InsnVectorTimesScalar& insn) { stepVectorTimesScalar(insn); },
 [&](const InsnDot& insn) { stepDot(insn); },
+[&](const InsnLogicalNot& insn) { stepLogicalNot(insn); },
 [&](const InsnSelect& insn) { stepSelect(insn); },
 [&](const InsnIEqual& insn) { stepIEqual(insn); },
 [&](const InsnSLessThan& insn) { stepSLessThan(insn); },
