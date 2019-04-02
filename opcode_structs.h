@@ -412,6 +412,17 @@ struct InsnGLSLstd450FMax : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMax(*this); }
 };
 
+// GLSLstd450SmoothStep instruction (code 49).
+struct InsnGLSLstd450SmoothStep : public Instruction {
+    InsnGLSLstd450SmoothStep(uint32_t type, uint32_t resultId, uint32_t edge0Id, uint32_t edge1Id, uint32_t xId) : type(type), resultId(resultId), edge0Id(edge0Id), edge1Id(edge1Id), xId(xId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t edge0Id; // operand from register
+    uint32_t edge1Id; // operand from register
+    uint32_t xId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450SmoothStep(*this); }
+};
+
 // GLSLstd450Length instruction (code 66).
 struct InsnGLSLstd450Length : public Instruction {
     InsnGLSLstd450Length(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}

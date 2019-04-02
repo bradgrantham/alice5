@@ -46,6 +46,7 @@ struct InsnGLSLstd450Atan2;
 struct InsnGLSLstd450Pow;
 struct InsnGLSLstd450FMin;
 struct InsnGLSLstd450FMax;
+struct InsnGLSLstd450SmoothStep;
 struct InsnGLSLstd450Length;
 struct InsnGLSLstd450Distance;
 struct InsnGLSLstd450Cross;

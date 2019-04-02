@@ -1688,11 +1688,6 @@ void Interpreter::stepGLSLstd450Step(const InsnGLSLstd450Step& insn)
     std::cerr << "stepGLSLstd450Step() not implemented\n";
 }
 
-void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
-{
-    std::cerr << "stepGLSLstd450SmoothStep() not implemented\n";
-}
-
 void Interpreter::stepGLSLstd450Fma(const InsnGLSLstd450Fma& insn)
 {
     std::cerr << "stepGLSLstd450Fma() not implemented\n";

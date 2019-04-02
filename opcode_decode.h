@@ -831,6 +831,28 @@ case GLSLstd450FMax: {
     break;
 }
 
+case GLSLstd450SmoothStep: {
+    uint32_t edge0Id = nextu();
+    uint32_t edge1Id = nextu();
+    uint32_t xId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450SmoothStep{type, resultId, edge0Id, edge1Id, xId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450SmoothStep";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " edge0Id ";
+        std::cout << edge0Id;
+        std::cout << " edge1Id ";
+        std::cout << edge1Id;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Length: {
     uint32_t xId = nextu();
     pgm->code.push_back(new InsnGLSLstd450Length{type, resultId, xId});

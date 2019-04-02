@@ -1926,6 +1926,57 @@ void Interpreter::stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn)
     }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
+// Compute the smoothstep function per the GLSL docs. They say that the
+// results are undefined if edge0 >= edge1, but we allow edge0 > edge1.
+static float smoothstep(float edge0, float edge1, float x)
+{
+    if (edge0 == edge1) {
+        return 0;
+    }
+
+    float t = (x - edge0)/(edge1 - edge0);
+    if (t < 0.0) {
+        t = 0.0;
+    }
+    if (t > 1.0) {
+        t = 1.0;
+    }
+
+    return t*t*(3 - 2*t);
+}
+
+void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float edge0 = registerAs<float>(insn.edge0Id);
+            float edge1 = registerAs<float>(insn.edge1Id);
+            float x = registerAs<float>(insn.xId);
+            registerAs<float>(insn.resultId) = smoothstep(edge0, edge1, x);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* edge0 = &registerAs<float>(insn.edge0Id);
+            float* edge1 = &registerAs<float>(insn.edge1Id);
+            float* x = &registerAs<float>(insn.xId);
+            float* result = &registerAs<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = smoothstep(edge0[i], edge1[i], x[i]);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for SmoothStep\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+}
+
 void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);

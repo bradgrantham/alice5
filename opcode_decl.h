@@ -46,6 +46,7 @@ void stepGLSLstd450Atan2(const InsnGLSLstd450Atan2& insn);
 void stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn);
 void stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn);
 void stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn);
+void stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn);
 void stepGLSLstd450Length(const InsnGLSLstd450Length& insn);
 void stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn);
 void stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn);
