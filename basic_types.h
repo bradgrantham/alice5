@@ -267,7 +267,7 @@ struct RegisterObject
     }
 };
 
-class Interpreter;
+struct Interpreter;
 
 struct Instruction {
     virtual ~Instruction() {};
