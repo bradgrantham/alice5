@@ -57,5 +57,6 @@ struct InsnGLSLstd450Length;
 struct InsnGLSLstd450Distance;
 struct InsnGLSLstd450Cross;
 struct InsnGLSLstd450Normalize;
+struct InsnGLSLstd450Reflect;
 
 #endif // OPCODE_STRUCT_DECL_H

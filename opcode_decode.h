@@ -1038,6 +1038,25 @@ case GLSLstd450Normalize: {
     break;
 }
 
+case GLSLstd450Reflect: {
+    uint32_t iId = nextu();
+    uint32_t nId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450Reflect{type, resultId, iId, nId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Reflect";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " iId ";
+        std::cout << iId;
+        std::cout << " nId ";
+        std::cout << nId;
+        std::cout << "\n";
+    }
+    break;
+}
+
             default: {
                 if(pgm->throwOnUnimplemented) {
                     throw std::runtime_error("unimplemented GLSLstd450 opcode " + GLSLstd450OpcodeToString[opcode] + " (" + std::to_string(opcode) + ")");

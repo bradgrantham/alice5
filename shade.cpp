@@ -1216,6 +1216,18 @@ void Interpreter::stepFNegate(const InsnFNegate& insn)
     }, pgm->types.at(insn.type));
 }
 
+// Computes the dot product of two vectors.
+float dotProduct(float *a, float *b, int count)
+{
+    float dot = 0.0;
+
+    for (int i = 0; i < count; i++) {
+        dot += a[i]*b[i];
+    }
+
+    return dot;
+}
+
 void Interpreter::stepDot(const InsnDot& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
@@ -1230,11 +1242,7 @@ void Interpreter::stepDot(const InsnDot& insn)
 
             float* vector1 = &registerAs<float>(insn.vector1Id);
             float* vector2 = &registerAs<float>(insn.vector2Id);
-            float sum = 0;
-            for(int i = 0; i < t1.count; i++) {
-                sum += vector1[i] * vector2[i];
-            }
-            registerAs<float>(insn.resultId) = sum;
+            registerAs<float>(insn.resultId) = dotProduct(vector1, vector2, t1.count);
 
         } else {
 
@@ -2181,6 +2189,42 @@ void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 
         }
     }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+}
+
+void Interpreter::stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float i = registerAs<float>(insn.iId);
+            float n = registerAs<float>(insn.nId);
+
+            float dot = n*i;
+
+            registerAs<float>(insn.resultId) = i - 2.0*dot*n;
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* i = &registerAs<float>(insn.iId);
+            float* n = &registerAs<float>(insn.nId);
+            float* result = &registerAs<float>(insn.resultId);
+
+            float dot = dotProduct(n, i, type.count);
+
+            for (int k = 0; k < type.count; k++) {
+                result[k] = i[k] - 2.0*dot*n[k];
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Reflect\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.iId]).type));
 }
 
 void Interpreter::stepBranch(const InsnBranch& insn)

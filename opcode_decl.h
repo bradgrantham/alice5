@@ -57,5 +57,6 @@ void stepGLSLstd450Length(const InsnGLSLstd450Length& insn);
 void stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn);
 void stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn);
 void stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn);
+void stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn);
 
 #endif // OPCODE_DECL_H

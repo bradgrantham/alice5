@@ -1743,11 +1743,6 @@ void Interpreter::stepGLSLstd450FaceForward(const InsnGLSLstd450FaceForward& ins
     std::cerr << "stepGLSLstd450FaceForward() not implemented\n";
 }
 
-void Interpreter::stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn)
-{
-    std::cerr << "stepGLSLstd450Reflect() not implemented\n";
-}
-
 void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
 {
     std::cerr << "stepGLSLstd450Refract() not implemented\n";

@@ -520,5 +520,15 @@ struct InsnGLSLstd450Normalize : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Normalize(*this); }
 };
 
+// GLSLstd450Reflect instruction (code 71).
+struct InsnGLSLstd450Reflect : public Instruction {
+    InsnGLSLstd450Reflect(uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId) : type(type), resultId(resultId), iId(iId), nId(nId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t iId; // operand from register
+    uint32_t nId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Reflect(*this); }
+};
+
 
 #endif // OPCODE_STRUCTS_H
