@@ -573,16 +573,6 @@ void Interpreter::stepMatrixTimesScalar(const InsnMatrixTimesScalar& insn)
     std::cerr << "stepMatrixTimesScalar() not implemented\n";
 }
 
-void Interpreter::stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn)
-{
-    std::cerr << "stepVectorTimesMatrix() not implemented\n";
-}
-
-void Interpreter::stepMatrixTimesVector(const InsnMatrixTimesVector& insn)
-{
-    std::cerr << "stepMatrixTimesVector() not implemented\n";
-}
-
 void Interpreter::stepMatrixTimesMatrix(const InsnMatrixTimesMatrix& insn)
 {
     std::cerr << "stepMatrixTimesMatrix() not implemented\n";

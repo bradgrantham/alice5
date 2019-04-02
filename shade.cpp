@@ -1471,7 +1471,6 @@ void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
 
-    // XXX assumes floats.
     float* vector = &registerAs<float>(insn.vectorId);
     float scalar = registerAs<float>(insn.scalarId);
     float* result = &registerAs<float>(insn.resultId);
@@ -1480,6 +1479,54 @@ void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 
     for(int i = 0; i < type.count; i++) {
         result[i] = vector[i] * scalar;
+    }
+}
+
+void Interpreter::stepMatrixTimesVector(const InsnMatrixTimesVector& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+
+    float* matrix = &registerAs<float>(insn.matrixId);
+    float* vector = &registerAs<float>(insn.vectorId);
+    float* result = &registerAs<float>(insn.resultId);
+
+    const RegisterObject &vectorReg = std::get<RegisterObject>(registers[insn.vectorId]);
+
+    const TypeVector &resultType = std::get<TypeVector>(pgm->types.at(insn.type));
+    const TypeVector &vectorType = std::get<TypeVector>(pgm->types.at(vectorReg.type));
+
+    int rn = resultType.count;
+    int vn = vectorType.count;
+
+    for(int i = 0; i < rn; i++) {
+        float dot = 0.0;
+
+        for(int j = 0; j < vn; j++) {
+            dot += matrix[i + j*rn]*vector[j];
+        }
+
+        result[i] = dot;
+    }
+}
+
+void Interpreter::stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+
+    float* vector = &registerAs<float>(insn.vectorId);
+    float* matrix = &registerAs<float>(insn.matrixId);
+    float* result = &registerAs<float>(insn.resultId);
+
+    const RegisterObject &vectorReg = std::get<RegisterObject>(registers[insn.vectorId]);
+
+    const TypeVector &resultType = std::get<TypeVector>(pgm->types.at(insn.type));
+    const TypeVector &vectorType = std::get<TypeVector>(pgm->types.at(vectorReg.type));
+
+    int rn = resultType.count;
+    int vn = vectorType.count;
+
+    for(int i = 0; i < rn; i++) {
+        result[i] = dotProduct(vector, matrix + vn*i, vn);
     }
 }
 

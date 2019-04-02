@@ -189,6 +189,26 @@ struct InsnVectorTimesScalar : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepVectorTimesScalar(*this); }
 };
 
+// OpVectorTimesMatrix instruction (code 144).
+struct InsnVectorTimesMatrix : public Instruction {
+    InsnVectorTimesMatrix(uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t matrixId) : type(type), resultId(resultId), vectorId(vectorId), matrixId(matrixId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vectorId; // operand from register
+    uint32_t matrixId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepVectorTimesMatrix(*this); }
+};
+
+// OpMatrixTimesVector instruction (code 145).
+struct InsnMatrixTimesVector : public Instruction {
+    InsnMatrixTimesVector(uint32_t type, uint32_t resultId, uint32_t matrixId, uint32_t vectorId) : type(type), resultId(resultId), matrixId(matrixId), vectorId(vectorId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t matrixId; // operand from register
+    uint32_t vectorId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepMatrixTimesVector(*this); }
+};
+
 // OpDot instruction (code 148).
 struct InsnDot : public Instruction {
     InsnDot(uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id) : type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id) {}

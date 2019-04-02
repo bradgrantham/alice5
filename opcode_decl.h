@@ -22,6 +22,8 @@ void stepSDiv(const InsnSDiv& insn);
 void stepFDiv(const InsnFDiv& insn);
 void stepFMod(const InsnFMod& insn);
 void stepVectorTimesScalar(const InsnVectorTimesScalar& insn);
+void stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn);
+void stepMatrixTimesVector(const InsnMatrixTimesVector& insn);
 void stepDot(const InsnDot& insn);
 void stepLogicalOr(const InsnLogicalOr& insn);
 void stepLogicalNot(const InsnLogicalNot& insn);

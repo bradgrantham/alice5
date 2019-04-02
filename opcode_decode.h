@@ -389,6 +389,48 @@ case SpvOpVectorTimesScalar: {
     break;
 }
 
+case SpvOpVectorTimesMatrix: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t vectorId = nextu();
+    uint32_t matrixId = nextu();
+    pgm->code.push_back(new InsnVectorTimesMatrix{type, resultId, vectorId, matrixId});
+    if(pgm->verbose) {
+        std::cout << "VectorTimesMatrix";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " vectorId ";
+        std::cout << vectorId;
+        std::cout << " matrixId ";
+        std::cout << matrixId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpMatrixTimesVector: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t matrixId = nextu();
+    uint32_t vectorId = nextu();
+    pgm->code.push_back(new InsnMatrixTimesVector{type, resultId, matrixId, vectorId});
+    if(pgm->verbose) {
+        std::cout << "MatrixTimesVector";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " matrixId ";
+        std::cout << matrixId;
+        std::cout << " vectorId ";
+        std::cout << vectorId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpDot: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();

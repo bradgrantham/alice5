@@ -22,6 +22,8 @@ struct InsnSDiv;
 struct InsnFDiv;
 struct InsnFMod;
 struct InsnVectorTimesScalar;
+struct InsnVectorTimesMatrix;
+struct InsnMatrixTimesVector;
 struct InsnDot;
 struct InsnLogicalOr;
 struct InsnLogicalNot;
