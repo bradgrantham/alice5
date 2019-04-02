@@ -1784,6 +1784,64 @@ void Interpreter::stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
     }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
+void Interpreter::stepGLSLstd450Atan(const InsnGLSLstd450Atan& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float y_over_x = registerAs<float>(insn.y_over_xId);
+            registerAs<float>(insn.resultId) = atanf(y_over_x);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* y_over_x = &registerAs<float>(insn.y_over_xId);
+            float* result = &registerAs<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = atanf(y_over_x[i]);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Atan\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.y_over_xId]).type));
+}
+
+void Interpreter::stepGLSLstd450Atan2(const InsnGLSLstd450Atan2& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float y = registerAs<float>(insn.yId);
+            float x = registerAs<float>(insn.xId);
+            registerAs<float>(insn.resultId) = atan2f(y, x);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* y = &registerAs<float>(insn.yId);
+            float* x = &registerAs<float>(insn.xId);
+            float* result = &registerAs<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = atan2f(y[i], x[i]);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Atan2\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+}
+
 void Interpreter::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);

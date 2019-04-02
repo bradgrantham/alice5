@@ -40,6 +40,8 @@ struct InsnGLSLstd450FAbs;
 struct InsnGLSLstd450Floor;
 struct InsnGLSLstd450Sin;
 struct InsnGLSLstd450Cos;
+struct InsnGLSLstd450Atan;
+struct InsnGLSLstd450Atan2;
 struct InsnGLSLstd450Pow;
 struct InsnGLSLstd450FMin;
 struct InsnGLSLstd450FMax;

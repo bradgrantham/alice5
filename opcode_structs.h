@@ -354,6 +354,25 @@ struct InsnGLSLstd450Cos : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Cos(*this); }
 };
 
+// GLSLstd450Atan instruction (code 18).
+struct InsnGLSLstd450Atan : public Instruction {
+    InsnGLSLstd450Atan(uint32_t type, uint32_t resultId, uint32_t y_over_xId) : type(type), resultId(resultId), y_over_xId(y_over_xId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t y_over_xId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Atan(*this); }
+};
+
+// GLSLstd450Atan2 instruction (code 25).
+struct InsnGLSLstd450Atan2 : public Instruction {
+    InsnGLSLstd450Atan2(uint32_t type, uint32_t resultId, uint32_t yId, uint32_t xId) : type(type), resultId(resultId), yId(yId), xId(xId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t yId; // operand from register
+    uint32_t xId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Atan2(*this); }
+};
+
 // GLSLstd450Pow instruction (code 26).
 struct InsnGLSLstd450Pow : public Instruction {
     InsnGLSLstd450Pow(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : type(type), resultId(resultId), xId(xId), yId(yId) {}

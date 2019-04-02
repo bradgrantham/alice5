@@ -723,6 +723,41 @@ case GLSLstd450Cos: {
     break;
 }
 
+case GLSLstd450Atan: {
+    uint32_t y_over_xId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450Atan{type, resultId, y_over_xId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Atan";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " y_over_xId ";
+        std::cout << y_over_xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Atan2: {
+    uint32_t yId = nextu();
+    uint32_t xId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450Atan2{type, resultId, yId, xId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Atan2";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " yId ";
+        std::cout << yId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Pow: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
