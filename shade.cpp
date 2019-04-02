@@ -1898,6 +1898,34 @@ void Interpreter::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
     }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
+void Interpreter::stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float x = registerAs<float>(insn.xId);
+            registerAs<float>(insn.resultId) = x - floor(x);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* x = &registerAs<float>(insn.xId);
+            float* result = &registerAs<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = x[i] - floor(x[i]);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Fract\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+}
+
 void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);

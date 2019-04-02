@@ -1533,11 +1533,6 @@ void Interpreter::stepGLSLstd450Ceil(const InsnGLSLstd450Ceil& insn)
     std::cerr << "stepGLSLstd450Ceil() not implemented\n";
 }
 
-void Interpreter::stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn)
-{
-    std::cerr << "stepGLSLstd450Fract() not implemented\n";
-}
-
 void Interpreter::stepGLSLstd450Radians(const InsnGLSLstd450Radians& insn)
 {
     std::cerr << "stepGLSLstd450Radians() not implemented\n";

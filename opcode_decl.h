@@ -38,6 +38,7 @@ void stepReturn(const InsnReturn& insn);
 void stepReturnValue(const InsnReturnValue& insn);
 void stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn);
 void stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn);
+void stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn);
 void stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn);
 void stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn);
 void stepGLSLstd450Atan(const InsnGLSLstd450Atan& insn);

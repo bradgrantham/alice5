@@ -691,6 +691,22 @@ case GLSLstd450Floor: {
     break;
 }
 
+case GLSLstd450Fract: {
+    uint32_t xId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450Fract{type, resultId, xId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Fract";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Sin: {
     uint32_t xId = nextu();
     pgm->code.push_back(new InsnGLSLstd450Sin{type, resultId, xId});

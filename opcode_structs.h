@@ -336,6 +336,15 @@ struct InsnGLSLstd450Floor : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Floor(*this); }
 };
 
+// GLSLstd450Fract instruction (code 10).
+struct InsnGLSLstd450Fract : public Instruction {
+    InsnGLSLstd450Fract(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Fract(*this); }
+};
+
 // GLSLstd450Sin instruction (code 13).
 struct InsnGLSLstd450Sin : public Instruction {
     InsnGLSLstd450Sin(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}

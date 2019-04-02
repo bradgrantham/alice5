@@ -38,6 +38,7 @@ struct InsnReturn;
 struct InsnReturnValue;
 struct InsnGLSLstd450FAbs;
 struct InsnGLSLstd450Floor;
+struct InsnGLSLstd450Fract;
 struct InsnGLSLstd450Sin;
 struct InsnGLSLstd450Cos;
 struct InsnGLSLstd450Atan;
