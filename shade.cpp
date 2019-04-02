@@ -6,6 +6,8 @@
 #include <thread>
 #include <algorithm>
 #include <atomic>
+#include <sstream>
+#include <iomanip>
 
 #include <StandAlone/ResourceLimits.h>
 #include <glslang/MachineIndependent/localintermediate.h>
@@ -2448,18 +2450,19 @@ void usage(const char* progname)
     printf("usage: %s [options] shader.frag\n", progname);
     printf("provide \"-\" as a filename to read from stdin\n");
     printf("options:\n");
-    printf("\t-v    Print opcodes as they are parsed\n");
-    printf("\t-g    Generate debugging information\n");
-    printf("\t-O    Run optimizing passes\n");
-    printf("\t-t    Throw an exception on first unimplemented opcode\n");
-    printf("\t-n    Compile and load shader, but do not shade an image\n");
+    printf("\t-f S E    Render frames S through and including E\n");
+    printf("\t-v        Print opcodes as they are parsed\n");
+    printf("\t-g        Generate debugging information\n");
+    printf("\t-O        Run optimizing passes\n");
+    printf("\t-t        Throw an exception on first unimplemented opcode\n");
+    printf("\t-n        Compile and load shader, but do not shade an image\n");
 }
 
 // Number of rows still left to shade (for progress report).
 static std::atomic_int rowsLeft;
 
 // Render rows starting at "startRow" every "skip".
-void render(const Program *pgm, int startRow, int skip)
+void render(const Program *pgm, int startRow, int skip, float when)
 {
     Interpreter interpreter(pgm);
 
@@ -2467,7 +2470,7 @@ void render(const Program *pgm, int startRow, int skip)
     interpreter.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight});
 
     // iTime is uniform @8 in preamble
-    interpreter.set(SpvStorageClassUniform, 8, 3.0f);
+    interpreter.set(SpvStorageClassUniform, 8, when);
 
     for(int y = startRow; y < imageHeight; y += skip) {
         for(int x = 0; x < imageWidth; x++) {
@@ -2525,6 +2528,7 @@ int main(int argc, char **argv)
     bool beVerbose = false;
     bool throwOnUnimplemented = false;
     bool doNotShade = false;
+    int startImage = 0, endImage = 0;
 
     char *progname = argv[0];
     argv++; argc--;
@@ -2660,34 +2664,38 @@ int main(int argc, char **argv)
     // Workers decrement rowsLeft at the end of each row.
     rowsLeft = imageHeight;
 
-    // Generate the rows on multiple threads.
-    std::vector<std::thread *> thread;
-    for (int t = 0; t < threadCount; t++) {
-        thread.push_back(new std::thread(render, &pgm, t, threadCount));
+    for(int imageNumber = startImage; imageNumber <= endImage; imageNumber++) {
+        // Generate the rows on multiple threads.
+        std::vector<std::thread *> thread;
+        for (int t = 0; t < threadCount; t++) {
+            thread.push_back(new std::thread(render, &pgm, t, threadCount));
+        }
+
+        // Progress information.
+        thread.push_back(new std::thread(showProgress, imageHeight, startTime));
+
+        // Wait for worker threads to quit.
+        for (int t = 0; t < threadCount; t++) {
+            thread[t]->join();
+            delete thread[t];
+            thread[t] = nullptr;
+        }
+
+        auto endTime = std::chrono::steady_clock::now();
+        auto elapsedTime = endTime - startTime;
+        auto elapsedSeconds = double(elapsedTime.count())*
+            std::chrono::steady_clock::period::num/
+            std::chrono::steady_clock::period::den;
+        std::cout << "Shading took " << elapsedSeconds << " seconds ("
+            << long(imageWidth*imageHeight/elapsedSeconds) << " pixels per second)\n";
+
+        std::ostringstream ss;
+        ss << "image" << std::setfill('0') << std::setw(4) << imageNumber;
+        std::ofstream imageFile(ss.str(), std::ios::out | std::ios::binary);
+        imageFile << "P6 " << imageWidth << " " << imageHeight << " 255\n";
+        imageFile.write(reinterpret_cast<const char *>(imageBuffer), sizeof(imageBuffer));
+        imageFile.close();
     }
-
-    // Progress information.
-    thread.push_back(new std::thread(showProgress, imageHeight, startTime));
-
-    // Wait for worker threads to quit.
-    for (int t = 0; t < threadCount; t++) {
-        thread[t]->join();
-        delete thread[t];
-        thread[t] = nullptr;
-    }
-
-    auto endTime = std::chrono::steady_clock::now();
-    auto elapsedTime = endTime - startTime;
-    auto elapsedSeconds = double(elapsedTime.count())*
-        std::chrono::steady_clock::period::num/
-        std::chrono::steady_clock::period::den;
-    std::cout << "Shading took " << elapsedSeconds << " seconds ("
-        << long(imageWidth*imageHeight/elapsedSeconds) << " pixels per second)\n";
-
-    std::ofstream imageFile("shaded.ppm", std::ios::out | std::ios::binary);
-    imageFile << "P6 " << imageWidth << " " << imageHeight << " 255\n";
-    imageFile.write(reinterpret_cast<const char *>(imageBuffer), sizeof(imageBuffer));
-    imageFile.close();
 
     exit(EXIT_SUCCESS);
 }
