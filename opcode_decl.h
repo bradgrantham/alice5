@@ -23,6 +23,7 @@ void stepFDiv(const InsnFDiv& insn);
 void stepFMod(const InsnFMod& insn);
 void stepVectorTimesScalar(const InsnVectorTimesScalar& insn);
 void stepDot(const InsnDot& insn);
+void stepLogicalOr(const InsnLogicalOr& insn);
 void stepLogicalNot(const InsnLogicalNot& insn);
 void stepSelect(const InsnSelect& insn);
 void stepIEqual(const InsnIEqual& insn);

@@ -199,6 +199,16 @@ struct InsnDot : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepDot(*this); }
 };
 
+// OpLogicalOr instruction (code 166).
+struct InsnLogicalOr : public Instruction {
+    InsnLogicalOr(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t operand1Id; // operand from register
+    uint32_t operand2Id; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepLogicalOr(*this); }
+};
+
 // OpLogicalNot instruction (code 168).
 struct InsnLogicalNot : public Instruction {
     InsnLogicalNot(uint32_t type, uint32_t resultId, uint32_t operandId) : type(type), resultId(resultId), operandId(operandId) {}

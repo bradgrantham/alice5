@@ -673,11 +673,6 @@ void Interpreter::stepLogicalNotEqual(const InsnLogicalNotEqual& insn)
     std::cerr << "stepLogicalNotEqual() not implemented\n";
 }
 
-void Interpreter::stepLogicalOr(const InsnLogicalOr& insn)
-{
-    std::cerr << "stepLogicalOr() not implemented\n";
-}
-
 void Interpreter::stepLogicalAnd(const InsnLogicalAnd& insn)
 {
     std::cerr << "stepLogicalAnd() not implemented\n";

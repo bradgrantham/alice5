@@ -23,6 +23,7 @@ struct InsnFDiv;
 struct InsnFMod;
 struct InsnVectorTimesScalar;
 struct InsnDot;
+struct InsnLogicalOr;
 struct InsnLogicalNot;
 struct InsnSelect;
 struct InsnIEqual;
