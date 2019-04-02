@@ -5,6 +5,7 @@
 #include <chrono>
 #include <thread>
 #include <algorithm>
+#include <atomic>
 
 #include <StandAlone/ResourceLimits.h>
 #include <glslang/MachineIndependent/localintermediate.h>
@@ -2454,6 +2455,9 @@ void usage(const char* progname)
     printf("\t-n    Compile and load shader, but do not shade an image\n");
 }
 
+// Number of rows still left to shade (for progress report).
+static std::atomic_int rowsLeft;
+
 // Render rows starting at "startRow" every "skip".
 void render(const Program *pgm, int startRow, int skip)
 {
@@ -2466,8 +2470,6 @@ void render(const Program *pgm, int startRow, int skip)
     interpreter.set(SpvStorageClassUniform, 8, 3.0f);
 
     for(int y = startRow; y < imageHeight; y += skip) {
-        std::cout << y << "\r";
-        std::cout.flush();
         for(int x = 0; x < imageWidth; x++) {
             v4float color;
             eval(interpreter, x + 0.5f, y + 0.5f, color);
@@ -2479,7 +2481,41 @@ void render(const Program *pgm, int startRow, int skip)
                 imageBuffer[imageHeight - 1 - y][x][c] = byteColor;
             }
         }
+
+        rowsLeft--;
     }
+}
+
+// Thread to show progress to the user.
+void showProgress(int totalRows, std::chrono::time_point<std::chrono::steady_clock> startTime)
+{
+    while(true) {
+        int left = rowsLeft;
+        if (left == 0) {
+            break;
+        }
+
+        std::cout << left << " rows left of " << totalRows;
+
+        // Estimate time left.
+        if (left != totalRows) {
+            auto now = std::chrono::steady_clock::now();
+            auto elapsedTime = now - startTime;
+            auto elapsedSeconds = double(elapsedTime.count())*
+                std::chrono::steady_clock::period::num/
+                std::chrono::steady_clock::period::den;
+            auto secondsLeft = elapsedSeconds*left/(totalRows - left);
+
+            std::cout << " (" << int(secondsLeft) << " seconds left)   ";
+        }
+        std::cout << "\r";
+        std::cout.flush();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+
+    // Clear the line.
+    std::cout << "                                                             \r";
 }
 
 int main(int argc, char **argv)
@@ -2536,7 +2572,6 @@ int main(int argc, char **argv)
 
         }
     }
-
 
     if(argc < 1) {
         usage(progname);
@@ -2617,16 +2652,22 @@ int main(int argc, char **argv)
         exit(EXIT_SUCCESS);
     }
 
-    auto start_time = std::chrono::steady_clock::now();
+    auto startTime = std::chrono::steady_clock::now();
 
     int threadCount = std::thread::hardware_concurrency();
     std::cout << "Using " << threadCount << " threads.\n";
+
+    // Workers decrement rowsLeft at the end of each row.
+    rowsLeft = imageHeight;
 
     // Generate the rows on multiple threads.
     std::vector<std::thread *> thread;
     for (int t = 0; t < threadCount; t++) {
         thread.push_back(new std::thread(render, &pgm, t, threadCount));
     }
+
+    // Progress information.
+    thread.push_back(new std::thread(showProgress, imageHeight, startTime));
 
     // Wait for worker threads to quit.
     for (int t = 0; t < threadCount; t++) {
@@ -2635,13 +2676,13 @@ int main(int argc, char **argv)
         thread[t] = nullptr;
     }
 
-    auto end_time = std::chrono::steady_clock::now();
-    auto elapsed_time = end_time - start_time;
-    auto elapsed_seconds = double(elapsed_time.count())*
+    auto endTime = std::chrono::steady_clock::now();
+    auto elapsedTime = endTime - startTime;
+    auto elapsedSeconds = double(elapsedTime.count())*
         std::chrono::steady_clock::period::num/
         std::chrono::steady_clock::period::den;
-    std::cout << "Shading took " << elapsed_seconds << " seconds ("
-        << long(imageWidth*imageHeight/elapsed_seconds) << " pixels per second)\n";
+    std::cout << "Shading took " << elapsedSeconds << " seconds ("
+        << long(imageWidth*imageHeight/elapsedSeconds) << " pixels per second)\n";
 
     std::ofstream imageFile("shaded.ppm", std::ios::out | std::ios::binary);
     imageFile << "P6 " << imageWidth << " " << imageHeight << " 255\n";
