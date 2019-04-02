@@ -1306,6 +1306,37 @@ void Interpreter::stepSLessThan(const InsnSLessThan& insn)
     }, pgm->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
 }
 
+void Interpreter::stepSDiv(const InsnSDiv& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeInt>) {
+
+            int32_t operand1 = registerAs<int32_t>(insn.operand1Id);
+            int32_t operand2 = registerAs<int32_t>(insn.operand2Id);
+            int32_t result = operand1 / operand2;
+            registerAs<int32_t>(insn.resultId) = result;
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            int32_t* operand1 = &registerAs<int32_t>(insn.operand1Id);
+            int32_t* operand2 = &registerAs<int32_t>(insn.operand2Id);
+            int32_t* result = &registerAs<int32_t>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = operand1[i] / operand2[i];
+            }
+
+        } else {
+
+            std::cout << "Unknown type for SDiv\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.operand1Id]).type));
+}
+
 void Interpreter::stepIEqual(const InsnIEqual& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);

@@ -18,6 +18,7 @@ void stepIAdd(const InsnIAdd& insn);
 void stepFAdd(const InsnFAdd& insn);
 void stepFSub(const InsnFSub& insn);
 void stepFMul(const InsnFMul& insn);
+void stepSDiv(const InsnSDiv& insn);
 void stepFDiv(const InsnFDiv& insn);
 void stepFMod(const InsnFMod& insn);
 void stepVectorTimesScalar(const InsnVectorTimesScalar& insn);

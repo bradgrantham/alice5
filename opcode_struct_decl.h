@@ -18,6 +18,7 @@ struct InsnIAdd;
 struct InsnFAdd;
 struct InsnFSub;
 struct InsnFMul;
+struct InsnSDiv;
 struct InsnFDiv;
 struct InsnFMod;
 struct InsnVectorTimesScalar;

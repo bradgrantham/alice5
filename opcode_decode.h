@@ -305,6 +305,27 @@ case SpvOpFMul: {
     break;
 }
 
+case SpvOpSDiv: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    pgm->code.push_back(new InsnSDiv{type, resultId, operand1Id, operand2Id});
+    if(pgm->verbose) {
+        std::cout << "SDiv";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpFDiv: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();

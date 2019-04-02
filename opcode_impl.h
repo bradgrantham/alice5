@@ -548,11 +548,6 @@ void Interpreter::stepUDiv(const InsnUDiv& insn)
     std::cerr << "stepUDiv() not implemented\n";
 }
 
-void Interpreter::stepSDiv(const InsnSDiv& insn)
-{
-    std::cerr << "stepSDiv() not implemented\n";
-}
-
 void Interpreter::stepUMod(const InsnUMod& insn)
 {
     std::cerr << "stepUMod() not implemented\n";

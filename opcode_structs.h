@@ -149,6 +149,16 @@ struct InsnFMul : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepFMul(*this); }
 };
 
+// OpSDiv instruction (code 135).
+struct InsnSDiv : public Instruction {
+    InsnSDiv(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t operand1Id; // operand from register
+    uint32_t operand2Id; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepSDiv(*this); }
+};
+
 // OpFDiv instruction (code 136).
 struct InsnFDiv : public Instruction {
     InsnFDiv(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
