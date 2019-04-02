@@ -51,6 +51,7 @@ struct InsnGLSLstd450Exp2;
 struct InsnGLSLstd450FMin;
 struct InsnGLSLstd450FMax;
 struct InsnGLSLstd450FClamp;
+struct InsnGLSLstd450FMix;
 struct InsnGLSLstd450Step;
 struct InsnGLSLstd450SmoothStep;
 struct InsnGLSLstd450Length;

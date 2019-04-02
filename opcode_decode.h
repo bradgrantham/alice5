@@ -927,6 +927,28 @@ case GLSLstd450FClamp: {
     break;
 }
 
+case GLSLstd450FMix: {
+    uint32_t xId = nextu();
+    uint32_t yId = nextu();
+    uint32_t aId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450FMix{type, resultId, xId, yId, aId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450FMix";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << " yId ";
+        std::cout << yId;
+        std::cout << " aId ";
+        std::cout << aId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Step: {
     uint32_t edgeId = nextu();
     uint32_t xId = nextu();

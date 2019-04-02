@@ -1648,11 +1648,6 @@ void Interpreter::stepGLSLstd450SClamp(const InsnGLSLstd450SClamp& insn)
     std::cerr << "stepGLSLstd450SClamp() not implemented\n";
 }
 
-void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
-{
-    std::cerr << "stepGLSLstd450FMix() not implemented\n";
-}
-
 void Interpreter::stepGLSLstd450IMix(const InsnGLSLstd450IMix& insn)
 {
     std::cerr << "stepGLSLstd450IMix() not implemented\n";

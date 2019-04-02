@@ -461,6 +461,17 @@ struct InsnGLSLstd450FClamp : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FClamp(*this); }
 };
 
+// GLSLstd450FMix instruction (code 46).
+struct InsnGLSLstd450FMix : public Instruction {
+    InsnGLSLstd450FMix(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId, uint32_t aId) : type(type), resultId(resultId), xId(xId), yId(yId), aId(aId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t yId; // operand from register
+    uint32_t aId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMix(*this); }
+};
+
 // GLSLstd450Step instruction (code 48).
 struct InsnGLSLstd450Step : public Instruction {
     InsnGLSLstd450Step(uint32_t type, uint32_t resultId, uint32_t edgeId, uint32_t xId) : type(type), resultId(resultId), edgeId(edgeId), xId(xId) {}

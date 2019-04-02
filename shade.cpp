@@ -2070,6 +2070,12 @@ static float smoothstep(float edge0, float edge1, float x)
     return t*t*(3 - 2*t);
 }
 
+// Mixes between x and y according to a.
+static float fmix(float x, float y, float a)
+{
+    return x*(1.0 - a) + y*a;
+}
+
 void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
@@ -2097,6 +2103,38 @@ void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
         } else {
 
             std::cout << "Unknown type for FClamp\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+}
+
+void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float x = registerAs<float>(insn.xId);
+            float y = registerAs<float>(insn.yId);
+            float a = registerAs<float>(insn.aId);
+            registerAs<float>(insn.resultId) = fmix(x, y, a);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* x = &registerAs<float>(insn.xId);
+            float* y = &registerAs<float>(insn.yId);
+            float* a = &registerAs<float>(insn.aId);
+            float* result = &registerAs<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = fmix(x[i], y[i], a[i]);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for FMix\n";
 
         }
     }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
