@@ -402,6 +402,24 @@ struct InsnGLSLstd450Pow : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Pow(*this); }
 };
 
+// GLSLstd450Exp instruction (code 27).
+struct InsnGLSLstd450Exp : public Instruction {
+    InsnGLSLstd450Exp(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp(*this); }
+};
+
+// GLSLstd450Exp2 instruction (code 29).
+struct InsnGLSLstd450Exp2 : public Instruction {
+    InsnGLSLstd450Exp2(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp2(*this); }
+};
+
 // GLSLstd450FMin instruction (code 37).
 struct InsnGLSLstd450FMin : public Instruction {
     InsnGLSLstd450FMin(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : type(type), resultId(resultId), xId(xId), yId(yId) {}
@@ -420,6 +438,16 @@ struct InsnGLSLstd450FMax : public Instruction {
     uint32_t xId; // operand from register
     uint32_t yId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMax(*this); }
+};
+
+// GLSLstd450Step instruction (code 48).
+struct InsnGLSLstd450Step : public Instruction {
+    InsnGLSLstd450Step(uint32_t type, uint32_t resultId, uint32_t edgeId, uint32_t xId) : type(type), resultId(resultId), edgeId(edgeId), xId(xId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t edgeId; // operand from register
+    uint32_t xId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Step(*this); }
 };
 
 // GLSLstd450SmoothStep instruction (code 49).

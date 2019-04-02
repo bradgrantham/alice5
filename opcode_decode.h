@@ -814,6 +814,38 @@ case GLSLstd450Pow: {
     break;
 }
 
+case GLSLstd450Exp: {
+    uint32_t xId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450Exp{type, resultId, xId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Exp";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Exp2: {
+    uint32_t xId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450Exp2{type, resultId, xId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Exp2";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450FMin: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
@@ -847,6 +879,25 @@ case GLSLstd450FMax: {
         std::cout << xId;
         std::cout << " yId ";
         std::cout << yId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Step: {
+    uint32_t edgeId = nextu();
+    uint32_t xId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450Step{type, resultId, edgeId, xId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Step";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " edgeId ";
+        std::cout << edgeId;
+        std::cout << " xId ";
+        std::cout << xId;
         std::cout << "\n";
     }
     break;

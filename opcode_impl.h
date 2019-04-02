@@ -1583,19 +1583,9 @@ void Interpreter::stepGLSLstd450Atanh(const InsnGLSLstd450Atanh& insn)
     std::cerr << "stepGLSLstd450Atanh() not implemented\n";
 }
 
-void Interpreter::stepGLSLstd450Exp(const InsnGLSLstd450Exp& insn)
-{
-    std::cerr << "stepGLSLstd450Exp() not implemented\n";
-}
-
 void Interpreter::stepGLSLstd450Log(const InsnGLSLstd450Log& insn)
 {
     std::cerr << "stepGLSLstd450Log() not implemented\n";
-}
-
-void Interpreter::stepGLSLstd450Exp2(const InsnGLSLstd450Exp2& insn)
-{
-    std::cerr << "stepGLSLstd450Exp2() not implemented\n";
 }
 
 void Interpreter::stepGLSLstd450Log2(const InsnGLSLstd450Log2& insn)
@@ -1676,11 +1666,6 @@ void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
 void Interpreter::stepGLSLstd450IMix(const InsnGLSLstd450IMix& insn)
 {
     std::cerr << "stepGLSLstd450IMix() not implemented\n";
-}
-
-void Interpreter::stepGLSLstd450Step(const InsnGLSLstd450Step& insn)
-{
-    std::cerr << "stepGLSLstd450Step() not implemented\n";
 }
 
 void Interpreter::stepGLSLstd450Fma(const InsnGLSLstd450Fma& insn)

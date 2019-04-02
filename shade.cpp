@@ -1901,6 +1901,62 @@ void Interpreter::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
     }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
+void Interpreter::stepGLSLstd450Exp(const InsnGLSLstd450Exp& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float x = registerAs<float>(insn.xId);
+            registerAs<float>(insn.resultId) = expf(x);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* x = &registerAs<float>(insn.xId);
+            float* result = &registerAs<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = expf(x[i]);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Exp\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+}
+
+void Interpreter::stepGLSLstd450Exp2(const InsnGLSLstd450Exp2& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float x = registerAs<float>(insn.xId);
+            registerAs<float>(insn.resultId) = exp2f(x);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* x = &registerAs<float>(insn.xId);
+            float* result = &registerAs<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = exp2f(x[i]);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Exp2\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+}
+
 void Interpreter::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
 {
     RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
@@ -2003,6 +2059,36 @@ void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
         } else {
 
             std::cout << "Unknown type for SmoothStep\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
+}
+
+void Interpreter::stepGLSLstd450Step(const InsnGLSLstd450Step& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float edge = registerAs<float>(insn.edgeId);
+            float x = registerAs<float>(insn.xId);
+            registerAs<float>(insn.resultId) = x < edge ? 0.0 : 1.0;
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* edge = &registerAs<float>(insn.edgeId);
+            float* x = &registerAs<float>(insn.xId);
+            float* result = &registerAs<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = x[i] < edge[i] ? 0.0 : 1.0;
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Step\n";
 
         }
     }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
@@ -2186,7 +2272,7 @@ void render(const Program *pgm, int startRow, int skip)
     interpreter.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight});
 
     // iTime is uniform @8 in preamble
-    interpreter.set(SpvStorageClassUniform, 8, 0.0f);
+    interpreter.set(SpvStorageClassUniform, 8, 3.0f);
 
     for(int y = startRow; y < imageHeight; y += skip) {
         std::cout << y << "\r";
