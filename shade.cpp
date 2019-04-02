@@ -2528,7 +2528,7 @@ int main(int argc, char **argv)
     bool beVerbose = false;
     bool throwOnUnimplemented = false;
     bool doNotShade = false;
-    int startImage = 0, endImage = 0;
+    int imageStart = 0, imageEnd = 0;
 
     char *progname = argv[0];
     argv++; argc--;
@@ -2538,6 +2538,16 @@ int main(int argc, char **argv)
 
             debug = true;
             argv++; argc--;
+
+        } else if(strcmp(argv[0], "-f") == 0) {
+
+            if(argc < 3) {
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            imageStart = atoi(argv[1]);
+            imageEnd = atoi(argv[2]);
+            argv += 3; argc -= 3;
 
         } else if(strcmp(argv[0], "-v") == 0) {
 
@@ -2656,29 +2666,31 @@ int main(int argc, char **argv)
         exit(EXIT_SUCCESS);
     }
 
-    auto startTime = std::chrono::steady_clock::now();
-
     int threadCount = std::thread::hardware_concurrency();
     std::cout << "Using " << threadCount << " threads.\n";
 
-    // Workers decrement rowsLeft at the end of each row.
-    rowsLeft = imageHeight;
+    for(int imageNumber = imageStart; imageNumber <= imageEnd; imageNumber++) {
 
-    for(int imageNumber = startImage; imageNumber <= endImage; imageNumber++) {
-        // Generate the rows on multiple threads.
+        auto startTime = std::chrono::steady_clock::now();
+
+        // Workers decrement rowsLeft at the end of each row.
+        rowsLeft = imageHeight;
+
         std::vector<std::thread *> thread;
+
+        // Generate the rows on multiple threads.
         for (int t = 0; t < threadCount; t++) {
-            thread.push_back(new std::thread(render, &pgm, t, threadCount));
+            thread.push_back(new std::thread(render, &pgm, t, threadCount, imageNumber / 60.0));
         }
 
         // Progress information.
         thread.push_back(new std::thread(showProgress, imageHeight, startTime));
 
         // Wait for worker threads to quit.
-        for (int t = 0; t < threadCount; t++) {
-            thread[t]->join();
-            delete thread[t];
-            thread[t] = nullptr;
+        for (int t = 0; t < thread.size(); t++) {
+            std::thread* td = thread.back();
+            thread.pop_back();
+            td->join();
         }
 
         auto endTime = std::chrono::steady_clock::now();
@@ -2690,7 +2702,7 @@ int main(int argc, char **argv)
             << long(imageWidth*imageHeight/elapsedSeconds) << " pixels per second)\n";
 
         std::ostringstream ss;
-        ss << "image" << std::setfill('0') << std::setw(4) << imageNumber;
+        ss << "image" << std::setfill('0') << std::setw(4) << imageNumber << std::setw(0) << ".ppm";
         std::ofstream imageFile(ss.str(), std::ios::out | std::ios::binary);
         imageFile << "P6 " << imageWidth << " " << imageHeight << " 255\n";
         imageFile.write(reinterpret_cast<const char *>(imageBuffer), sizeof(imageBuffer));
