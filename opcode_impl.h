@@ -1643,11 +1643,6 @@ void Interpreter::stepGLSLstd450SMax(const InsnGLSLstd450SMax& insn)
     std::cerr << "stepGLSLstd450SMax() not implemented\n";
 }
 
-void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
-{
-    std::cerr << "stepGLSLstd450FClamp() not implemented\n";
-}
-
 void Interpreter::stepGLSLstd450UClamp(const InsnGLSLstd450UClamp& insn)
 {
     std::cerr << "stepGLSLstd450UClamp() not implemented\n";

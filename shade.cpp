@@ -1646,7 +1646,7 @@ void Interpreter::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
 
             float x = registerAs<float>(insn.xId);
             float y = registerAs<float>(insn.yId);
-            registerAs<float>(insn.resultId) = x < y ? y : x;
+            registerAs<float>(insn.resultId) = fmaxf(x, y);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
@@ -1654,7 +1654,7 @@ void Interpreter::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
             float* y = &registerAs<float>(insn.yId);
             float* result = &registerAs<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
-                result[i] = x[i] < y[i] ? y[i] : x[i];
+                result[i] = fmaxf(x[i], y[i]);
             }
 
         } else {
@@ -1676,7 +1676,7 @@ void Interpreter::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
 
             float x = registerAs<float>(insn.xId);
             float y = registerAs<float>(insn.yId);
-            registerAs<float>(insn.resultId) = x > y ? y : x;
+            registerAs<float>(insn.resultId) = fminf(x, y);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
@@ -1684,7 +1684,7 @@ void Interpreter::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
             float* y = &registerAs<float>(insn.yId);
             float* result = &registerAs<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
-                result[i] = x[i] > y[i] ? y[i] : x[i];
+                result[i] = fminf(x[i], y[i]);
             }
 
         } else {
@@ -2013,6 +2013,12 @@ void Interpreter::stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn)
     }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
+// Returns the value x clamped to the range minVal to maxVal per the GLSL docs.
+static float fclamp(float x, float minVal, float maxVal)
+{
+    return fminf(fmaxf(x, minVal), maxVal);
+}
+
 // Compute the smoothstep function per the GLSL docs. They say that the
 // results are undefined if edge0 >= edge1, but we allow edge0 > edge1.
 static float smoothstep(float edge0, float edge1, float x)
@@ -2021,15 +2027,41 @@ static float smoothstep(float edge0, float edge1, float x)
         return 0;
     }
 
-    float t = (x - edge0)/(edge1 - edge0);
-    if (t < 0.0) {
-        t = 0.0;
-    }
-    if (t > 1.0) {
-        t = 1.0;
-    }
+    float t = fclamp((x - edge0)/(edge1 - edge0), 0.0, 1.0);
 
     return t*t*(3 - 2*t);
+}
+
+void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
+{
+    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float x = registerAs<float>(insn.xId);
+            float minVal = registerAs<float>(insn.minValId);
+            float maxVal = registerAs<float>(insn.maxValId);
+            registerAs<float>(insn.resultId) = fclamp(x, minVal, maxVal);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            float* x = &registerAs<float>(insn.xId);
+            float* minVal = &registerAs<float>(insn.minValId);
+            float* maxVal = &registerAs<float>(insn.maxValId);
+            float* result = &registerAs<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = fclamp(x[i], minVal[i], maxVal[i]);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for FClamp\n";
+
+        }
+    }, pgm->types.at(std::get<RegisterObject>(registers[insn.xId]).type));
 }
 
 void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)

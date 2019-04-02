@@ -884,6 +884,28 @@ case GLSLstd450FMax: {
     break;
 }
 
+case GLSLstd450FClamp: {
+    uint32_t xId = nextu();
+    uint32_t minValId = nextu();
+    uint32_t maxValId = nextu();
+    pgm->code.push_back(new InsnGLSLstd450FClamp{type, resultId, xId, minValId, maxValId});
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450FClamp";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << " minValId ";
+        std::cout << minValId;
+        std::cout << " maxValId ";
+        std::cout << maxValId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Step: {
     uint32_t edgeId = nextu();
     uint32_t xId = nextu();

@@ -440,6 +440,17 @@ struct InsnGLSLstd450FMax : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMax(*this); }
 };
 
+// GLSLstd450FClamp instruction (code 43).
+struct InsnGLSLstd450FClamp : public Instruction {
+    InsnGLSLstd450FClamp(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t minValId, uint32_t maxValId) : type(type), resultId(resultId), xId(xId), minValId(minValId), maxValId(maxValId) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    uint32_t minValId; // operand from register
+    uint32_t maxValId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FClamp(*this); }
+};
+
 // GLSLstd450Step instruction (code 48).
 struct InsnGLSLstd450Step : public Instruction {
     InsnGLSLstd450Step(uint32_t type, uint32_t resultId, uint32_t edgeId, uint32_t xId) : type(type), resultId(resultId), edgeId(edgeId), xId(xId) {}
