@@ -6,7 +6,7 @@
 precision highp float;
 
 layout (binding = 0) uniform params {
-	ivec2 iResolution;
+	vec2 iResolution;
 	float iTime;
 	ivec4 iMouse;
 }; // Params;
