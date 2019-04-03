@@ -116,6 +116,7 @@ struct Program
 
     std::map<uint32_t, MemoryRegion> memoryRegions;
 
+    std::map<uint32_t, uint32_t> resultsCreated;
     std::map<uint32_t, Register> constants;
     RegisterObject& allocConstantObject(uint32_t id, uint32_t type)
     {
@@ -800,8 +801,13 @@ Interpreter::Interpreter(const Program *pgm)
 {
     memory = new unsigned char[pgm->memorySize];
 
-    // So we can catch errors:
+    // So we can catch errors.
     std::fill(memory, memory + pgm->memorySize, 0xFF);
+
+    // Allocate registers so they aren't allocated during run()
+    for(auto r: pgm->resultsCreated) {
+        allocRegisterObject(r.first, r.second);
+    }
 }
 
 RegisterObject& Interpreter::allocRegisterObject(uint32_t id, uint32_t type)
@@ -838,7 +844,7 @@ void Interpreter::clearPrivateVariables()
 void Interpreter::stepLoad(const InsnLoad& insn)
 {
     RegisterPointer& ptr = std::get<RegisterPointer>(registers[insn.pointerId]);
-    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    RegisterObject& obj = std::get<RegisterObject>(registers[insn.resultId]);
     std::copy(memory + ptr.offset, memory + ptr.offset + pgm->typeSizes.at(insn.type), obj.data);
     if(false) {
         std::cout << "load result is";
@@ -856,7 +862,7 @@ void Interpreter::stepStore(const InsnStore& insn)
 
 void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
 {
-    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    RegisterObject& obj = std::get<RegisterObject>(registers[insn.resultId]);
     RegisterObject& src = std::get<RegisterObject>(registers[insn.compositeId]);
     /* use indexes to walk blob */
     uint32_t type = src.type;
@@ -879,7 +885,7 @@ void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
 
 void Interpreter::stepCompositeConstruct(const InsnCompositeConstruct& insn)
 {
-    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    RegisterObject& obj = std::get<RegisterObject>(registers[insn.resultId]);
     size_t offset = 0;
     for(auto& j: insn.constituentsId) {
         RegisterObject& src = std::get<RegisterObject>(registers[j]);
@@ -895,7 +901,6 @@ void Interpreter::stepCompositeConstruct(const InsnCompositeConstruct& insn)
 
 void Interpreter::stepIAdd(const InsnIAdd& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -926,7 +931,6 @@ void Interpreter::stepIAdd(const InsnIAdd& insn)
 
 void Interpreter::stepFAdd(const InsnFAdd& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -957,7 +961,6 @@ void Interpreter::stepFAdd(const InsnFAdd& insn)
 
 void Interpreter::stepFSub(const InsnFSub& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -988,7 +991,6 @@ void Interpreter::stepFSub(const InsnFSub& insn)
 
 void Interpreter::stepFMul(const InsnFMul& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1019,7 +1021,6 @@ void Interpreter::stepFMul(const InsnFMul& insn)
 
 void Interpreter::stepFDiv(const InsnFDiv& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1050,7 +1051,6 @@ void Interpreter::stepFDiv(const InsnFDiv& insn)
 
 void Interpreter::stepFMod(const InsnFMod& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1081,7 +1081,6 @@ void Interpreter::stepFMod(const InsnFMod& insn)
 
 void Interpreter::stepFOrdLessThan(const InsnFOrdLessThan& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1112,7 +1111,6 @@ void Interpreter::stepFOrdLessThan(const InsnFOrdLessThan& insn)
 
 void Interpreter::stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1143,7 +1141,6 @@ void Interpreter::stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
 
 void Interpreter::stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1174,7 +1171,6 @@ void Interpreter::stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
 
 void Interpreter::stepFOrdEqual(const InsnFOrdEqual& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1207,7 +1203,6 @@ void Interpreter::stepFOrdEqual(const InsnFOrdEqual& insn)
 
 void Interpreter::stepFNegate(const InsnFNegate& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1250,7 +1245,6 @@ float dotProduct(float *a, float *b, int count)
 
 void Interpreter::stepDot(const InsnDot& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1274,7 +1268,6 @@ void Interpreter::stepDot(const InsnDot& insn)
 
 void Interpreter::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1305,7 +1298,6 @@ void Interpreter::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
 
 void Interpreter::stepSLessThan(const InsnSLessThan& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1336,7 +1328,6 @@ void Interpreter::stepSLessThan(const InsnSLessThan& insn)
 
 void Interpreter::stepSDiv(const InsnSDiv& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1367,7 +1358,6 @@ void Interpreter::stepSDiv(const InsnSDiv& insn)
 
 void Interpreter::stepIEqual(const InsnIEqual& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1398,7 +1388,6 @@ void Interpreter::stepIEqual(const InsnIEqual& insn)
 
 void Interpreter::stepLogicalNot(const InsnLogicalNot& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1425,7 +1414,6 @@ void Interpreter::stepLogicalNot(const InsnLogicalNot& insn)
 
 void Interpreter::stepLogicalOr(const InsnLogicalOr& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1455,7 +1443,6 @@ void Interpreter::stepLogicalOr(const InsnLogicalOr& insn)
 
 void Interpreter::stepSelect(const InsnSelect& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1489,8 +1476,6 @@ void Interpreter::stepSelect(const InsnSelect& insn)
 
 void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
-
     float* vector = &registerAs<float>(insn.vectorId);
     float scalar = registerAs<float>(insn.scalarId);
     float* result = &registerAs<float>(insn.resultId);
@@ -1504,8 +1489,6 @@ void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 
 void Interpreter::stepMatrixTimesVector(const InsnMatrixTimesVector& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
-
     float* matrix = &registerAs<float>(insn.matrixId);
     float* vector = &registerAs<float>(insn.vectorId);
     float* result = &registerAs<float>(insn.resultId);
@@ -1531,8 +1514,6 @@ void Interpreter::stepMatrixTimesVector(const InsnMatrixTimesVector& insn)
 
 void Interpreter::stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
-
     float* vector = &registerAs<float>(insn.vectorId);
     float* matrix = &registerAs<float>(insn.matrixId);
     float* result = &registerAs<float>(insn.resultId);
@@ -1552,7 +1533,7 @@ void Interpreter::stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn)
 
 void Interpreter::stepVectorShuffle(const InsnVectorShuffle& insn)
 {
-    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    RegisterObject& obj = std::get<RegisterObject>(registers[insn.resultId]);
     const RegisterObject &r1 = std::get<RegisterObject>(registers[insn.vector1Id]);
     const RegisterObject &r2 = std::get<RegisterObject>(registers[insn.vector2Id]);
     const TypeVector &t1 = std::get<TypeVector>(pgm->types.at(r1.type));
@@ -1570,7 +1551,6 @@ void Interpreter::stepVectorShuffle(const InsnVectorShuffle& insn)
 
 void Interpreter::stepConvertSToF(const InsnConvertSToF& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1598,7 +1578,6 @@ void Interpreter::stepConvertSToF(const InsnConvertSToF& insn)
 
 void Interpreter::stepConvertFToS(const InsnConvertFToS& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1681,7 +1660,6 @@ void Interpreter::stepFunctionCall(const InsnFunctionCall& insn)
 
 void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1713,7 +1691,6 @@ void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
 
 void Interpreter::stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1742,7 +1719,6 @@ void Interpreter::stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
 
 void Interpreter::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1772,7 +1748,6 @@ void Interpreter::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
 
 void Interpreter::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1802,7 +1777,6 @@ void Interpreter::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
 
 void Interpreter::stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1832,7 +1806,6 @@ void Interpreter::stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
 
 void Interpreter::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1866,7 +1839,6 @@ void Interpreter::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
 
 void Interpreter::stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1894,7 +1866,6 @@ void Interpreter::stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
 
 void Interpreter::stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1922,7 +1893,6 @@ void Interpreter::stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
 
 void Interpreter::stepGLSLstd450Atan(const InsnGLSLstd450Atan& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1950,7 +1920,6 @@ void Interpreter::stepGLSLstd450Atan(const InsnGLSLstd450Atan& insn)
 
 void Interpreter::stepGLSLstd450Atan2(const InsnGLSLstd450Atan2& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -1980,7 +1949,6 @@ void Interpreter::stepGLSLstd450Atan2(const InsnGLSLstd450Atan2& insn)
 
 void Interpreter::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2008,7 +1976,6 @@ void Interpreter::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
 
 void Interpreter::stepGLSLstd450Exp(const InsnGLSLstd450Exp& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2036,7 +2003,6 @@ void Interpreter::stepGLSLstd450Exp(const InsnGLSLstd450Exp& insn)
 
 void Interpreter::stepGLSLstd450Exp2(const InsnGLSLstd450Exp2& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2064,7 +2030,6 @@ void Interpreter::stepGLSLstd450Exp2(const InsnGLSLstd450Exp2& insn)
 
 void Interpreter::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2092,7 +2057,6 @@ void Interpreter::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
 
 void Interpreter::stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2145,7 +2109,6 @@ static float fmix(float x, float y, float a)
 
 void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2177,7 +2140,6 @@ void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
 
 void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2209,7 +2171,6 @@ void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
 
 void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2241,7 +2202,6 @@ void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
 
 void Interpreter::stepGLSLstd450Step(const InsnGLSLstd450Step& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2271,7 +2231,6 @@ void Interpreter::stepGLSLstd450Step(const InsnGLSLstd450Step& insn)
 
 void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2298,7 +2257,6 @@ void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 
 void Interpreter::stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn)
 {
-    allocRegisterObject(insn.resultId, insn.type);
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2345,7 +2303,7 @@ void Interpreter::stepBranchConditional(const InsnBranchConditional& insn)
 
 void Interpreter::stepPhi(const InsnPhi& insn)
 {
-    RegisterObject& obj = allocRegisterObject(insn.resultId, insn.type);
+    RegisterObject& obj = std::get<RegisterObject>(registers[insn.resultId]);
     uint32_t size = pgm->typeSizes.at(obj.type);
 
     bool found = false;
@@ -2413,7 +2371,9 @@ void Interpreter::run()
     previousBlockId = NO_BLOCK_ID;
 
     // Copy constants to memory. They're treated like variables.
-    registers = pgm->constants;
+    for(auto c: pgm->constants) {
+        registers[c.first] = c.second;
+    }
 
     // init Function variables with initializers before each invocation
     // XXX also need to initialize within function calls?
