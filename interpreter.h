@@ -48,6 +48,8 @@ struct Interpreter
     template <class T>
     void get(SpvStorageClass clss, size_t offset, T& v);
 
+    void clearPrivateVariables();
+
     void step();
     void run();
 

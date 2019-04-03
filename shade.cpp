@@ -20,8 +20,8 @@
 #include "basic_types.h"
 #include "interpreter.h"
 
-const int imageWidth = 256;
-const int imageHeight = 256;
+const int imageWidth = 640/2; // ShaderToy default is 640
+const int imageHeight = 360/2; // ShaderToy default is 360
 unsigned char imageBuffer[imageHeight][imageWidth][3];
 
 std::map<uint32_t, std::string> OpcodeToString = {
@@ -43,11 +43,18 @@ const uint32_t EXECUTION_ENDED = 0xFFFFFFFF;
 const uint32_t NO_RETURN_REGISTER = 0xFFFFFFFF;
 const uint32_t NO_BLOCK_ID = 0xFFFFFFFF;
 
+// Section of memory for a specific use.
 struct MemoryRegion
 {
+    // Offset within the "memory" array.
     size_t base;
+
+    // Size of the region.
     size_t size;
+
+    // Offset within the "memory" array of next allocation.
     size_t top;
+
     MemoryRegion() :
         base(0),
         size(0),
@@ -792,6 +799,9 @@ Interpreter::Interpreter(const Program *pgm)
     : pgm(pgm)
 {
     memory = new unsigned char[pgm->memorySize];
+
+    // So we can catch errors:
+    std::fill(memory, memory + pgm->memorySize, 0xFF);
 }
 
 RegisterObject& Interpreter::allocRegisterObject(uint32_t id, uint32_t type)
@@ -816,6 +826,13 @@ template <class T>
 T& Interpreter::registerAs(int id)
 {
     return *reinterpret_cast<T*>(std::get<RegisterObject>(registers[id]).data);
+}
+
+void Interpreter::clearPrivateVariables()
+{
+    // Global variables are cleared for each run.
+    const MemoryRegion &mr = pgm->memoryRegions.at(SpvStorageClassPrivate);
+    std::fill(memory + mr.base, memory + mr.top, 0x00);
 }
 
 void Interpreter::stepLoad(const InsnLoad& insn)
@@ -2421,6 +2438,7 @@ void Interpreter::run()
 
 void eval(Interpreter &interpreter, float x, float y, v4float& color)
 {
+    interpreter.clearPrivateVariables();
     interpreter.set(SpvStorageClassInput, 0, v2float {x, y}); // fragCoord is in #0 in preamble
     interpreter.run();
     interpreter.get(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
@@ -2471,6 +2489,9 @@ void render(const Program *pgm, int startRow, int skip, float when)
 
     // iTime is uniform @8 in preamble
     interpreter.set(SpvStorageClassUniform, 8, when);
+
+    // iMouse is uniform @16 in preamble, but we don't align properly, so ours is at 12.
+    interpreter.set(SpvStorageClassUniform, 12, v4float {0, 0, 0, 0});
 
     for(int y = startRow; y < imageHeight; y += skip) {
         for(int x = 0; x < imageWidth; x++) {
@@ -2681,6 +2702,7 @@ int main(int argc, char **argv)
         // Generate the rows on multiple threads.
         for (int t = 0; t < threadCount; t++) {
             thread.push_back(new std::thread(render, &pgm, t, threadCount, imageNumber / 60.0));
+            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         // Progress information.
