@@ -2445,7 +2445,7 @@ void render(const Program *pgm, int startRow, int skip, float when)
     Interpreter interpreter(pgm);
 
     // iResolution is uniform @0 in preamble
-    interpreter.set(SpvStorageClassUniform, 0, v2int {imageWidth, imageHeight});
+    interpreter.set(SpvStorageClassUniform, 0, v2float {imageWidth, imageHeight});
 
     // iTime is uniform @8 in preamble
     interpreter.set(SpvStorageClassUniform, 8, when);
