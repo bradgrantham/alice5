@@ -11,6 +11,8 @@ struct Interpreter
 {
     uint32_t pc;
     std::vector<size_t> callstack;
+    std::map<uint32_t, Register> registers;
+    std::map<uint32_t, Pointer> pointers;
 
     // These values are label IDs identifying blocks within a function. The current block
     // is the block we're executing. The previous block was the block we came from.
@@ -29,8 +31,7 @@ struct Interpreter
         delete[] memory;
     }
 
-    std::map<uint32_t, Register> registers;
-    RegisterObject& allocRegisterObject(uint32_t id, uint32_t type);
+    Register& allocRegister(uint32_t id, uint32_t type);
 
     // Copy a variable of type "type" from "src" to "dst" in memory.
     void copy(uint32_t type, size_t src, size_t dst);

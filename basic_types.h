@@ -207,20 +207,20 @@ struct Function
     uint32_t start;
 };
 
-struct RegisterPointer
+struct Pointer
 {
     uint32_t type;
     uint32_t storageClass;
     size_t offset; // offset into memory, not into Region
 };
 
-struct RegisterObject
+struct Register
 {
     uint32_t type;
     size_t size;
     unsigned char *data;
-    
-    RegisterObject(const RegisterObject &other) 
+
+    Register(const Register &other)
     {
         if(false)std::cout << "move ctor allocated to " << this << " as " << &data << "\n";
         type = other.type;
@@ -229,7 +229,7 @@ struct RegisterObject
         std::copy(other.data, other.data + size, data);
     }
 
-    RegisterObject(uint32_t type_, size_t size_) :
+    Register(uint32_t type_, size_t size_) :
         type(type_),
         size(size_),
         data(new unsigned char[size_])
@@ -237,21 +237,21 @@ struct RegisterObject
         if(false)std::cout << "ctor allocated to " << this << " as " << &data << "\n";
     }
 
-    RegisterObject() :
+    Register() :
         type(0xFFFFFFFF),
         size(0),
         data(nullptr)
     {
-        if(false)std::cout << "ctor empty RegisterObject " << this << " \n";
+        if(false)std::cout << "ctor empty Register " << this << " \n";
     }
 
-    ~RegisterObject()
+    ~Register()
     {
         if(false)std::cout << "dtor deleting from " << this << " as " << &data << "\n";
         delete[] data;
     }
 
-    RegisterObject& operator=(const RegisterObject &other)
+    Register& operator=(const Register &other)
     {
         if(false)std::cout << "operator=\n";
         if(this != &other) {
@@ -274,7 +274,5 @@ struct Instruction {
 
     virtual void step(Interpreter *interpreter) = 0;
 };
-
-typedef std::variant<RegisterPointer, RegisterObject> Register;
 
 #endif // BASIC_TYPES_H
