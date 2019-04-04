@@ -2421,7 +2421,7 @@ struct Compiler
         for(int pc = 0; pc < pgm->code.size(); pc++) {
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
-                    std::string name = pgm->names.at(function.first);
+                    std::string name = cleanUpFunctionName(function.first);
                     std::cout
                         << "; ---------------------------- function " << name << "\n"
                         << name << ":\n";
@@ -2437,6 +2437,25 @@ struct Compiler
             Instruction *insn = pgm->code.at(pc);
             insn->emit(this);
         }
+    }
+
+    // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
+    std::string cleanUpFunctionName(int nameId) {
+        std::string name = pgm->names.at(nameId);
+
+        // Replace "mainImage(vf4;vf2;" with "mainImage$v4f$vf2$"
+        for (int i = 0; i < name.length(); i++) {
+            if (name[i] == '(' || name[i] == ';') {
+                name[i] = '$';
+            }
+        }
+
+        // Strip trailing dollar sign.
+        if (name.length() > 0 && name[name.length() - 1] == '$') {
+            name = name.substr(0, name.length() - 1);
+        }
+
+        return name;
     }
 
     void emitNotImplemented(const std::string &op)
@@ -2497,7 +2516,7 @@ void InsnFunctionCall::emit(Compiler *compiler)
     for(int i = operandId.size() - 1; i >= 0; i--) {
         compiler->emit("", std::string("push r") + std::to_string(operandId[i]), "");
     }
-    compiler->emit("", std::string("call ") + compiler->pgm->names.at(functionId), "");
+    compiler->emit("", std::string("call ") + compiler->cleanUpFunctionName(functionId), "");
     compiler->emit("", std::string("pop r") + std::to_string(resultId), "");
 }
 
