@@ -16,6 +16,9 @@ LDFLAGS         :=      $(OPT) $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a 
 
 default: shade
 
+shade: shade.cpp GLSL.std.450.h GLSLstd450_opcode_to_string.h basic_types.h interpreter.h opcode_decl.h opcode_decode.h opcode_impl.h opcode_struct_decl.h opcode_structs.h opcode_to_string.h opcode_union.h spirv.h
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) shade.cpp -o $@ $(LDLIBS)
+
 simple.spv: simple.frag
 	cat preamble.frag simple.frag epilogue.frag | $(GLSLANG_BINARY_DIR)/glslangValidator -H -V100 -d -o simple.spv --stdin -S frag
 
