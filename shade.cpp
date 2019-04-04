@@ -9,6 +9,13 @@
 #include <sstream>
 #include <iomanip>
 
+#ifdef USE_CPP17_FILESYSTEM
+// filesystem still not available in XCode 2019/04/04
+#include <filesystem>
+#else
+#include <libgen.h>
+#endif
+
 #include <StandAlone/ResourceLimits.h>
 #include <glslang/MachineIndependent/localintermediate.h>
 #include <glslang/Public/ShaderLang.h>
@@ -17,8 +24,11 @@
 #include <spirv-tools/libspirv.h>
 #include "spirv.h"
 #include "GLSL.std.450.h"
+#include "json.hpp"
 #include "basic_types.h"
 #include "interpreter.h"
+
+using json = nlohmann::json;
 
 int imageWidth = 640/2; // ShaderToy default is 640
 int imageHeight = 360/2; // ShaderToy default is 360
@@ -2555,6 +2565,9 @@ void eval(Interpreter &interpreter, float x, float y, v4float& color)
 std::string readFileContents(std::string shaderFileName)
 {
     std::ifstream shaderFile(shaderFileName.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
+    if(!shaderFile.good()) {
+        throw std::runtime_error("couldn't open file " + shaderFileName + " for reading");
+    }
     std::ifstream::pos_type size = shaderFile.tellg();
     shaderFile.seekg(0, std::ios::beg);
 
@@ -2657,6 +2670,7 @@ int main(int argc, char **argv)
     bool beVerbose = false;
     bool throwOnUnimplemented = false;
     bool doNotShade = false;
+    bool inputIsJSON = false;
     bool compile = false;
     int imageStart = 0, imageEnd = 0;
 
@@ -2669,6 +2683,11 @@ int main(int argc, char **argv)
         if(strcmp(argv[0], "-g") == 0) {
 
             debug = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "--json") == 0) {
+
+            inputIsJSON = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-d") == 0) {
@@ -2740,19 +2759,74 @@ int main(int argc, char **argv)
     }
 
     std::string preambleFilename = "preamble.frag";
-    std::string preamble = readFileContents(preambleFilename.c_str());
+    std::string preamble = readFileContents(preambleFilename);
     std::string epilogueFilename = "epilogue.frag";
-    std::string epilogue = readFileContents(epilogueFilename.c_str());
+    std::string epilogue = readFileContents(epilogueFilename);
 
-    std::string filename;
-    std::string text;
-    if(strcmp(argv[0], "-") == 0) {
-        filename = "stdin";
-        text = readStdin();
-    } else {
-        filename = argv[0];
-        text = readFileContents(filename.c_str());
+    std::string filename = argv[0];
+    std::string text = readFileContents(filename);
+
+    if(inputIsJSON) {
+        json j = json::parse(text);
+
+        // Go through the render passes.  If special key "codefile" is
+        // present, use that file as the shader code instead of the value
+        // of key "code".
+        auto& passes = j["Shader"]["renderpass"];
+        for (json::iterator it = passes.begin(); it != passes.end(); ++it) {
+            auto& pass = *it;
+            if(pass.find("codefile") != pass.end()) {
+                std::string code_filename = pass["codefile"];
+
+#ifdef USE_CPP17_FILESYSTEM
+
+                // filesystem still not available in XCode 2019/04/04
+                std::filesystem::path json_path(filename);
+                std::filesystem::path json_dirname = json_path.parent_path();
+                std::filesystem::path code_path(pass["codefile"]);
+
+                if(code_path.is_relative()) {
+                    std::filesystem::path full_path(json_dirname + code_path);
+                    code_filename = full_path;
+                }
+#else
+
+                if(code_filename[0] != '/') {
+                    // Assume relative path, get directory from JSON filename
+                    char *filename_copy = strdup(filename.c_str());;
+                    code_filename = std::string(dirname(filename_copy)) + "/" + code_filename;
+                    free(filename_copy);
+                }
+
+#endif
+
+                pass["full_code_filename"] = code_filename;
+                pass["code"] = readFileContents(code_filename);
+            }
+        }
+
+        auto& pass0 = j["Shader"]["renderpass"][0];
+
+        // Do special casing for single pass, since that's all we handle now.
+        if(pass0.find("full_code_filename") != pass0.end()) {
+	    // If we find "full_code_filename", that's the
+	    // fully-qualified absolute on-disk path we loaded.  Set
+	    // that for debugging.
+            filename = pass0["full_code_filename"];
+        } else if(pass0.find("codefile") != pass0.end()) {
+	    // If we find only "codefile", that's the on-disk path
+	    // the JSON specified.  Set that for debugging.
+            filename = pass0["codefile"];
+        } else {
+	    // If we find neither "codefile" nor "full_code_filename",
+	    // then the shader came out of the renderpass "code", so
+	    // at least use the pass name to aid debugging.
+            filename = std::string("shader from pass ") + pass0["name"].get<std::string>();
+        }
+        text = pass0["code"];
     }
+
+
 
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 

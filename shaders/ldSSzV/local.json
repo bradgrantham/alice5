@@ -1,0 +1,35 @@
+{
+   "Shader" : {
+      "renderpass" : [
+         {
+            "description" : "",
+            "type" : "image",
+            "inputs" : [],
+            "outputs" : [
+               {
+                  "channel" : 0,
+                  "id" : 37
+               }
+            ],
+            "codefile" : "Image.frag",
+            "name" : "Image"
+         }
+      ],
+      "ver" : "0.1",
+      "info" : {
+         "hasliked" : 0,
+         "viewed" : 0,
+         "description" : "copied from ShaderToy editor",
+         "username" : "brad_grantham",
+         "likes" : 1,
+         "name" : "Wet stone",
+         "date" : "1554347246",
+         "tags" : [
+            "new"
+         ],
+         "published" : 0,
+         "id" : "ldSSzV",
+         "flags" : 0
+      }
+   }
+}

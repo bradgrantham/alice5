@@ -1,0 +1,35 @@
+{
+   "Shader" : {
+      "renderpass" : [
+         {
+            "description" : "",
+            "type" : "image",
+            "inputs" : [],
+            "outputs" : [
+               {
+                  "channel" : 0,
+                  "id" : 37
+               }
+            ],
+            "codefile" : "simple.frag",
+            "name" : "Image"
+         }
+      ],
+      "ver" : "0.1",
+      "info" : {
+         "hasliked" : 0,
+         "viewed" : 7,
+         "description" : "new",
+         "username" : "brad_grantham",
+         "likes" : 1,
+         "name" : "newblarg",
+         "date" : "1554347246",
+         "tags" : [
+            "new"
+         ],
+         "published" : 3,
+         "id" : "tdBSzV",
+         "flags" : 0
+      }
+   }
+}
