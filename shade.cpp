@@ -2395,6 +2395,154 @@ void Interpreter::run()
 
 // -----------------------------------------------------------------------------------
 
+struct Compiler
+{
+    const Program *pgm;
+
+    Compiler(const Program *pgm) : pgm(pgm)
+    {
+        // Nothing.
+    }
+
+    void compile()
+    {
+        // pc = pgm->mainFunction->start;
+
+        for(int pc = 0; pc < pgm->code.size(); pc++) {
+            for(auto &function : pgm->functions) {
+                if(pc == function.second.start) {
+                    std::string name = pgm->names.at(function.first);
+                    std::cout
+                        << "; ---------------------------- function " << name << "\n"
+                        << name << ":\n";
+                }
+            }
+
+            for(auto &label : pgm->labels) {
+                if(pc == label.second) {
+                    std::cout << "label" << label.first << ":\n";
+                }
+            }
+
+            Instruction *insn = pgm->code.at(pc);
+            insn->emit(this);
+        }
+    }
+
+    void emitNotImplemented(const std::string &op)
+    {
+        std::ostringstream ss;
+
+        ss << op << " not implemented";
+
+        emit("", "nop", ss.str());
+    }
+
+    void emitBinaryOp(const std::string &opName, int op1, int op2, int result)
+    {
+        std::ostringstream ss;
+        ss << opName << " r" << op1 << ", r" << op2 << ", r" << result;
+        emit("", ss.str(), "");
+    }
+
+    void emit(const std::string &label, const std::string &op, const std::string comment)
+    {
+        std::ios oldState(nullptr);
+        oldState.copyfmt(std::cout);
+
+        std::cout
+            << std::left
+            << std::setw(10) << label
+            << std::setw(30) << op
+            << std::setw(0);
+        if(!comment.empty()) {
+            std::cout << "; " << comment;
+        }
+        std::cout << "\n";
+
+        std::cout.copyfmt(oldState);
+    }
+};
+
+// -----------------------------------------------------------------------------------
+
+void Instruction::emit(Compiler *compiler)
+{
+    compiler->emitNotImplemented(name());
+}
+
+void InsnFAdd::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("fadd", operand1Id, operand2Id, resultId);
+}
+
+void InsnFMul::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("fmul", operand1Id, operand2Id, resultId);
+}
+
+void InsnFunctionCall::emit(Compiler *compiler)
+{
+    compiler->emit("", "push pc", "");
+    for(int i = operandId.size() - 1; i >= 0; i--) {
+        compiler->emit("", std::string("push r") + std::to_string(operandId[i]), "");
+    }
+    compiler->emit("", std::string("call ") + compiler->pgm->names.at(functionId), "");
+    compiler->emit("", std::string("pop r") + std::to_string(resultId), "");
+}
+
+void InsnFunctionParameter::emit(Compiler *compiler)
+{
+    compiler->emit("", std::string("pop r") + std::to_string(resultId), "");
+}
+
+void InsnLoad::emit(Compiler *compiler)
+{
+    std::ostringstream ss;
+    ss << "mov (r" << pointerId << "), r" << resultId;
+    compiler->emit("", ss.str(), "");
+}
+
+void InsnStore::emit(Compiler *compiler)
+{
+    std::ostringstream ss;
+    ss << "mov r" << objectId << ", (r" << pointerId << ")";
+    compiler->emit("", ss.str(), "");
+}
+
+void InsnBranch::emit(Compiler *compiler)
+{
+    std::ostringstream ss;
+    ss << "jmp label" << targetLabelId;
+    compiler->emit("", ss.str(), "");
+}
+
+void InsnReturn::emit(Compiler *compiler)
+{
+    compiler->emit("", "ret r0", "");
+}
+
+void InsnReturnValue::emit(Compiler *compiler)
+{
+    std::ostringstream ss;
+    ss << "ret r" << valueId;
+    compiler->emit("", ss.str(), "");
+}
+
+// -----------------------------------------------------------------------------------
+
+// Returns whether successful.
+bool compileProgram(const Program &pgm)
+{
+    Compiler compiler(&pgm);
+
+    compiler.compile();
+
+    return true;
+}
+
+// -----------------------------------------------------------------------------------
+
 void eval(Interpreter &interpreter, float x, float y, v4float& color)
 {
     interpreter.clearPrivateVariables();
@@ -2509,6 +2657,7 @@ int main(int argc, char **argv)
     bool beVerbose = false;
     bool throwOnUnimplemented = false;
     bool doNotShade = false;
+    bool compile = false;
     int imageStart = 0, imageEnd = 0;
 
     imageBuffer = new unsigned char[imageWidth * imageHeight * 3];
@@ -2560,6 +2709,11 @@ int main(int argc, char **argv)
         } else if(strcmp(argv[0], "-n") == 0) {
 
             doNotShade = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "-c") == 0) {
+
+            compile = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-h") == 0) {
@@ -2654,6 +2808,11 @@ int main(int argc, char **argv)
     }
 
     pgm.postParse();
+
+    if (compile) {
+        bool success = compileProgram(pgm);
+        exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
+    }
 
     if (doNotShade) {
         exit(EXIT_SUCCESS);

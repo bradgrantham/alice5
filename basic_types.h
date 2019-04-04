@@ -268,11 +268,14 @@ struct Register
 };
 
 struct Interpreter;
+struct Compiler;
 
 struct Instruction {
     virtual ~Instruction() {};
 
     virtual void step(Interpreter *interpreter) = 0;
+    virtual void emit(Compiler *compiler);
+    virtual std::string name() = 0;
 };
 
 #endif // BASIC_TYPES_H

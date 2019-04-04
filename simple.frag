@@ -1,6 +1,16 @@
 
+void foo(int x)
+{
+}
+
+float foo(float x)
+{
+    return x*2;
+}
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
+    /*
     vec2 uv = (fragCoord - iResolution.xy/2.0)/iResolution.y;
 
     // Plot a function.
@@ -22,7 +32,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
 
     // Matrix test.
-    if (true) {
+    if (false) {
         float a = 10.0*3.14159/180.0;
         float s = sin(a);
         float c = cos(a);
@@ -33,7 +43,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         // Checkerboard.
         uv = floor(mod(uv*vec2(10.0), 2.0));
     }
+    */
 
+    foo(1);
+    float y = foo(1.0);
 
-    fragColor = vec4(uv, 0.0, 1.0);
+    // fragColor = vec4(uv, 0.0, 1.0);
 }

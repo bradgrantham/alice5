@@ -11,6 +11,8 @@ struct InsnFunctionParameter : public Instruction {
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     virtual void step(Interpreter *interpreter) { interpreter->stepFunctionParameter(*this); }
+    virtual std::string name() { return "OpFunctionParameter"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFunctionCall instruction (code 57).
@@ -21,6 +23,8 @@ struct InsnFunctionCall : public Instruction {
     uint32_t functionId; // operand from register
     std::vector<uint32_t> operandId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFunctionCall(*this); }
+    virtual std::string name() { return "OpFunctionCall"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpLoad instruction (code 61).
@@ -31,6 +35,8 @@ struct InsnLoad : public Instruction {
     uint32_t pointerId; // operand from register
     uint32_t memoryAccess; // MemoryAccess (optional)
     virtual void step(Interpreter *interpreter) { interpreter->stepLoad(*this); }
+    virtual std::string name() { return "OpLoad"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpStore instruction (code 62).
@@ -40,6 +46,8 @@ struct InsnStore : public Instruction {
     uint32_t objectId; // operand from register
     uint32_t memoryAccess; // MemoryAccess (optional)
     virtual void step(Interpreter *interpreter) { interpreter->stepStore(*this); }
+    virtual std::string name() { return "OpStore"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpAccessChain instruction (code 65).
@@ -50,6 +58,7 @@ struct InsnAccessChain : public Instruction {
     uint32_t baseId; // operand from register
     std::vector<uint32_t> indexesId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepAccessChain(*this); }
+    virtual std::string name() { return "OpAccessChain"; }
 };
 
 // OpVectorShuffle instruction (code 79).
@@ -61,6 +70,7 @@ struct InsnVectorShuffle : public Instruction {
     uint32_t vector2Id; // operand from register
     std::vector<uint32_t> componentsId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepVectorShuffle(*this); }
+    virtual std::string name() { return "OpVectorShuffle"; }
 };
 
 // OpCompositeConstruct instruction (code 80).
@@ -70,6 +80,7 @@ struct InsnCompositeConstruct : public Instruction {
     uint32_t resultId; // SSA register for result value
     std::vector<uint32_t> constituentsId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepCompositeConstruct(*this); }
+    virtual std::string name() { return "OpCompositeConstruct"; }
 };
 
 // OpCompositeExtract instruction (code 81).
@@ -80,6 +91,7 @@ struct InsnCompositeExtract : public Instruction {
     uint32_t compositeId; // operand from register
     std::vector<uint32_t> indexesId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepCompositeExtract(*this); }
+    virtual std::string name() { return "OpCompositeExtract"; }
 };
 
 // OpConvertFToS instruction (code 110).
@@ -89,6 +101,7 @@ struct InsnConvertFToS : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t floatValueId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepConvertFToS(*this); }
+    virtual std::string name() { return "OpConvertFToS"; }
 };
 
 // OpConvertSToF instruction (code 111).
@@ -98,6 +111,7 @@ struct InsnConvertSToF : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t signedValueId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepConvertSToF(*this); }
+    virtual std::string name() { return "OpConvertSToF"; }
 };
 
 // OpFNegate instruction (code 127).
@@ -107,6 +121,7 @@ struct InsnFNegate : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t operandId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFNegate(*this); }
+    virtual std::string name() { return "OpFNegate"; }
 };
 
 // OpIAdd instruction (code 128).
@@ -117,6 +132,7 @@ struct InsnIAdd : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepIAdd(*this); }
+    virtual std::string name() { return "OpIAdd"; }
 };
 
 // OpFAdd instruction (code 129).
@@ -127,6 +143,8 @@ struct InsnFAdd : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFAdd(*this); }
+    virtual std::string name() { return "OpFAdd"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFSub instruction (code 131).
@@ -137,6 +155,7 @@ struct InsnFSub : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFSub(*this); }
+    virtual std::string name() { return "OpFSub"; }
 };
 
 // OpFMul instruction (code 133).
@@ -147,6 +166,8 @@ struct InsnFMul : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFMul(*this); }
+    virtual std::string name() { return "OpFMul"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpSDiv instruction (code 135).
@@ -157,6 +178,7 @@ struct InsnSDiv : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepSDiv(*this); }
+    virtual std::string name() { return "OpSDiv"; }
 };
 
 // OpFDiv instruction (code 136).
@@ -167,6 +189,7 @@ struct InsnFDiv : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFDiv(*this); }
+    virtual std::string name() { return "OpFDiv"; }
 };
 
 // OpFMod instruction (code 141).
@@ -177,6 +200,7 @@ struct InsnFMod : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFMod(*this); }
+    virtual std::string name() { return "OpFMod"; }
 };
 
 // OpVectorTimesScalar instruction (code 142).
@@ -187,6 +211,7 @@ struct InsnVectorTimesScalar : public Instruction {
     uint32_t vectorId; // operand from register
     uint32_t scalarId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepVectorTimesScalar(*this); }
+    virtual std::string name() { return "OpVectorTimesScalar"; }
 };
 
 // OpVectorTimesMatrix instruction (code 144).
@@ -197,6 +222,7 @@ struct InsnVectorTimesMatrix : public Instruction {
     uint32_t vectorId; // operand from register
     uint32_t matrixId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepVectorTimesMatrix(*this); }
+    virtual std::string name() { return "OpVectorTimesMatrix"; }
 };
 
 // OpMatrixTimesVector instruction (code 145).
@@ -207,6 +233,7 @@ struct InsnMatrixTimesVector : public Instruction {
     uint32_t matrixId; // operand from register
     uint32_t vectorId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepMatrixTimesVector(*this); }
+    virtual std::string name() { return "OpMatrixTimesVector"; }
 };
 
 // OpDot instruction (code 148).
@@ -217,6 +244,7 @@ struct InsnDot : public Instruction {
     uint32_t vector1Id; // operand from register
     uint32_t vector2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepDot(*this); }
+    virtual std::string name() { return "OpDot"; }
 };
 
 // OpLogicalOr instruction (code 166).
@@ -227,6 +255,7 @@ struct InsnLogicalOr : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepLogicalOr(*this); }
+    virtual std::string name() { return "OpLogicalOr"; }
 };
 
 // OpLogicalNot instruction (code 168).
@@ -236,6 +265,7 @@ struct InsnLogicalNot : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t operandId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepLogicalNot(*this); }
+    virtual std::string name() { return "OpLogicalNot"; }
 };
 
 // OpSelect instruction (code 169).
@@ -247,6 +277,7 @@ struct InsnSelect : public Instruction {
     uint32_t object1Id; // operand from register
     uint32_t object2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepSelect(*this); }
+    virtual std::string name() { return "OpSelect"; }
 };
 
 // OpIEqual instruction (code 170).
@@ -257,6 +288,7 @@ struct InsnIEqual : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepIEqual(*this); }
+    virtual std::string name() { return "OpIEqual"; }
 };
 
 // OpSLessThan instruction (code 177).
@@ -267,6 +299,7 @@ struct InsnSLessThan : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepSLessThan(*this); }
+    virtual std::string name() { return "OpSLessThan"; }
 };
 
 // OpFOrdEqual instruction (code 180).
@@ -277,6 +310,7 @@ struct InsnFOrdEqual : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdEqual(*this); }
+    virtual std::string name() { return "OpFOrdEqual"; }
 };
 
 // OpFOrdLessThan instruction (code 184).
@@ -287,6 +321,7 @@ struct InsnFOrdLessThan : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdLessThan(*this); }
+    virtual std::string name() { return "OpFOrdLessThan"; }
 };
 
 // OpFOrdGreaterThan instruction (code 186).
@@ -297,6 +332,7 @@ struct InsnFOrdGreaterThan : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdGreaterThan(*this); }
+    virtual std::string name() { return "OpFOrdGreaterThan"; }
 };
 
 // OpFOrdLessThanEqual instruction (code 188).
@@ -307,6 +343,7 @@ struct InsnFOrdLessThanEqual : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdLessThanEqual(*this); }
+    virtual std::string name() { return "OpFOrdLessThanEqual"; }
 };
 
 // OpFOrdGreaterThanEqual instruction (code 190).
@@ -317,6 +354,7 @@ struct InsnFOrdGreaterThanEqual : public Instruction {
     uint32_t operand1Id; // operand from register
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdGreaterThanEqual(*this); }
+    virtual std::string name() { return "OpFOrdGreaterThanEqual"; }
 };
 
 // OpPhi instruction (code 245).
@@ -326,6 +364,7 @@ struct InsnPhi : public Instruction {
     uint32_t resultId; // SSA register for result value
     std::vector<uint32_t> operandId; // PairIdRefIdRef
     virtual void step(Interpreter *interpreter) { interpreter->stepPhi(*this); }
+    virtual std::string name() { return "OpPhi"; }
 };
 
 // OpBranch instruction (code 249).
@@ -333,6 +372,8 @@ struct InsnBranch : public Instruction {
     InsnBranch(uint32_t targetLabelId) : targetLabelId(targetLabelId) {}
     uint32_t targetLabelId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepBranch(*this); }
+    virtual std::string name() { return "OpBranch"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpBranchConditional instruction (code 250).
@@ -343,12 +384,15 @@ struct InsnBranchConditional : public Instruction {
     uint32_t falseLabelId; // operand from register
     std::vector<uint32_t> branchweightsId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepBranchConditional(*this); }
+    virtual std::string name() { return "OpBranchConditional"; }
 };
 
 // OpReturn instruction (code 253).
 struct InsnReturn : public Instruction {
     InsnReturn() {}
     virtual void step(Interpreter *interpreter) { interpreter->stepReturn(*this); }
+    virtual std::string name() { return "OpReturn"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpReturnValue instruction (code 254).
@@ -356,6 +400,8 @@ struct InsnReturnValue : public Instruction {
     InsnReturnValue(uint32_t valueId) : valueId(valueId) {}
     uint32_t valueId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepReturnValue(*this); }
+    virtual std::string name() { return "OpReturnValue"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450FAbs instruction (code 4).
@@ -365,6 +411,7 @@ struct InsnGLSLstd450FAbs : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FAbs(*this); }
+    virtual std::string name() { return "GLSLstd450FAbs"; }
 };
 
 // GLSLstd450Floor instruction (code 8).
@@ -374,6 +421,7 @@ struct InsnGLSLstd450Floor : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Floor(*this); }
+    virtual std::string name() { return "GLSLstd450Floor"; }
 };
 
 // GLSLstd450Fract instruction (code 10).
@@ -383,6 +431,7 @@ struct InsnGLSLstd450Fract : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Fract(*this); }
+    virtual std::string name() { return "GLSLstd450Fract"; }
 };
 
 // GLSLstd450Sin instruction (code 13).
@@ -392,6 +441,7 @@ struct InsnGLSLstd450Sin : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Sin(*this); }
+    virtual std::string name() { return "GLSLstd450Sin"; }
 };
 
 // GLSLstd450Cos instruction (code 14).
@@ -401,6 +451,7 @@ struct InsnGLSLstd450Cos : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Cos(*this); }
+    virtual std::string name() { return "GLSLstd450Cos"; }
 };
 
 // GLSLstd450Atan instruction (code 18).
@@ -410,6 +461,7 @@ struct InsnGLSLstd450Atan : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t y_over_xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Atan(*this); }
+    virtual std::string name() { return "GLSLstd450Atan"; }
 };
 
 // GLSLstd450Atan2 instruction (code 25).
@@ -420,6 +472,7 @@ struct InsnGLSLstd450Atan2 : public Instruction {
     uint32_t yId; // operand from register
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Atan2(*this); }
+    virtual std::string name() { return "GLSLstd450Atan2"; }
 };
 
 // GLSLstd450Pow instruction (code 26).
@@ -430,6 +483,7 @@ struct InsnGLSLstd450Pow : public Instruction {
     uint32_t xId; // operand from register
     uint32_t yId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Pow(*this); }
+    virtual std::string name() { return "GLSLstd450Pow"; }
 };
 
 // GLSLstd450Exp instruction (code 27).
@@ -439,6 +493,7 @@ struct InsnGLSLstd450Exp : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp(*this); }
+    virtual std::string name() { return "GLSLstd450Exp"; }
 };
 
 // GLSLstd450Exp2 instruction (code 29).
@@ -448,6 +503,7 @@ struct InsnGLSLstd450Exp2 : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp2(*this); }
+    virtual std::string name() { return "GLSLstd450Exp2"; }
 };
 
 // GLSLstd450FMin instruction (code 37).
@@ -458,6 +514,7 @@ struct InsnGLSLstd450FMin : public Instruction {
     uint32_t xId; // operand from register
     uint32_t yId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMin(*this); }
+    virtual std::string name() { return "GLSLstd450FMin"; }
 };
 
 // GLSLstd450FMax instruction (code 40).
@@ -468,6 +525,7 @@ struct InsnGLSLstd450FMax : public Instruction {
     uint32_t xId; // operand from register
     uint32_t yId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMax(*this); }
+    virtual std::string name() { return "GLSLstd450FMax"; }
 };
 
 // GLSLstd450FClamp instruction (code 43).
@@ -479,6 +537,7 @@ struct InsnGLSLstd450FClamp : public Instruction {
     uint32_t minValId; // operand from register
     uint32_t maxValId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FClamp(*this); }
+    virtual std::string name() { return "GLSLstd450FClamp"; }
 };
 
 // GLSLstd450FMix instruction (code 46).
@@ -490,6 +549,7 @@ struct InsnGLSLstd450FMix : public Instruction {
     uint32_t yId; // operand from register
     uint32_t aId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMix(*this); }
+    virtual std::string name() { return "GLSLstd450FMix"; }
 };
 
 // GLSLstd450Step instruction (code 48).
@@ -500,6 +560,7 @@ struct InsnGLSLstd450Step : public Instruction {
     uint32_t edgeId; // operand from register
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Step(*this); }
+    virtual std::string name() { return "GLSLstd450Step"; }
 };
 
 // GLSLstd450SmoothStep instruction (code 49).
@@ -511,6 +572,7 @@ struct InsnGLSLstd450SmoothStep : public Instruction {
     uint32_t edge1Id; // operand from register
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450SmoothStep(*this); }
+    virtual std::string name() { return "GLSLstd450SmoothStep"; }
 };
 
 // GLSLstd450Length instruction (code 66).
@@ -520,6 +582,7 @@ struct InsnGLSLstd450Length : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Length(*this); }
+    virtual std::string name() { return "GLSLstd450Length"; }
 };
 
 // GLSLstd450Distance instruction (code 67).
@@ -530,6 +593,7 @@ struct InsnGLSLstd450Distance : public Instruction {
     uint32_t p0Id; // operand from register
     uint32_t p1Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Distance(*this); }
+    virtual std::string name() { return "GLSLstd450Distance"; }
 };
 
 // GLSLstd450Cross instruction (code 68).
@@ -540,6 +604,7 @@ struct InsnGLSLstd450Cross : public Instruction {
     uint32_t xId; // operand from register
     uint32_t yId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Cross(*this); }
+    virtual std::string name() { return "GLSLstd450Cross"; }
 };
 
 // GLSLstd450Normalize instruction (code 69).
@@ -549,6 +614,7 @@ struct InsnGLSLstd450Normalize : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Normalize(*this); }
+    virtual std::string name() { return "GLSLstd450Normalize"; }
 };
 
 // GLSLstd450Reflect instruction (code 71).
@@ -559,6 +625,7 @@ struct InsnGLSLstd450Reflect : public Instruction {
     uint32_t iId; // operand from register
     uint32_t nId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Reflect(*this); }
+    virtual std::string name() { return "GLSLstd450Reflect"; }
 };
 
 
