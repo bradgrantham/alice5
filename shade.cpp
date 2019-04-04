@@ -20,9 +20,9 @@
 #include "basic_types.h"
 #include "interpreter.h"
 
-const int imageWidth = 640/2; // ShaderToy default is 640
-const int imageHeight = 360/2; // ShaderToy default is 360
-unsigned char imageBuffer[imageHeight][imageWidth][3];
+int imageWidth = 640/2; // ShaderToy default is 640
+int imageHeight = 360/2; // ShaderToy default is 360
+unsigned char *imageBuffer;
 
 std::map<uint32_t, std::string> OpcodeToString = {
 #include "opcode_to_string.h"
@@ -2429,6 +2429,7 @@ void usage(const char* progname)
     printf("provide \"-\" as a filename to read from stdin\n");
     printf("options:\n");
     printf("\t-f S E    Render frames S through and including E\n");
+    printf("\t-d W H    Render frame at size W by H\n");
     printf("\t-v        Print opcodes as they are parsed\n");
     printf("\t-g        Generate debugging information\n");
     printf("\t-O        Run optimizing passes\n");
@@ -2445,7 +2446,7 @@ void render(const Program *pgm, int startRow, int skip, float when)
     Interpreter interpreter(pgm);
 
     // iResolution is uniform @0 in preamble
-    interpreter.set(SpvStorageClassUniform, 0, v2float {imageWidth, imageHeight});
+    interpreter.set(SpvStorageClassUniform, 0, v2float {static_cast<float>(imageWidth), static_cast<float>(imageHeight)});
 
     // iTime is uniform @8 in preamble
     interpreter.set(SpvStorageClassUniform, 8, when);
@@ -2462,7 +2463,7 @@ void render(const Program *pgm, int startRow, int skip, float when)
                 int byteColor = color[c]*255.99;
                 if (byteColor < 0) byteColor = 0;
                 if (byteColor > 255) byteColor = 255;
-                imageBuffer[imageHeight - 1 - y][x][c] = byteColor;
+                imageBuffer[((imageHeight - 1 - y) * imageWidth + x) * 3 + c] = byteColor;
             }
         }
 
@@ -2511,6 +2512,8 @@ int main(int argc, char **argv)
     bool doNotShade = false;
     int imageStart = 0, imageEnd = 0;
 
+    imageBuffer = new unsigned char[imageWidth * imageHeight * 3];
+
     char *progname = argv[0];
     argv++; argc--;
 
@@ -2519,6 +2522,16 @@ int main(int argc, char **argv)
 
             debug = true;
             argv++; argc--;
+
+        } else if(strcmp(argv[0], "-d") == 0) {
+
+            if(argc < 3) {
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            imageWidth = atoi(argv[1]);
+            imageHeight = atoi(argv[2]);
+            argv += 3; argc -= 3;
 
         } else if(strcmp(argv[0], "-f") == 0) {
 
@@ -2687,7 +2700,7 @@ int main(int argc, char **argv)
         ss << "image" << std::setfill('0') << std::setw(4) << imageNumber << std::setw(0) << ".ppm";
         std::ofstream imageFile(ss.str(), std::ios::out | std::ios::binary);
         imageFile << "P6 " << imageWidth << " " << imageHeight << " 255\n";
-        imageFile.write(reinterpret_cast<const char *>(imageBuffer), sizeof(imageBuffer));
+        imageFile.write(reinterpret_cast<const char *>(imageBuffer), 3 * imageWidth * imageHeight);
         imageFile.close();
     }
 
