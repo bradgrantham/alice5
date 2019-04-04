@@ -46,7 +46,7 @@ def main(shadertoy_key):
         analyze_shader(shader_id, shadertoy_key)
 
 if __name__ == "__main__":
-     if sys.version_info.major != 3:
+    if sys.version_info.major != 3:
         sys.stderr.write("Must run with Python 3.\n")
         sys.exit(1)
 
