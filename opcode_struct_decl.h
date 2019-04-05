@@ -11,6 +11,7 @@ struct InsnAccessChain;
 struct InsnVectorShuffle;
 struct InsnCompositeConstruct;
 struct InsnCompositeExtract;
+struct InsnImageSampleImplicitLod;
 struct InsnConvertFToS;
 struct InsnConvertSToF;
 struct InsnFNegate;

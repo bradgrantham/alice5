@@ -353,11 +353,6 @@ void Interpreter::stepSampledImage(const InsnSampledImage& insn)
     std::cerr << "stepSampledImage() not implemented\n";
 }
 
-void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn)
-{
-    std::cerr << "stepImageSampleImplicitLod() not implemented\n";
-}
-
 void Interpreter::stepImageSampleExplicitLod(const InsnImageSampleExplicitLod& insn)
 {
     std::cerr << "stepImageSampleExplicitLod() not implemented\n";

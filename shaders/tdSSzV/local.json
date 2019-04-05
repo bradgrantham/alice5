@@ -1,0 +1,51 @@
+{
+   "Shader" : {
+      "info" : {
+         "tags" : [
+            "simple"
+         ],
+         "username" : "brad_grantham",
+         "published" : 3,
+         "flags" : 0,
+         "date" : "1554345399",
+         "id" : "tdSSzV",
+         "name" : "simplest texture",
+         "description" : "fetch texture and use as color",
+         "likes" : 1,
+         "viewed" : 39,
+         "hasliked" : 0
+      },
+      "renderpass" : [
+         {
+            "name" : "Image",
+            "description" : "",
+            "inputs" : [
+               {
+                  "channel" : 0,
+                  "id" : 8,
+                  "published" : 1,
+                  "sampler" : {
+                     "vflip" : "true",
+                     "internal" : "byte",
+                     "filter" : "mipmap",
+                     "srgb" : "false",
+                     "wrap" : "repeat"
+                  },
+                  "locally_saved" : "52d2a8f514c4fd2d9866587f4d7b2a5bfa1a11a0e772077d7682deb8b3b517e5.ppm",
+                  "src" : "/media/a/52d2a8f514c4fd2d9866587f4d7b2a5bfa1a11a0e772077d7682deb8b3b517e5.jpg",
+                  "ctype" : "texture"
+               }
+            ],
+            "codefile" : "Image.frag",
+            "type" : "image",
+            "outputs" : [
+               {
+                  "id" : 37,
+                  "channel" : 0
+               }
+            ]
+         }
+      ],
+      "ver" : "0.1"
+   }
+}

@@ -11,6 +11,7 @@ void stepAccessChain(const InsnAccessChain& insn);
 void stepVectorShuffle(const InsnVectorShuffle& insn);
 void stepCompositeConstruct(const InsnCompositeConstruct& insn);
 void stepCompositeExtract(const InsnCompositeExtract& insn);
+void stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn);
 void stepConvertFToS(const InsnConvertFToS& insn);
 void stepConvertSToF(const InsnConvertSToF& insn);
 void stepFNegate(const InsnFNegate& insn);

@@ -11,7 +11,7 @@ layout (binding = 0) uniform params {
 	ivec4 iMouse;
 }; // Params;
 
-// layout (binding = 1) uniform sampler2D iChannel0;
+layout (binding = 1) uniform sampler2D iChannel0;
 
 layout (location = 0) in vec2 fragCoord;
 

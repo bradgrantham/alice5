@@ -8,6 +8,9 @@
 #include <atomic>
 #include <sstream>
 #include <iomanip>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef USE_CPP17_FILESYSTEM
 // filesystem still not available in XCode 2019/04/04
@@ -28,6 +31,161 @@
 #include "json.hpp"
 #include "basic_types.h"
 #include "interpreter.h"
+
+
+static void skipComments(FILE *fp, char ***comments, size_t *commentCount)
+{
+    int c;
+    char line[512];
+
+    while((c = fgetc(fp)) == '#') {
+        fgets(line, sizeof(line) - 1, fp);
+	line[strlen(line) - 1] = '\0';
+	if(comments != NULL) {
+	    *comments = (char **)
+	        realloc(*comments, sizeof(char *) * (*commentCount + 1));
+	    (*comments)[*commentCount] = strdup(line);
+	}
+	if(commentCount != NULL) {
+	    (*commentCount) ++;
+	}
+    }
+    ungetc(c, fp);
+}
+
+
+int pnmRead(FILE *file, unsigned int *w, unsigned int *h, float **pixels,
+    char ***comments, size_t *commentCount)
+{
+    unsigned char	dummyByte;
+    int			i;
+    float		max;
+    char		token;
+    int			width, height;
+    float		*rgbPixels;
+
+    if(commentCount != NULL)
+	*commentCount = 0;
+    if(comments != NULL)
+	*comments = NULL;
+
+    fscanf(file, " ");
+
+    skipComments(file, comments, commentCount);
+
+    if(fscanf(file, "P%c ", &token) != 1) {
+         fprintf(stderr, "pnmRead: Had trouble reading PNM tag\n");
+	 return 0;
+    }
+
+    skipComments(file, comments, commentCount);
+
+    if(fscanf(file, "%d ", &width) != 1) {
+         fprintf(stderr, "pnmRead: Had trouble reading PNM width\n");
+	 return 0;
+    }
+
+    skipComments(file, comments, commentCount);
+
+    if(fscanf(file, "%d ", &height) != 1) {
+         fprintf(stderr, "pnmRead: Had trouble reading PNM height\n");
+	 return 0;
+    }
+
+    skipComments(file, comments, commentCount);
+
+    if(token != '1' && token != '4')
+        if(fscanf(file, "%f", &max) != 1) {
+             fprintf(stderr, "pnmRead: Had trouble reading PNM max value\n");
+	     return 0;
+        }
+
+    rgbPixels = (float*) malloc(width * height * 4 * sizeof(float));
+    if(rgbPixels == NULL) {
+         fprintf(stderr, "pnmRead: Couldn't allocate %zd bytes\n",
+	     width * height * 4 * sizeof(float));
+         fprintf(stderr, "pnmRead: (For a %u by %u image)\n", width,
+	     height);
+	 return 0;
+    }
+
+    if(token != '4')
+	skipComments(file, comments, commentCount);
+
+    if(token != '4')
+    fread(&dummyByte, 1, 1, file);	/* chuck white space */
+
+    if(token == '1') {
+	for(i = 0; i < width * height; i++) {
+	    int pixel;
+	    fscanf(file, "%d", &pixel);
+	    pixel = 1 - pixel;
+	    rgbPixels[i * 4 + 0] = pixel;
+	    rgbPixels[i * 4 + 1] = pixel;
+	    rgbPixels[i * 4 + 2] = pixel;
+	    rgbPixels[i * 4 + 3] = 1.0;
+	}
+    } else if(token == '2') {
+	for(i = 0; i < width * height; i++) {
+	    int pixel;
+	    fscanf(file, "%d", &pixel);
+	    rgbPixels[i * 4 + 0] = pixel / max;
+	    rgbPixels[i * 4 + 1] = pixel / max;
+	    rgbPixels[i * 4 + 2] = pixel / max;
+	    rgbPixels[i * 4 + 3] = 1.0;
+	}
+    } else if(token == '3') {
+	for(i = 0; i < width * height; i++) {
+	    int r, g, b;
+	    fscanf(file, "%d %d %d", &r, &g, &b);
+	    rgbPixels[i * 4 + 0] = r / max;
+	    rgbPixels[i * 4 + 1] = g / max;
+	    rgbPixels[i * 4 + 2] = b / max;
+	    rgbPixels[i * 4 + 3] = 1.0;
+	}
+    } else if(token == '4') {
+        int bitnum = 0;
+        unsigned char value = 0;
+
+	for(i = 0; i < width * height; i++) {
+	    unsigned char pixel;
+
+	    if(bitnum == 0)
+	        fread(&value, 1, 1, file);
+
+	    pixel = (1 - ((value >> (7 - bitnum)) & 1));
+	    rgbPixels[i * 4 + 0] = pixel;
+	    rgbPixels[i * 4 + 1] = pixel;
+	    rgbPixels[i * 4 + 2] = pixel;
+	    rgbPixels[i * 4 + 3] = 1.0;
+
+	    if(++bitnum == 8 || ((i + 1) % width) == 0)
+	        bitnum = 0;
+	}
+    } else if(token == '5') {
+	for(i = 0; i < width * height; i++) {
+	    unsigned char pixel;
+	    fread(&pixel, 1, 1, file);
+	    rgbPixels[i * 4 + 0] = pixel / max;
+	    rgbPixels[i * 4 + 1] = pixel / max;
+	    rgbPixels[i * 4 + 2] = pixel / max;
+	    rgbPixels[i * 4 + 3] = 1.0;
+	}
+    } else if(token == '6') {
+	for(i = 0; i < width * height; i++) {
+	    unsigned char rgb[3];
+	    fread(rgb, 3, 1, file);
+	    rgbPixels[i * 4 + 0] = rgb[0] / max;
+	    rgbPixels[i * 4 + 1] = rgb[1] / max;
+	    rgbPixels[i * 4 + 2] = rgb[2] / max;
+	    rgbPixels[i * 4 + 3] = 1.0;
+	}
+    }
+    *w = width;
+    *h = height;
+    *pixels = rgbPixels;
+    return 1;
+}
 
 using json = nlohmann::json;
 
@@ -2337,6 +2495,63 @@ void Interpreter::stepPhi(const InsnPhi& insn)
     }
 }
 
+float *textureData;
+unsigned int textureWidth, textureHeight;
+
+void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn)
+{
+    // uint32_t type; // result type
+    // uint32_t resultId; // SSA register for result value
+    // uint32_t sampledImageId; // operand from register
+    // uint32_t coordinateId; // operand from register
+    // uint32_t imageOperands; // ImageOperands (optional)
+    float rgba[4];
+
+    std::visit([this, &insn, &rgba](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeVector>) {
+
+            assert(type.count == 2);
+
+            auto [u, v] = registerAs<v2float>(insn.coordinateId);
+
+            unsigned int s = std::clamp(static_cast<unsigned int>(u * textureWidth), 0u, textureWidth - 1);
+            unsigned int t = std::clamp(static_cast<unsigned int>(v * textureHeight), 0u, textureHeight - 1);
+            unsigned int address = (t * textureWidth + s) * 4;
+            for(int i = 0; i < 4; i++)
+                rgba[i] = textureData[address + i];
+
+        } else {
+
+            std::cout << "Unhandled type for ImageSampleImplicitLod coordinate\n";
+
+        }
+    }, pgm->types.at(registers[insn.coordinateId].type));
+
+    uint32_t resultType = std::get<TypeVector>(pgm->types.at(registers[insn.resultId].type)).type;
+
+    std::visit([this, &insn, rgba](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            registerAs<v4float>(insn.resultId) = v4float { rgba[0], rgba[1], rgba[2], rgba[3] };
+
+        // else if constexpr (std::is_same_v<T, TypeInt>) {
+
+
+        } else {
+
+            std::cout << "Unhandled type for ImageSampleImplicitLod result\n";
+
+        }
+    }, pgm->types.at(resultType));
+}
+
+
 void Interpreter::step()
 {
     if(false) std::cout << "address " << pc << "\n";
@@ -2682,6 +2897,36 @@ void showProgress(int totalRows, std::chrono::time_point<std::chrono::steady_clo
     std::cout << "                                                             \r";
 }
 
+std::string getFilepathAdjacentToPath(const std::string& filename, std::string adjacent)
+{
+    std::string result;
+
+#ifdef USE_CPP17_FILESYSTEM
+
+    // filesystem still not available in XCode 2019/04/04
+    std::filesystem::path adjacent_path(adjacent);
+    std::filesystem::path adjacent_dirname = adjacent_path.parent_path();
+    std::filesystem::path code_path(filename);
+
+    if(code_path.is_relative()) {
+        std::filesystem::path full_path(adjacent_dirname + code_path);
+        result = full_path;
+    }
+
+#else
+
+    if(filename[0] != '/') {
+        // Assume relative path, get directory from JSON filename
+        char *adjacent_copy = strdup(adjacent.c_str());;
+        result = std::string(dirname(adjacent_copy)) + "/" + filename;
+        free(adjacent_copy);
+    }
+
+#endif
+
+    return result;
+}
+
 int main(int argc, char **argv)
 {
     bool debug = false;
@@ -2803,27 +3048,7 @@ int main(int argc, char **argv)
             if(pass.find("codefile") != pass.end()) {
                 std::string code_filename = pass["codefile"];
 
-#ifdef USE_CPP17_FILESYSTEM
-
-                // filesystem still not available in XCode 2019/04/04
-                std::filesystem::path json_path(filename);
-                std::filesystem::path json_dirname = json_path.parent_path();
-                std::filesystem::path code_path(pass["codefile"]);
-
-                if(code_path.is_relative()) {
-                    std::filesystem::path full_path(json_dirname + code_path);
-                    code_filename = full_path;
-                }
-#else
-
-                if(code_filename[0] != '/') {
-                    // Assume relative path, get directory from JSON filename
-                    char *filename_copy = strdup(filename.c_str());;
-                    code_filename = std::string(dirname(filename_copy)) + "/" + code_filename;
-                    free(filename_copy);
-                }
-
-#endif
+                code_filename = getFilepathAdjacentToPath(code_filename, filename);
 
                 pass["full_code_filename"] = code_filename;
                 pass["code"] = readFileContents(code_filename);
@@ -2849,9 +3074,20 @@ int main(int argc, char **argv)
             filename = std::string("shader from pass ") + pass0["name"].get<std::string>();
         }
         text = pass0["code"];
+
+        if(pass0.find("inputs") != pass0.end()) {
+            auto& input0 = pass0["inputs"][0];
+            if(input0.find("locally_saved") != input0.end()) {
+                std::string asset_filename = getFilepathAdjacentToPath(input0["locally_saved"].get<std::string>(), filename);
+                FILE *fp = fopen(asset_filename.c_str(), "rb");
+                if(!pnmRead(fp, &textureWidth, &textureHeight, &textureData, NULL, NULL)) {
+                    std::cerr << "couldn't read image from " << asset_filename;
+                    exit(EXIT_FAILURE);
+                }
+                fclose(fp);
+            }
+        }
     }
-
-
 
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 

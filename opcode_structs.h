@@ -94,6 +94,18 @@ struct InsnCompositeExtract : public Instruction {
     virtual std::string name() { return "OpCompositeExtract"; }
 };
 
+// OpImageSampleImplicitLod instruction (code 87).
+struct InsnImageSampleImplicitLod : public Instruction {
+    InsnImageSampleImplicitLod(uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : type(type), resultId(resultId), sampledImageId(sampledImageId), coordinateId(coordinateId), imageOperands(imageOperands) {}
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t sampledImageId; // operand from register
+    uint32_t coordinateId; // operand from register
+    uint32_t imageOperands; // ImageOperands (optional)
+    virtual void step(Interpreter *interpreter) { interpreter->stepImageSampleImplicitLod(*this); }
+    virtual std::string name() { return "OpImageSampleImplicitLod"; }
+};
+
 // OpConvertFToS instruction (code 110).
 struct InsnConvertFToS : public Instruction {
     InsnConvertFToS(uint32_t type, uint32_t resultId, uint32_t floatValueId) : type(type), resultId(resultId), floatValueId(floatValueId) {}
