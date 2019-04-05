@@ -787,8 +787,8 @@ struct Program
         // switched.
         typedef std::pair<uint32_t,uint32_t> IndexLabelId;
         std::vector<IndexLabelId> labels_in_order;
-        for (auto label : labels) {
-            labels_in_order.push_back(IndexLabelId{label.second, label.first});
+        for (auto [labelId, codeIndex] : labels) {
+            labels_in_order.push_back(IndexLabelId{codeIndex, labelId});
         }
         // Add pseudo-entry for end of code.
         labels_in_order.push_back(IndexLabelId{code.size(), NO_BLOCK_ID});
