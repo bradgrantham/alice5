@@ -21,6 +21,7 @@
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Include/intermediate.h>
 #include <SPIRV/GlslangToSpv.h>
+#include <SPIRV/disassemble.h>
 #include <spirv-tools/libspirv.h>
 #include "spirv.h"
 #include "GLSL.std.450.h"
@@ -2685,6 +2686,7 @@ void showProgress(int totalRows, std::chrono::time_point<std::chrono::steady_clo
 int main(int argc, char **argv)
 {
     bool debug = false;
+    bool disassemble = false;
     bool optimize = false;
     bool beVerbose = false;
     bool throwOnUnimplemented = false;
@@ -2707,6 +2709,11 @@ int main(int argc, char **argv)
         } else if(strcmp(argv[0], "--json") == 0) {
 
             inputIsJSON = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "-S") == 0) {
+
+            disassemble = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-d") == 0) {
@@ -2870,9 +2877,19 @@ int main(int argc, char **argv)
 
     ShInitialize();
 
+    glslang::TProgram& program = *new glslang::TProgram;
+
     if (!shader->parse(&resources, 110, false, messages, includer)) {
         std::cerr << "compile failed\n";
         std::cerr << shader->getInfoLog();
+        exit(EXIT_FAILURE);
+    }
+
+    program.addShader(shader);
+
+    if(!program.link(messages)) {
+        std::cerr << "link failed\n";
+        std::cerr << program.getInfoLog();
         exit(EXIT_FAILURE);
     }
 
@@ -2883,8 +2900,12 @@ int main(int argc, char **argv)
     options.generateDebugInfo = debug;
     options.disableOptimizer = !optimize;
     options.optimizeSize = false;
-    glslang::TIntermediate *shaderInterm = shader->getIntermediate();
+    glslang::TIntermediate *shaderInterm = program.getIntermediate(EShLangFragment);
     glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
+
+    if(disassemble) {
+        spv::Disassemble(std::cout, spirv);
+    }
 
     if(false) {
         FILE *fp = fopen("spirv", "wb");
