@@ -816,8 +816,8 @@ Interpreter::Interpreter(const Program *pgm)
     std::fill(memory, memory + pgm->memorySize, 0xFF);
 
     // Allocate registers so they aren't allocated during run()
-    for(auto r: pgm->resultsCreated) {
-        allocRegister(r.first, r.second);
+    for(auto [id, type]: pgm->resultsCreated) {
+        allocRegister(id, type);
     }
 }
 
@@ -2381,17 +2381,16 @@ void Interpreter::run()
     previousBlockId = NO_BLOCK_ID;
 
     // Copy constants to memory. They're treated like variables.
-    for(auto c: pgm->constants) {
-        registers[c.first] = c.second;
+    for(auto& [id, constant]: pgm->constants) {
+        registers[id] = constant;
     }
 
     // init Function variables with initializers before each invocation
     // XXX also need to initialize within function calls?
-    for(auto v: pgm->variables) {
-        const Variable& var = v.second;
-        pointers[v.first] = Pointer { var.type, var.storageClass, var.offset };
-        if(v.second.storageClass == SpvStorageClassFunction) {
-            assert(v.second.initializer == NO_INITIALIZER); // XXX will do initializers later
+    for(auto& [id, var]: pgm->variables) {
+        pointers[id] = Pointer { var.type, var.storageClass, var.offset };
+        if(var.storageClass == SpvStorageClassFunction) {
+            assert(var.initializer == NO_INITIALIZER); // XXX will do initializers later
         }
     }
 
