@@ -8,6 +8,7 @@
 #include <atomic>
 #include <sstream>
 #include <iomanip>
+#include <memory>
 
 #ifdef USE_CPP17_FILESYSTEM
 // filesystem still not available in XCode 2019/04/04
@@ -115,7 +116,7 @@ struct Program
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
-    std::vector<Instruction *> code;
+    std::vector<std::unique_ptr<Instruction>> code;
     std::vector<Block> blocks;
     std::vector<uint32_t> blockId; // Parallel to "code".
 
@@ -158,13 +159,6 @@ struct Program
         memoryRegions[SpvStorageClassAtomicCounter] = anotherRegion(0);
         memoryRegions[SpvStorageClassImage] = anotherRegion(0);
         memoryRegions[SpvStorageClassStorageBuffer] = anotherRegion(0);
-    }
-
-    ~Program()
-    {
-        for (auto insn : code) {
-            delete insn;
-        }
     }
 
     size_t allocate(SpvStorageClass clss, uint32_t type)
@@ -2366,9 +2360,7 @@ void Interpreter::step()
         currentBlockId = pgm->blockId.at(pc);
     }
 
-    Instruction *insn = pgm->code.at(pc++);
-
-    insn->step(this);
+    pgm->code.at(pc++)->step(this);
 }
 
 template <class T>
@@ -2442,8 +2434,7 @@ struct Compiler
                 }
             }
 
-            Instruction *insn = pgm->code.at(pc);
-            insn->emit(this);
+            pgm->code.at(pc)->emit(this);
         }
     }
 

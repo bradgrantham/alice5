@@ -6,7 +6,7 @@
 case SpvOpFunctionParameter: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
-    pgm->code.push_back(new InsnFunctionParameter{type, resultId});
+    pgm->code.push_back(std::make_unique<InsnFunctionParameter>(type, resultId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FunctionParameter";
@@ -24,7 +24,7 @@ case SpvOpFunctionCall: {
     uint32_t resultId = nextu();
     uint32_t functionId = nextu();
     std::vector<uint32_t> operandId = restv();
-    pgm->code.push_back(new InsnFunctionCall{type, resultId, functionId, operandId});
+    pgm->code.push_back(std::make_unique<InsnFunctionCall>(type, resultId, functionId, operandId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FunctionCall";
@@ -47,7 +47,7 @@ case SpvOpLoad: {
     uint32_t resultId = nextu();
     uint32_t pointerId = nextu();
     uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
-    pgm->code.push_back(new InsnLoad{type, resultId, pointerId, memoryAccess});
+    pgm->code.push_back(std::make_unique<InsnLoad>(type, resultId, pointerId, memoryAccess));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "Load";
@@ -68,7 +68,7 @@ case SpvOpStore: {
     uint32_t pointerId = nextu();
     uint32_t objectId = nextu();
     uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
-    pgm->code.push_back(new InsnStore{pointerId, objectId, memoryAccess});
+    pgm->code.push_back(std::make_unique<InsnStore>(pointerId, objectId, memoryAccess));
     if(pgm->verbose) {
         std::cout << "Store";
         std::cout << " pointerId ";
@@ -87,7 +87,7 @@ case SpvOpAccessChain: {
     uint32_t resultId = nextu();
     uint32_t baseId = nextu();
     std::vector<uint32_t> indexesId = restv();
-    pgm->code.push_back(new InsnAccessChain{type, resultId, baseId, indexesId});
+    pgm->code.push_back(std::make_unique<InsnAccessChain>(type, resultId, baseId, indexesId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "AccessChain";
@@ -111,7 +111,7 @@ case SpvOpVectorShuffle: {
     uint32_t vector1Id = nextu();
     uint32_t vector2Id = nextu();
     std::vector<uint32_t> componentsId = restv();
-    pgm->code.push_back(new InsnVectorShuffle{type, resultId, vector1Id, vector2Id, componentsId});
+    pgm->code.push_back(std::make_unique<InsnVectorShuffle>(type, resultId, vector1Id, vector2Id, componentsId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "VectorShuffle";
@@ -135,7 +135,7 @@ case SpvOpCompositeConstruct: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
     std::vector<uint32_t> constituentsId = restv();
-    pgm->code.push_back(new InsnCompositeConstruct{type, resultId, constituentsId});
+    pgm->code.push_back(std::make_unique<InsnCompositeConstruct>(type, resultId, constituentsId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "CompositeConstruct";
@@ -156,7 +156,7 @@ case SpvOpCompositeExtract: {
     uint32_t resultId = nextu();
     uint32_t compositeId = nextu();
     std::vector<uint32_t> indexesId = restv();
-    pgm->code.push_back(new InsnCompositeExtract{type, resultId, compositeId, indexesId});
+    pgm->code.push_back(std::make_unique<InsnCompositeExtract>(type, resultId, compositeId, indexesId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "CompositeExtract";
@@ -178,7 +178,7 @@ case SpvOpConvertFToS: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
     uint32_t floatValueId = nextu();
-    pgm->code.push_back(new InsnConvertFToS{type, resultId, floatValueId});
+    pgm->code.push_back(std::make_unique<InsnConvertFToS>(type, resultId, floatValueId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "ConvertFToS";
@@ -197,7 +197,7 @@ case SpvOpConvertSToF: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
     uint32_t signedValueId = nextu();
-    pgm->code.push_back(new InsnConvertSToF{type, resultId, signedValueId});
+    pgm->code.push_back(std::make_unique<InsnConvertSToF>(type, resultId, signedValueId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "ConvertSToF";
@@ -216,7 +216,7 @@ case SpvOpFNegate: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
     uint32_t operandId = nextu();
-    pgm->code.push_back(new InsnFNegate{type, resultId, operandId});
+    pgm->code.push_back(std::make_unique<InsnFNegate>(type, resultId, operandId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FNegate";
@@ -236,7 +236,7 @@ case SpvOpIAdd: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnIAdd{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnIAdd>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "IAdd";
@@ -258,7 +258,7 @@ case SpvOpFAdd: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFAdd{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFAdd>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FAdd";
@@ -280,7 +280,7 @@ case SpvOpFSub: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFSub{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFSub>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FSub";
@@ -302,7 +302,7 @@ case SpvOpFMul: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFMul{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFMul>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FMul";
@@ -324,7 +324,7 @@ case SpvOpSDiv: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnSDiv{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnSDiv>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "SDiv";
@@ -346,7 +346,7 @@ case SpvOpFDiv: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFDiv{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFDiv>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FDiv";
@@ -368,7 +368,7 @@ case SpvOpFMod: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFMod{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFMod>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FMod";
@@ -390,7 +390,7 @@ case SpvOpVectorTimesScalar: {
     uint32_t resultId = nextu();
     uint32_t vectorId = nextu();
     uint32_t scalarId = nextu();
-    pgm->code.push_back(new InsnVectorTimesScalar{type, resultId, vectorId, scalarId});
+    pgm->code.push_back(std::make_unique<InsnVectorTimesScalar>(type, resultId, vectorId, scalarId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "VectorTimesScalar";
@@ -412,7 +412,7 @@ case SpvOpVectorTimesMatrix: {
     uint32_t resultId = nextu();
     uint32_t vectorId = nextu();
     uint32_t matrixId = nextu();
-    pgm->code.push_back(new InsnVectorTimesMatrix{type, resultId, vectorId, matrixId});
+    pgm->code.push_back(std::make_unique<InsnVectorTimesMatrix>(type, resultId, vectorId, matrixId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "VectorTimesMatrix";
@@ -434,7 +434,7 @@ case SpvOpMatrixTimesVector: {
     uint32_t resultId = nextu();
     uint32_t matrixId = nextu();
     uint32_t vectorId = nextu();
-    pgm->code.push_back(new InsnMatrixTimesVector{type, resultId, matrixId, vectorId});
+    pgm->code.push_back(std::make_unique<InsnMatrixTimesVector>(type, resultId, matrixId, vectorId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "MatrixTimesVector";
@@ -456,7 +456,7 @@ case SpvOpDot: {
     uint32_t resultId = nextu();
     uint32_t vector1Id = nextu();
     uint32_t vector2Id = nextu();
-    pgm->code.push_back(new InsnDot{type, resultId, vector1Id, vector2Id});
+    pgm->code.push_back(std::make_unique<InsnDot>(type, resultId, vector1Id, vector2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "Dot";
@@ -478,7 +478,7 @@ case SpvOpLogicalOr: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnLogicalOr{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnLogicalOr>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "LogicalOr";
@@ -499,7 +499,7 @@ case SpvOpLogicalNot: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
     uint32_t operandId = nextu();
-    pgm->code.push_back(new InsnLogicalNot{type, resultId, operandId});
+    pgm->code.push_back(std::make_unique<InsnLogicalNot>(type, resultId, operandId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "LogicalNot";
@@ -520,7 +520,7 @@ case SpvOpSelect: {
     uint32_t conditionId = nextu();
     uint32_t object1Id = nextu();
     uint32_t object2Id = nextu();
-    pgm->code.push_back(new InsnSelect{type, resultId, conditionId, object1Id, object2Id});
+    pgm->code.push_back(std::make_unique<InsnSelect>(type, resultId, conditionId, object1Id, object2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "Select";
@@ -544,7 +544,7 @@ case SpvOpIEqual: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnIEqual{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnIEqual>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "IEqual";
@@ -566,7 +566,7 @@ case SpvOpSLessThan: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnSLessThan{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnSLessThan>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "SLessThan";
@@ -588,7 +588,7 @@ case SpvOpFOrdEqual: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFOrdEqual{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFOrdEqual>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdEqual";
@@ -610,7 +610,7 @@ case SpvOpFOrdLessThan: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFOrdLessThan{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFOrdLessThan>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdLessThan";
@@ -632,7 +632,7 @@ case SpvOpFOrdGreaterThan: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFOrdGreaterThan{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFOrdGreaterThan>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdGreaterThan";
@@ -654,7 +654,7 @@ case SpvOpFOrdLessThanEqual: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFOrdLessThanEqual{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFOrdLessThanEqual>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdLessThanEqual";
@@ -676,7 +676,7 @@ case SpvOpFOrdGreaterThanEqual: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->code.push_back(new InsnFOrdGreaterThanEqual{type, resultId, operand1Id, operand2Id});
+    pgm->code.push_back(std::make_unique<InsnFOrdGreaterThanEqual>(type, resultId, operand1Id, operand2Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdGreaterThanEqual";
@@ -697,7 +697,7 @@ case SpvOpPhi: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
     std::vector<uint32_t> operandId = restv();
-    pgm->code.push_back(new InsnPhi{type, resultId, operandId});
+    pgm->code.push_back(std::make_unique<InsnPhi>(type, resultId, operandId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "Phi";
@@ -715,7 +715,7 @@ case SpvOpPhi: {
 
 case SpvOpBranch: {
     uint32_t targetLabelId = nextu();
-    pgm->code.push_back(new InsnBranch{targetLabelId});
+    pgm->code.push_back(std::make_unique<InsnBranch>(targetLabelId));
     if(pgm->verbose) {
         std::cout << "Branch";
         std::cout << " targetLabelId ";
@@ -730,7 +730,7 @@ case SpvOpBranchConditional: {
     uint32_t trueLabelId = nextu();
     uint32_t falseLabelId = nextu();
     std::vector<uint32_t> branchweightsId = restv();
-    pgm->code.push_back(new InsnBranchConditional{conditionId, trueLabelId, falseLabelId, branchweightsId});
+    pgm->code.push_back(std::make_unique<InsnBranchConditional>(conditionId, trueLabelId, falseLabelId, branchweightsId));
     if(pgm->verbose) {
         std::cout << "BranchConditional";
         std::cout << " conditionId ";
@@ -748,7 +748,7 @@ case SpvOpBranchConditional: {
 }
 
 case SpvOpReturn: {
-    pgm->code.push_back(new InsnReturn{});
+    pgm->code.push_back(std::make_unique<InsnReturn>());
     if(pgm->verbose) {
         std::cout << "Return";
         std::cout << "\n";
@@ -758,7 +758,7 @@ case SpvOpReturn: {
 
 case SpvOpReturnValue: {
     uint32_t valueId = nextu();
-    pgm->code.push_back(new InsnReturnValue{valueId});
+    pgm->code.push_back(std::make_unique<InsnReturnValue>(valueId));
     if(pgm->verbose) {
         std::cout << "ReturnValue";
         std::cout << " valueId ";
@@ -777,7 +777,7 @@ case SpvOpExtInst: {
         switch(opcode) {
 case GLSLstd450FAbs: {
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450FAbs{type, resultId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450FAbs>(type, resultId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FAbs";
@@ -794,7 +794,7 @@ case GLSLstd450FAbs: {
 
 case GLSLstd450Floor: {
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Floor{type, resultId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Floor>(type, resultId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Floor";
@@ -811,7 +811,7 @@ case GLSLstd450Floor: {
 
 case GLSLstd450Fract: {
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Fract{type, resultId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Fract>(type, resultId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Fract";
@@ -828,7 +828,7 @@ case GLSLstd450Fract: {
 
 case GLSLstd450Sin: {
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Sin{type, resultId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Sin>(type, resultId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Sin";
@@ -845,7 +845,7 @@ case GLSLstd450Sin: {
 
 case GLSLstd450Cos: {
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Cos{type, resultId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Cos>(type, resultId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Cos";
@@ -862,7 +862,7 @@ case GLSLstd450Cos: {
 
 case GLSLstd450Atan: {
     uint32_t y_over_xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Atan{type, resultId, y_over_xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Atan>(type, resultId, y_over_xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Atan";
@@ -880,7 +880,7 @@ case GLSLstd450Atan: {
 case GLSLstd450Atan2: {
     uint32_t yId = nextu();
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Atan2{type, resultId, yId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Atan2>(type, resultId, yId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Atan2";
@@ -900,7 +900,7 @@ case GLSLstd450Atan2: {
 case GLSLstd450Pow: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Pow{type, resultId, xId, yId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Pow>(type, resultId, xId, yId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Pow";
@@ -919,7 +919,7 @@ case GLSLstd450Pow: {
 
 case GLSLstd450Exp: {
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Exp{type, resultId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Exp>(type, resultId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Exp";
@@ -936,7 +936,7 @@ case GLSLstd450Exp: {
 
 case GLSLstd450Exp2: {
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Exp2{type, resultId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Exp2>(type, resultId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Exp2";
@@ -954,7 +954,7 @@ case GLSLstd450Exp2: {
 case GLSLstd450FMin: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450FMin{type, resultId, xId, yId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450FMin>(type, resultId, xId, yId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FMin";
@@ -974,7 +974,7 @@ case GLSLstd450FMin: {
 case GLSLstd450FMax: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450FMax{type, resultId, xId, yId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450FMax>(type, resultId, xId, yId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FMax";
@@ -995,7 +995,7 @@ case GLSLstd450FClamp: {
     uint32_t xId = nextu();
     uint32_t minValId = nextu();
     uint32_t maxValId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450FClamp{type, resultId, xId, minValId, maxValId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450FClamp>(type, resultId, xId, minValId, maxValId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FClamp";
@@ -1018,7 +1018,7 @@ case GLSLstd450FMix: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
     uint32_t aId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450FMix{type, resultId, xId, yId, aId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450FMix>(type, resultId, xId, yId, aId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FMix";
@@ -1040,7 +1040,7 @@ case GLSLstd450FMix: {
 case GLSLstd450Step: {
     uint32_t edgeId = nextu();
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Step{type, resultId, edgeId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Step>(type, resultId, edgeId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Step";
@@ -1061,7 +1061,7 @@ case GLSLstd450SmoothStep: {
     uint32_t edge0Id = nextu();
     uint32_t edge1Id = nextu();
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450SmoothStep{type, resultId, edge0Id, edge1Id, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450SmoothStep>(type, resultId, edge0Id, edge1Id, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450SmoothStep";
@@ -1082,7 +1082,7 @@ case GLSLstd450SmoothStep: {
 
 case GLSLstd450Length: {
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Length{type, resultId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Length>(type, resultId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Length";
@@ -1100,7 +1100,7 @@ case GLSLstd450Length: {
 case GLSLstd450Distance: {
     uint32_t p0Id = nextu();
     uint32_t p1Id = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Distance{type, resultId, p0Id, p1Id});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Distance>(type, resultId, p0Id, p1Id));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Distance";
@@ -1120,7 +1120,7 @@ case GLSLstd450Distance: {
 case GLSLstd450Cross: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Cross{type, resultId, xId, yId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Cross>(type, resultId, xId, yId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Cross";
@@ -1139,7 +1139,7 @@ case GLSLstd450Cross: {
 
 case GLSLstd450Normalize: {
     uint32_t xId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Normalize{type, resultId, xId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Normalize>(type, resultId, xId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Normalize";
@@ -1157,7 +1157,7 @@ case GLSLstd450Normalize: {
 case GLSLstd450Reflect: {
     uint32_t iId = nextu();
     uint32_t nId = nextu();
-    pgm->code.push_back(new InsnGLSLstd450Reflect{type, resultId, iId, nId});
+    pgm->code.push_back(std::make_unique<InsnGLSLstd450Reflect>(type, resultId, iId, nId));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Reflect";
