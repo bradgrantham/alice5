@@ -278,4 +278,18 @@ struct Instruction {
     virtual std::string name() = 0;
 };
 
+// A block is a sequence of instructions that has one entry point
+// (the first instruction) and one exit point (the last instruction).
+// The last instruction must be a variant of a branch.
+struct Block {
+    // ID of label that points to first instruction.
+    uint32_t labelId;
+
+    // Index into "code" array of first instruction.
+    uint32_t begin;
+
+    // Index into "code" array of one past last instruction.
+    uint32_t end;
+};
+
 #endif // BASIC_TYPES_H

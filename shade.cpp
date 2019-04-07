@@ -116,6 +116,7 @@ struct Program
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
     std::vector<Instruction *> code;
+    std::vector<Block> blocks;
     std::vector<uint32_t> blockId; // Parallel to "code".
 
     Function* currentFunction;
@@ -796,12 +797,23 @@ struct Program
         // Sort by code index.
         std::sort(labels_in_order.begin(), labels_in_order.end());
 
-        // Create parallel array. Each entry in the "labels_in_order" vector is
-        // a range of code indices.
-        blockId.clear();
+        // Create blocks array.
         for (int i = 0; i < labels_in_order.size() - 1; i++) {
-            for (int j = labels_in_order[i].first; j < labels_in_order[i + 1].first; j++) {
-                blockId.push_back(labels_in_order[i].second);
+            blocks.push_back(Block{labels_in_order[i].second,
+                    labels_in_order[i].first, labels_in_order[i + 1].first});
+        }
+
+        // Create parallel array. Each entry in the "labels_in_order" vector is
+        // a range of code indices. Note a problem here is that the OpFunctionParameter
+        // instruction gets put into the block at the end of the previous function.
+        // I don't think this matters in practice because there's never a Phi at
+        // the top of a function.
+        blockId.clear();
+        for (const Block &block : blocks) {
+            std::cout << block.labelId << " " << block.begin << " " << block.end << "\n";
+            for (int i = block.begin; i < block.end; i++) {
+                blockId.push_back(block.labelId);
+                std::cout << "    " << i << ": " << code[i]->name() << "\n";
             }
         }
     }
