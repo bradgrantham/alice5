@@ -2614,6 +2614,9 @@ void usage(const char* progname)
     printf("\t-O        Run optimizing passes\n");
     printf("\t-t        Throw an exception on first unimplemented opcode\n");
     printf("\t-n        Compile and load shader, but do not shade an image\n");
+    printf("\t-S        show the disassembly of the SPIR-V code\n");
+    printf("\t-c        compile to our own ISA\n");
+    printf("\t--json    input file is a ShaderToy JSON file\n");
 }
 
 // Number of rows still left to shade (for progress report).
