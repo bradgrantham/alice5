@@ -2495,8 +2495,9 @@ struct Compiler
 
 // -----------------------------------------------------------------------------------
 
-Instruction::Instruction()
-    : blockId(NO_BLOCK_ID)
+Instruction::Instruction(uint32_t resId)
+    : blockId(NO_BLOCK_ID),
+      resId(resId)
 {
     // Nothing.
 }

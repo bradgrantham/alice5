@@ -14,6 +14,8 @@ typedef std::array<float,4> v4float;
 typedef std::array<uint32_t,4> v4uint;
 typedef std::array<int32_t,4> v4int;
 
+const uint32_t NO_REGISTER = 0xFFFFFFFF;
+
 // A variable in memory, either global or within a function's frame.
 struct Variable
 {
@@ -271,11 +273,17 @@ struct Interpreter;
 struct Compiler;
 
 struct Instruction {
-    Instruction();
+    Instruction(uint32_t resId);
     virtual ~Instruction() {};
 
     // Which block this instruction is in.
     uint32_t blockId;
+
+    // Register affected by instruction, or NO_REGISTER if no register is affected.
+    uint32_t resId;
+
+    // Set of registers that are inputs to the instruction.
+    std::set<uint32_t> argIds;
 
     // Step the interpreter forward one instruction.
     virtual void step(Interpreter *interpreter) = 0;
