@@ -273,9 +273,22 @@ struct Compiler;
 struct Instruction {
     virtual ~Instruction() {};
 
+    // Step the interpreter forward one instruction.
     virtual void step(Interpreter *interpreter) = 0;
+
+    // Emit compiler output for this instruction.
     virtual void emit(Compiler *compiler);
+
+    // The name of this instruction (e.g., "OpFMul").
     virtual std::string name() = 0;
+
+    // Whether this is a branch instruction (OpBranch, OpBranchConditional,
+    // OpSwitch, OpReturn, or OpReturnValue).
+    virtual bool isBranch() const { return false; }
+
+    // Whether this is a termination instruction (branch instruction, OpKill,
+    // OpUnreachable).
+    virtual bool isTermination() const { return false; }
 };
 
 // A block is a sequence of instructions that has one entry point

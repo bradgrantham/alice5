@@ -783,37 +783,33 @@ struct Program
             }
         }
 
-        // Make a parallel array to "code" recording the block ID for each
-        // instruction. First create a list of <index,labelId> pairs. These
-        // are the same pairs as in the "labels" map but with the two elements
-        // switched.
-        typedef std::pair<uint32_t,uint32_t> IndexLabelId;
-        std::vector<IndexLabelId> labels_in_order;
+        // Figure out our basic blocks. These start on an OpLabel and end on
+        // a terminating instruction.
         for (auto [labelId, codeIndex] : labels) {
-            labels_in_order.push_back(IndexLabelId{codeIndex, labelId});
+            bool found = false;
+            for (int i = codeIndex; i < code.size(); i++) {
+                if (code[i]->isTermination()) {
+                    blocks.push_back(Block{labelId, codeIndex, uint32_t(i + 1)});
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                std::cout << "Error: Terminating instruction for label "
+                    << labelId << " not found.\n";
+                exit(EXIT_FAILURE);
+            }
         }
-        // Add pseudo-entry for end of code.
-        labels_in_order.push_back(IndexLabelId{code.size(), NO_BLOCK_ID});
-        // Sort by code index.
-        std::sort(labels_in_order.begin(), labels_in_order.end());
 
-        // Create blocks array.
-        for (int i = 0; i < labels_in_order.size() - 1; i++) {
-            blocks.push_back(Block{labels_in_order[i].second,
-                    labels_in_order[i].first, labels_in_order[i + 1].first});
-        }
-
-        // Create parallel array. Each entry in the "labels_in_order" vector is
-        // a range of code indices. Note a problem here is that the OpFunctionParameter
-        // instruction gets put into the block at the end of the previous function.
-        // I don't think this matters in practice because there's never a Phi at
-        // the top of a function.
-        blockId.clear();
+        // Create array parallel to "code" for the label Id. Note a problem
+        // here is that the OpFunctionParameter instruction gets put into the
+        // block at the end of the previous function. I don't think this
+        // matters in practice because there's never a Phi at the top of a
+        // function.
+        blockId.resize(code.size());
         for (const Block &block : blocks) {
-            std::cout << block.labelId << " " << block.begin << " " << block.end << "\n";
             for (int i = block.begin; i < block.end; i++) {
-                blockId.push_back(block.labelId);
-                std::cout << "    " << i << ": " << code[i]->name() << "\n";
+                blockId[i] = block.labelId;
             }
         }
     }

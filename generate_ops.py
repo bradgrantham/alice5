@@ -188,6 +188,12 @@ def main():
             opcode_structs_f.write("    virtual std::string name() { return \"%s\"; }\n" % opname)
             if short_opname in emitting:
                 opcode_structs_f.write("    virtual void emit(Compiler *compiler);\n")
+            is_branch = opname in ["OpBranch", "OpBranchConditional", "OpSwitch",
+                    "OpReturn", "OpReturnValue"]
+            if is_branch:
+                opcode_structs_f.write("    virtual bool isBranch() const { return true; }\n")
+            if is_branch or opname in ["OpKill", "OpUnreachable"]:
+                opcode_structs_f.write("    virtual bool isTermination() const { return true; }\n")
             opcode_structs_f.write("};\n\n")
 
             # Struct declaration file.

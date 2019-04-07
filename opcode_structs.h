@@ -374,6 +374,8 @@ struct InsnBranch : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepBranch(*this); }
     virtual std::string name() { return "OpBranch"; }
     virtual void emit(Compiler *compiler);
+    virtual bool isBranch() const { return true; }
+    virtual bool isTermination() const { return true; }
 };
 
 // OpBranchConditional instruction (code 250).
@@ -385,6 +387,8 @@ struct InsnBranchConditional : public Instruction {
     std::vector<uint32_t> branchweightsId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepBranchConditional(*this); }
     virtual std::string name() { return "OpBranchConditional"; }
+    virtual bool isBranch() const { return true; }
+    virtual bool isTermination() const { return true; }
 };
 
 // OpReturn instruction (code 253).
@@ -393,6 +397,8 @@ struct InsnReturn : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepReturn(*this); }
     virtual std::string name() { return "OpReturn"; }
     virtual void emit(Compiler *compiler);
+    virtual bool isBranch() const { return true; }
+    virtual bool isTermination() const { return true; }
 };
 
 // OpReturnValue instruction (code 254).
@@ -402,6 +408,8 @@ struct InsnReturnValue : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepReturnValue(*this); }
     virtual std::string name() { return "OpReturnValue"; }
     virtual void emit(Compiler *compiler);
+    virtual bool isBranch() const { return true; }
+    virtual bool isTermination() const { return true; }
 };
 
 // GLSLstd450FAbs instruction (code 4).
