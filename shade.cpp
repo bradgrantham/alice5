@@ -118,7 +118,6 @@ struct Program
     std::map<uint32_t, Function> functions;
     std::vector<std::unique_ptr<Instruction>> instructions;
     std::vector<Block> blocks;
-    std::vector<uint32_t> blockId; // Parallel to "instructions".
 
     Function* currentFunction;
     // Map from label ID to index into instructions vector.
@@ -800,10 +799,9 @@ struct Program
         // block at the end of the previous function. I don't think this
         // matters in practice because there's never a Phi at the top of a
         // function.
-        blockId.resize(instructions.size());
         for (const Block &block : blocks) {
             for (int i = block.begin; i < block.end; i++) {
-                blockId[i] = block.labelId;
+                instructions[i]->blockId = block.labelId;
             }
         }
     }
@@ -2343,9 +2341,12 @@ void Interpreter::step()
 {
     if(false) std::cout << "address " << pc << "\n";
 
+    Instruction *instruction = pgm->instructions.at(pc++).get();
+
     // Update our idea of what block we're in. If we just switched blocks,
     // remember the previous one (for Phi).
-    if (pgm->blockId.at(pc) != currentBlockId) {
+    uint32_t thisBlockId = instruction->blockId;
+    if (thisBlockId != currentBlockId) {
         // I'm not sure this is fully correct. For example, when returning
         // from a function this will set previousBlockId to a block in
         // the called function, but that's not right, it should always
@@ -2354,13 +2355,13 @@ void Interpreter::step()
         // is placed.
         if(false) {
             std::cout << "Previous " << previousBlockId << ", current "
-                << currentBlockId << ", new " << pgm->blockId.at(pc) << "\n";
+                << currentBlockId << ", new " << thisBlockId << "\n";
         }
         previousBlockId = currentBlockId;
-        currentBlockId = pgm->blockId.at(pc);
+        currentBlockId = thisBlockId;
     }
 
-    pgm->instructions.at(pc++)->step(this);
+    instruction->step(this);
 }
 
 template <class T>
@@ -2493,6 +2494,12 @@ struct Compiler
 };
 
 // -----------------------------------------------------------------------------------
+
+Instruction::Instruction()
+    : blockId(NO_BLOCK_ID)
+{
+    // Nothing.
+}
 
 void Instruction::emit(Compiler *compiler)
 {

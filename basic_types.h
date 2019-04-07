@@ -271,7 +271,11 @@ struct Interpreter;
 struct Compiler;
 
 struct Instruction {
+    Instruction();
     virtual ~Instruction() {};
+
+    // Which block this instruction is in.
+    uint32_t blockId;
 
     // Step the interpreter forward one instruction.
     virtual void step(Interpreter *interpreter) = 0;
