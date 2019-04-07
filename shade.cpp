@@ -32,6 +32,83 @@
 #include "basic_types.h"
 #include "interpreter.h"
 
+struct Image
+{
+    enum Format {
+        // Matching Vulkan 1.0
+        UNDEFINED = 0,
+        FORMAT_R8G8B8_UNORM = 23,
+        FORMAT_R8G8B8A8_UNORM = 37,
+        FORMAT_R32G32B32_SFLOAT = 106,
+        FORMAT_R32G32B32A32_SFLOAT = 109
+    };
+
+    static size_t getPixelSize(Format fmt)
+    {
+        switch(fmt) {
+            case FORMAT_R8G8B8_UNORM: return 3; break;
+            case FORMAT_R8G8B8A8_UNORM: return 4; break;
+            case FORMAT_R32G32B32_SFLOAT: return 12; break;
+            case FORMAT_R32G32B32A32_SFLOAT: return 16; break;
+
+            default:
+            case UNDEFINED:
+                throw std::runtime_error("unimplemented image format " + std::to_string(fmt));
+                break;
+        };
+    };
+
+    enum Dim {
+        // Matching Vulkan 1.0
+        DIM_1D = 0,
+        DIM_2D = 1,
+        DIM_3D = 2,
+        DIM_CUBE = 3
+    };
+
+    Format format;
+    size_t pixelSize;
+    Dim dim;
+    uint32_t width, height, depth, slices;
+    unsigned char *storage;
+
+    unsigned char *getPixelAddress(int s, int t, int r, int q)
+    {
+        return storage + (q * depth * width * height + r * width * height + t * width + s) * pixelSize;
+    }
+
+    Image() :
+        format(UNDEFINED),
+        pixelSize(0),
+        dim(DIM_2D),
+        storage(nullptr)
+    {}
+    Image(Format format_, Dim dim_, uint32_t w_) {}
+    Image(Format format_, Dim dim_, uint32_t w_, uint32_t h_, uint32_t d_) {}
+    Image(Format format_, Dim dim_, uint32_t w_, uint32_t h_) :
+        format(format_),
+        pixelSize(getPixelSize(format_)),
+        dim(dim_),
+        width(w_),
+        height(h_),
+        depth(1),
+        slices(1),
+        storage(new unsigned char [width * height * depth * slices * pixelSize])
+    {
+        assert(dim == DIM_2D);
+    }
+    ~Image()
+    {
+        delete[] storage;
+    }
+
+    // void setPixel(int s, int t, int r, int q, const v4float& v) {}
+    // void getPixel(int s, int t, int r, int q, v4float& v) {}
+
+    // implement first only rgb, rgba and f32 and ub8
+    // Read(filename, format); // XXX should construct an image with this and use move semantics
+    // Write(filename);
+};
 
 static void skipComments(FILE *fp, char ***comments, size_t *commentCount)
 {
@@ -2495,8 +2572,7 @@ void Interpreter::stepPhi(const InsnPhi& insn)
     }
 }
 
-float *textureData;
-unsigned int textureWidth, textureHeight;
+Image *texture;
 
 void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn)
 {
@@ -2517,11 +2593,11 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
             auto [u, v] = registerAs<v2float>(insn.coordinateId);
 
-            unsigned int s = std::clamp(static_cast<unsigned int>(u * textureWidth), 0u, textureWidth - 1);
-            unsigned int t = std::clamp(static_cast<unsigned int>(v * textureHeight), 0u, textureHeight - 1);
-            unsigned int address = (t * textureWidth + s) * 4;
+            unsigned int s = std::clamp(static_cast<unsigned int>(u * texture->width), 0u, texture->width - 1);
+            unsigned int t = std::clamp(static_cast<unsigned int>(v * texture->height), 0u, texture->height - 1);
+            unsigned char *address = texture->getPixelAddress(s, t, 0, 0);
             for(int i = 0; i < 4; i++)
-                rgba[i] = textureData[address + i];
+                rgba[i] = reinterpret_cast<float*>(address)[i];
 
         } else {
 
@@ -3080,10 +3156,16 @@ int main(int argc, char **argv)
             if(input0.find("locally_saved") != input0.end()) {
                 std::string asset_filename = getFilepathAdjacentToPath(input0["locally_saved"].get<std::string>(), filename);
                 FILE *fp = fopen(asset_filename.c_str(), "rb");
+                unsigned int textureWidth, textureHeight;
+                float *textureData;
                 if(!pnmRead(fp, &textureWidth, &textureHeight, &textureData, NULL, NULL)) {
                     std::cerr << "couldn't read image from " << asset_filename;
                     exit(EXIT_FAILURE);
                 }
+                texture = new Image(Image::FORMAT_R32G32B32A32_SFLOAT, Image::DIM_2D, textureWidth, textureHeight);
+                unsigned char* s = reinterpret_cast<unsigned char*>(textureData);
+                unsigned char* d = reinterpret_cast<unsigned char*>(texture->storage);
+                std::copy(s, s + textureWidth * textureHeight * Image::getPixelSize(Image::FORMAT_R32G32B32A32_SFLOAT), d);
                 fclose(fp);
             }
         }
