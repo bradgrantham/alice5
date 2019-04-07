@@ -116,12 +116,12 @@ struct Program
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
-    std::vector<std::unique_ptr<Instruction>> code;
+    std::vector<std::unique_ptr<Instruction>> instructions;
     std::vector<Block> blocks;
-    std::vector<uint32_t> blockId; // Parallel to "code".
+    std::vector<uint32_t> blockId; // Parallel to "instructions".
 
     Function* currentFunction;
-    // Map from label ID to index into code vector.
+    // Map from label ID to index into instructions vector.
     std::map<uint32_t, uint32_t> labels;
     Function* mainFunction; 
 
@@ -706,7 +706,7 @@ struct Program
                 uint32_t id = nextu();
                 uint32_t functionControl = nextu();
                 uint32_t functionType = nextu();
-                uint32_t start = pgm->code.size();
+                uint32_t start = pgm->instructions.size();
                 pgm->functions[id] = Function {id, resultType, functionControl, functionType, start };
                 pgm->currentFunction = &pgm->functions[id];
                 if(pgm->verbose) {
@@ -721,7 +721,7 @@ struct Program
 
             case SpvOpLabel: {
                 uint32_t id = nextu();
-                pgm->labels[id] = pgm->code.size();
+                pgm->labels[id] = pgm->instructions.size();
                 if(pgm->verbose) {
                     std::cout << "Label " << id
                         << " at " << pgm->labels[id]
@@ -781,8 +781,8 @@ struct Program
         // a terminating instruction.
         for (auto [labelId, codeIndex] : labels) {
             bool found = false;
-            for (int i = codeIndex; i < code.size(); i++) {
-                if (code[i]->isTermination()) {
+            for (int i = codeIndex; i < instructions.size(); i++) {
+                if (instructions[i]->isTermination()) {
                     blocks.push_back(Block{labelId, codeIndex, uint32_t(i + 1)});
                     found = true;
                     break;
@@ -795,12 +795,12 @@ struct Program
             }
         }
 
-        // Create array parallel to "code" for the label Id. Note a problem
+        // Create array parallel to "instructions" for the label Id. Note a problem
         // here is that the OpFunctionParameter instruction gets put into the
         // block at the end of the previous function. I don't think this
         // matters in practice because there's never a Phi at the top of a
         // function.
-        blockId.resize(code.size());
+        blockId.resize(instructions.size());
         for (const Block &block : blocks) {
             for (int i = block.begin; i < block.end; i++) {
                 blockId[i] = block.labelId;
@@ -2360,7 +2360,7 @@ void Interpreter::step()
         currentBlockId = pgm->blockId.at(pc);
     }
 
-    pgm->code.at(pc++)->step(this);
+    pgm->instructions.at(pc++)->step(this);
 }
 
 template <class T>
@@ -2418,7 +2418,7 @@ struct Compiler
     {
         // pc = pgm->mainFunction->start;
 
-        for(int pc = 0; pc < pgm->code.size(); pc++) {
+        for(int pc = 0; pc < pgm->instructions.size(); pc++) {
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
                     std::string name = cleanUpFunctionName(function.first);
@@ -2434,7 +2434,7 @@ struct Compiler
                 }
             }
 
-            pgm->code.at(pc)->emit(this);
+            pgm->instructions.at(pc)->emit(this);
         }
     }
 
