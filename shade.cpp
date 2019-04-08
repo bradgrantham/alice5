@@ -8,6 +8,7 @@
 #include <atomic>
 #include <sstream>
 #include <iomanip>
+#include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -350,11 +351,11 @@ struct Program
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
-    std::vector<Instruction *> code;
-    std::vector<uint32_t> blockId; // Parallel to "code".
+    std::vector<std::unique_ptr<Instruction>> instructions;
+    std::vector<Block> blocks;
 
     Function* currentFunction;
-    // Map from label ID to index into code vector.
+    // Map from label ID to index into instructions vector.
     std::map<uint32_t, uint32_t> labels;
     Function* mainFunction; 
 
@@ -392,13 +393,6 @@ struct Program
         memoryRegions[SpvStorageClassAtomicCounter] = anotherRegion(0);
         memoryRegions[SpvStorageClassImage] = anotherRegion(0);
         memoryRegions[SpvStorageClassStorageBuffer] = anotherRegion(0);
-    }
-
-    ~Program()
-    {
-        for (auto insn : code) {
-            delete insn;
-        }
     }
 
     size_t allocate(SpvStorageClass clss, uint32_t type)
@@ -946,7 +940,7 @@ struct Program
                 uint32_t id = nextu();
                 uint32_t functionControl = nextu();
                 uint32_t functionType = nextu();
-                uint32_t start = pgm->code.size();
+                uint32_t start = pgm->instructions.size();
                 pgm->functions[id] = Function {id, resultType, functionControl, functionType, start };
                 pgm->currentFunction = &pgm->functions[id];
                 if(pgm->verbose) {
@@ -961,7 +955,7 @@ struct Program
 
             case SpvOpLabel: {
                 uint32_t id = nextu();
-                pgm->labels[id] = pgm->code.size();
+                pgm->labels[id] = pgm->instructions.size();
                 if(pgm->verbose) {
                     std::cout << "Label " << id
                         << " at " << pgm->labels[id]
@@ -1017,26 +1011,32 @@ struct Program
             }
         }
 
-        // Make a parallel array to "code" recording the block ID for each
-        // instruction. First create a list of <index,labelId> pairs. These
-        // are the same pairs as in the "labels" map but with the two elements
-        // switched.
-        typedef std::pair<uint32_t,uint32_t> IndexLabelId;
-        std::vector<IndexLabelId> labels_in_order;
+        // Figure out our basic blocks. These start on an OpLabel and end on
+        // a terminating instruction.
         for (auto [labelId, codeIndex] : labels) {
-            labels_in_order.push_back(IndexLabelId{codeIndex, labelId});
+            bool found = false;
+            for (int i = codeIndex; i < instructions.size(); i++) {
+                if (instructions[i]->isTermination()) {
+                    blocks.push_back(Block{labelId, codeIndex, uint32_t(i + 1)});
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                std::cout << "Error: Terminating instruction for label "
+                    << labelId << " not found.\n";
+                exit(EXIT_FAILURE);
+            }
         }
-        // Add pseudo-entry for end of code.
-        labels_in_order.push_back(IndexLabelId{code.size(), NO_BLOCK_ID});
-        // Sort by code index.
-        std::sort(labels_in_order.begin(), labels_in_order.end());
 
-        // Create parallel array. Each entry in the "labels_in_order" vector is
-        // a range of code indices.
-        blockId.clear();
-        for (int i = 0; i < labels_in_order.size() - 1; i++) {
-            for (int j = labels_in_order[i].first; j < labels_in_order[i + 1].first; j++) {
-                blockId.push_back(labels_in_order[i].second);
+        // Create array parallel to "instructions" for the label Id. Note a problem
+        // here is that the OpFunctionParameter instruction gets put into the
+        // block at the end of the previous function. I don't think this
+        // matters in practice because there's never a Phi at the top of a
+        // function.
+        for (const Block &block : blocks) {
+            for (int i = block.begin; i < block.end; i++) {
+                instructions[i]->blockId = block.labelId;
             }
         }
     }
@@ -2632,9 +2632,12 @@ void Interpreter::step()
 {
     if(false) std::cout << "address " << pc << "\n";
 
+    Instruction *instruction = pgm->instructions.at(pc++).get();
+
     // Update our idea of what block we're in. If we just switched blocks,
     // remember the previous one (for Phi).
-    if (pgm->blockId.at(pc) != currentBlockId) {
+    uint32_t thisBlockId = instruction->blockId;
+    if (thisBlockId != currentBlockId) {
         // I'm not sure this is fully correct. For example, when returning
         // from a function this will set previousBlockId to a block in
         // the called function, but that's not right, it should always
@@ -2643,15 +2646,13 @@ void Interpreter::step()
         // is placed.
         if(false) {
             std::cout << "Previous " << previousBlockId << ", current "
-                << currentBlockId << ", new " << pgm->blockId.at(pc) << "\n";
+                << currentBlockId << ", new " << thisBlockId << "\n";
         }
         previousBlockId = currentBlockId;
-        currentBlockId = pgm->blockId.at(pc);
+        currentBlockId = thisBlockId;
     }
 
-    Instruction *insn = pgm->code.at(pc++);
-
-    insn->step(this);
+    instruction->step(this);
 }
 
 template <class T>
@@ -2709,7 +2710,7 @@ struct Compiler
     {
         // pc = pgm->mainFunction->start;
 
-        for(int pc = 0; pc < pgm->code.size(); pc++) {
+        for(int pc = 0; pc < pgm->instructions.size(); pc++) {
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
                     std::string name = cleanUpFunctionName(function.first);
@@ -2725,8 +2726,7 @@ struct Compiler
                 }
             }
 
-            Instruction *insn = pgm->code.at(pc);
-            insn->emit(this);
+            pgm->instructions.at(pc)->emit(this);
         }
     }
 
@@ -2785,6 +2785,13 @@ struct Compiler
 };
 
 // -----------------------------------------------------------------------------------
+
+Instruction::Instruction(uint32_t resId)
+    : blockId(NO_BLOCK_ID),
+      resId(resId)
+{
+    // Nothing.
+}
 
 void Instruction::emit(Compiler *compiler)
 {
@@ -2905,6 +2912,9 @@ void usage(const char* progname)
     printf("\t-O        Run optimizing passes\n");
     printf("\t-t        Throw an exception on first unimplemented opcode\n");
     printf("\t-n        Compile and load shader, but do not shade an image\n");
+    printf("\t-S        show the disassembly of the SPIR-V code\n");
+    printf("\t-c        compile to our own ISA\n");
+    printf("\t--json    input file is a ShaderToy JSON file\n");
 }
 
 // Number of rows still left to shade (for progress report).

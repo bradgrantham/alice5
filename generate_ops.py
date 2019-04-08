@@ -21,6 +21,8 @@ class Operand:
         cpp_name = cleanUpName(name) + "Id" if name else None
         decode_function = "nextu"
         default_value = ""
+        is_result = False
+        is_argument = False
 
         if kind == "IdResultType":
             assert(not name)
@@ -30,9 +32,11 @@ class Operand:
             assert(not name)
             cpp_name = "resultId"
             cpp_comment = "SSA register for result value"
+            is_result = True
         elif kind == "IdRef":
             assert(name)
             cpp_comment = "operand from register"
+            is_argument = True
         elif kind == "LiteralString":
             cpp_type = "std::string"
             cpp_comment = "literal string"
@@ -75,6 +79,8 @@ class Operand:
         self.cpp_comment = cpp_comment
         self.decode_function = decode_function
         self.default_value = default_value
+        self.is_result = is_result
+        self.is_argument = is_argument
 
 def CamelCase_to_camelCase(name):
     return name[0].lower() + name[1:]
@@ -163,6 +169,16 @@ def main():
         operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
                 for operand_index, json_operand in enumerate(instruction.get("operands", []))]
 
+        # Name of result register.
+        resultIds = [operand.cpp_name for operand in operands if operand.is_result]
+        if not resultIds:
+            resultId = "NO_REGISTER"
+        elif len(resultIds) == 1:
+            resultId = resultIds[0]
+        else:
+            sys.stderr.write("Multiple results for %s: %s\n" % (opname, resultIds))
+            sys.exit(1)
+
         # Opcode to string file.
         opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, short_opname))
 
@@ -171,15 +187,23 @@ def main():
             opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
             opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
             params = []
-            inits = []
+            inits = ["Instruction(%s)" % resultId]
             for operand in operands:
                 params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
                 inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
-            opcode_structs_f.write("    %s(%s)%s%s {}\n" %
+            opcode_structs_f.write("    %s(%s) : %s {\n" %
                     (struct_opname,
                         ", ".join(params),
-                        " : " if params else "",
                         ", ".join(inits)))
+            for operand in operands:
+                if operand.is_argument:
+                    if operand.quantifier == "*":
+                        opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
+                        opcode_structs_f.write("            argIds.insert(_argId);\n");
+                        opcode_structs_f.write("        }\n")
+                    else:
+                        opcode_structs_f.write("        argIds.insert(%s);\n" % operand.cpp_name);
+            opcode_structs_f.write("    }\n")
             for operand in operands:
                 opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
                     operand.cpp_name, operand.cpp_comment,
@@ -188,6 +212,12 @@ def main():
             opcode_structs_f.write("    virtual std::string name() { return \"%s\"; }\n" % opname)
             if short_opname in emitting:
                 opcode_structs_f.write("    virtual void emit(Compiler *compiler);\n")
+            is_branch = opname in ["OpBranch", "OpBranchConditional", "OpSwitch",
+                    "OpReturn", "OpReturnValue"]
+            if is_branch:
+                opcode_structs_f.write("    virtual bool isBranch() const { return true; }\n")
+            if is_branch or opname in ["OpKill", "OpUnreachable"]:
+                opcode_structs_f.write("    virtual bool isTermination() const { return true; }\n")
             opcode_structs_f.write("};\n\n")
 
             # Struct declaration file.
@@ -199,7 +229,7 @@ def main():
                 opcode_decode_f.write("    %s %s = %s(%s);\n" %
                         (operand.cpp_type, operand.cpp_name,
                             operand.decode_function, operand.default_value))
-            opcode_decode_f.write("    pgm->code.push_back(new %s{%s});\n" %
+            opcode_decode_f.write("    pgm->instructions.push_back(std::make_unique<%s>(%s));\n" %
                     (struct_opname, ", ".join(operand.cpp_name for operand in operands)))
             if 'IdResultType' in [op.kind for op in operands] and 'IdResult' in [op.kind for op in operands]:
                 opcode_decode_f.write("    pgm->resultsCreated[resultId] = type;\n")
@@ -250,6 +280,16 @@ def main():
         operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
                 for operand_index, json_operand in enumerate(instruction.get("operands", []))]
 
+        # Name of result register.
+        resultIds = [operand.cpp_name for operand in operands if operand.is_result]
+        if not resultIds:
+            resultId = "NO_REGISTER"
+        elif len(resultIds) == 1:
+            resultId = resultIds[0]
+        else:
+            sys.stderr.write("Multiple results for %s: %s\n" % (opname, resultIds))
+            sys.exit(1)
+
         # Opcode to string file.
         GLSLstd450_opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, opname))
 
@@ -258,15 +298,23 @@ def main():
             opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
             opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
             params = []
-            inits = []
+            inits = ["Instruction(%s)" % resultId]
             for operand in extinst_operands + operands:
                 params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
                 inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
-            opcode_structs_f.write("    %s(%s)%s%s {}\n" %
+            opcode_structs_f.write("    %s(%s) : %s {\n" %
                     (struct_opname,
                         ", ".join(params),
-                        " : " if params else "",
                         ", ".join(inits)))
+            for operand in operands:
+                if operand.is_argument:
+                    if operand.quantifier == "*":
+                        opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
+                        opcode_structs_f.write("            argIds.insert(_argId);\n");
+                        opcode_structs_f.write("        }\n")
+                    else:
+                        opcode_structs_f.write("        argIds.insert(%s);\n" % operand.cpp_name);
+            opcode_structs_f.write("    }\n")
             for operand in extinst_operands + operands:
                 opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
                     operand.cpp_name, operand.cpp_comment,
@@ -286,7 +334,7 @@ def main():
                 opcode_decode_f.write("    %s %s = %s(%s);\n" %
                         (operand.cpp_type, operand.cpp_name,
                             operand.decode_function, operand.default_value))
-            opcode_decode_f.write("    pgm->code.push_back(new %s{%s});\n" %
+            opcode_decode_f.write("    pgm->instructions.push_back(std::make_unique<%s>(%s));\n" %
                     (struct_opname, ", ".join(operand.cpp_name for operand in extinst_operands + operands)))
             opcode_decode_f.write("    pgm->resultsCreated[resultId] = type;\n")
             opcode_decode_f.write("    if(pgm->verbose) {\n")

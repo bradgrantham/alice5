@@ -14,6 +14,8 @@ typedef std::array<float,4> v4float;
 typedef std::array<uint32_t,4> v4uint;
 typedef std::array<int32_t,4> v4int;
 
+const uint32_t NO_REGISTER = 0xFFFFFFFF;
+
 // A variable in memory, either global or within a function's frame.
 struct Variable
 {
@@ -271,11 +273,48 @@ struct Interpreter;
 struct Compiler;
 
 struct Instruction {
+    Instruction(uint32_t resId);
     virtual ~Instruction() {};
 
+    // Which block this instruction is in.
+    uint32_t blockId;
+
+    // Register affected by instruction, or NO_REGISTER if no register is affected.
+    uint32_t resId;
+
+    // Set of registers that are inputs to the instruction.
+    std::set<uint32_t> argIds;
+
+    // Step the interpreter forward one instruction.
     virtual void step(Interpreter *interpreter) = 0;
+
+    // Emit compiler output for this instruction.
     virtual void emit(Compiler *compiler);
+
+    // The name of this instruction (e.g., "OpFMul").
     virtual std::string name() = 0;
+
+    // Whether this is a branch instruction (OpBranch, OpBranchConditional,
+    // OpSwitch, OpReturn, or OpReturnValue).
+    virtual bool isBranch() const { return false; }
+
+    // Whether this is a termination instruction (branch instruction, OpKill,
+    // OpUnreachable).
+    virtual bool isTermination() const { return false; }
+};
+
+// A block is a sequence of instructions that has one entry point
+// (the first instruction) and one exit point (the last instruction).
+// The last instruction must be a variant of a branch.
+struct Block {
+    // ID of label that points to first instruction.
+    uint32_t labelId;
+
+    // Index into "code" array of first instruction.
+    uint32_t begin;
+
+    // Index into "code" array of one past last instruction.
+    uint32_t end;
 };
 
 #endif // BASIC_TYPES_H

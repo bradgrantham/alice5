@@ -7,7 +7,8 @@
 
 // OpFunctionParameter instruction (code 55).
 struct InsnFunctionParameter : public Instruction {
-    InsnFunctionParameter(uint32_t type, uint32_t resultId) : type(type), resultId(resultId) {}
+    InsnFunctionParameter(uint32_t type, uint32_t resultId) : Instruction(resultId), type(type), resultId(resultId) {
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     virtual void step(Interpreter *interpreter) { interpreter->stepFunctionParameter(*this); }
@@ -17,7 +18,12 @@ struct InsnFunctionParameter : public Instruction {
 
 // OpFunctionCall instruction (code 57).
 struct InsnFunctionCall : public Instruction {
-    InsnFunctionCall(uint32_t type, uint32_t resultId, uint32_t functionId, std::vector<uint32_t> operandId) : type(type), resultId(resultId), functionId(functionId), operandId(operandId) {}
+    InsnFunctionCall(uint32_t type, uint32_t resultId, uint32_t functionId, std::vector<uint32_t> operandId) : Instruction(resultId), type(type), resultId(resultId), functionId(functionId), operandId(operandId) {
+        argIds.insert(functionId);
+        for (auto _argId : operandId) {
+            argIds.insert(_argId);
+        }
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t functionId; // operand from register
@@ -29,7 +35,9 @@ struct InsnFunctionCall : public Instruction {
 
 // OpLoad instruction (code 61).
 struct InsnLoad : public Instruction {
-    InsnLoad(uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess) : type(type), resultId(resultId), pointerId(pointerId), memoryAccess(memoryAccess) {}
+    InsnLoad(uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess) : Instruction(resultId), type(type), resultId(resultId), pointerId(pointerId), memoryAccess(memoryAccess) {
+        argIds.insert(pointerId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t pointerId; // operand from register
@@ -41,7 +49,10 @@ struct InsnLoad : public Instruction {
 
 // OpStore instruction (code 62).
 struct InsnStore : public Instruction {
-    InsnStore(uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess) : pointerId(pointerId), objectId(objectId), memoryAccess(memoryAccess) {}
+    InsnStore(uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess) : Instruction(NO_REGISTER), pointerId(pointerId), objectId(objectId), memoryAccess(memoryAccess) {
+        argIds.insert(pointerId);
+        argIds.insert(objectId);
+    }
     uint32_t pointerId; // operand from register
     uint32_t objectId; // operand from register
     uint32_t memoryAccess; // MemoryAccess (optional)
@@ -52,7 +63,12 @@ struct InsnStore : public Instruction {
 
 // OpAccessChain instruction (code 65).
 struct InsnAccessChain : public Instruction {
-    InsnAccessChain(uint32_t type, uint32_t resultId, uint32_t baseId, std::vector<uint32_t> indexesId) : type(type), resultId(resultId), baseId(baseId), indexesId(indexesId) {}
+    InsnAccessChain(uint32_t type, uint32_t resultId, uint32_t baseId, std::vector<uint32_t> indexesId) : Instruction(resultId), type(type), resultId(resultId), baseId(baseId), indexesId(indexesId) {
+        argIds.insert(baseId);
+        for (auto _argId : indexesId) {
+            argIds.insert(_argId);
+        }
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t baseId; // operand from register
@@ -63,7 +79,10 @@ struct InsnAccessChain : public Instruction {
 
 // OpVectorShuffle instruction (code 79).
 struct InsnVectorShuffle : public Instruction {
-    InsnVectorShuffle(uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id, std::vector<uint32_t> componentsId) : type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id), componentsId(componentsId) {}
+    InsnVectorShuffle(uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id, std::vector<uint32_t> componentsId) : Instruction(resultId), type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id), componentsId(componentsId) {
+        argIds.insert(vector1Id);
+        argIds.insert(vector2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t vector1Id; // operand from register
@@ -75,7 +94,11 @@ struct InsnVectorShuffle : public Instruction {
 
 // OpCompositeConstruct instruction (code 80).
 struct InsnCompositeConstruct : public Instruction {
-    InsnCompositeConstruct(uint32_t type, uint32_t resultId, std::vector<uint32_t> constituentsId) : type(type), resultId(resultId), constituentsId(constituentsId) {}
+    InsnCompositeConstruct(uint32_t type, uint32_t resultId, std::vector<uint32_t> constituentsId) : Instruction(resultId), type(type), resultId(resultId), constituentsId(constituentsId) {
+        for (auto _argId : constituentsId) {
+            argIds.insert(_argId);
+        }
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     std::vector<uint32_t> constituentsId; // operand from register
@@ -85,7 +108,9 @@ struct InsnCompositeConstruct : public Instruction {
 
 // OpCompositeExtract instruction (code 81).
 struct InsnCompositeExtract : public Instruction {
-    InsnCompositeExtract(uint32_t type, uint32_t resultId, uint32_t compositeId, std::vector<uint32_t> indexesId) : type(type), resultId(resultId), compositeId(compositeId), indexesId(indexesId) {}
+    InsnCompositeExtract(uint32_t type, uint32_t resultId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(resultId), type(type), resultId(resultId), compositeId(compositeId), indexesId(indexesId) {
+        argIds.insert(compositeId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t compositeId; // operand from register
@@ -108,7 +133,9 @@ struct InsnImageSampleImplicitLod : public Instruction {
 
 // OpConvertFToS instruction (code 110).
 struct InsnConvertFToS : public Instruction {
-    InsnConvertFToS(uint32_t type, uint32_t resultId, uint32_t floatValueId) : type(type), resultId(resultId), floatValueId(floatValueId) {}
+    InsnConvertFToS(uint32_t type, uint32_t resultId, uint32_t floatValueId) : Instruction(resultId), type(type), resultId(resultId), floatValueId(floatValueId) {
+        argIds.insert(floatValueId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t floatValueId; // operand from register
@@ -118,7 +145,9 @@ struct InsnConvertFToS : public Instruction {
 
 // OpConvertSToF instruction (code 111).
 struct InsnConvertSToF : public Instruction {
-    InsnConvertSToF(uint32_t type, uint32_t resultId, uint32_t signedValueId) : type(type), resultId(resultId), signedValueId(signedValueId) {}
+    InsnConvertSToF(uint32_t type, uint32_t resultId, uint32_t signedValueId) : Instruction(resultId), type(type), resultId(resultId), signedValueId(signedValueId) {
+        argIds.insert(signedValueId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t signedValueId; // operand from register
@@ -128,7 +157,9 @@ struct InsnConvertSToF : public Instruction {
 
 // OpFNegate instruction (code 127).
 struct InsnFNegate : public Instruction {
-    InsnFNegate(uint32_t type, uint32_t resultId, uint32_t operandId) : type(type), resultId(resultId), operandId(operandId) {}
+    InsnFNegate(uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(resultId), type(type), resultId(resultId), operandId(operandId) {
+        argIds.insert(operandId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operandId; // operand from register
@@ -138,7 +169,10 @@ struct InsnFNegate : public Instruction {
 
 // OpIAdd instruction (code 128).
 struct InsnIAdd : public Instruction {
-    InsnIAdd(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnIAdd(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -149,7 +183,10 @@ struct InsnIAdd : public Instruction {
 
 // OpFAdd instruction (code 129).
 struct InsnFAdd : public Instruction {
-    InsnFAdd(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFAdd(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -161,7 +198,10 @@ struct InsnFAdd : public Instruction {
 
 // OpFSub instruction (code 131).
 struct InsnFSub : public Instruction {
-    InsnFSub(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFSub(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -172,7 +212,10 @@ struct InsnFSub : public Instruction {
 
 // OpFMul instruction (code 133).
 struct InsnFMul : public Instruction {
-    InsnFMul(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFMul(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -184,7 +227,10 @@ struct InsnFMul : public Instruction {
 
 // OpSDiv instruction (code 135).
 struct InsnSDiv : public Instruction {
-    InsnSDiv(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnSDiv(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -195,7 +241,10 @@ struct InsnSDiv : public Instruction {
 
 // OpFDiv instruction (code 136).
 struct InsnFDiv : public Instruction {
-    InsnFDiv(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFDiv(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -206,7 +255,10 @@ struct InsnFDiv : public Instruction {
 
 // OpFMod instruction (code 141).
 struct InsnFMod : public Instruction {
-    InsnFMod(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFMod(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -217,7 +269,10 @@ struct InsnFMod : public Instruction {
 
 // OpVectorTimesScalar instruction (code 142).
 struct InsnVectorTimesScalar : public Instruction {
-    InsnVectorTimesScalar(uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t scalarId) : type(type), resultId(resultId), vectorId(vectorId), scalarId(scalarId) {}
+    InsnVectorTimesScalar(uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t scalarId) : Instruction(resultId), type(type), resultId(resultId), vectorId(vectorId), scalarId(scalarId) {
+        argIds.insert(vectorId);
+        argIds.insert(scalarId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t vectorId; // operand from register
@@ -228,7 +283,10 @@ struct InsnVectorTimesScalar : public Instruction {
 
 // OpVectorTimesMatrix instruction (code 144).
 struct InsnVectorTimesMatrix : public Instruction {
-    InsnVectorTimesMatrix(uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t matrixId) : type(type), resultId(resultId), vectorId(vectorId), matrixId(matrixId) {}
+    InsnVectorTimesMatrix(uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t matrixId) : Instruction(resultId), type(type), resultId(resultId), vectorId(vectorId), matrixId(matrixId) {
+        argIds.insert(vectorId);
+        argIds.insert(matrixId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t vectorId; // operand from register
@@ -239,7 +297,10 @@ struct InsnVectorTimesMatrix : public Instruction {
 
 // OpMatrixTimesVector instruction (code 145).
 struct InsnMatrixTimesVector : public Instruction {
-    InsnMatrixTimesVector(uint32_t type, uint32_t resultId, uint32_t matrixId, uint32_t vectorId) : type(type), resultId(resultId), matrixId(matrixId), vectorId(vectorId) {}
+    InsnMatrixTimesVector(uint32_t type, uint32_t resultId, uint32_t matrixId, uint32_t vectorId) : Instruction(resultId), type(type), resultId(resultId), matrixId(matrixId), vectorId(vectorId) {
+        argIds.insert(matrixId);
+        argIds.insert(vectorId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t matrixId; // operand from register
@@ -250,7 +311,10 @@ struct InsnMatrixTimesVector : public Instruction {
 
 // OpDot instruction (code 148).
 struct InsnDot : public Instruction {
-    InsnDot(uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id) : type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id) {}
+    InsnDot(uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id) : Instruction(resultId), type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id) {
+        argIds.insert(vector1Id);
+        argIds.insert(vector2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t vector1Id; // operand from register
@@ -261,7 +325,10 @@ struct InsnDot : public Instruction {
 
 // OpLogicalOr instruction (code 166).
 struct InsnLogicalOr : public Instruction {
-    InsnLogicalOr(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnLogicalOr(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -272,7 +339,9 @@ struct InsnLogicalOr : public Instruction {
 
 // OpLogicalNot instruction (code 168).
 struct InsnLogicalNot : public Instruction {
-    InsnLogicalNot(uint32_t type, uint32_t resultId, uint32_t operandId) : type(type), resultId(resultId), operandId(operandId) {}
+    InsnLogicalNot(uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(resultId), type(type), resultId(resultId), operandId(operandId) {
+        argIds.insert(operandId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operandId; // operand from register
@@ -282,7 +351,11 @@ struct InsnLogicalNot : public Instruction {
 
 // OpSelect instruction (code 169).
 struct InsnSelect : public Instruction {
-    InsnSelect(uint32_t type, uint32_t resultId, uint32_t conditionId, uint32_t object1Id, uint32_t object2Id) : type(type), resultId(resultId), conditionId(conditionId), object1Id(object1Id), object2Id(object2Id) {}
+    InsnSelect(uint32_t type, uint32_t resultId, uint32_t conditionId, uint32_t object1Id, uint32_t object2Id) : Instruction(resultId), type(type), resultId(resultId), conditionId(conditionId), object1Id(object1Id), object2Id(object2Id) {
+        argIds.insert(conditionId);
+        argIds.insert(object1Id);
+        argIds.insert(object2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t conditionId; // operand from register
@@ -294,7 +367,10 @@ struct InsnSelect : public Instruction {
 
 // OpIEqual instruction (code 170).
 struct InsnIEqual : public Instruction {
-    InsnIEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnIEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -305,7 +381,10 @@ struct InsnIEqual : public Instruction {
 
 // OpSLessThan instruction (code 177).
 struct InsnSLessThan : public Instruction {
-    InsnSLessThan(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnSLessThan(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -316,7 +395,10 @@ struct InsnSLessThan : public Instruction {
 
 // OpFOrdEqual instruction (code 180).
 struct InsnFOrdEqual : public Instruction {
-    InsnFOrdEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFOrdEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -327,7 +409,10 @@ struct InsnFOrdEqual : public Instruction {
 
 // OpFOrdLessThan instruction (code 184).
 struct InsnFOrdLessThan : public Instruction {
-    InsnFOrdLessThan(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFOrdLessThan(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -338,7 +423,10 @@ struct InsnFOrdLessThan : public Instruction {
 
 // OpFOrdGreaterThan instruction (code 186).
 struct InsnFOrdGreaterThan : public Instruction {
-    InsnFOrdGreaterThan(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFOrdGreaterThan(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -349,7 +437,10 @@ struct InsnFOrdGreaterThan : public Instruction {
 
 // OpFOrdLessThanEqual instruction (code 188).
 struct InsnFOrdLessThanEqual : public Instruction {
-    InsnFOrdLessThanEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFOrdLessThanEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -360,7 +451,10 @@ struct InsnFOrdLessThanEqual : public Instruction {
 
 // OpFOrdGreaterThanEqual instruction (code 190).
 struct InsnFOrdGreaterThanEqual : public Instruction {
-    InsnFOrdGreaterThanEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {}
+    InsnFOrdGreaterThanEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t operand1Id; // operand from register
@@ -371,7 +465,8 @@ struct InsnFOrdGreaterThanEqual : public Instruction {
 
 // OpPhi instruction (code 245).
 struct InsnPhi : public Instruction {
-    InsnPhi(uint32_t type, uint32_t resultId, std::vector<uint32_t> operandId) : type(type), resultId(resultId), operandId(operandId) {}
+    InsnPhi(uint32_t type, uint32_t resultId, std::vector<uint32_t> operandId) : Instruction(resultId), type(type), resultId(resultId), operandId(operandId) {
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     std::vector<uint32_t> operandId; // PairIdRefIdRef
@@ -381,44 +476,63 @@ struct InsnPhi : public Instruction {
 
 // OpBranch instruction (code 249).
 struct InsnBranch : public Instruction {
-    InsnBranch(uint32_t targetLabelId) : targetLabelId(targetLabelId) {}
+    InsnBranch(uint32_t targetLabelId) : Instruction(NO_REGISTER), targetLabelId(targetLabelId) {
+        argIds.insert(targetLabelId);
+    }
     uint32_t targetLabelId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepBranch(*this); }
     virtual std::string name() { return "OpBranch"; }
     virtual void emit(Compiler *compiler);
+    virtual bool isBranch() const { return true; }
+    virtual bool isTermination() const { return true; }
 };
 
 // OpBranchConditional instruction (code 250).
 struct InsnBranchConditional : public Instruction {
-    InsnBranchConditional(uint32_t conditionId, uint32_t trueLabelId, uint32_t falseLabelId, std::vector<uint32_t> branchweightsId) : conditionId(conditionId), trueLabelId(trueLabelId), falseLabelId(falseLabelId), branchweightsId(branchweightsId) {}
+    InsnBranchConditional(uint32_t conditionId, uint32_t trueLabelId, uint32_t falseLabelId, std::vector<uint32_t> branchweightsId) : Instruction(NO_REGISTER), conditionId(conditionId), trueLabelId(trueLabelId), falseLabelId(falseLabelId), branchweightsId(branchweightsId) {
+        argIds.insert(conditionId);
+        argIds.insert(trueLabelId);
+        argIds.insert(falseLabelId);
+    }
     uint32_t conditionId; // operand from register
     uint32_t trueLabelId; // operand from register
     uint32_t falseLabelId; // operand from register
     std::vector<uint32_t> branchweightsId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepBranchConditional(*this); }
     virtual std::string name() { return "OpBranchConditional"; }
+    virtual bool isBranch() const { return true; }
+    virtual bool isTermination() const { return true; }
 };
 
 // OpReturn instruction (code 253).
 struct InsnReturn : public Instruction {
-    InsnReturn() {}
+    InsnReturn() : Instruction(NO_REGISTER) {
+    }
     virtual void step(Interpreter *interpreter) { interpreter->stepReturn(*this); }
     virtual std::string name() { return "OpReturn"; }
     virtual void emit(Compiler *compiler);
+    virtual bool isBranch() const { return true; }
+    virtual bool isTermination() const { return true; }
 };
 
 // OpReturnValue instruction (code 254).
 struct InsnReturnValue : public Instruction {
-    InsnReturnValue(uint32_t valueId) : valueId(valueId) {}
+    InsnReturnValue(uint32_t valueId) : Instruction(NO_REGISTER), valueId(valueId) {
+        argIds.insert(valueId);
+    }
     uint32_t valueId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepReturnValue(*this); }
     virtual std::string name() { return "OpReturnValue"; }
     virtual void emit(Compiler *compiler);
+    virtual bool isBranch() const { return true; }
+    virtual bool isTermination() const { return true; }
 };
 
 // GLSLstd450FAbs instruction (code 4).
 struct InsnGLSLstd450FAbs : public Instruction {
-    InsnGLSLstd450FAbs(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    InsnGLSLstd450FAbs(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -428,7 +542,9 @@ struct InsnGLSLstd450FAbs : public Instruction {
 
 // GLSLstd450Floor instruction (code 8).
 struct InsnGLSLstd450Floor : public Instruction {
-    InsnGLSLstd450Floor(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    InsnGLSLstd450Floor(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -438,7 +554,9 @@ struct InsnGLSLstd450Floor : public Instruction {
 
 // GLSLstd450Fract instruction (code 10).
 struct InsnGLSLstd450Fract : public Instruction {
-    InsnGLSLstd450Fract(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    InsnGLSLstd450Fract(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -448,7 +566,9 @@ struct InsnGLSLstd450Fract : public Instruction {
 
 // GLSLstd450Sin instruction (code 13).
 struct InsnGLSLstd450Sin : public Instruction {
-    InsnGLSLstd450Sin(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    InsnGLSLstd450Sin(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -458,7 +578,9 @@ struct InsnGLSLstd450Sin : public Instruction {
 
 // GLSLstd450Cos instruction (code 14).
 struct InsnGLSLstd450Cos : public Instruction {
-    InsnGLSLstd450Cos(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    InsnGLSLstd450Cos(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -468,7 +590,9 @@ struct InsnGLSLstd450Cos : public Instruction {
 
 // GLSLstd450Atan instruction (code 18).
 struct InsnGLSLstd450Atan : public Instruction {
-    InsnGLSLstd450Atan(uint32_t type, uint32_t resultId, uint32_t y_over_xId) : type(type), resultId(resultId), y_over_xId(y_over_xId) {}
+    InsnGLSLstd450Atan(uint32_t type, uint32_t resultId, uint32_t y_over_xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), y_over_xId(y_over_xId) {
+        argIds.insert(y_over_xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t y_over_xId; // operand from register
@@ -478,7 +602,10 @@ struct InsnGLSLstd450Atan : public Instruction {
 
 // GLSLstd450Atan2 instruction (code 25).
 struct InsnGLSLstd450Atan2 : public Instruction {
-    InsnGLSLstd450Atan2(uint32_t type, uint32_t resultId, uint32_t yId, uint32_t xId) : type(type), resultId(resultId), yId(yId), xId(xId) {}
+    InsnGLSLstd450Atan2(uint32_t type, uint32_t resultId, uint32_t yId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), yId(yId), xId(xId) {
+        argIds.insert(yId);
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t yId; // operand from register
@@ -489,7 +616,10 @@ struct InsnGLSLstd450Atan2 : public Instruction {
 
 // GLSLstd450Pow instruction (code 26).
 struct InsnGLSLstd450Pow : public Instruction {
-    InsnGLSLstd450Pow(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : type(type), resultId(resultId), xId(xId), yId(yId) {}
+    InsnGLSLstd450Pow(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
+        argIds.insert(xId);
+        argIds.insert(yId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -500,7 +630,9 @@ struct InsnGLSLstd450Pow : public Instruction {
 
 // GLSLstd450Exp instruction (code 27).
 struct InsnGLSLstd450Exp : public Instruction {
-    InsnGLSLstd450Exp(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    InsnGLSLstd450Exp(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -510,7 +642,9 @@ struct InsnGLSLstd450Exp : public Instruction {
 
 // GLSLstd450Exp2 instruction (code 29).
 struct InsnGLSLstd450Exp2 : public Instruction {
-    InsnGLSLstd450Exp2(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    InsnGLSLstd450Exp2(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -520,7 +654,10 @@ struct InsnGLSLstd450Exp2 : public Instruction {
 
 // GLSLstd450FMin instruction (code 37).
 struct InsnGLSLstd450FMin : public Instruction {
-    InsnGLSLstd450FMin(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : type(type), resultId(resultId), xId(xId), yId(yId) {}
+    InsnGLSLstd450FMin(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
+        argIds.insert(xId);
+        argIds.insert(yId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -531,7 +668,10 @@ struct InsnGLSLstd450FMin : public Instruction {
 
 // GLSLstd450FMax instruction (code 40).
 struct InsnGLSLstd450FMax : public Instruction {
-    InsnGLSLstd450FMax(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : type(type), resultId(resultId), xId(xId), yId(yId) {}
+    InsnGLSLstd450FMax(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
+        argIds.insert(xId);
+        argIds.insert(yId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -542,7 +682,11 @@ struct InsnGLSLstd450FMax : public Instruction {
 
 // GLSLstd450FClamp instruction (code 43).
 struct InsnGLSLstd450FClamp : public Instruction {
-    InsnGLSLstd450FClamp(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t minValId, uint32_t maxValId) : type(type), resultId(resultId), xId(xId), minValId(minValId), maxValId(maxValId) {}
+    InsnGLSLstd450FClamp(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t minValId, uint32_t maxValId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), minValId(minValId), maxValId(maxValId) {
+        argIds.insert(xId);
+        argIds.insert(minValId);
+        argIds.insert(maxValId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -554,7 +698,11 @@ struct InsnGLSLstd450FClamp : public Instruction {
 
 // GLSLstd450FMix instruction (code 46).
 struct InsnGLSLstd450FMix : public Instruction {
-    InsnGLSLstd450FMix(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId, uint32_t aId) : type(type), resultId(resultId), xId(xId), yId(yId), aId(aId) {}
+    InsnGLSLstd450FMix(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId, uint32_t aId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId), aId(aId) {
+        argIds.insert(xId);
+        argIds.insert(yId);
+        argIds.insert(aId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -566,7 +714,10 @@ struct InsnGLSLstd450FMix : public Instruction {
 
 // GLSLstd450Step instruction (code 48).
 struct InsnGLSLstd450Step : public Instruction {
-    InsnGLSLstd450Step(uint32_t type, uint32_t resultId, uint32_t edgeId, uint32_t xId) : type(type), resultId(resultId), edgeId(edgeId), xId(xId) {}
+    InsnGLSLstd450Step(uint32_t type, uint32_t resultId, uint32_t edgeId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), edgeId(edgeId), xId(xId) {
+        argIds.insert(edgeId);
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t edgeId; // operand from register
@@ -577,7 +728,11 @@ struct InsnGLSLstd450Step : public Instruction {
 
 // GLSLstd450SmoothStep instruction (code 49).
 struct InsnGLSLstd450SmoothStep : public Instruction {
-    InsnGLSLstd450SmoothStep(uint32_t type, uint32_t resultId, uint32_t edge0Id, uint32_t edge1Id, uint32_t xId) : type(type), resultId(resultId), edge0Id(edge0Id), edge1Id(edge1Id), xId(xId) {}
+    InsnGLSLstd450SmoothStep(uint32_t type, uint32_t resultId, uint32_t edge0Id, uint32_t edge1Id, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), edge0Id(edge0Id), edge1Id(edge1Id), xId(xId) {
+        argIds.insert(edge0Id);
+        argIds.insert(edge1Id);
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t edge0Id; // operand from register
@@ -589,7 +744,9 @@ struct InsnGLSLstd450SmoothStep : public Instruction {
 
 // GLSLstd450Length instruction (code 66).
 struct InsnGLSLstd450Length : public Instruction {
-    InsnGLSLstd450Length(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    InsnGLSLstd450Length(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -599,7 +756,10 @@ struct InsnGLSLstd450Length : public Instruction {
 
 // GLSLstd450Distance instruction (code 67).
 struct InsnGLSLstd450Distance : public Instruction {
-    InsnGLSLstd450Distance(uint32_t type, uint32_t resultId, uint32_t p0Id, uint32_t p1Id) : type(type), resultId(resultId), p0Id(p0Id), p1Id(p1Id) {}
+    InsnGLSLstd450Distance(uint32_t type, uint32_t resultId, uint32_t p0Id, uint32_t p1Id) : Instruction(NO_REGISTER), type(type), resultId(resultId), p0Id(p0Id), p1Id(p1Id) {
+        argIds.insert(p0Id);
+        argIds.insert(p1Id);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t p0Id; // operand from register
@@ -610,7 +770,10 @@ struct InsnGLSLstd450Distance : public Instruction {
 
 // GLSLstd450Cross instruction (code 68).
 struct InsnGLSLstd450Cross : public Instruction {
-    InsnGLSLstd450Cross(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : type(type), resultId(resultId), xId(xId), yId(yId) {}
+    InsnGLSLstd450Cross(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
+        argIds.insert(xId);
+        argIds.insert(yId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -621,7 +784,9 @@ struct InsnGLSLstd450Cross : public Instruction {
 
 // GLSLstd450Normalize instruction (code 69).
 struct InsnGLSLstd450Normalize : public Instruction {
-    InsnGLSLstd450Normalize(uint32_t type, uint32_t resultId, uint32_t xId) : type(type), resultId(resultId), xId(xId) {}
+    InsnGLSLstd450Normalize(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
@@ -631,7 +796,10 @@ struct InsnGLSLstd450Normalize : public Instruction {
 
 // GLSLstd450Reflect instruction (code 71).
 struct InsnGLSLstd450Reflect : public Instruction {
-    InsnGLSLstd450Reflect(uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId) : type(type), resultId(resultId), iId(iId), nId(nId) {}
+    InsnGLSLstd450Reflect(uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId) : Instruction(NO_REGISTER), type(type), resultId(resultId), iId(iId), nId(nId) {
+        argIds.insert(iId);
+        argIds.insert(nId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t iId; // operand from register
