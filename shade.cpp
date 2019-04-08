@@ -2658,12 +2658,12 @@ void Instruction::emit(Compiler *compiler)
 
 void InsnFAdd::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fadd", operand1Id, operand2Id, resultId);
+    compiler->emitBinaryOp("fadd", resultId, operand1Id, operand2Id);
 }
 
 void InsnFMul::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fmul", operand1Id, operand2Id, resultId);
+    compiler->emitBinaryOp("fmul", resultId, operand1Id, operand2Id);
 }
 
 void InsnFunctionCall::emit(Compiler *compiler)
@@ -2684,14 +2684,14 @@ void InsnFunctionParameter::emit(Compiler *compiler)
 void InsnLoad::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "mov (r" << pointerId << "), r" << resultId;
+    ss << "mov r" << resultId << ", (r" << pointerId << ")";
     compiler->emit("", ss.str(), "");
 }
 
 void InsnStore::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "mov r" << objectId << ", (r" << pointerId << ")";
+    ss << "mov r(" << pointerId << "), r" << objectId;
     compiler->emit("", ss.str(), "");
 }
 
@@ -2711,6 +2711,18 @@ void InsnReturnValue::emit(Compiler *compiler)
 {
     std::ostringstream ss;
     ss << "ret r" << valueId;
+    compiler->emit("", ss.str(), "");
+}
+
+void InsnFOrdLessThanEqual::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("lte", resultId, operand1Id, operand2Id);
+}
+
+void InsnBranchConditional::emit(Compiler *compiler)
+{
+    std::ostringstream ss;
+    ss << "jmp r" << conditionId << ", label" << trueLabelId << ", label" << falseLabelId;
     compiler->emit("", ss.str(), "");
 }
 

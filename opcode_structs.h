@@ -434,6 +434,7 @@ struct InsnFOrdLessThanEqual : public Instruction {
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdLessThanEqual(*this); }
     virtual std::string name() { return "OpFOrdLessThanEqual"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFOrdGreaterThanEqual instruction (code 190).
@@ -487,6 +488,7 @@ struct InsnBranchConditional : public Instruction {
     std::vector<uint32_t> branchweightsId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepBranchConditional(*this); }
     virtual std::string name() { return "OpBranchConditional"; }
+    virtual void emit(Compiler *compiler);
     virtual bool isBranch() const { return true; }
     virtual bool isTermination() const { return true; }
 };
