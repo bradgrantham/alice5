@@ -288,7 +288,6 @@ const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
 const uint32_t EXECUTION_ENDED = 0xFFFFFFFF;
 const uint32_t NO_RETURN_REGISTER = 0xFFFFFFFF;
-const uint32_t NO_BLOCK_ID = 0xFFFFFFFF;
 
 // Section of memory for a specific use.
 struct MemoryRegion
@@ -352,7 +351,10 @@ struct Program
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
     std::vector<std::unique_ptr<Instruction>> instructions;
-    std::vector<Block> blocks;
+    // Map from label ID to block object.
+    std::map<uint32_t, std::unique_ptr<Block>> blocks;
+    // Map from virtual register ID to physical register ID.
+    std::map<uint32_t, uint32_t> virtToPhy;
 
     Function* currentFunction;
     // Map from label ID to index into instructions vector.
@@ -938,7 +940,7 @@ struct Program
             case SpvOpFunction: {
                 uint32_t resultType = nextu();
                 uint32_t id = nextu();
-                uint32_t functionControl = nextu();
+                uint32_t functionControl = nextu(); // bitfield hints for inlining, pure, etc.
                 uint32_t functionType = nextu();
                 uint32_t start = pgm->instructions.size();
                 pgm->functions[id] = Function {id, resultType, functionControl, functionType, start };
@@ -1001,6 +1003,65 @@ struct Program
         return SPV_SUCCESS;
     }
 
+    void assignRegisters(Block *block, const std::set<uint32_t> &allPhy) {
+        std::cout << "assignRegisters(" << block->labelId << ")\n";
+
+        // Assigned physical registers.
+        std::set<uint32_t> assigned;
+
+        // Registers that are live going into this block have already been
+        // assigned. XXX not sure how that can be true.
+        for (auto regId : instructions.at(block->begin)->livein) {
+            auto r = virtToPhy.find(regId);
+            if (r == virtToPhy.end()) {
+                std::cout << "Warning: Expected physical register for "
+                    << regId << " in block " << block->labelId << ".\n";
+            } else {
+                assigned.insert(r->second);
+            }
+        }
+
+        for (int pc = block->begin; pc < block->end; pc++) {
+            Instruction *instruction = instructions.at(pc).get();
+
+            // Free up now-unused physical registers.
+            for (auto argId : instruction->argIds) {
+                // If this virtual register doesn't survive past this line, then we
+                // can use its physical register again.
+                if (instruction->liveout.find(argId) == instruction->liveout.end() &&
+                        virtToPhy.find(argId) != virtToPhy.end()) {
+
+                    assigned.erase(virtToPhy.at(argId));
+                }
+            }
+
+            // Assign result registers to physical registers.
+            if (instruction->resId != NO_REGISTER) {
+                // Find an available physical register for this virtual register.
+                bool found = false;
+                for (uint32_t phy : allPhy) {
+                    if (assigned.find(phy) == assigned.end()) {
+                        virtToPhy[instruction->resId] = phy;
+                        assigned.insert(phy);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    std::cout << "Warning: No physical register available for "
+                        << instruction->resId << " on line " << pc << ".\n";
+                }
+            }
+        }
+
+        // Go down dominance tree.
+        for (auto& [labelId, subBlock] : blocks) {
+            if (subBlock->idom == block->labelId) {
+                assignRegisters(subBlock.get(), allPhy);
+            }
+        }
+    }
+
     // Post-parsing work.
     void postParse() {
         // Find the main function.
@@ -1017,7 +1078,7 @@ struct Program
             bool found = false;
             for (int i = codeIndex; i < instructions.size(); i++) {
                 if (instructions[i]->isTermination()) {
-                    blocks.push_back(Block{labelId, codeIndex, uint32_t(i + 1)});
+                    blocks[labelId] = std::make_unique<Block>(labelId, codeIndex, uint32_t(i + 1));
                     found = true;
                     break;
                 }
@@ -1029,16 +1090,289 @@ struct Program
             }
         }
 
-        // Create array parallel to "instructions" for the label Id. Note a problem
+        // Compute successor blocks.
+        for (auto& [labelId, block] : blocks) {
+            Instruction *instruction = instructions[block->end - 1].get();
+            assert(instruction->isTermination());
+            block->succ = instruction->targetLabelIds;
+            for (uint32_t labelId : block->succ) {
+                blocks[labelId]->pred.insert(block->labelId);
+            }
+        }
+
+        // Record the block ID for each instruction. Note a problem
         // here is that the OpFunctionParameter instruction gets put into the
         // block at the end of the previous function. I don't think this
         // matters in practice because there's never a Phi at the top of a
         // function.
-        for (const Block &block : blocks) {
-            for (int i = block.begin; i < block.end; i++) {
-                instructions[i]->blockId = block.labelId;
+        for (auto& [labelId, block] : blocks) {
+            for (int pc = block->begin; pc < block->end; pc++) {
+                instructions[pc]->blockId = block->labelId;
             }
         }
+
+        // Compute predecessor and successor instructions for each instruction.
+        // For most instructions this is just the previous or next line, except
+        // for the ones at the beginning or end of each block.
+        for (auto& [labelId, block] : blocks) {
+            for (auto predBlockId : block->pred) {
+                instructions[block->begin]->pred.insert(blocks[predBlockId]->end - 1);
+            }
+            if (block->begin != block->end - 1) {
+                instructions[block->begin]->succ.insert(block->begin + 1);
+            }
+            for (int pc = block->begin + 1; pc < block->end - 1; pc++) {
+                instructions[pc]->pred.insert(pc - 1);
+                instructions[pc]->succ.insert(pc + 1);
+            }
+            if (block->begin != block->end - 1) {
+                instructions[block->end - 1]->pred.insert(block->end - 2);
+            }
+            for (auto succBlockId : block->succ) {
+                instructions[block->end - 1]->succ.insert(blocks[succBlockId]->begin);
+            }
+        }
+
+        // Compute livein and liveout registers for each line. This is an inefficient
+        // way to do this, we should use a worklist algorithm.
+        bool changed = true;
+        while (changed) {
+            changed = false;
+
+            for (int pc = 0; pc < instructions.size(); pc++) {
+                Instruction *instruction = instructions[pc].get();
+                std::set<uint32_t> oldLivein = instruction->livein;
+                std::set<uint32_t> oldLiveout = instruction->liveout;
+
+                instruction->liveout.clear();
+                for (uint32_t succPc : instruction->succ) {
+                    Instruction *succInstruction = instructions[succPc].get();
+                    instruction->liveout.insert(succInstruction->livein.begin(),
+                        succInstruction->livein.end());
+                }
+
+                instruction->livein = instruction->liveout;
+                if (instruction->resId != NO_REGISTER) {
+                    instruction->livein.erase(instruction->resId);
+                }
+                for (uint32_t argId : instruction->argIds) {
+                    // Don't consider constants or variables, they're never in registers.
+                    if (constants.find(argId) == constants.end() &&
+                            variables.find(argId) == variables.end()) {
+
+                        instruction->livein.insert(argId);
+                    }
+                }
+
+                if (oldLivein != instruction->livein || oldLiveout != instruction->liveout) {
+                    changed = true;
+                }
+            }
+        }
+
+        // Compute the dominance tree for blocks. Use a worklist. Do all blocks
+        // simultaneously (across functions).
+        std::vector<uint32_t> worklist; // block IDs.
+        // Make set of all label IDs.
+        std::set<uint32_t> allLabelIds;
+        for (auto& [labelId, block] : blocks) {
+            allLabelIds.insert(labelId);
+        }
+        // Prepare every block.
+        for (auto& [labelId, block] : blocks) {
+            if (block->pred.empty()) {
+                // First block of a function.
+                worklist.push_back(labelId);
+            }
+            block->dom = allLabelIds;
+        }
+        while (!worklist.empty()) {
+            // Take any item from worklist.
+            uint32_t labelId = worklist.back();
+            worklist.pop_back();
+
+            Block *block = blocks.at(labelId).get();
+
+            // Intersection of all predecessor doms.
+            std::set<uint32_t> dom;
+            bool first = true;
+            for (auto predBlockId : block->pred) {
+                Block *pred = blocks.at(predBlockId).get();
+
+                if (first) {
+                    dom = pred->dom;
+                    first = false;
+                } else {
+                    // I love C++.
+                    std::set<uint32_t> intersection;
+                    std::set_intersection(dom.begin(), dom.end(),
+                            pred->dom.begin(), pred->dom.end(),
+                            std::inserter(intersection, intersection.begin()));
+                    std::swap(intersection, dom);
+                }
+            }
+            // Add ourselves.
+            dom.insert(labelId);
+
+            // If the set changed, update it and put the
+            // successors in the work queue.
+            if (dom != block->dom) {
+                block->dom = dom;
+                worklist.insert(worklist.end(), block->succ.begin(), block->succ.end());
+            }
+        }
+
+        // Compute immediate dom for each block.
+        for (auto& [labelId, block] : blocks) {
+            block->idom = NO_BLOCK_ID;
+
+            // Try each block in the block's dom.
+            for (auto idomCandidate : block->dom) {
+                bool valid = idomCandidate != labelId;
+
+                // Can't be the idom if it's dominated by another dom.
+                for (auto otherDom : block->dom) {
+                    if (otherDom != idomCandidate &&
+                            otherDom != labelId &&
+                            blocks[otherDom]->isDominatedBy(idomCandidate)) {
+
+                        valid = false;
+                        break;
+                    }
+                }
+
+                if (valid) {
+                    block->idom = idomCandidate;
+                    break;
+                }
+            }
+
+            // It's okay to have no idom as long as you're the first block in the function.
+            assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
+        }
+
+        // Perform physical register assignment.
+
+        // Fake ones for now, pretend we have 32 of them.
+        std::set<uint32_t> PHY_REGS;
+        for (int i = 0; i < 32; i++) {
+            PHY_REGS.insert(i);
+        }
+
+        // Look for blocks at the start of functions.
+        for (auto& [labelId, block] : blocks) {
+            if (block->pred.empty()) {
+                assignRegisters(block.get(), PHY_REGS);
+            }
+        }
+
+        // Dump block info.
+        if (verbose) {
+            std::cout << "----------------------- Block info\n";
+            for (auto& [labelId, block] : blocks) {
+                std::cout << "Block " << labelId << ", instructions "
+                    << block->begin << "-" << block->end << ":\n";
+                std::cout << "    Pred:";
+                for (auto labelId : block->pred) {
+                    std::cout << " " << labelId;
+                }
+                std::cout << "\n";
+                std::cout << "    Succ:";
+                for (auto labelId : block->succ) {
+                    std::cout << " " << labelId;
+                }
+                std::cout << "\n";
+                std::cout << "    Dom:";
+                for (auto labelId : block->dom) {
+                    std::cout << " " << labelId;
+                }
+                std::cout << "\n";
+                if (block->idom != NO_BLOCK_ID) {
+                    std::cout << "    Immediate Dom: " << block->idom << "\n";
+                }
+            }
+            std::cout << "-----------------------\n";
+        }
+
+        // Dump instruction info.
+        if (verbose) {
+            std::cout << "----------------------- Instruction info\n";
+            for (int pc = 0; pc < instructions.size(); pc++) {
+                Instruction *instruction = instructions[pc].get();
+
+                for(auto &function : functions) {
+                    if(pc == function.second.start) {
+                        std::string name = cleanUpFunctionName(function.first);
+                        std::cout << name << ":\n";
+                    }
+                }
+
+                for(auto &label : labels) {
+                    if(pc == label.second) {
+                        std::cout << label.first << ":\n";
+                    }
+                }
+
+                std::ios oldState(nullptr);
+                oldState.copyfmt(std::cout);
+
+                std::cout
+                    << std::setw(5) << pc;
+                if (instruction->blockId == NO_BLOCK_ID) {
+                    std::cout << "  ---";
+                } else {
+                    std::cout << std::setw(5) << instruction->blockId;
+                }
+                if (instruction->resId == NO_REGISTER) {
+                    std::cout << "        ";
+                } else {
+                    std::cout << std::setw(5) << instruction->resId << " <-";
+                }
+
+                std::cout << std::setw(0) << " " << instruction->name();
+
+                for (auto argId : instruction->argIds) {
+                    std::cout << " " << argId;
+                }
+
+                std::cout << " (pred";
+                for (auto line : instruction->pred) {
+                    std::cout << " " << line;
+                }
+                std::cout << ", succ";
+                for (auto line : instruction->succ) {
+                    std::cout << " " << line;
+                }
+                std::cout << ", live";
+                for (auto regId : instruction->livein) {
+                    std::cout << " " << regId;
+                }
+
+                std::cout << ")\n";
+
+                std::cout.copyfmt(oldState);
+            }
+            std::cout << "-----------------------\n";
+        }
+    }
+
+    // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
+    std::string cleanUpFunctionName(int nameId) const {
+        std::string name = names.at(nameId);
+
+        // Replace "mainImage(vf4;vf2;" with "mainImage$v4f$vf2$"
+        for (int i = 0; i < name.length(); i++) {
+            if (name[i] == '(' || name[i] == ';') {
+                name[i] = '$';
+            }
+        }
+
+        // Strip trailing dollar sign.
+        if (name.length() > 0 && name[name.length() - 1] == '$') {
+            name = name.substr(0, name.length() - 1);
+        }
+
+        return name;
     }
 };
 
@@ -2713,7 +3047,7 @@ struct Compiler
         for(int pc = 0; pc < pgm->instructions.size(); pc++) {
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
-                    std::string name = cleanUpFunctionName(function.first);
+                    std::string name = pgm->cleanUpFunctionName(function.first);
                     std::cout
                         << "; ---------------------------- function " << name << "\n"
                         << name << ":\n";
@@ -2730,23 +3064,33 @@ struct Compiler
         }
     }
 
-    // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
-    std::string cleanUpFunctionName(int nameId) {
-        std::string name = pgm->names.at(nameId);
+    // String for a virtual register ("r12" or more).
+    std::string reg(uint32_t id) const {
+        std::ostringstream ss;
 
-        // Replace "mainImage(vf4;vf2;" with "mainImage$v4f$vf2$"
-        for (int i = 0; i < name.length(); i++) {
-            if (name[i] == '(' || name[i] == ';') {
-                name[i] = '$';
+        ss << "r" << id;
+
+        auto name = pgm->names.find(id);
+        if (name != pgm->names.end()) {
+            ss << "{" << name->second << "}";
+        }
+
+        auto constant = pgm->constants.find(id);
+        if (constant != pgm->constants.end()) {
+            if (std::holds_alternative<TypeFloat>(pgm->types.at(constant->second.type))) {
+                const float *f = reinterpret_cast<float *>(constant->second.data);
+                ss << "{=" << *f << "}";
             }
         }
 
-        // Strip trailing dollar sign.
-        if (name.length() > 0 && name[name.length() - 1] == '$') {
-            name = name.substr(0, name.length() - 1);
+        auto r = pgm->virtToPhy.find(id);
+        if (r != pgm->virtToPhy.end()) {
+            if (r->second != NO_REGISTER) {
+                ss << "{%" << r->second << "}";
+            }
         }
 
-        return name;
+        return ss.str();
     }
 
     void emitNotImplemented(const std::string &op)
@@ -2761,7 +3105,7 @@ struct Compiler
     void emitBinaryOp(const std::string &opName, int op1, int op2, int result)
     {
         std::ostringstream ss;
-        ss << opName << " r" << op1 << ", r" << op2 << ", r" << result;
+        ss << opName << " " << reg(op1) << ", " << reg(op2) << ", " << reg(result);
         emit("", ss.str(), "");
     }
 
@@ -2800,40 +3144,40 @@ void Instruction::emit(Compiler *compiler)
 
 void InsnFAdd::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fadd", operand1Id, operand2Id, resultId);
+    compiler->emitBinaryOp("fadd", resultId, operand1Id, operand2Id);
 }
 
 void InsnFMul::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fmul", operand1Id, operand2Id, resultId);
+    compiler->emitBinaryOp("fmul", resultId, operand1Id, operand2Id);
 }
 
 void InsnFunctionCall::emit(Compiler *compiler)
 {
     compiler->emit("", "push pc", "");
     for(int i = operandId.size() - 1; i >= 0; i--) {
-        compiler->emit("", std::string("push r") + std::to_string(operandId[i]), "");
+        compiler->emit("", std::string("push ") + compiler->reg(operandId[i]), "");
     }
-    compiler->emit("", std::string("call ") + compiler->cleanUpFunctionName(functionId), "");
-    compiler->emit("", std::string("pop r") + std::to_string(resultId), "");
+    compiler->emit("", std::string("call ") + compiler->pgm->cleanUpFunctionName(functionId), "");
+    compiler->emit("", std::string("pop ") + compiler->reg(resultId), "");
 }
 
 void InsnFunctionParameter::emit(Compiler *compiler)
 {
-    compiler->emit("", std::string("pop r") + std::to_string(resultId), "");
+    compiler->emit("", std::string("pop ") + compiler->reg(resultId), "");
 }
 
 void InsnLoad::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "mov (r" << pointerId << "), r" << resultId;
+    ss << "mov " << compiler->reg(resultId) << ", (" << compiler->reg(pointerId) << ")";
     compiler->emit("", ss.str(), "");
 }
 
 void InsnStore::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "mov r" << objectId << ", (r" << pointerId << ")";
+    ss << "mov (" << compiler->reg(pointerId) << "), " << compiler->reg(objectId);
     compiler->emit("", ss.str(), "");
 }
 
@@ -2852,7 +3196,21 @@ void InsnReturn::emit(Compiler *compiler)
 void InsnReturnValue::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "ret r" << valueId;
+    ss << "ret " << compiler->reg(valueId);
+    compiler->emit("", ss.str(), "");
+}
+
+void InsnFOrdLessThanEqual::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("lte", resultId, operand1Id, operand2Id);
+}
+
+void InsnBranchConditional::emit(Compiler *compiler)
+{
+    std::ostringstream ss;
+    ss << "jmp " << compiler->reg(conditionId)
+        << ", label" << trueLabelId
+        << ", label" << falseLabelId;
     compiler->emit("", ss.str(), "");
 }
 

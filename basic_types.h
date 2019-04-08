@@ -15,6 +15,7 @@ typedef std::array<uint32_t,4> v4uint;
 typedef std::array<int32_t,4> v4int;
 
 const uint32_t NO_REGISTER = 0xFFFFFFFF;
+const uint32_t NO_BLOCK_ID = 0xFFFFFFFF;
 
 // A variable in memory, either global or within a function's frame.
 struct Variable
@@ -216,6 +217,7 @@ struct Pointer
     size_t offset; // offset into memory, not into Region
 };
 
+// SSA (virtual) register.
 struct Register
 {
     uint32_t type;
@@ -285,6 +287,21 @@ struct Instruction {
     // Set of registers that are inputs to the instruction.
     std::set<uint32_t> argIds;
 
+    // Label IDs we might branch to.
+    std::set<uint32_t> targetLabelIds;
+
+    // Predecessor instructions. This is only empty for the first instruction in each function.
+    std::set<uint32_t> pred;
+
+    // Successor instructions.
+    std::set<uint32_t> succ;
+
+    // Registers that are live going into this instruction.
+    std::set<uint32_t> livein;
+
+    // Registers that are live leaving this instruction.
+    std::set<uint32_t> liveout;
+
     // Step the interpreter forward one instruction.
     virtual void step(Interpreter *interpreter) = 0;
 
@@ -307,14 +324,36 @@ struct Instruction {
 // (the first instruction) and one exit point (the last instruction).
 // The last instruction must be a variant of a branch.
 struct Block {
+    Block(uint32_t labelId, uint32_t begin, uint32_t end)
+        : labelId(labelId), begin(begin), end(end), idom(NO_BLOCK_ID) {
+        // Nothing.
+    }
+
     // ID of label that points to first instruction.
     uint32_t labelId;
 
-    // Index into "code" array of first instruction.
+    // Index into "instructions" array of first instruction.
     uint32_t begin;
 
-    // Index into "code" array of one past last instruction.
+    // Index into "instructions" array of one past last instruction.
     uint32_t end;
+
+    // Predecessor blocks. This is only empty for the first block in each function.
+    std::set<uint32_t> pred;
+
+    // Successor blocks.
+    std::set<uint32_t> succ;
+
+    // Block IDs that dominate this block.
+    std::set<uint32_t> dom;
+
+    // Immediate dominator of this block, or NO_BLOCK_ID if this is the start block.
+    uint32_t idom;
+
+    // Whether this block is dominated by the other block.
+    bool isDominatedBy(uint32_t other) const {
+        return dom.find(other) != dom.end();
+    }
 };
 
 #endif // BASIC_TYPES_H

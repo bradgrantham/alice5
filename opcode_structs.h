@@ -19,7 +19,6 @@ struct InsnFunctionParameter : public Instruction {
 // OpFunctionCall instruction (code 57).
 struct InsnFunctionCall : public Instruction {
     InsnFunctionCall(uint32_t type, uint32_t resultId, uint32_t functionId, std::vector<uint32_t> operandId) : Instruction(resultId), type(type), resultId(resultId), functionId(functionId), operandId(operandId) {
-        argIds.insert(functionId);
         for (auto _argId : operandId) {
             argIds.insert(_argId);
         }
@@ -447,6 +446,7 @@ struct InsnFOrdLessThanEqual : public Instruction {
     uint32_t operand2Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdLessThanEqual(*this); }
     virtual std::string name() { return "OpFOrdLessThanEqual"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFOrdGreaterThanEqual instruction (code 190).
@@ -477,7 +477,7 @@ struct InsnPhi : public Instruction {
 // OpBranch instruction (code 249).
 struct InsnBranch : public Instruction {
     InsnBranch(uint32_t targetLabelId) : Instruction(NO_REGISTER), targetLabelId(targetLabelId) {
-        argIds.insert(targetLabelId);
+        targetLabelIds.insert(targetLabelId);
     }
     uint32_t targetLabelId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepBranch(*this); }
@@ -491,8 +491,8 @@ struct InsnBranch : public Instruction {
 struct InsnBranchConditional : public Instruction {
     InsnBranchConditional(uint32_t conditionId, uint32_t trueLabelId, uint32_t falseLabelId, std::vector<uint32_t> branchweightsId) : Instruction(NO_REGISTER), conditionId(conditionId), trueLabelId(trueLabelId), falseLabelId(falseLabelId), branchweightsId(branchweightsId) {
         argIds.insert(conditionId);
-        argIds.insert(trueLabelId);
-        argIds.insert(falseLabelId);
+        targetLabelIds.insert(trueLabelId);
+        targetLabelIds.insert(falseLabelId);
     }
     uint32_t conditionId; // operand from register
     uint32_t trueLabelId; // operand from register
@@ -500,6 +500,7 @@ struct InsnBranchConditional : public Instruction {
     std::vector<uint32_t> branchweightsId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepBranchConditional(*this); }
     virtual std::string name() { return "OpBranchConditional"; }
+    virtual void emit(Compiler *compiler);
     virtual bool isBranch() const { return true; }
     virtual bool isTermination() const { return true; }
 };

@@ -1,11 +1,15 @@
 
-void foo(int x)
-{
-}
 
-float foo(float x)
-{
-    return x*2;
+float foo(float n) {
+    float i = 1;
+    float j = 0;
+
+    while (i <= n) {
+        j += i;
+        i += 1;
+    }
+
+    return j;
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
@@ -43,10 +47,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         // Checkerboard.
         uv = floor(mod(uv*vec2(10.0), 2.0));
     }
-    */
-
-    foo(1);
-    float y = foo(1.0);
 
     // fragColor = vec4(uv, 0.0, 1.0);
+    */
+
+    foo(10.0);
+
 }

@@ -22,6 +22,9 @@ shade: shade.cpp GLSL.std.450.h GLSLstd450_opcode_to_string.h basic_types.h inte
 simple.spv: simple.frag
 	cat preamble.frag simple.frag epilogue.frag | $(GLSLANG_BINARY_DIR)/glslangValidator -H -V100 -d -o simple.spv --stdin -S frag
 
+# ~/trees/glslang/External/spirv-tools/external/spirv-headers/include/spirv/1.2/spirv.core.grammar.json
+# ~/trees/glslang/External/spirv-tools/external/spirv-headers/include/spirv/1.2/extinst.glsl.std.450.grammar.json
+
 .PHONY: generate
 generate:
 	python3 generate_ops.py $(GLSLANG_SOURCE_DIR)/External/spirv-tools/external/spirv-headers/include/spirv/1.2/spirv.core.grammar.json $(GLSLANG_SOURCE_DIR)/External/spirv-tools/external/spirv-headers/include/spirv/1.2/extinst.glsl.std.450.grammar.json
