@@ -53,7 +53,6 @@ const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
 const uint32_t EXECUTION_ENDED = 0xFFFFFFFF;
 const uint32_t NO_RETURN_REGISTER = 0xFFFFFFFF;
-const uint32_t NO_BLOCK_ID = 0xFFFFFFFF;
 
 // Section of memory for a specific use.
 struct MemoryRegion
@@ -704,7 +703,7 @@ struct Program
             case SpvOpFunction: {
                 uint32_t resultType = nextu();
                 uint32_t id = nextu();
-                uint32_t functionControl = nextu();
+                uint32_t functionControl = nextu(); // bitfield hints for inlining, pure, etc.
                 uint32_t functionType = nextu();
                 uint32_t start = pgm->instructions.size();
                 pgm->functions[id] = Function {id, resultType, functionControl, functionType, start };
@@ -875,6 +874,87 @@ struct Program
             }
         }
 
+        // Compute the dominance tree for blocks. Use a worklist. Do all blocks
+        // simultaneously (across functions).
+        std::vector<uint32_t> worklist; // block IDs.
+        // Make set of all label IDs.
+        std::set<uint32_t> allLabelIds;
+        for (auto& [labelId, block] : blocks) {
+            allLabelIds.insert(labelId);
+        }
+        // Prepare every block.
+        for (auto& [labelId, block] : blocks) {
+            if (block->pred.empty()) {
+                // First block of a function.
+                worklist.push_back(labelId);
+            }
+            block->dom = allLabelIds;
+        }
+        while (!worklist.empty()) {
+            // Take any item from worklist.
+            uint32_t labelId = worklist.back();
+            worklist.pop_back();
+
+            Block *block = blocks.at(labelId).get();
+
+            // Intersection of all predecessor doms.
+            std::set<uint32_t> dom;
+            bool first = true;
+            for (auto predBlockId : block->pred) {
+                Block *pred = blocks.at(predBlockId).get();
+
+                if (first) {
+                    dom = pred->dom;
+                    first = false;
+                } else {
+                    // I love C++.
+                    std::set<uint32_t> intersection;
+                    std::set_intersection(dom.begin(), dom.end(),
+                            pred->dom.begin(), pred->dom.end(),
+                            std::inserter(intersection, intersection.begin()));
+                    std::swap(intersection, dom);
+                }
+            }
+            // Add ourselves.
+            dom.insert(labelId);
+
+            // If the set changed, update it and put the
+            // successors in the work queue.
+            if (dom != block->dom) {
+                block->dom = dom;
+                worklist.insert(worklist.end(), block->succ.begin(), block->succ.end());
+            }
+        }
+
+        // Compute immediate dom for each block.
+        for (auto& [labelId, block] : blocks) {
+            block->idom = NO_BLOCK_ID;
+
+            // Try each block in the block's dom.
+            for (auto idomCandidate : block->dom) {
+                bool valid = idomCandidate != labelId;
+
+                // Can't be the idom if it's dominated by another dom.
+                for (auto otherDom : block->dom) {
+                    if (otherDom != idomCandidate &&
+                            otherDom != labelId &&
+                            blocks[otherDom]->isDominatedBy(idomCandidate)) {
+
+                        valid = false;
+                        break;
+                    }
+                }
+
+                if (valid) {
+                    block->idom = idomCandidate;
+                    break;
+                }
+            }
+
+            // It's okay to have no idom as long as you're the first block in the function.
+            assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
+        }
+
         // Dump block info.
         if (verbose) {
             std::cout << "----------------------- Block info\n";
@@ -891,6 +971,14 @@ struct Program
                     std::cout << " " << labelId;
                 }
                 std::cout << "\n";
+                std::cout << "    Dom:";
+                for (auto labelId : block->dom) {
+                    std::cout << " " << labelId;
+                }
+                std::cout << "\n";
+                if (block->idom != NO_BLOCK_ID) {
+                    std::cout << "    Immediate Dom: " << block->idom << "\n";
+                }
             }
             std::cout << "-----------------------\n";
         }

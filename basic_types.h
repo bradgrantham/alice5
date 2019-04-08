@@ -15,6 +15,7 @@ typedef std::array<uint32_t,4> v4uint;
 typedef std::array<int32_t,4> v4int;
 
 const uint32_t NO_REGISTER = 0xFFFFFFFF;
+const uint32_t NO_BLOCK_ID = 0xFFFFFFFF;
 
 // A variable in memory, either global or within a function's frame.
 struct Variable
@@ -323,7 +324,7 @@ struct Instruction {
 // The last instruction must be a variant of a branch.
 struct Block {
     Block(uint32_t labelId, uint32_t begin, uint32_t end)
-        : labelId(labelId), begin(begin), end(end) {
+        : labelId(labelId), begin(begin), end(end), idom(NO_BLOCK_ID) {
         // Nothing.
     }
 
@@ -342,11 +343,16 @@ struct Block {
     // Successor blocks.
     std::set<uint32_t> succ;
 
-    // Registers that are live going into this block.
-    std::set<uint32_t> livein;
+    // Block IDs that dominate this block.
+    std::set<uint32_t> dom;
 
-    // Registers that are live leaving this block.
-    std::set<uint32_t> liveout;
+    // Immediate dominator of this block, or NO_BLOCK_ID if this is the start block.
+    uint32_t idom;
+
+    // Whether this block is dominated by the other block.
+    bool isDominatedBy(uint32_t other) const {
+        return dom.find(other) != dom.end();
+    }
 };
 
 #endif // BASIC_TYPES_H
