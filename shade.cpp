@@ -117,7 +117,8 @@ struct Program
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
     std::vector<std::unique_ptr<Instruction>> instructions;
-    std::vector<Block> blocks;
+    // Map from label ID to block object.
+    std::map<uint32_t, std::unique_ptr<Block>> blocks;
 
     Function* currentFunction;
     // Map from label ID to index into instructions vector.
@@ -782,7 +783,7 @@ struct Program
             bool found = false;
             for (int i = codeIndex; i < instructions.size(); i++) {
                 if (instructions[i]->isTermination()) {
-                    blocks.push_back(Block{labelId, codeIndex, uint32_t(i + 1)});
+                    blocks[labelId] = std::make_unique<Block>(labelId, codeIndex, uint32_t(i + 1));
                     found = true;
                     break;
                 }
@@ -794,15 +795,45 @@ struct Program
             }
         }
 
+        // Compute successor blocks.
+        for (auto& [labelId, block]: blocks) {
+            Instruction *instruction = instructions[block->end - 1].get();
+            assert(instruction->isTermination());
+            block->succ = instruction->targetLabelIds;
+            for (uint32_t labelId : block->succ) {
+                blocks[labelId]->pred.insert(block->labelId);
+            }
+        }
+
         // Create array parallel to "instructions" for the label Id. Note a problem
         // here is that the OpFunctionParameter instruction gets put into the
         // block at the end of the previous function. I don't think this
         // matters in practice because there's never a Phi at the top of a
         // function.
-        for (const Block &block : blocks) {
-            for (int i = block.begin; i < block.end; i++) {
-                instructions[i]->blockId = block.labelId;
+        for (auto& [labelId, block]: blocks) {
+            for (int i = block->begin; i < block->end; i++) {
+                instructions[i]->blockId = block->labelId;
             }
+        }
+
+        // Dump block info.
+        if (false) {
+            std::cout << "----------------------- Block info\n";
+            for (auto& [labelId, block]: blocks) {
+                std::cout << "Block " << labelId << ", instructions "
+                    << block->begin << "-" << block->end << ":\n";
+                std::cout << "    Pred:";
+                for (auto labelId : block->pred) {
+                    std::cout << " " << labelId;
+                }
+                std::cout << "\n";
+                std::cout << "    Succ:";
+                for (auto labelId : block->succ) {
+                    std::cout << " " << labelId;
+                }
+                std::cout << "\n";
+            }
+            std::cout << "-----------------------\n";
         }
     }
 };

@@ -10,9 +10,16 @@ FOOTER = "\n#endif // %s\n"
 IMPL_RE = re.compile(r"void Interpreter::step(.*)\(const Insn(.*)& insn\)")
 EMIT_RE = re.compile(r"void Insn(.*)::emit\(Compiler \*compiler\)")
 
+# Hard-code these, they're not marked as label IDs in the JSON.
+TARGET_LABEL_IDS = {
+        "OpBranch": ["targetLabelId"],
+        "OpBranchConditional": ["trueLabelId", "falseLabelId"],
+        "OpSwitch": ["targetId"],
+}
+
 # Instruction operand (with some of our own info).
 class Operand:
-    def __init__(self, json_operand, operand_kind_map, operand_index, instruction_name):
+    def __init__(self, json_operand, operand_kind_map, operand_index, opname):
         kind = json_operand["kind"]
         name = json_operand.get("name")
         quantifier = json_operand.get("quantifier")
@@ -23,6 +30,7 @@ class Operand:
         default_value = ""
         is_result = False
         is_argument = False
+        is_label = False
 
         if kind == "IdResultType":
             assert(not name)
@@ -69,7 +77,13 @@ class Operand:
         # Should have a default if it's optional.
         if quantifier == "?" and not default_value:
             sys.stderr.write("Warning: No default for optional operand %d of %s.\n"
-                    % (operand_index + 1, instruction_name))
+                    % (operand_index + 1, opname))
+
+        # Target labels of this instruction.
+        targetLabelIds = TARGET_LABEL_IDS.get(opname, [])
+        if cpp_name in targetLabelIds:
+            is_argument = False
+            is_label = True
 
         self.kind = kind
         self.name = name
@@ -81,6 +95,7 @@ class Operand:
         self.default_value = default_value
         self.is_result = is_result
         self.is_argument = is_argument
+        self.is_label = is_label
 
 def CamelCase_to_camelCase(name):
     return name[0].lower() + name[1:]
@@ -133,33 +148,33 @@ def main():
 
     # Output files.
     opcode_to_string_f = open("opcode_to_string.h", "w")
-    opcode_to_string_f.write(HEADER % ("OPCODE_TO_STRING_H", "OPCODE_TO_STRING_H"));
+    opcode_to_string_f.write(HEADER % ("OPCODE_TO_STRING_H", "OPCODE_TO_STRING_H"))
 
     GLSLstd450_opcode_to_string_f = open("GLSLstd450_opcode_to_string.h", "w")
-    GLSLstd450_opcode_to_string_f.write(HEADER % ("GLSLSTD450_OPCODE_TO_STRING_H", "GLSLSTD450_OPCODE_TO_STRING_H"));
+    GLSLstd450_opcode_to_string_f.write(HEADER % ("GLSLSTD450_OPCODE_TO_STRING_H", "GLSLSTD450_OPCODE_TO_STRING_H"))
 
     opcode_structs_f = open("opcode_structs.h", "w")
-    opcode_structs_f.write(HEADER % ("OPCODE_STRUCTS_H", "OPCODE_STRUCTS_H"));
+    opcode_structs_f.write(HEADER % ("OPCODE_STRUCTS_H", "OPCODE_STRUCTS_H"))
     opcode_structs_f.write("#include \"interpreter.h\"\n\n")
 
     opcode_struct_decl_f = open("opcode_struct_decl.h", "w")
-    opcode_struct_decl_f.write(HEADER % ("OPCODE_STRUCT_DECL_H", "OPCODE_STRUCT_DECL_H"));
+    opcode_struct_decl_f.write(HEADER % ("OPCODE_STRUCT_DECL_H", "OPCODE_STRUCT_DECL_H"))
 
     opcode_impl_f = open("opcode_impl.h", "w")
-    opcode_impl_f.write(HEADER % ("OPCODE_IMPL_H", "OPCODE_IMPL_H"));
+    opcode_impl_f.write(HEADER % ("OPCODE_IMPL_H", "OPCODE_IMPL_H"))
 
     opcode_decl_f = open("opcode_decl.h", "w")
-    opcode_decl_f.write(HEADER % ("OPCODE_DECL_H", "OPCODE_DECL_H"));
+    opcode_decl_f.write(HEADER % ("OPCODE_DECL_H", "OPCODE_DECL_H"))
 
     opcode_decode_f = open("opcode_decode.h", "w")
-    opcode_decode_f.write(HEADER % ("OPCODE_DECODE_H", "OPCODE_DECODE_H"));
+    opcode_decode_f.write(HEADER % ("OPCODE_DECODE_H", "OPCODE_DECODE_H"))
 
     # Output instructions for core SPIR-V
     for instruction in grammar["instructions"]:
         opcode = instruction["opcode"]
         opname = instruction["opname"]
         if not opname.startswith("Op"):
-            sys.stderr.write("Instruction name \"%s\" does not start with \"Op\".\n" % opname);
+            sys.stderr.write("Instruction name \"%s\" does not start with \"Op\".\n" % opname)
             sys.exit(1)
 
         short_opname = opname[2:]
@@ -199,15 +214,17 @@ def main():
                 if operand.is_argument:
                     if operand.quantifier == "*":
                         opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
-                        opcode_structs_f.write("            argIds.insert(_argId);\n");
+                        opcode_structs_f.write("            argIds.insert(_argId);\n")
                         opcode_structs_f.write("        }\n")
                     else:
-                        opcode_structs_f.write("        argIds.insert(%s);\n" % operand.cpp_name);
+                        opcode_structs_f.write("        argIds.insert(%s);\n" % operand.cpp_name)
+                if operand.is_label:
+                    opcode_structs_f.write("        targetLabelIds.insert(%s);\n" % operand.cpp_name)
             opcode_structs_f.write("    }\n")
             for operand in operands:
                 opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
                     operand.cpp_name, operand.cpp_comment,
-                    " (optional)" if operand.quantifier == "?" else ""));
+                    " (optional)" if operand.quantifier == "?" else ""))
             opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % short_opname)
             opcode_structs_f.write("    virtual std::string name() { return \"%s\"; }\n" % opname)
             if short_opname in emitting:
@@ -310,15 +327,15 @@ def main():
                 if operand.is_argument:
                     if operand.quantifier == "*":
                         opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
-                        opcode_structs_f.write("            argIds.insert(_argId);\n");
+                        opcode_structs_f.write("            argIds.insert(_argId);\n")
                         opcode_structs_f.write("        }\n")
                     else:
-                        opcode_structs_f.write("        argIds.insert(%s);\n" % operand.cpp_name);
+                        opcode_structs_f.write("        argIds.insert(%s);\n" % operand.cpp_name)
             opcode_structs_f.write("    }\n")
             for operand in extinst_operands + operands:
                 opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
                     operand.cpp_name, operand.cpp_comment,
-                    " (optional)" if operand.quantifier == "?" else ""));
+                    " (optional)" if operand.quantifier == "?" else ""))
             opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % opname)
             opcode_structs_f.write("    virtual std::string name() { return \"%s\"; }\n" % opname)
             if opname in emitting:
@@ -376,13 +393,13 @@ def main():
     opcode_decode_f.write("    break;\n")
     opcode_decode_f.write("}\n")
 
-    opcode_to_string_f.write(FOOTER % "OPCODE_TO_STRING_H");
-    GLSLstd450_opcode_to_string_f.write(FOOTER % "GLSLSTD450_OPCODE_TO_STRING_H");
-    opcode_structs_f.write(FOOTER % "OPCODE_STRUCTS_H");
-    opcode_struct_decl_f.write(FOOTER % "OPCODE_STRUCT_DECL_H");
-    opcode_impl_f.write(FOOTER % "OPCODE_IMPL_H");
-    opcode_decl_f.write(FOOTER % "OPCODE_DECL_H");
-    opcode_decode_f.write(FOOTER % "OPCODE_DECODE_H");
+    opcode_to_string_f.write(FOOTER % "OPCODE_TO_STRING_H")
+    GLSLstd450_opcode_to_string_f.write(FOOTER % "GLSLSTD450_OPCODE_TO_STRING_H")
+    opcode_structs_f.write(FOOTER % "OPCODE_STRUCTS_H")
+    opcode_struct_decl_f.write(FOOTER % "OPCODE_STRUCT_DECL_H")
+    opcode_impl_f.write(FOOTER % "OPCODE_IMPL_H")
+    opcode_decl_f.write(FOOTER % "OPCODE_DECL_H")
+    opcode_decode_f.write(FOOTER % "OPCODE_DECODE_H")
 
     opcode_to_string_f.close()
     GLSLstd450_opcode_to_string_f.close()

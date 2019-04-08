@@ -465,7 +465,7 @@ struct InsnPhi : public Instruction {
 // OpBranch instruction (code 249).
 struct InsnBranch : public Instruction {
     InsnBranch(uint32_t targetLabelId) : Instruction(NO_REGISTER), targetLabelId(targetLabelId) {
-        argIds.insert(targetLabelId);
+        targetLabelIds.insert(targetLabelId);
     }
     uint32_t targetLabelId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepBranch(*this); }
@@ -479,8 +479,8 @@ struct InsnBranch : public Instruction {
 struct InsnBranchConditional : public Instruction {
     InsnBranchConditional(uint32_t conditionId, uint32_t trueLabelId, uint32_t falseLabelId, std::vector<uint32_t> branchweightsId) : Instruction(NO_REGISTER), conditionId(conditionId), trueLabelId(trueLabelId), falseLabelId(falseLabelId), branchweightsId(branchweightsId) {
         argIds.insert(conditionId);
-        argIds.insert(trueLabelId);
-        argIds.insert(falseLabelId);
+        targetLabelIds.insert(trueLabelId);
+        targetLabelIds.insert(falseLabelId);
     }
     uint32_t conditionId; // operand from register
     uint32_t trueLabelId; // operand from register

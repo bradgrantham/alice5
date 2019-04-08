@@ -285,6 +285,9 @@ struct Instruction {
     // Set of registers that are inputs to the instruction.
     std::set<uint32_t> argIds;
 
+    // Label IDs we might branch to.
+    std::set<uint32_t> targetLabelIds;
+
     // Step the interpreter forward one instruction.
     virtual void step(Interpreter *interpreter) = 0;
 
@@ -307,6 +310,11 @@ struct Instruction {
 // (the first instruction) and one exit point (the last instruction).
 // The last instruction must be a variant of a branch.
 struct Block {
+    Block(uint32_t labelId, uint32_t begin, uint32_t end)
+        : labelId(labelId), begin(begin), end(end) {
+        // Nothing.
+    }
+
     // ID of label that points to first instruction.
     uint32_t labelId;
 
@@ -315,6 +323,12 @@ struct Block {
 
     // Index into "code" array of one past last instruction.
     uint32_t end;
+
+    // Predecessor blocks. This is only empty for the first block in each function.
+    std::set<uint32_t> pred;
+
+    // Successor blocks.
+    std::set<uint32_t> succ;
 };
 
 #endif // BASIC_TYPES_H
