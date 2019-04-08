@@ -838,8 +838,43 @@ struct Program
             }
         }
 
+        // Compute livein and liveout registers for each line. This is an inefficient
+        // way to do this, we should use a worklist algorithm.
+        bool changed = true;
+        while (changed) {
+            changed = false;
+
+            for (int pc = 0; pc < instructions.size(); pc++) {
+                Instruction *instruction = instructions[pc].get();
+                std::set<uint32_t> oldLivein = instruction->livein;
+                std::set<uint32_t> oldLiveout = instruction->liveout;
+
+                instruction->liveout.clear();
+                for (uint32_t succPc : instruction->succ) {
+                    Instruction *succInstruction = instructions[succPc].get();
+                    instruction->liveout.insert(succInstruction->livein.begin(),
+                        succInstruction->livein.end());
+                }
+
+                instruction->livein = instruction->liveout;
+                if (instruction->resId != NO_REGISTER) {
+                    instruction->livein.erase(instruction->resId);
+                }
+                for (uint32_t argId : instruction->argIds) {
+                    // Don't consider constants, they're never in registers.
+                    if (constants.find(argId) == constants.end()) {
+                        instruction->livein.insert(argId);
+                    }
+                }
+
+                if (oldLivein != instruction->livein || oldLiveout != instruction->liveout) {
+                    changed = true;
+                }
+            }
+        }
+
         // Dump block info.
-        if (false) {
+        if (verbose) {
             std::cout << "----------------------- Block info\n";
             for (auto& [labelId, block] : blocks) {
                 std::cout << "Block " << labelId << ", instructions "
@@ -859,7 +894,7 @@ struct Program
         }
 
         // Dump instruction info.
-        if (false) {
+        if (verbose) {
             std::cout << "----------------------- Instruction info\n";
             for (int pc = 0; pc < instructions.size(); pc++) {
                 Instruction *instruction = instructions[pc].get();
@@ -906,6 +941,10 @@ struct Program
                 std::cout << ", succ";
                 for (auto line : instruction->succ) {
                     std::cout << " " << line;
+                }
+                std::cout << ", live";
+                for (auto regId : instruction->livein) {
+                    std::cout << " " << regId;
                 }
 
                 std::cout << ")\n";

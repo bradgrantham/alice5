@@ -45,6 +45,10 @@ class Operand:
             assert(name)
             cpp_comment = "operand from register"
             is_argument = True
+
+            # Special cases.
+            if opname == "OpFunctionCall" and cpp_name == "functionId":
+                is_argument = False
         elif kind == "LiteralString":
             cpp_type = "std::string"
             cpp_comment = "literal string"

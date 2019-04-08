@@ -19,7 +19,6 @@ struct InsnFunctionParameter : public Instruction {
 // OpFunctionCall instruction (code 57).
 struct InsnFunctionCall : public Instruction {
     InsnFunctionCall(uint32_t type, uint32_t resultId, uint32_t functionId, std::vector<uint32_t> operandId) : Instruction(resultId), type(type), resultId(resultId), functionId(functionId), operandId(operandId) {
-        argIds.insert(functionId);
         for (auto _argId : operandId) {
             argIds.insert(_argId);
         }
