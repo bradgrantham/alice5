@@ -118,6 +118,8 @@ struct Program
     std::vector<std::unique_ptr<Instruction>> instructions;
     // Map from label ID to block object.
     std::map<uint32_t, std::unique_ptr<Block>> blocks;
+    // Map from virtual register ID to physical register ID.
+    std::map<uint32_t, uint32_t> virtToPhy;
 
     Function* currentFunction;
     // Map from label ID to index into instructions vector.
@@ -766,6 +768,65 @@ struct Program
         return SPV_SUCCESS;
     }
 
+    void assignRegisters(Block *block, const std::set<uint32_t> &allPhy) {
+        std::cout << "assignRegisters(" << block->labelId << ")\n";
+
+        // Assigned physical registers.
+        std::set<uint32_t> assigned;
+
+        // Registers that are live going into this block have already been
+        // assigned. XXX not sure how that can be true.
+        for (auto regId : instructions.at(block->begin)->livein) {
+            auto r = virtToPhy.find(regId);
+            if (r == virtToPhy.end()) {
+                std::cout << "Warning: Expected physical register for "
+                    << regId << " in block " << block->labelId << ".\n";
+            } else {
+                assigned.insert(r->second);
+            }
+        }
+
+        for (int pc = block->begin; pc < block->end; pc++) {
+            Instruction *instruction = instructions.at(pc).get();
+
+            // Free up now-unused physical registers.
+            for (auto argId : instruction->argIds) {
+                // If this virtual register doesn't survive past this line, then we
+                // can use its physical register again.
+                if (instruction->liveout.find(argId) == instruction->liveout.end() &&
+                        virtToPhy.find(argId) != virtToPhy.end()) {
+
+                    assigned.erase(virtToPhy.at(argId));
+                }
+            }
+
+            // Assign result registers to physical registers.
+            if (instruction->resId != NO_REGISTER) {
+                // Find an available physical register for this virtual register.
+                bool found = false;
+                for (uint32_t phy : allPhy) {
+                    if (assigned.find(phy) == assigned.end()) {
+                        virtToPhy[instruction->resId] = phy;
+                        assigned.insert(phy);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    std::cout << "Warning: No physical register available for "
+                        << instruction->resId << " on line " << pc << ".\n";
+                }
+            }
+        }
+
+        // Go down dominance tree.
+        for (auto& [labelId, subBlock] : blocks) {
+            if (subBlock->idom == block->labelId) {
+                assignRegisters(subBlock.get(), allPhy);
+            }
+        }
+    }
+
     // Post-parsing work.
     void postParse() {
         // Find the main function.
@@ -953,6 +1014,21 @@ struct Program
 
             // It's okay to have no idom as long as you're the first block in the function.
             assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
+        }
+
+        // Perform physical register assignment.
+
+        // Fake ones for now, pretend we have 32 of them.
+        std::set<uint32_t> PHY_REGS;
+        for (int i = 0; i < 32; i++) {
+            PHY_REGS.insert(i);
+        }
+
+        // Look for blocks at the start of functions.
+        for (auto& [labelId, block] : blocks) {
+            if (block->pred.empty()) {
+                assignRegisters(block.get(), PHY_REGS);
+            }
         }
 
         // Dump block info.
@@ -2697,6 +2773,35 @@ struct Compiler
         }
     }
 
+    // String for a virtual register ("r12" or more).
+    std::string reg(uint32_t id) const {
+        std::ostringstream ss;
+
+        ss << "r" << id;
+
+        auto name = pgm->names.find(id);
+        if (name != pgm->names.end()) {
+            ss << "{" << name->second << "}";
+        }
+
+        auto constant = pgm->constants.find(id);
+        if (constant != pgm->constants.end()) {
+            if (std::holds_alternative<TypeFloat>(pgm->types.at(constant->second.type))) {
+                const float *f = reinterpret_cast<float *>(constant->second.data);
+                ss << "{=" << *f << "}";
+            }
+        }
+
+        auto r = pgm->virtToPhy.find(id);
+        if (r != pgm->virtToPhy.end()) {
+            if (r->second != NO_REGISTER) {
+                ss << "{%" << r->second << "}";
+            }
+        }
+
+        return ss.str();
+    }
+
     void emitNotImplemented(const std::string &op)
     {
         std::ostringstream ss;
@@ -2709,7 +2814,7 @@ struct Compiler
     void emitBinaryOp(const std::string &opName, int op1, int op2, int result)
     {
         std::ostringstream ss;
-        ss << opName << " r" << op1 << ", r" << op2 << ", r" << result;
+        ss << opName << " " << reg(op1) << ", " << reg(op2) << ", " << reg(result);
         emit("", ss.str(), "");
     }
 
@@ -2760,28 +2865,28 @@ void InsnFunctionCall::emit(Compiler *compiler)
 {
     compiler->emit("", "push pc", "");
     for(int i = operandId.size() - 1; i >= 0; i--) {
-        compiler->emit("", std::string("push r") + std::to_string(operandId[i]), "");
+        compiler->emit("", std::string("push ") + compiler->reg(operandId[i]), "");
     }
     compiler->emit("", std::string("call ") + compiler->pgm->cleanUpFunctionName(functionId), "");
-    compiler->emit("", std::string("pop r") + std::to_string(resultId), "");
+    compiler->emit("", std::string("pop ") + compiler->reg(resultId), "");
 }
 
 void InsnFunctionParameter::emit(Compiler *compiler)
 {
-    compiler->emit("", std::string("pop r") + std::to_string(resultId), "");
+    compiler->emit("", std::string("pop ") + compiler->reg(resultId), "");
 }
 
 void InsnLoad::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "mov r" << resultId << ", (r" << pointerId << ")";
+    ss << "mov " << compiler->reg(resultId) << ", (" << compiler->reg(pointerId) << ")";
     compiler->emit("", ss.str(), "");
 }
 
 void InsnStore::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "mov (r" << pointerId << "), r" << objectId;
+    ss << "mov (" << compiler->reg(pointerId) << "), " << compiler->reg(objectId);
     compiler->emit("", ss.str(), "");
 }
 
@@ -2800,7 +2905,7 @@ void InsnReturn::emit(Compiler *compiler)
 void InsnReturnValue::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "ret r" << valueId;
+    ss << "ret " << compiler->reg(valueId);
     compiler->emit("", ss.str(), "");
 }
 
@@ -2812,7 +2917,9 @@ void InsnFOrdLessThanEqual::emit(Compiler *compiler)
 void InsnBranchConditional::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "jmp r" << conditionId << ", label" << trueLabelId << ", label" << falseLabelId;
+    ss << "jmp " << compiler->reg(conditionId)
+        << ", label" << trueLabelId
+        << ", label" << falseLabelId;
     compiler->emit("", ss.str(), "");
 }
 

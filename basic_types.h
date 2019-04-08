@@ -217,6 +217,7 @@ struct Pointer
     size_t offset; // offset into memory, not into Region
 };
 
+// SSA (virtual) register.
 struct Register
 {
     uint32_t type;
@@ -331,10 +332,10 @@ struct Block {
     // ID of label that points to first instruction.
     uint32_t labelId;
 
-    // Index into "code" array of first instruction.
+    // Index into "instructions" array of first instruction.
     uint32_t begin;
 
-    // Index into "code" array of one past last instruction.
+    // Index into "instructions" array of one past last instruction.
     uint32_t end;
 
     // Predecessor blocks. This is only empty for the first block in each function.
