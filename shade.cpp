@@ -796,7 +796,7 @@ struct Program
         }
 
         // Compute successor blocks.
-        for (auto& [labelId, block]: blocks) {
+        for (auto& [labelId, block] : blocks) {
             Instruction *instruction = instructions[block->end - 1].get();
             assert(instruction->isTermination());
             block->succ = instruction->targetLabelIds;
@@ -805,21 +805,43 @@ struct Program
             }
         }
 
-        // Create array parallel to "instructions" for the label Id. Note a problem
+        // Record the block ID for each instruction. Note a problem
         // here is that the OpFunctionParameter instruction gets put into the
         // block at the end of the previous function. I don't think this
         // matters in practice because there's never a Phi at the top of a
         // function.
-        for (auto& [labelId, block]: blocks) {
-            for (int i = block->begin; i < block->end; i++) {
-                instructions[i]->blockId = block->labelId;
+        for (auto& [labelId, block] : blocks) {
+            for (int pc = block->begin; pc < block->end; pc++) {
+                instructions[pc]->blockId = block->labelId;
+            }
+        }
+
+        // Compute predecessor and successor instructions for each instruction.
+        // For most instructions this is just the previous or next line, except
+        // for the ones at the beginning or end of each block.
+        for (auto& [labelId, block] : blocks) {
+            for (auto predBlockId : block->pred) {
+                instructions[block->begin]->pred.insert(blocks[predBlockId]->end - 1);
+            }
+            if (block->begin != block->end - 1) {
+                instructions[block->begin]->succ.insert(block->begin + 1);
+            }
+            for (int pc = block->begin + 1; pc < block->end - 1; pc++) {
+                instructions[pc]->pred.insert(pc - 1);
+                instructions[pc]->succ.insert(pc + 1);
+            }
+            if (block->begin != block->end - 1) {
+                instructions[block->end - 1]->pred.insert(block->end - 2);
+            }
+            for (auto succBlockId : block->succ) {
+                instructions[block->end - 1]->succ.insert(blocks[succBlockId]->begin);
             }
         }
 
         // Dump block info.
         if (false) {
             std::cout << "----------------------- Block info\n";
-            for (auto& [labelId, block]: blocks) {
+            for (auto& [labelId, block] : blocks) {
                 std::cout << "Block " << labelId << ", instructions "
                     << block->begin << "-" << block->end << ":\n";
                 std::cout << "    Pred:";
@@ -835,6 +857,82 @@ struct Program
             }
             std::cout << "-----------------------\n";
         }
+
+        // Dump instruction info.
+        if (false) {
+            std::cout << "----------------------- Instruction info\n";
+            for (int pc = 0; pc < instructions.size(); pc++) {
+                Instruction *instruction = instructions[pc].get();
+
+                for(auto &function : functions) {
+                    if(pc == function.second.start) {
+                        std::string name = cleanUpFunctionName(function.first);
+                        std::cout << name << ":\n";
+                    }
+                }
+
+                for(auto &label : labels) {
+                    if(pc == label.second) {
+                        std::cout << label.first << ":\n";
+                    }
+                }
+
+                std::ios oldState(nullptr);
+                oldState.copyfmt(std::cout);
+
+                std::cout
+                    << std::setw(5) << pc;
+                if (instruction->blockId == NO_BLOCK_ID) {
+                    std::cout << "  ---";
+                } else {
+                    std::cout << std::setw(5) << instruction->blockId;
+                }
+                if (instruction->resId == NO_REGISTER) {
+                    std::cout << "        ";
+                } else {
+                    std::cout << std::setw(5) << instruction->resId << " <-";
+                }
+
+                std::cout << std::setw(0) << " " << instruction->name();
+
+                for (auto argId : instruction->argIds) {
+                    std::cout << " " << argId;
+                }
+
+                std::cout << " (pred";
+                for (auto line : instruction->pred) {
+                    std::cout << " " << line;
+                }
+                std::cout << ", succ";
+                for (auto line : instruction->succ) {
+                    std::cout << " " << line;
+                }
+
+                std::cout << ")\n";
+
+                std::cout.copyfmt(oldState);
+            }
+            std::cout << "-----------------------\n";
+        }
+    }
+
+    // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
+    std::string cleanUpFunctionName(int nameId) const {
+        std::string name = names.at(nameId);
+
+        // Replace "mainImage(vf4;vf2;" with "mainImage$v4f$vf2$"
+        for (int i = 0; i < name.length(); i++) {
+            if (name[i] == '(' || name[i] == ';') {
+                name[i] = '$';
+            }
+        }
+
+        // Strip trailing dollar sign.
+        if (name.length() > 0 && name[name.length() - 1] == '$') {
+            name = name.substr(0, name.length() - 1);
+        }
+
+        return name;
     }
 };
 
@@ -2453,7 +2551,7 @@ struct Compiler
         for(int pc = 0; pc < pgm->instructions.size(); pc++) {
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
-                    std::string name = cleanUpFunctionName(function.first);
+                    std::string name = pgm->cleanUpFunctionName(function.first);
                     std::cout
                         << "; ---------------------------- function " << name << "\n"
                         << name << ":\n";
@@ -2468,25 +2566,6 @@ struct Compiler
 
             pgm->instructions.at(pc)->emit(this);
         }
-    }
-
-    // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
-    std::string cleanUpFunctionName(int nameId) {
-        std::string name = pgm->names.at(nameId);
-
-        // Replace "mainImage(vf4;vf2;" with "mainImage$v4f$vf2$"
-        for (int i = 0; i < name.length(); i++) {
-            if (name[i] == '(' || name[i] == ';') {
-                name[i] = '$';
-            }
-        }
-
-        // Strip trailing dollar sign.
-        if (name.length() > 0 && name[name.length() - 1] == '$') {
-            name = name.substr(0, name.length() - 1);
-        }
-
-        return name;
     }
 
     void emitNotImplemented(const std::string &op)
@@ -2554,7 +2633,7 @@ void InsnFunctionCall::emit(Compiler *compiler)
     for(int i = operandId.size() - 1; i >= 0; i--) {
         compiler->emit("", std::string("push r") + std::to_string(operandId[i]), "");
     }
-    compiler->emit("", std::string("call ") + compiler->cleanUpFunctionName(functionId), "");
+    compiler->emit("", std::string("call ") + compiler->pgm->cleanUpFunctionName(functionId), "");
     compiler->emit("", std::string("pop r") + std::to_string(resultId), "");
 }
 

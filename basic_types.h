@@ -288,6 +288,18 @@ struct Instruction {
     // Label IDs we might branch to.
     std::set<uint32_t> targetLabelIds;
 
+    // Predecessor instructions. This is only empty for the first instruction in each function.
+    std::set<uint32_t> pred;
+
+    // Successor instructions.
+    std::set<uint32_t> succ;
+
+    // Registers that are live going into this instruction.
+    std::set<uint32_t> livein;
+
+    // Registers that are live leaving this instruction.
+    std::set<uint32_t> liveout;
+
     // Step the interpreter forward one instruction.
     virtual void step(Interpreter *interpreter) = 0;
 
@@ -329,6 +341,12 @@ struct Block {
 
     // Successor blocks.
     std::set<uint32_t> succ;
+
+    // Registers that are live going into this block.
+    std::set<uint32_t> livein;
+
+    // Registers that are live leaving this block.
+    std::set<uint32_t> liveout;
 };
 
 #endif // BASIC_TYPES_H
