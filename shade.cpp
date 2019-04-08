@@ -861,8 +861,10 @@ struct Program
                     instruction->livein.erase(instruction->resId);
                 }
                 for (uint32_t argId : instruction->argIds) {
-                    // Don't consider constants, they're never in registers.
-                    if (constants.find(argId) == constants.end()) {
+                    // Don't consider constants or variables, they're never in registers.
+                    if (constants.find(argId) == constants.end() &&
+                            variables.find(argId) == variables.end()) {
+
                         instruction->livein.insert(argId);
                     }
                 }
@@ -2691,7 +2693,7 @@ void InsnLoad::emit(Compiler *compiler)
 void InsnStore::emit(Compiler *compiler)
 {
     std::ostringstream ss;
-    ss << "mov r(" << pointerId << "), r" << objectId;
+    ss << "mov (r" << pointerId << "), r" << objectId;
     compiler->emit("", ss.str(), "");
 }
 
