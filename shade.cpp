@@ -77,6 +77,14 @@ struct Image
     {
         return storage + (q * depth * width * height + r * width * height + t * width + s) * pixelSize;
     }
+    unsigned char *getPixelAddress(int s, int t, int r)
+    {
+        return storage + (r * width * height + t * width + s) * pixelSize;
+    }
+    unsigned char *getPixelAddress(int s, int t)
+    {
+        return storage + (t * width + s) * pixelSize;
+    }
 
     Image() :
         format(UNDEFINED),
@@ -103,12 +111,59 @@ struct Image
         delete[] storage;
     }
 
+#if 0
+    static get(const unsigned char *pixel, const v4float& v)
+    {
+        switch(format) {
+            case FORMAT_R8G8U8_UNORM: {
+                for(int c = 0; c < 3; c++) {
+                    v[0] = pixel[c] / 255.99;
+                }
+                v[3] = 1.0;
+                break;
+            }
+            default: {
+                throw std::runtime_error("get() : unimplemented image format " + std::to_string(fmt));
+                break; // not reached
+            }
+        }
+    }
+#endif
+
+    // There's probably a clever C++ way to do this with variadic templates...
     // void setPixel(int s, int t, int r, int q, const v4float& v) {}
-    // void getPixel(int s, int t, int r, int q, v4float& v) {}
+    // void setPixel(int s, int t, int r,  const v4float& v) {}
+    void set(int s, int t, const v4float& v)
+    {
+        assert((s >= 0) || (t >= 0) || (s < width) || (t < height));
+        assert(dim == DIM_2D);
+        set(getPixelAddress(s, t), v);
+    }
+    // void get(int s, int t, int r, int q, v4float& v) {}
+    // void get(int s, int t, int r, v4float& v) {}
+    // void get(int s, int t, v4float& v) {}
 
     // implement first only rgb, rgba and f32 and ub8
     // Read(filename, format); // XXX should construct an image with this and use move semantics
     // Write(filename);
+
+private:
+    void set(unsigned char *pixel, const v4float& v)
+    {
+        switch(format) {
+            case FORMAT_R8G8B8_UNORM: {
+                for(int c = 0; c < 3; c++) {
+                    // ShaderToy clamps the color.
+                    pixel[c] = std::clamp(int(v[c]*255.99), 0, 255);
+                }
+                break;
+            }
+            default: {
+                throw std::runtime_error("set() : unimplemented image format " + std::to_string(format));
+                break; // not reached
+            }
+        }
+    }
 };
 
 static void skipComments(FILE *fp, char ***comments, size_t *commentCount)
@@ -266,10 +321,6 @@ int pnmRead(FILE *file, unsigned int *w, unsigned int *h, float **pixels,
 }
 
 using json = nlohmann::json;
-
-int imageWidth = 640/2; // ShaderToy default is 640
-int imageHeight = 360/2; // ShaderToy default is 360
-unsigned char *imageBuffer;
 
 std::map<uint32_t, std::string> OpcodeToString = {
 #include "opcode_to_string.h"
@@ -2929,7 +2980,7 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
             unsigned int s = std::clamp(static_cast<unsigned int>(u * texture->width), 0u, texture->width - 1);
             unsigned int t = std::clamp(static_cast<unsigned int>(v * texture->height), 0u, texture->height - 1);
-            unsigned char *address = texture->getPixelAddress(s, t, 0, 0);
+            unsigned char *address = texture->getPixelAddress(s, t);
             for(int i = 0; i < 4; i++)
                 rgba[i] = reinterpret_cast<float*>(address)[i];
 
@@ -3279,12 +3330,12 @@ void usage(const char* progname)
 static std::atomic_int rowsLeft;
 
 // Render rows starting at "startRow" every "skip".
-void render(const Program *pgm, int startRow, int skip, float when)
+void render(const Program *pgm, int startRow, int skip, Image* output, float when)
 {
     Interpreter interpreter(pgm);
 
     // iResolution is uniform @0 in preamble
-    interpreter.set(SpvStorageClassUniform, 0, v2float {static_cast<float>(imageWidth), static_cast<float>(imageHeight)});
+    interpreter.set(SpvStorageClassUniform, 0, v2float {static_cast<float>(output->width), static_cast<float>(output->height)});
 
     // iTime is uniform @8 in preamble
     interpreter.set(SpvStorageClassUniform, 8, when);
@@ -3292,17 +3343,12 @@ void render(const Program *pgm, int startRow, int skip, float when)
     // iMouse is uniform @16 in preamble, but we don't align properly, so ours is at 12.
     interpreter.set(SpvStorageClassUniform, 12, v4float {0, 0, 0, 0});
 
-    for(int y = startRow; y < imageHeight; y += skip) {
-        for(int x = 0; x < imageWidth; x++) {
+    for(int y = startRow; y < output->height; y += skip) {
+        for(int x = 0; x < output->width; x++) {
             v4float color;
+            // XXX what about pixel kill?  C64 demo requires it
             eval(interpreter, x + 0.5f, y + 0.5f, color);
-            for(int c = 0; c < 3; c++) {
-                // ShaderToy clamps the color.
-                int byteColor = color[c]*255.99;
-                if (byteColor < 0) byteColor = 0;
-                if (byteColor > 255) byteColor = 255;
-                imageBuffer[((imageHeight - 1 - y) * imageWidth + x) * 3 + c] = byteColor;
-            }
+            output->set(x, output->height - 1 - y, color);
         }
 
         rowsLeft--;
@@ -3382,8 +3428,8 @@ int main(int argc, char **argv)
     bool inputIsJSON = false;
     bool compile = false;
     int imageStart = 0, imageEnd = 0;
-
-    imageBuffer = new unsigned char[imageWidth * imageHeight * 3];
+    int imageWidth = 640/2; // ShaderToy default is 640
+    int imageHeight = 360/2; // ShaderToy default is 360
 
     char *progname = argv[0];
     argv++; argc--;
@@ -3621,23 +3667,25 @@ int main(int argc, char **argv)
     int threadCount = std::thread::hardware_concurrency();
     std::cout << "Using " << threadCount << " threads.\n";
 
+    Image image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, imageWidth, imageHeight);
+
     for(int imageNumber = imageStart; imageNumber <= imageEnd; imageNumber++) {
 
         auto startTime = std::chrono::steady_clock::now();
 
         // Workers decrement rowsLeft at the end of each row.
-        rowsLeft = imageHeight;
+        rowsLeft = image.height;
 
         std::vector<std::thread *> thread;
 
         // Generate the rows on multiple threads.
         for (int t = 0; t < threadCount; t++) {
-            thread.push_back(new std::thread(render, &pgm, t, threadCount, imageNumber / 60.0));
+            thread.push_back(new std::thread(render, &pgm, t, threadCount, &image, imageNumber / 60.0));
             // std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         // Progress information.
-        thread.push_back(new std::thread(showProgress, imageHeight, startTime));
+        thread.push_back(new std::thread(showProgress, image.height, startTime));
 
         // Wait for worker threads to quit.
         for (int t = 0; t < thread.size(); t++) {
@@ -3652,13 +3700,13 @@ int main(int argc, char **argv)
             std::chrono::steady_clock::period::num/
             std::chrono::steady_clock::period::den;
         std::cout << "Shading took " << elapsedSeconds << " seconds ("
-            << long(imageWidth*imageHeight/elapsedSeconds) << " pixels per second)\n";
+            << long(image.width*image.height/elapsedSeconds) << " pixels per second)\n";
 
         std::ostringstream ss;
         ss << "image" << std::setfill('0') << std::setw(4) << imageNumber << std::setw(0) << ".ppm";
         std::ofstream imageFile(ss.str(), std::ios::out | std::ios::binary);
-        imageFile << "P6 " << imageWidth << " " << imageHeight << " 255\n";
-        imageFile.write(reinterpret_cast<const char *>(imageBuffer), 3 * imageWidth * imageHeight);
+        imageFile << "P6 " << image.width << " " << image.height << " 255\n";
+        imageFile.write(reinterpret_cast<char *>(image.getPixelAddress(0, 0)), 3 * image.width * image.height);
         imageFile.close();
     }
 
