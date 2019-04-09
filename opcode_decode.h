@@ -180,7 +180,7 @@ case SpvOpImageSampleImplicitLod: {
     uint32_t sampledImageId = nextu();
     uint32_t coordinateId = nextu();
     uint32_t imageOperands = nextu();
-    pgm->code.push_back(new InsnImageSampleImplicitLod{type, resultId, sampledImageId, coordinateId, imageOperands});
+    pgm->instructions.push_back(std::make_unique<InsnImageSampleImplicitLod>(type, resultId, sampledImageId, coordinateId, imageOperands));
     pgm->resultsCreated[resultId] = type;
     if(pgm->verbose) {
         std::cout << "ImageSampleImplicitLod";
