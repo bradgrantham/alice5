@@ -3535,6 +3535,7 @@ int main(int argc, char **argv)
                 unsigned char* d = reinterpret_cast<unsigned char*>(texture->storage);
                 std::copy(s, s + textureWidth * textureHeight * Image::getPixelSize(Image::FORMAT_R32G32B32A32_SFLOAT), d);
                 fclose(fp);
+                preamble = preamble + "layout (binding = 1) uniform sampler2D iChannel0;\n";
             }
         }
     }
