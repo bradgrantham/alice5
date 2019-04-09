@@ -120,7 +120,10 @@ struct InsnCompositeExtract : public Instruction {
 
 // OpImageSampleImplicitLod instruction (code 87).
 struct InsnImageSampleImplicitLod : public Instruction {
-    InsnImageSampleImplicitLod(uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : type(type), resultId(resultId), sampledImageId(sampledImageId), coordinateId(coordinateId), imageOperands(imageOperands) {}
+    InsnImageSampleImplicitLod(uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(resultId), type(type), resultId(resultId), sampledImageId(sampledImageId), coordinateId(coordinateId), imageOperands(imageOperands) {
+        argIds.insert(sampledImageId);
+        argIds.insert(coordinateId);
+    }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
     uint32_t sampledImageId; // operand from register
