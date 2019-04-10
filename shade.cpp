@@ -2763,8 +2763,9 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
     // uint32_t sampledImageId; // operand from register
     // uint32_t coordinateId; // operand from register
     // uint32_t imageOperands; // ImageOperands (optional)
-    float rgba[4];
+    v4float rgba;
 
+    // Sample the image
     std::visit([this, &insn, &rgba](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
@@ -2777,9 +2778,7 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
             unsigned int s = std::clamp(static_cast<unsigned int>(u * texture->width), 0u, texture->width - 1);
             unsigned int t = std::clamp(static_cast<unsigned int>(v * texture->height), 0u, texture->height - 1);
-            unsigned char *address = texture->getPixelAddress(s, t);
-            for(int i = 0; i < 4; i++)
-                rgba[i] = reinterpret_cast<float*>(address)[i];
+            texture->get(s, t, rgba);
 
         } else {
 
@@ -2790,15 +2789,16 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
     uint32_t resultType = std::get<TypeVector>(pgm->types.at(registers[insn.resultId].type)).type;
 
+    // Store the sample result in register
     std::visit([this, &insn, rgba](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            registerAs<v4float>(insn.resultId) = v4float { rgba[0], rgba[1], rgba[2], rgba[3] };
+            registerAs<v4float>(insn.resultId) = rgba;
 
-        // else if constexpr (std::is_same_v<T, TypeInt>) {
+        // else if constexpr (std::is_same_v<T, TypeInt>)
 
 
         } else {

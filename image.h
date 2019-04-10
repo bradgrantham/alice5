@@ -44,17 +44,17 @@ struct Image
     uint32_t width, height, depth, slices;
     unsigned char *storage;
 
-    unsigned char *getPixelAddress(int s, int t, int r, int q)
+    unsigned char *getPixelAddress(int i, int j, int k, int l)
     {
-        return storage + (q * depth * width * height + r * width * height + t * width + s) * pixelSize;
+        return storage + (l * depth * width * height + k * width * height + j * width + i) * pixelSize;
     }
-    unsigned char *getPixelAddress(int s, int t, int r)
+    unsigned char *getPixelAddress(int i, int j, int k)
     {
-        return storage + (r * width * height + t * width + s) * pixelSize;
+        return storage + (k * width * height + j * width + i) * pixelSize;
     }
-    unsigned char *getPixelAddress(int s, int t)
+    unsigned char *getPixelAddress(int i, int j)
     {
-        return storage + (t * width + s) * pixelSize;
+        return storage + (j * width + i) * pixelSize;
     }
 
     Image() :
@@ -82,11 +82,40 @@ struct Image
         delete[] storage;
     }
 
-#if 0
-    static get(const unsigned char *pixel, const v4float& v)
+    // There's probably a clever C++ way to do this with variadic templates...
+    // void setPixel(int i, int j, int k, int l, const v4float& v) {}
+    // void setPixel(int i, int j, int k,  const v4float& v) {}
+    void set(int i, int j, const v4float& v)
+    {
+        assert((i >= 0) || (j >= 0) || (i < width) || (j < height));
+        assert(dim == DIM_2D);
+        set(getPixelAddress(i, j), v);
+    }
+    // void get(int i, int j, int k, int l, v4float& v) {}
+    // void get(int i, int j, int k, v4float& v) {}
+    void get(int i, int j, v4float& v)
+    {
+        assert((i >= 0) || (j >= 0) || (i < width) || (j < height));
+        assert(dim == DIM_2D);
+        get(getPixelAddress(i, j), v);
+    }
+
+    // implement first only rgb, rgba and f32 and ub8
+    // Read(filename, format); // XXX should construct an image with this and use move semantics
+    // Write(filename);
+
+private:
+    void get(const unsigned char *pixel, v4float& v)
     {
         switch(format) {
-            case FORMAT_R8G8U8_UNORM: {
+            case FORMAT_R32G32B32A32_SFLOAT: {
+                for(int c = 0; c < 4; c++) {
+                    v[c] = reinterpret_cast<const float*>(pixel)[c];
+                }
+                break;
+            }
+                
+            case FORMAT_R8G8B8_UNORM: {
                 for(int c = 0; c < 3; c++) {
                     v[0] = pixel[c] / 255.99;
                 }
@@ -94,31 +123,12 @@ struct Image
                 break;
             }
             default: {
-                throw std::runtime_error("get() : unimplemented image format " + std::to_string(fmt));
+                throw std::runtime_error("get() : unimplemented image format " + std::to_string(format));
                 break; // not reached
             }
         }
     }
-#endif
 
-    // There's probably a clever C++ way to do this with variadic templates...
-    // void setPixel(int s, int t, int r, int q, const v4float& v) {}
-    // void setPixel(int s, int t, int r,  const v4float& v) {}
-    void set(int s, int t, const v4float& v)
-    {
-        assert((s >= 0) || (t >= 0) || (s < width) || (t < height));
-        assert(dim == DIM_2D);
-        set(getPixelAddress(s, t), v);
-    }
-    // void get(int s, int t, int r, int q, v4float& v) {}
-    // void get(int s, int t, int r, v4float& v) {}
-    // void get(int s, int t, v4float& v) {}
-
-    // implement first only rgb, rgba and f32 and ub8
-    // Read(filename, format); // XXX should construct an image with this and use move semantics
-    // Write(filename);
-
-private:
     void set(unsigned char *pixel, const v4float& v)
     {
         switch(format) {
