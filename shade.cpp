@@ -3075,7 +3075,6 @@ struct Compiler
             const TypeVector *typeVector = pgm->getTypeAsVector(type);
             int count = typeVector == nullptr ? 1 : typeVector->count;
             registers[id] = CompilerRegister {type, count};
-            std::cout << id << " " << type << " " << count << "\n";
         }
 
         // Fake physical registers for now, pretend we have 32 of them.
@@ -3138,29 +3137,32 @@ struct Compiler
             // Assign result registers to physical registers.
             uint32_t resId = instruction->resId;
             if (resId != NO_REGISTER) {
-                // Find an available physical register for this virtual register.
-                bool found = false;
-                for (uint32_t phy : allPhy) {
-                    if (assigned.find(phy) == assigned.end()) {
-                        auto r = registers.find(resId);
-                        if (r == registers.end()) {
-                            std::cout << "Warning: Virtual register "
-                                << resId << " not found in block " << block->labelId << ".\n";
-                            exit(EXIT_FAILURE);
-                        }
-                        r->second.phy.push_back(phy);
-                        // If the result lives past this instruction, consider its
-                        // register assigned.
-                        if (instruction->liveout.find(resId) != instruction->liveout.end()) {
-                            assigned.insert(phy);
-                        }
-                        found = true;
-                        break;
-                    }
+                auto r = registers.find(resId);
+                if (r == registers.end()) {
+                    std::cout << "Warning: Virtual register "
+                        << resId << " not found in block " << block->labelId << ".\n";
+                    exit(EXIT_FAILURE);
                 }
-                if (!found) {
-                    std::cout << "Error: No physical register available for "
-                        << instruction->resId << " on line " << pc << ".\n";
+
+                for (int i = 0; i < r->second.count; i++) {
+                    // Find an available physical register for this virtual register.
+                    bool found = false;
+                    for (uint32_t phy : allPhy) {
+                        if (assigned.find(phy) == assigned.end()) {
+                            r->second.phy.push_back(phy);
+                            // If the result lives past this instruction, consider its
+                            // register assigned.
+                            if (instruction->liveout.find(resId) != instruction->liveout.end()) {
+                                assigned.insert(phy);
+                            }
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        std::cout << "Error: No physical register available for "
+                            << instruction->resId << "[" << i << "] on line " << pc << ".\n";
+                    }
                 }
             }
         }
@@ -3174,7 +3176,7 @@ struct Compiler
     }
 
     // String for a virtual register ("r12" or more).
-    std::string reg(uint32_t id) const {
+    std::string reg(uint32_t id, int index = 0) const {
         std::ostringstream ss;
 
         ss << "r" << id;
@@ -3193,10 +3195,8 @@ struct Compiler
         }
 
         auto r = registers.find(id);
-        if (r != registers.end()) {
-            for (auto phy : r->second.phy) {
-                ss << "{x" << phy << "}";
-            }
+        if (r != registers.end() && index < r->second.phy.size()) {
+            ss << "{x" << r->second.phy[index] << "}";
         }
 
         return ss.str();
@@ -3213,9 +3213,13 @@ struct Compiler
 
     void emitBinaryOp(const std::string &opName, int op1, int op2, int result)
     {
-        std::ostringstream ss;
-        ss << opName << " " << reg(op1) << ", " << reg(op2) << ", " << reg(result);
-        emit("", ss.str(), "");
+        CompilerRegister &r = registers.at(result);
+
+        for (int i = 0; i < r.count; i++) {
+            std::ostringstream ss;
+            ss << opName << " " << reg(op1, i) << ", " << reg(op2, i) << ", " << reg(result, i);
+            emit("", ss.str(), "");
+        }
     }
 
     void emit(const std::string &label, const std::string &op, const std::string comment)
@@ -3278,16 +3282,36 @@ void InsnFunctionParameter::emit(Compiler *compiler)
 
 void InsnLoad::emit(Compiler *compiler)
 {
-    std::ostringstream ss;
-    ss << "mov " << compiler->reg(resultId) << ", (" << compiler->reg(pointerId) << ")";
-    compiler->emit("", ss.str(), "");
+    auto r = compiler->registers.find(objectId);
+    if (r == compiler->registers.end()) {
+        std::ostringstream ss;
+        ss << "mov " << compiler->reg(resultId) << ", (" << compiler->reg(pointerId) << ")";
+        compiler->emit("", ss.str(), "");
+    } else {
+        for (int i = 0; i < r->second.count; i++) {
+            std::ostringstream ss;
+            ss << "mov " << compiler->reg(resultId, i)
+                << ", (" << compiler->reg(pointerId) << ")" << (i*4);
+            compiler->emit("", ss.str(), "");
+        }
+    }
 }
 
 void InsnStore::emit(Compiler *compiler)
 {
-    std::ostringstream ss;
-    ss << "mov (" << compiler->reg(pointerId) << "), " << compiler->reg(objectId);
-    compiler->emit("", ss.str(), "");
+    auto r = compiler->registers.find(objectId);
+    if (r == compiler->registers.end()) {
+        std::ostringstream ss;
+        ss << "mov (" << compiler->reg(pointerId) << "), " << compiler->reg(objectId);
+        compiler->emit("", ss.str(), "");
+    } else {
+        for (int i = 0; i < r->second.count; i++) {
+            std::ostringstream ss;
+            ss << "mov (" << compiler->reg(pointerId) << ")" << (i*4)
+                << ", " << compiler->reg(objectId, i);
+            compiler->emit("", ss.str(), "");
+        }
+    }
 }
 
 void InsnBranch::emit(Compiler *compiler)

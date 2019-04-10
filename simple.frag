@@ -1,5 +1,6 @@
 
 
+/*
 float foo(float n) {
     float i = 1;
     float j = 0;
@@ -11,6 +12,7 @@ float foo(float n) {
 
     return j;
 }
+*/
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
@@ -51,9 +53,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // fragColor = vec4(uv, 0.0, 1.0);
     */
 
-    foo(10.0);
-    foo(10.0);
-    foo(10.0);
-    foo(10.0);
+    //foo(10.0);
+
+    vec3 x = vec3(1.0, 2.0, 3.0);
+    vec3 y = vec3(4.0, 5.0, 6.0);
+    vec3 z = x + y;
 
 }
