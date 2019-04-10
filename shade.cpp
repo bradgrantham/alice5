@@ -2886,6 +2886,8 @@ void Interpreter::stepPhi(const InsnPhi& insn)
 
 Image *texture;
 
+// XXX image binding
+// XXX implicit LOD level and thus texel interpolants
 void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn)
 {
     // uint32_t type; // result type
