@@ -1,4 +1,3 @@
-set as output resource...?
 Implement Sampler and sample(), test on single texture input
 store JSON in Pass, Image, Sampler, and dump to verify
 follow Passes
