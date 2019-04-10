@@ -1054,6 +1054,7 @@ struct Program
         return SPV_SUCCESS;
     }
 
+    // Assigns registers for this block.
     void assignRegisters(Block *block, const std::set<uint32_t> &allPhy) {
         std::cout << "assignRegisters(" << block->labelId << ")\n";
 
@@ -1087,19 +1088,24 @@ struct Program
             }
 
             // Assign result registers to physical registers.
-            if (instruction->resId != NO_REGISTER) {
+            uint32_t resId = instruction->resId;
+            if (resId != NO_REGISTER) {
                 // Find an available physical register for this virtual register.
                 bool found = false;
                 for (uint32_t phy : allPhy) {
                     if (assigned.find(phy) == assigned.end()) {
-                        virtToPhy[instruction->resId] = phy;
-                        assigned.insert(phy);
+                        virtToPhy[resId] = phy;
+                        // If the result lives past this instruction, consider its
+                        // register assigned.
+                        if (instruction->liveout.find(resId) != instruction->liveout.end()) {
+                            assigned.insert(phy);
+                        }
                         found = true;
                         break;
                     }
                 }
                 if (!found) {
-                    std::cout << "Warning: No physical register available for "
+                    std::cout << "Error: No physical register available for "
                         << instruction->resId << " on line " << pc << ".\n";
                 }
             }

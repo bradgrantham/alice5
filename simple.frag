@@ -52,5 +52,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     */
 
     foo(10.0);
+    foo(10.0);
+    foo(10.0);
+    foo(10.0);
 
 }
