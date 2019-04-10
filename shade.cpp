@@ -3539,9 +3539,15 @@ int main(int argc, char **argv)
                     exit(EXIT_FAILURE);
                 }
                 texture = new Image(Image::FORMAT_R32G32B32A32_SFLOAT, Image::DIM_2D, textureWidth, textureHeight);
-                unsigned char* s = reinterpret_cast<unsigned char*>(textureData);
-                unsigned char* d = reinterpret_cast<unsigned char*>(texture->storage);
-                std::copy(s, s + textureWidth * textureHeight * Image::getPixelSize(Image::FORMAT_R32G32B32A32_SFLOAT), d);
+                if((input0.find("vflip") != input0.end()) && (input0["vflip"].get<std::string>() == std::string("true"))) {
+                } else {
+                    unsigned char* s = reinterpret_cast<unsigned char*>(textureData);
+                    unsigned char* d = reinterpret_cast<unsigned char*>(texture->storage);
+                    int rowsize = textureWidth * Image::getPixelSize(Image::FORMAT_R32G32B32A32_SFLOAT);
+                    for(int row = 0; row < textureHeight; row++) {
+                        std::copy(s + rowsize * row, s + rowsize * (row + 1), d + rowsize * (textureHeight - row - 1));
+                    }
+                }
                 fclose(fp);
                 preamble = preamble + "layout (binding = 1) uniform sampler2D iChannel0;\n";
             }
