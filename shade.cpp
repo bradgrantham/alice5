@@ -3416,19 +3416,29 @@ void render(const Program *pgm, int startRow, int skip, Image* output, float whe
 {
     Interpreter interpreter(pgm);
 
+    // If we discovered the location of Uniform variables from SPIR-V, then
+    // we could change preamble.frag without needing to change code here.
+
     // iResolution is uniform @0 in preamble
+    // XXX We should discover from SPIR-V.
     interpreter.set(SpvStorageClassUniform, 0, v2float {static_cast<float>(output->width), static_cast<float>(output->height)});
 
     // iTime is uniform @8 in preamble
+    // XXX We should discover from SPIR-V.
     interpreter.set(SpvStorageClassUniform, 8, when);
 
     // iMouse is uniform @16 in preamble, but we don't align properly, so ours is at 12.
+    // XXX We should discover from SPIR-V.
     interpreter.set(SpvStorageClassUniform, 12, v4float {0, 0, 0, 0});
 
+    // This loop acts like a rasterizer fixed function block.  Maybe it should
+    // set inputs and read outputs also.
     for(int y = startRow; y < output->height; y += skip) {
         for(int x = 0; x < output->width; x++) {
             v4float color;
-            // XXX what about pixel kill?  C64 demo requires it
+            // XXX what about pixel kill?  C64 demo requires it.  eval() will
+            // need to track whether output was written, and then set() below
+            // will need to be conditional.
             eval(interpreter, x + 0.5f, y + 0.5f, color);
             output->set(x, output->height - 1 - y, color);
         }
