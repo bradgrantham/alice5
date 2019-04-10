@@ -224,8 +224,8 @@ struct Register
     size_t size;
     unsigned char *data;
 
-    // Physical register.
-    uint32_t phy;
+    // Physical registers.
+    std::vector<uint32_t> phy;
 
     Register(const Register &other)
     {
@@ -240,8 +240,7 @@ struct Register
     Register(uint32_t type_, size_t size_) :
         type(type_),
         size(size_),
-        data(new unsigned char[size_]),
-        phy(NO_REGISTER)
+        data(new unsigned char[size_])
     {
         if(false)std::cout << "ctor allocated to " << this << " as " << &data << "\n";
     }
@@ -249,8 +248,7 @@ struct Register
     Register() :
         type(0xFFFFFFFF),
         size(0),
-        data(nullptr),
-        phy(NO_REGISTER)
+        data(nullptr)
     {
         if(false)std::cout << "ctor empty Register " << this << " \n";
     }

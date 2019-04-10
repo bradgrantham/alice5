@@ -1066,11 +1066,13 @@ struct Program
             if (r == registers.end()) {
                 std::cout << "Warning: Virtual register "
                     << regId << " not found in block " << block->labelId << ".\n";
-            } else if (r->second.phy == NO_REGISTER) {
+            } else if (r->second.phy.empty()) {
                 std::cout << "Warning: Expected physical register for "
                     << regId << " in block " << block->labelId << ".\n";
             } else {
-                assigned.insert(r->second.phy);
+                for (auto phy : r->second.phy) {
+                    assigned.insert(phy);
+                }
             }
         }
 
@@ -1083,8 +1085,10 @@ struct Program
                 // can use its physical register again.
                 if (instruction->liveout.find(argId) == instruction->liveout.end()) {
                     auto r = registers.find(argId);
-                    if (r != registers.end() && r->second.phy != NO_REGISTER) {
-                        assigned.erase(r->second.phy);
+                    if (r != registers.end()) {
+                        for (auto phy : r->second.phy) {
+                            assigned.erase(phy);
+                        }
                     }
                 }
             }
@@ -1102,7 +1106,7 @@ struct Program
                                 << resId << " not found in block " << block->labelId << ".\n";
                             exit(EXIT_FAILURE);
                         }
-                        r->second.phy = phy;
+                        r->second.phy.push_back(phy);
                         // If the result lives past this instruction, consider its
                         // register assigned.
                         if (instruction->liveout.find(resId) != instruction->liveout.end()) {
@@ -3141,8 +3145,8 @@ struct Compiler
 
         auto r = pgm->registers.find(id);
         if (r != pgm->registers.end()) {
-            if (r->second.phy != NO_REGISTER) {
-                ss << "{x" << r->second.phy << "}";
+            for (auto phy : r->second.phy) {
+                ss << "{x" << phy << "}";
             }
         }
 
