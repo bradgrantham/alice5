@@ -3208,7 +3208,7 @@ struct Compiler
 
         ss << op << " not implemented";
 
-        emit("", "nop", ss.str());
+        emit("nop", ss.str());
     }
 
     void emitBinaryOp(const std::string &opName, int op1, int op2, int result)
@@ -3218,18 +3218,18 @@ struct Compiler
         for (int i = 0; i < r.count; i++) {
             std::ostringstream ss;
             ss << opName << " " << reg(op1, i) << ", " << reg(op2, i) << ", " << reg(result, i);
-            emit("", ss.str(), "");
+            emit(ss.str(), "");
         }
     }
 
-    void emit(const std::string &label, const std::string &op, const std::string comment)
+    void emit(const std::string &op, const std::string comment)
     {
         std::ios oldState(nullptr);
         oldState.copyfmt(std::cout);
 
         std::cout
+            << "        "
             << std::left
-            << std::setw(10) << label
             << std::setw(30) << op
             << std::setw(0);
         if(!comment.empty()) {
@@ -3267,32 +3267,32 @@ void InsnFMul::emit(Compiler *compiler)
 
 void InsnFunctionCall::emit(Compiler *compiler)
 {
-    compiler->emit("", "push pc", "");
+    compiler->emit("push pc", "");
     for(int i = operandId.size() - 1; i >= 0; i--) {
-        compiler->emit("", std::string("push ") + compiler->reg(operandId[i]), "");
+        compiler->emit(std::string("push ") + compiler->reg(operandId[i]), "");
     }
-    compiler->emit("", std::string("call ") + compiler->pgm->cleanUpFunctionName(functionId), "");
-    compiler->emit("", std::string("pop ") + compiler->reg(resultId), "");
+    compiler->emit(std::string("call ") + compiler->pgm->cleanUpFunctionName(functionId), "");
+    compiler->emit(std::string("pop ") + compiler->reg(resultId), "");
 }
 
 void InsnFunctionParameter::emit(Compiler *compiler)
 {
-    compiler->emit("", std::string("pop ") + compiler->reg(resultId), "");
+    compiler->emit(std::string("pop ") + compiler->reg(resultId), "");
 }
 
 void InsnLoad::emit(Compiler *compiler)
 {
-    auto r = compiler->registers.find(objectId);
+    auto r = compiler->registers.find(resultId);
     if (r == compiler->registers.end()) {
         std::ostringstream ss;
         ss << "mov " << compiler->reg(resultId) << ", (" << compiler->reg(pointerId) << ")";
-        compiler->emit("", ss.str(), "");
+        compiler->emit(ss.str(), "");
     } else {
         for (int i = 0; i < r->second.count; i++) {
             std::ostringstream ss;
             ss << "mov " << compiler->reg(resultId, i)
                 << ", (" << compiler->reg(pointerId) << ")" << (i*4);
-            compiler->emit("", ss.str(), "");
+            compiler->emit(ss.str(), "");
         }
     }
 }
@@ -3303,13 +3303,13 @@ void InsnStore::emit(Compiler *compiler)
     if (r == compiler->registers.end()) {
         std::ostringstream ss;
         ss << "mov (" << compiler->reg(pointerId) << "), " << compiler->reg(objectId);
-        compiler->emit("", ss.str(), "");
+        compiler->emit(ss.str(), "");
     } else {
         for (int i = 0; i < r->second.count; i++) {
             std::ostringstream ss;
             ss << "mov (" << compiler->reg(pointerId) << ")" << (i*4)
                 << ", " << compiler->reg(objectId, i);
-            compiler->emit("", ss.str(), "");
+            compiler->emit(ss.str(), "");
         }
     }
 }
@@ -3318,19 +3318,19 @@ void InsnBranch::emit(Compiler *compiler)
 {
     std::ostringstream ss;
     ss << "jmp label" << targetLabelId;
-    compiler->emit("", ss.str(), "");
+    compiler->emit(ss.str(), "");
 }
 
 void InsnReturn::emit(Compiler *compiler)
 {
-    compiler->emit("", "ret r0", "");
+    compiler->emit("ret r0", "");
 }
 
 void InsnReturnValue::emit(Compiler *compiler)
 {
     std::ostringstream ss;
     ss << "ret " << compiler->reg(valueId);
-    compiler->emit("", ss.str(), "");
+    compiler->emit(ss.str(), "");
 }
 
 void InsnFOrdLessThanEqual::emit(Compiler *compiler)
@@ -3344,7 +3344,7 @@ void InsnBranchConditional::emit(Compiler *compiler)
     ss << "jmp " << compiler->reg(conditionId)
         << ", label" << trueLabelId
         << ", label" << falseLabelId;
-    compiler->emit("", ss.str(), "");
+    compiler->emit(ss.str(), "");
 }
 
 // -----------------------------------------------------------------------------------
