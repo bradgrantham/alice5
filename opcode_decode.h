@@ -7,7 +7,7 @@ case SpvOpFunctionParameter: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFunctionParameter>(type, resultId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FunctionParameter";
         std::cout << " type ";
@@ -25,7 +25,7 @@ case SpvOpFunctionCall: {
     uint32_t functionId = nextu();
     std::vector<uint32_t> operandId = restv();
     pgm->instructions.push_back(std::make_unique<InsnFunctionCall>(type, resultId, functionId, operandId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FunctionCall";
         std::cout << " type ";
@@ -48,7 +48,7 @@ case SpvOpLoad: {
     uint32_t pointerId = nextu();
     uint32_t memoryAccess = nextu(NO_MEMORY_ACCESS_SEMANTIC);
     pgm->instructions.push_back(std::make_unique<InsnLoad>(type, resultId, pointerId, memoryAccess));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "Load";
         std::cout << " type ";
@@ -88,7 +88,7 @@ case SpvOpAccessChain: {
     uint32_t baseId = nextu();
     std::vector<uint32_t> indexesId = restv();
     pgm->instructions.push_back(std::make_unique<InsnAccessChain>(type, resultId, baseId, indexesId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "AccessChain";
         std::cout << " type ";
@@ -112,7 +112,7 @@ case SpvOpVectorShuffle: {
     uint32_t vector2Id = nextu();
     std::vector<uint32_t> componentsId = restv();
     pgm->instructions.push_back(std::make_unique<InsnVectorShuffle>(type, resultId, vector1Id, vector2Id, componentsId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "VectorShuffle";
         std::cout << " type ";
@@ -136,7 +136,7 @@ case SpvOpCompositeConstruct: {
     uint32_t resultId = nextu();
     std::vector<uint32_t> constituentsId = restv();
     pgm->instructions.push_back(std::make_unique<InsnCompositeConstruct>(type, resultId, constituentsId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "CompositeConstruct";
         std::cout << " type ";
@@ -157,7 +157,7 @@ case SpvOpCompositeExtract: {
     uint32_t compositeId = nextu();
     std::vector<uint32_t> indexesId = restv();
     pgm->instructions.push_back(std::make_unique<InsnCompositeExtract>(type, resultId, compositeId, indexesId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "CompositeExtract";
         std::cout << " type ";
@@ -181,7 +181,7 @@ case SpvOpImageSampleImplicitLod: {
     uint32_t coordinateId = nextu();
     uint32_t imageOperands = nextu();
     pgm->instructions.push_back(std::make_unique<InsnImageSampleImplicitLod>(type, resultId, sampledImageId, coordinateId, imageOperands));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "ImageSampleImplicitLod";
         std::cout << " type ";
@@ -204,7 +204,7 @@ case SpvOpConvertFToS: {
     uint32_t resultId = nextu();
     uint32_t floatValueId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnConvertFToS>(type, resultId, floatValueId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "ConvertFToS";
         std::cout << " type ";
@@ -223,7 +223,7 @@ case SpvOpConvertSToF: {
     uint32_t resultId = nextu();
     uint32_t signedValueId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnConvertSToF>(type, resultId, signedValueId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "ConvertSToF";
         std::cout << " type ";
@@ -242,7 +242,7 @@ case SpvOpFNegate: {
     uint32_t resultId = nextu();
     uint32_t operandId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFNegate>(type, resultId, operandId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FNegate";
         std::cout << " type ";
@@ -262,7 +262,7 @@ case SpvOpIAdd: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnIAdd>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "IAdd";
         std::cout << " type ";
@@ -284,7 +284,7 @@ case SpvOpFAdd: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFAdd>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FAdd";
         std::cout << " type ";
@@ -306,7 +306,7 @@ case SpvOpFSub: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFSub>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FSub";
         std::cout << " type ";
@@ -328,7 +328,7 @@ case SpvOpFMul: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFMul>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FMul";
         std::cout << " type ";
@@ -350,7 +350,7 @@ case SpvOpSDiv: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnSDiv>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "SDiv";
         std::cout << " type ";
@@ -372,7 +372,7 @@ case SpvOpFDiv: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFDiv>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FDiv";
         std::cout << " type ";
@@ -394,7 +394,7 @@ case SpvOpFMod: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFMod>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FMod";
         std::cout << " type ";
@@ -416,7 +416,7 @@ case SpvOpVectorTimesScalar: {
     uint32_t vectorId = nextu();
     uint32_t scalarId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnVectorTimesScalar>(type, resultId, vectorId, scalarId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "VectorTimesScalar";
         std::cout << " type ";
@@ -438,7 +438,7 @@ case SpvOpVectorTimesMatrix: {
     uint32_t vectorId = nextu();
     uint32_t matrixId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnVectorTimesMatrix>(type, resultId, vectorId, matrixId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "VectorTimesMatrix";
         std::cout << " type ";
@@ -460,7 +460,7 @@ case SpvOpMatrixTimesVector: {
     uint32_t matrixId = nextu();
     uint32_t vectorId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnMatrixTimesVector>(type, resultId, matrixId, vectorId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "MatrixTimesVector";
         std::cout << " type ";
@@ -482,7 +482,7 @@ case SpvOpDot: {
     uint32_t vector1Id = nextu();
     uint32_t vector2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnDot>(type, resultId, vector1Id, vector2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "Dot";
         std::cout << " type ";
@@ -504,7 +504,7 @@ case SpvOpLogicalOr: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnLogicalOr>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "LogicalOr";
         std::cout << " type ";
@@ -525,7 +525,7 @@ case SpvOpLogicalNot: {
     uint32_t resultId = nextu();
     uint32_t operandId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnLogicalNot>(type, resultId, operandId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "LogicalNot";
         std::cout << " type ";
@@ -546,7 +546,7 @@ case SpvOpSelect: {
     uint32_t object1Id = nextu();
     uint32_t object2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnSelect>(type, resultId, conditionId, object1Id, object2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "Select";
         std::cout << " type ";
@@ -570,7 +570,7 @@ case SpvOpIEqual: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnIEqual>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "IEqual";
         std::cout << " type ";
@@ -592,7 +592,7 @@ case SpvOpSLessThan: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnSLessThan>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "SLessThan";
         std::cout << " type ";
@@ -614,7 +614,7 @@ case SpvOpFOrdEqual: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFOrdEqual>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdEqual";
         std::cout << " type ";
@@ -636,7 +636,7 @@ case SpvOpFOrdLessThan: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFOrdLessThan>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdLessThan";
         std::cout << " type ";
@@ -658,7 +658,7 @@ case SpvOpFOrdGreaterThan: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFOrdGreaterThan>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdGreaterThan";
         std::cout << " type ";
@@ -680,7 +680,7 @@ case SpvOpFOrdLessThanEqual: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFOrdLessThanEqual>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdLessThanEqual";
         std::cout << " type ";
@@ -702,7 +702,7 @@ case SpvOpFOrdGreaterThanEqual: {
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnFOrdGreaterThanEqual>(type, resultId, operand1Id, operand2Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "FOrdGreaterThanEqual";
         std::cout << " type ";
@@ -723,7 +723,7 @@ case SpvOpPhi: {
     uint32_t resultId = nextu();
     std::vector<uint32_t> operandId = restv();
     pgm->instructions.push_back(std::make_unique<InsnPhi>(type, resultId, operandId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "Phi";
         std::cout << " type ";
@@ -803,7 +803,7 @@ case SpvOpExtInst: {
 case GLSLstd450FAbs: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450FAbs>(type, resultId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FAbs";
         std::cout << " type ";
@@ -820,7 +820,7 @@ case GLSLstd450FAbs: {
 case GLSLstd450Floor: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Floor>(type, resultId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Floor";
         std::cout << " type ";
@@ -837,7 +837,7 @@ case GLSLstd450Floor: {
 case GLSLstd450Fract: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Fract>(type, resultId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Fract";
         std::cout << " type ";
@@ -854,7 +854,7 @@ case GLSLstd450Fract: {
 case GLSLstd450Sin: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Sin>(type, resultId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Sin";
         std::cout << " type ";
@@ -871,7 +871,7 @@ case GLSLstd450Sin: {
 case GLSLstd450Cos: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Cos>(type, resultId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Cos";
         std::cout << " type ";
@@ -888,7 +888,7 @@ case GLSLstd450Cos: {
 case GLSLstd450Atan: {
     uint32_t y_over_xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Atan>(type, resultId, y_over_xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Atan";
         std::cout << " type ";
@@ -906,7 +906,7 @@ case GLSLstd450Atan2: {
     uint32_t yId = nextu();
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Atan2>(type, resultId, yId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Atan2";
         std::cout << " type ";
@@ -926,7 +926,7 @@ case GLSLstd450Pow: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Pow>(type, resultId, xId, yId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Pow";
         std::cout << " type ";
@@ -945,7 +945,7 @@ case GLSLstd450Pow: {
 case GLSLstd450Exp: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Exp>(type, resultId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Exp";
         std::cout << " type ";
@@ -962,7 +962,7 @@ case GLSLstd450Exp: {
 case GLSLstd450Exp2: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Exp2>(type, resultId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Exp2";
         std::cout << " type ";
@@ -980,7 +980,7 @@ case GLSLstd450FMin: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450FMin>(type, resultId, xId, yId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FMin";
         std::cout << " type ";
@@ -1000,7 +1000,7 @@ case GLSLstd450FMax: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450FMax>(type, resultId, xId, yId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FMax";
         std::cout << " type ";
@@ -1021,7 +1021,7 @@ case GLSLstd450FClamp: {
     uint32_t minValId = nextu();
     uint32_t maxValId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450FClamp>(type, resultId, xId, minValId, maxValId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FClamp";
         std::cout << " type ";
@@ -1044,7 +1044,7 @@ case GLSLstd450FMix: {
     uint32_t yId = nextu();
     uint32_t aId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450FMix>(type, resultId, xId, yId, aId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450FMix";
         std::cout << " type ";
@@ -1066,7 +1066,7 @@ case GLSLstd450Step: {
     uint32_t edgeId = nextu();
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Step>(type, resultId, edgeId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Step";
         std::cout << " type ";
@@ -1087,7 +1087,7 @@ case GLSLstd450SmoothStep: {
     uint32_t edge1Id = nextu();
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450SmoothStep>(type, resultId, edge0Id, edge1Id, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450SmoothStep";
         std::cout << " type ";
@@ -1108,7 +1108,7 @@ case GLSLstd450SmoothStep: {
 case GLSLstd450Length: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Length>(type, resultId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Length";
         std::cout << " type ";
@@ -1126,7 +1126,7 @@ case GLSLstd450Distance: {
     uint32_t p0Id = nextu();
     uint32_t p1Id = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Distance>(type, resultId, p0Id, p1Id));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Distance";
         std::cout << " type ";
@@ -1146,7 +1146,7 @@ case GLSLstd450Cross: {
     uint32_t xId = nextu();
     uint32_t yId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Cross>(type, resultId, xId, yId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Cross";
         std::cout << " type ";
@@ -1165,7 +1165,7 @@ case GLSLstd450Cross: {
 case GLSLstd450Normalize: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Normalize>(type, resultId, xId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Normalize";
         std::cout << " type ";
@@ -1183,7 +1183,7 @@ case GLSLstd450Reflect: {
     uint32_t iId = nextu();
     uint32_t nId = nextu();
     pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Reflect>(type, resultId, iId, nId));
-    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};
+    pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Reflect";
         std::cout << " type ";

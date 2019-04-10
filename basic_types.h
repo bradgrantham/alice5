@@ -224,9 +224,6 @@ struct Register
     size_t size;
     unsigned char *data;
 
-    // Physical registers.
-    std::vector<uint32_t> phy;
-
     Register(const Register &other)
     {
         if(false)std::cout << "move ctor allocated to " << this << " as " << &data << "\n";
@@ -234,7 +231,6 @@ struct Register
         size = other.size;
         data = new unsigned char[size];
         std::copy(other.data, other.data + size, data);
-        phy = other.phy;
     }
 
     Register(uint32_t type_, size_t size_) :
@@ -270,7 +266,6 @@ struct Register
             data = new unsigned char[size];
             if(false)std::cout << "op= allocated to " << this << " as " << &data << "\n";
             std::copy(other.data, other.data + size, data);
-            phy = other.phy;
         }
         return *this;
     }

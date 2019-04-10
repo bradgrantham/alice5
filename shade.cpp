@@ -404,7 +404,8 @@ struct Program
     std::vector<std::unique_ptr<Instruction>> instructions;
     // Map from label ID to block object.
     std::map<uint32_t, std::unique_ptr<Block>> blocks;
-    std::map<uint32_t, Register> registers;
+    // Map from virtual register ID to its type. Only used for results of instructions.
+    std::map<uint32_t, uint32_t> resultTypes;
     std::map<uint32_t, Register> constants;
 
     Function* currentFunction;
@@ -483,6 +484,15 @@ struct Program
             assert(false && "getConstituentType of invalid type?!");
         }
         return 0; // not reached
+    }
+
+    // If the type ID refers to a TypeVector, returns it. Otherwise returns null.
+    const TypeVector *getTypeAsVector(int typeId) const {
+        const Type &type = types.at(typeId);
+
+        return std::holds_alternative<TypeVector>(type)
+            ? &std::get<TypeVector>(type)
+            : nullptr;
     }
 
     void dumpTypeAt(const Type& type, unsigned char *ptr) const
@@ -1052,85 +1062,6 @@ struct Program
         return SPV_SUCCESS;
     }
 
-    // Assigns registers for this block.
-    void assignRegisters(Block *block, const std::set<uint32_t> &allPhy) {
-        std::cout << "assignRegisters(" << block->labelId << ")\n";
-
-        // Assigned physical registers.
-        std::set<uint32_t> assigned;
-
-        // Registers that are live going into this block have already been
-        // assigned. XXX not sure how that can be true.
-        for (auto regId : instructions.at(block->begin)->livein) {
-            auto r = registers.find(regId);
-            if (r == registers.end()) {
-                std::cout << "Warning: Virtual register "
-                    << regId << " not found in block " << block->labelId << ".\n";
-            } else if (r->second.phy.empty()) {
-                std::cout << "Warning: Expected physical register for "
-                    << regId << " in block " << block->labelId << ".\n";
-            } else {
-                for (auto phy : r->second.phy) {
-                    assigned.insert(phy);
-                }
-            }
-        }
-
-        for (int pc = block->begin; pc < block->end; pc++) {
-            Instruction *instruction = instructions.at(pc).get();
-
-            // Free up now-unused physical registers.
-            for (auto argId : instruction->argIds) {
-                // If this virtual register doesn't survive past this line, then we
-                // can use its physical register again.
-                if (instruction->liveout.find(argId) == instruction->liveout.end()) {
-                    auto r = registers.find(argId);
-                    if (r != registers.end()) {
-                        for (auto phy : r->second.phy) {
-                            assigned.erase(phy);
-                        }
-                    }
-                }
-            }
-
-            // Assign result registers to physical registers.
-            uint32_t resId = instruction->resId;
-            if (resId != NO_REGISTER) {
-                // Find an available physical register for this virtual register.
-                bool found = false;
-                for (uint32_t phy : allPhy) {
-                    if (assigned.find(phy) == assigned.end()) {
-                        auto r = registers.find(resId);
-                        if (r == registers.end()) {
-                            std::cout << "Warning: Virtual register "
-                                << resId << " not found in block " << block->labelId << ".\n";
-                            exit(EXIT_FAILURE);
-                        }
-                        r->second.phy.push_back(phy);
-                        // If the result lives past this instruction, consider its
-                        // register assigned.
-                        if (instruction->liveout.find(resId) != instruction->liveout.end()) {
-                            assigned.insert(phy);
-                        }
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    std::cout << "Error: No physical register available for "
-                        << instruction->resId << " on line " << pc << ".\n";
-                }
-            }
-        }
-
-        // Go down dominance tree.
-        for (auto& [labelId, subBlock] : blocks) {
-            if (subBlock->idom == block->labelId) {
-                assignRegisters(subBlock.get(), allPhy);
-            }
-        }
-    }
-
     // Post-parsing work.
     void postParse() {
         // Find the main function.
@@ -1320,21 +1251,6 @@ struct Program
             assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
         }
 
-        // Perform physical register assignment.
-
-        // Fake ones for now, pretend we have 32 of them.
-        std::set<uint32_t> PHY_REGS;
-        for (int i = 0; i < 32; i++) {
-            PHY_REGS.insert(i);
-        }
-
-        // Look for blocks at the start of functions.
-        for (auto& [labelId, block] : blocks) {
-            if (block->pred.empty()) {
-                assignRegisters(block.get(), PHY_REGS);
-            }
-        }
-
         // Dump block info.
         if (verbose) {
             std::cout << "----------------------- Block info\n";
@@ -1454,7 +1370,9 @@ Interpreter::Interpreter(const Program *pgm)
     std::fill(memory, memory + pgm->memorySize, 0xFF);
 
     // Allocate registers so they aren't allocated during run()
-    registers = pgm->registers;
+    for(auto [id, type]: pgm->resultTypes) {
+        registers[id] = Register {type, pgm->typeSizes.at(type)};
+    }
 }
 
 void Interpreter::copy(uint32_t type, size_t src, size_t dst)
@@ -3091,9 +3009,35 @@ void Interpreter::run()
 
 // -----------------------------------------------------------------------------------
 
+// Virtual register used by the compiler.
+struct CompilerRegister {
+    // Type of the data.
+    uint32_t type;
+
+    // Number of words of data in this register.
+    int count;
+
+    // Physical registers.
+    std::vector<uint32_t> phy;
+
+    CompilerRegister()
+        : type(NO_REGISTER)
+    {
+        // Nothing.
+    }
+
+    CompilerRegister(uint32_t type, int count)
+        : type(type), count(count)
+    {
+        // Nothing.
+    }
+};
+
+// Compiles a Program to our ISA.
 struct Compiler
 {
     const Program *pgm;
+    std::map<uint32_t, CompilerRegister> registers;
 
     Compiler(const Program *pgm) : pgm(pgm)
     {
@@ -3102,7 +3046,8 @@ struct Compiler
 
     void compile()
     {
-        // pc = pgm->mainFunction->start;
+        // Perform physical register assignment.
+        assignRegisters();
 
         for(int pc = 0; pc < pgm->instructions.size(); pc++) {
             for(auto &function : pgm->functions) {
@@ -3121,6 +3066,110 @@ struct Compiler
             }
 
             pgm->instructions.at(pc)->emit(this);
+        }
+    }
+
+    void assignRegisters() {
+        // Set up all the virtual registers we'll deal with.
+        for(auto [id, type]: pgm->resultTypes) {
+            const TypeVector *typeVector = pgm->getTypeAsVector(type);
+            int count = typeVector == nullptr ? 1 : typeVector->count;
+            registers[id] = CompilerRegister {type, count};
+            std::cout << id << " " << type << " " << count << "\n";
+        }
+
+        // Fake physical registers for now, pretend we have 32 of them.
+        std::set<uint32_t> PHY_REGS;
+        for (int i = 0; i < 32; i++) {
+            PHY_REGS.insert(i);
+        }
+
+        // Look for blocks at the start of functions.
+        for (auto& [labelId, block] : pgm->blocks) {
+            if (block->pred.empty()) {
+                assignRegisters(block.get(), PHY_REGS);
+            }
+        }
+    }
+
+    // Assigns registers for this block.
+    void assignRegisters(Block *block, const std::set<uint32_t> &allPhy) {
+        if (pgm->verbose) {
+            std::cout << "assignRegisters(" << block->labelId << ")\n";
+        }
+
+        // Assigned physical registers.
+        std::set<uint32_t> assigned;
+
+        // Registers that are live going into this block have already been
+        // assigned. XXX not sure how that can be true.
+        for (auto regId : pgm->instructions.at(block->begin)->livein) {
+            auto r = registers.find(regId);
+            if (r == registers.end()) {
+                std::cout << "Warning: Virtual register "
+                    << regId << " not found in block " << block->labelId << ".\n";
+            } else if (r->second.phy.empty()) {
+                std::cout << "Warning: Expected physical register for "
+                    << regId << " in block " << block->labelId << ".\n";
+            } else {
+                for (auto phy : r->second.phy) {
+                    assigned.insert(phy);
+                }
+            }
+        }
+
+        for (int pc = block->begin; pc < block->end; pc++) {
+            Instruction *instruction = pgm->instructions.at(pc).get();
+
+            // Free up now-unused physical registers.
+            for (auto argId : instruction->argIds) {
+                // If this virtual register doesn't survive past this line, then we
+                // can use its physical register again.
+                if (instruction->liveout.find(argId) == instruction->liveout.end()) {
+                    auto r = registers.find(argId);
+                    if (r != registers.end()) {
+                        for (auto phy : r->second.phy) {
+                            assigned.erase(phy);
+                        }
+                    }
+                }
+            }
+
+            // Assign result registers to physical registers.
+            uint32_t resId = instruction->resId;
+            if (resId != NO_REGISTER) {
+                // Find an available physical register for this virtual register.
+                bool found = false;
+                for (uint32_t phy : allPhy) {
+                    if (assigned.find(phy) == assigned.end()) {
+                        auto r = registers.find(resId);
+                        if (r == registers.end()) {
+                            std::cout << "Warning: Virtual register "
+                                << resId << " not found in block " << block->labelId << ".\n";
+                            exit(EXIT_FAILURE);
+                        }
+                        r->second.phy.push_back(phy);
+                        // If the result lives past this instruction, consider its
+                        // register assigned.
+                        if (instruction->liveout.find(resId) != instruction->liveout.end()) {
+                            assigned.insert(phy);
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    std::cout << "Error: No physical register available for "
+                        << instruction->resId << " on line " << pc << ".\n";
+                }
+            }
+        }
+
+        // Go down dominance tree.
+        for (auto& [labelId, subBlock] : pgm->blocks) {
+            if (subBlock->idom == block->labelId) {
+                assignRegisters(subBlock.get(), allPhy);
+            }
         }
     }
 
@@ -3143,8 +3192,8 @@ struct Compiler
             }
         }
 
-        auto r = pgm->registers.find(id);
-        if (r != pgm->registers.end()) {
+        auto r = registers.find(id);
+        if (r != registers.end()) {
             for (auto phy : r->second.phy) {
                 ss << "{x" << phy << "}";
             }

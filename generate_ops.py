@@ -253,7 +253,7 @@ def main():
             opcode_decode_f.write("    pgm->instructions.push_back(std::make_unique<%s>(%s));\n" %
                     (struct_opname, ", ".join(operand.cpp_name for operand in operands)))
             if 'IdResultType' in [op.kind for op in operands] and 'IdResult' in [op.kind for op in operands]:
-                opcode_decode_f.write("    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};\n")
+                opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")
 
             opcode_decode_f.write("    if(pgm->verbose) {\n")
             opcode_decode_f.write("        std::cout << \"%s\";\n" % short_opname)
@@ -357,7 +357,7 @@ def main():
                             operand.decode_function, operand.default_value))
             opcode_decode_f.write("    pgm->instructions.push_back(std::make_unique<%s>(%s));\n" %
                     (struct_opname, ", ".join(operand.cpp_name for operand in extinst_operands + operands)))
-            opcode_decode_f.write("    pgm->registers[resultId] = Register{type, pgm->typeSizes[type]};\n")
+            opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")
             opcode_decode_f.write("    if(pgm->verbose) {\n")
             opcode_decode_f.write("        std::cout << \"%s\";\n" % opname)
             for operand in extinst_operands + operands:
