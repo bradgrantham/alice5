@@ -404,8 +404,8 @@ struct Program
     std::vector<std::unique_ptr<Instruction>> instructions;
     // Map from label ID to block object.
     std::map<uint32_t, std::unique_ptr<Block>> blocks;
-    // Map from virtual register ID to physical register ID.
-    std::map<uint32_t, uint32_t> virtToPhy;
+    std::map<uint32_t, Register> registers;
+    std::map<uint32_t, Register> constants;
 
     Function* currentFunction;
     // Map from label ID to index into instructions vector.
@@ -416,8 +416,6 @@ struct Program
 
     std::map<uint32_t, MemoryRegion> memoryRegions;
 
-    std::map<uint32_t, uint32_t> resultsCreated;
-    std::map<uint32_t, Register> constants;
     Register& allocConstantObject(uint32_t id, uint32_t type)
     {
         Register r {type, typeSizes[type]};
@@ -1064,12 +1062,15 @@ struct Program
         // Registers that are live going into this block have already been
         // assigned. XXX not sure how that can be true.
         for (auto regId : instructions.at(block->begin)->livein) {
-            auto r = virtToPhy.find(regId);
-            if (r == virtToPhy.end()) {
+            auto r = registers.find(regId);
+            if (r == registers.end()) {
+                std::cout << "Warning: Virtual register "
+                    << regId << " not found in block " << block->labelId << ".\n";
+            } else if (r->second.phy == NO_REGISTER) {
                 std::cout << "Warning: Expected physical register for "
                     << regId << " in block " << block->labelId << ".\n";
             } else {
-                assigned.insert(r->second);
+                assigned.insert(r->second.phy);
             }
         }
 
@@ -1080,10 +1081,11 @@ struct Program
             for (auto argId : instruction->argIds) {
                 // If this virtual register doesn't survive past this line, then we
                 // can use its physical register again.
-                if (instruction->liveout.find(argId) == instruction->liveout.end() &&
-                        virtToPhy.find(argId) != virtToPhy.end()) {
-
-                    assigned.erase(virtToPhy.at(argId));
+                if (instruction->liveout.find(argId) == instruction->liveout.end()) {
+                    auto r = registers.find(argId);
+                    if (r != registers.end() && r->second.phy != NO_REGISTER) {
+                        assigned.erase(r->second.phy);
+                    }
                 }
             }
 
@@ -1094,7 +1096,13 @@ struct Program
                 bool found = false;
                 for (uint32_t phy : allPhy) {
                     if (assigned.find(phy) == assigned.end()) {
-                        virtToPhy[resId] = phy;
+                        auto r = registers.find(resId);
+                        if (r == registers.end()) {
+                            std::cout << "Warning: Virtual register "
+                                << resId << " not found in block " << block->labelId << ".\n";
+                            exit(EXIT_FAILURE);
+                        }
+                        r->second.phy = phy;
                         // If the result lives past this instruction, consider its
                         // register assigned.
                         if (instruction->liveout.find(resId) != instruction->liveout.end()) {
@@ -1442,16 +1450,7 @@ Interpreter::Interpreter(const Program *pgm)
     std::fill(memory, memory + pgm->memorySize, 0xFF);
 
     // Allocate registers so they aren't allocated during run()
-    for(auto [id, type]: pgm->resultsCreated) {
-        allocRegister(id, type);
-    }
-}
-
-Register& Interpreter::allocRegister(uint32_t id, uint32_t type)
-{
-    Register r {type, pgm->typeSizes.at(type)};
-    registers[id] = r;
-    return registers[id];
+    registers = pgm->registers;
 }
 
 void Interpreter::copy(uint32_t type, size_t src, size_t dst)
@@ -3140,10 +3139,10 @@ struct Compiler
             }
         }
 
-        auto r = pgm->virtToPhy.find(id);
-        if (r != pgm->virtToPhy.end()) {
-            if (r->second != NO_REGISTER) {
-                ss << "{%" << r->second << "}";
+        auto r = pgm->registers.find(id);
+        if (r != pgm->registers.end()) {
+            if (r->second.phy != NO_REGISTER) {
+                ss << "{x" << r->second.phy << "}";
             }
         }
 

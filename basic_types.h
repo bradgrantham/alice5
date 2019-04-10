@@ -224,6 +224,9 @@ struct Register
     size_t size;
     unsigned char *data;
 
+    // Physical register.
+    uint32_t phy;
+
     Register(const Register &other)
     {
         if(false)std::cout << "move ctor allocated to " << this << " as " << &data << "\n";
@@ -231,12 +234,14 @@ struct Register
         size = other.size;
         data = new unsigned char[size];
         std::copy(other.data, other.data + size, data);
+        phy = other.phy;
     }
 
     Register(uint32_t type_, size_t size_) :
         type(type_),
         size(size_),
-        data(new unsigned char[size_])
+        data(new unsigned char[size_]),
+        phy(NO_REGISTER)
     {
         if(false)std::cout << "ctor allocated to " << this << " as " << &data << "\n";
     }
@@ -244,7 +249,8 @@ struct Register
     Register() :
         type(0xFFFFFFFF),
         size(0),
-        data(nullptr)
+        data(nullptr),
+        phy(NO_REGISTER)
     {
         if(false)std::cout << "ctor empty Register " << this << " \n";
     }
@@ -266,6 +272,7 @@ struct Register
             data = new unsigned char[size];
             if(false)std::cout << "op= allocated to " << this << " as " << &data << "\n";
             std::copy(other.data, other.data + size, data);
+            phy = other.phy;
         }
         return *this;
     }

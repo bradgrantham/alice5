@@ -31,8 +31,6 @@ struct Interpreter
         delete[] memory;
     }
 
-    Register& allocRegister(uint32_t id, uint32_t type);
-
     // Copy a variable of type "type" from "src" to "dst" in memory.
     void copy(uint32_t type, size_t src, size_t dst);
 
