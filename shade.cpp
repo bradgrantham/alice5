@@ -27,6 +27,7 @@
 #include <SPIRV/GlslangToSpv.h>
 #include <SPIRV/disassemble.h>
 #include <spirv-tools/libspirv.h>
+#include <spirv-tools/optimizer.hpp>
 #include "spirv.h"
 #include "GLSL.std.450.h"
 #include "json.hpp"
@@ -3083,12 +3084,17 @@ struct Compiler
 
     void emitBinaryOp(const std::string &opName, int op1, int op2, int result)
     {
-        CompilerRegister &r = registers.at(result);
-
-        for (int i = 0; i < r.count; i++) {
+        auto r = registers.find(result);
+        if (r == registers.end()) {
             std::ostringstream ss;
-            ss << opName << " " << reg(op1, i) << ", " << reg(op2, i) << ", " << reg(result, i);
+            ss << opName << " " << reg(op1) << ", " << reg(op2) << ", " << reg(result);
             emit(ss.str(), "");
+        } else {
+            for (int i = 0; i < r->second.count; i++) {
+                std::ostringstream ss;
+                ss << opName << " " << reg(op1, i) << ", " << reg(op2, i) << ", " << reg(result, i);
+                emit(ss.str(), "");
+            }
         }
     }
 
@@ -3379,6 +3385,12 @@ std::string getFilepathAdjacentToPath(const std::string& filename, std::string a
     return result;
 }
 
+void earwigMessageConsumer(spv_message_level_t level, const char *source,
+        const spv_position_t& position, const char *message)
+{
+    std::cout << source << ": " << message << "\n";
+}
+
 int main(int argc, char **argv)
 {
     bool debug = false;
@@ -3593,7 +3605,9 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    std::vector<unsigned int> spirv;
+    spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_3;
+
+    std::vector<uint32_t> spirv;
     std::string warningsErrors;
     spv::SpvBuildLogger logger;
     glslang::SpvOptions options;
@@ -3602,6 +3616,18 @@ int main(int argc, char **argv)
     options.optimizeSize = false;
     glslang::TIntermediate *shaderInterm = program.getIntermediate(EShLangFragment);
     glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
+
+    if (optimize) {
+        spvtools::Optimizer optimizer(targetEnv);
+        optimizer.SetMessageConsumer(earwigMessageConsumer);
+        optimizer.RegisterPerformancePasses();
+        // optimizer.SetPrintAll(&std::cerr);
+        spvtools::OptimizerOptions optimizerOptions;
+        bool success = optimizer.Run(spirv.data(), spirv.size(), &spirv, optimizerOptions);
+        if (!success) {
+            std::cout << "Warning: Optimizer failed.\n";
+        }
+    }
 
     if(disassemble) {
         spv::Disassemble(std::cout, spirv);
@@ -3614,7 +3640,7 @@ int main(int argc, char **argv)
     }
 
     Program pgm(throwOnUnimplemented, beVerbose);
-    spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
+    spv_context context = spvContextCreate(targetEnv);
     spvBinaryParse(context, &pgm, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
 
     if (pgm.hasUnimplemented) {
