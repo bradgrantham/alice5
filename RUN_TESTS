@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+echo 
+for i in wetrock creation define flirt lk wavy
+do
+    echo $i
+    shade -f 90 90 shaders/$i.frag
+    mv image0090.ppm $i.ppm
+    echo $i.ppm
+    echo
+done
