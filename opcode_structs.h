@@ -5,6 +5,24 @@
 
 #include "interpreter.h"
 
+// OpNop instruction (code 0).
+struct InsnNop : public Instruction {
+    InsnNop() : Instruction(NO_REGISTER) {
+    }
+    virtual void step(Interpreter *interpreter) { interpreter->stepNop(*this); }
+    virtual std::string name() { return "OpNop"; }
+};
+
+// OpUndef instruction (code 1).
+struct InsnUndef : public Instruction {
+    InsnUndef(uint32_t type, uint32_t resultId) : Instruction(resultId), type(type), resultId(resultId) {
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    virtual void step(Interpreter *interpreter) { interpreter->stepUndef(*this); }
+    virtual std::string name() { return "OpUndef"; }
+};
+
 // OpFunctionParameter instruction (code 55).
 struct InsnFunctionParameter : public Instruction {
     InsnFunctionParameter(uint32_t type, uint32_t resultId) : Instruction(resultId), type(type), resultId(resultId) {
@@ -116,6 +134,21 @@ struct InsnCompositeExtract : public Instruction {
     std::vector<uint32_t> indexesId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepCompositeExtract(*this); }
     virtual std::string name() { return "OpCompositeExtract"; }
+};
+
+// OpCompositeInsert instruction (code 82).
+struct InsnCompositeInsert : public Instruction {
+    InsnCompositeInsert(uint32_t type, uint32_t resultId, uint32_t objectId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(resultId), type(type), resultId(resultId), objectId(objectId), compositeId(compositeId), indexesId(indexesId) {
+        argIds.insert(objectId);
+        argIds.insert(compositeId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t objectId; // operand from register
+    uint32_t compositeId; // operand from register
+    std::vector<uint32_t> indexesId; // LiteralInteger
+    virtual void step(Interpreter *interpreter) { interpreter->stepCompositeInsert(*this); }
+    virtual std::string name() { return "OpCompositeInsert"; }
 };
 
 // OpImageSampleImplicitLod instruction (code 87).

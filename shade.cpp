@@ -1268,6 +1268,16 @@ void Interpreter::clearPrivateVariables()
     std::fill(memory + mr.base, memory + mr.top, 0x00);
 }
 
+void Interpreter::stepNop(const InsnNop& insn)
+{
+    // Nothing to do.
+}
+
+void Interpreter::stepUndef(const InsnUndef& insn)
+{
+    // Nothing to do.
+}
+
 void Interpreter::stepLoad(const InsnLoad& insn)
 {
     Pointer& ptr = pointers.at(insn.pointerId);
@@ -1308,6 +1318,28 @@ void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
         pgm->dumpTypeAt(pgm->types.at(insn.type), obj.data);
         std::cout << "\n";
     }
+}
+
+// XXX This method has not been tested.
+void Interpreter::stepCompositeInsert(const InsnCompositeInsert& insn)
+{
+    Register& res = registers[insn.resultId];
+    Register& obj = registers[insn.objectId];
+    Register& cmp = registers[insn.compositeId];
+
+    // Start by copying composite to result.
+    std::copy(cmp.data, cmp.data + pgm->typeSizes.at(cmp.type), res.data);
+
+    /* use indexes to walk blob */
+    uint32_t type = res.type;
+    size_t offset = 0;
+    for(auto& j: insn.indexesId) {
+        for(int i = 0; i < j; i++) {
+            offset += pgm->typeSizes.at(pgm->getConstituentType(type, i));
+        }
+        type = pgm->getConstituentType(type, j);
+    }
+    std::copy(obj.data, obj.data + pgm->typeSizes.at(obj.type), res.data);
 }
 
 void Interpreter::stepCompositeConstruct(const InsnCompositeConstruct& insn)
