@@ -3434,27 +3434,29 @@ const std::string shaderEpilogueFilename = "epilogue.frag";
 std::string shaderPreamble;
 std::string shaderEpilogue;
 
+struct ShaderSource
+{
+    std::string code;
+    std::string filename;
+};
+
 struct RenderPass
 {
     std::string name;
     std::vector<ShaderToyImage> inputs; // in channel order
     std::vector<ShaderToyImage> outputs;
-    std::string common_code;
-    std::string common_code_filename;
-    std::string shader_code;
-    std::string shader_code_filename;
+    ShaderSource common;
+    ShaderSource shader;
     Program pgm;
     void Render(void) {
         // set input images, uniforms, output images, call run()
     }
-    RenderPass(const std::string& name_, std::vector<ShaderToyImage> inputs_, std::vector<ShaderToyImage> outputs_, const std::string& common_, const std::string& common_code_filename_, const std::string& code_, const std::string& shader_code_filename_, bool throwOnUnimplemented, bool beVerbose) :
+    RenderPass(const std::string& name_, std::vector<ShaderToyImage> inputs_, std::vector<ShaderToyImage> outputs_, const ShaderSource& common_, const ShaderSource& shader_, bool throwOnUnimplemented, bool beVerbose) :
         name(name_),
         inputs(inputs_),
         outputs(outputs_),
-        common_code(common_),
-        common_code_filename(common_code_filename_),
-        shader_code(code_),
-        shader_code_filename(shader_code_filename_),
+        common(common_),
+        shader(shader_),
         pgm(throwOnUnimplemented, beVerbose)
     {
     }
@@ -3761,8 +3763,8 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    shaderPreamble = readFileContents(shaderPreambleFilename);
-    shaderEpilogue = readFileContents(shaderEpilogueFilename);
+    ShaderSource preamble { readFileContents(shaderPreambleFilename), shaderPreambleFilename };
+    ShaderSource epilogue { readFileContents(shaderEpilogueFilename), shaderEpilogueFilename };
 
     std::vector<RenderPassPtr> renderPasses;
 
@@ -3776,7 +3778,7 @@ int main(int argc, char **argv)
         ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, imageWidth, imageHeight));
         ShaderToyImage output {image, Sampler {}};
 
-        RenderPassPtr pass(new RenderPass("image", {}, {output}, "", "", shader_code, filename, throwOnUnimplemented, beVerbose));
+        RenderPassPtr pass(new RenderPass("image", {}, {output}, {"", ""}, {shader_code, filename}, throwOnUnimplemented, beVerbose));
 
         renderPasses.push_back(pass);
 
@@ -3794,8 +3796,8 @@ int main(int argc, char **argv)
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 
     {
-        const char* strings[4] = { shaderPreamble.c_str(), pass->shader_code.c_str(), pass->common_code.c_str(), shaderEpilogue.c_str() };
-        const char* names[4] = { shaderPreambleFilename.c_str(), pass->common_code_filename.c_str(), pass->shader_code_filename.c_str(), shaderEpilogueFilename.c_str() };
+        const char* strings[4] = { preamble.code.c_str(), pass->common.code.c_str(), pass->shader.code.c_str(), epilogue.code.c_str() };
+        const char* names[4] = { preamble.filename.c_str(), pass->common.filename.c_str(), pass->shader.filename.c_str(), epilogue.filename.c_str() };
         shader->setStringsWithLengthsAndNames(strings, NULL, names, 4);
     }
 
