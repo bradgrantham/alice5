@@ -2785,7 +2785,7 @@ void Interpreter::stepPhi(const InsnPhi& insn)
     }
 }
 
-Image *texture;
+ImagePtr texture;
 
 // XXX image binding
 // XXX implicit LOD level and thus texel interpolants
@@ -3320,7 +3320,7 @@ void usage(const char* progname)
 static std::atomic_int rowsLeft;
 
 // Render rows starting at "startRow" every "skip".
-void render(const Program *pgm, int startRow, int skip, Image* output, float when)
+void render(const Program *pgm, int startRow, int skip, ImagePtr output, float when)
 {
     Interpreter interpreter(pgm);
 
@@ -3423,6 +3423,241 @@ void earwigMessageConsumer(spv_message_level_t level, const char *source,
     std::cout << source << ": " << message << "\n";
 }
 
+struct ShaderToyImage
+{
+    ImagePtr image;
+    Sampler sampler;
+};
+
+const std::string shaderPreambleFilename = "preamble.frag";
+const std::string shaderEpilogueFilename = "epilogue.frag";
+std::string shaderPreamble;
+std::string shaderEpilogue;
+
+struct RenderPass
+{
+    std::string name;
+    std::vector<ShaderToyImage> inputs; // in channel order
+    std::vector<ShaderToyImage> outputs;
+    std::string common_code;
+    std::string common_code_filename;
+    std::string shader_code;
+    std::string shader_code_filename;
+    Program pgm;
+    void Render(void) {
+        // set input images, uniforms, output images, call run()
+    }
+    RenderPass(const std::string& name_, std::vector<ShaderToyImage> inputs_, std::vector<ShaderToyImage> outputs_, const std::string& common_, const std::string& common_code_filename_, const std::string& code_, const std::string& shader_code_filename_, bool throwOnUnimplemented, bool beVerbose) :
+        name(name_),
+        inputs(inputs_),
+        outputs(outputs_),
+        common_code(common_),
+        common_code_filename(common_code_filename_),
+        shader_code(code_),
+        shader_code_filename(shader_code_filename_),
+        pgm(throwOnUnimplemented, beVerbose)
+    {
+    }
+};
+
+typedef std::shared_ptr<RenderPass> RenderPassPtr;
+
+#if 0
+void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPassPtr>& renderPasses)
+{
+    std::string common_code;
+    json j = json::parse(text);
+
+    // Go through the render passes and do preprocessing.
+    
+    auto& renderPasses = j["Shader"]["renderpass"];
+    for (json::iterator it = renderPasses.begin(); it != renderPasses.end(); ++it) {
+        auto& pass = *it;
+
+        // If special key "codefile" is present, use that file as
+        // the shader code instead of the value of key "code".
+
+        if(pass.find("codefile") != pass.end()) {
+            std::string code_filename = pass["codefile"];
+
+            code_filename = getFilepathAdjacentToPath(code_filename, filename);
+
+            pass["full_code_filename"] = code_filename;
+            pass["code"] = readFileContents(code_filename);
+        }
+
+	// If this is the "common" pass, it includes text which is
+	// preprended to all other passes.
+
+        if(pass["type"] == "common") {
+            common_code = pass["code"]
+        }
+    }
+
+    for (json::iterator it = renderPasses.begin(); it != renderPasses.end(); ++it) {
+        auto& pass = *it;
+
+        if(pass.find("full_code_filename") != pass.end()) {
+            // If we find "full_code_filename", that's the
+            // fully-qualified absolute on-disk path we loaded.  Set
+            // that for debugging.
+            filename = pass["full_code_filename"];
+        } else if(pass.find("codefile") != pass.end()) {
+            // If we find only "codefile", that's the on-disk path
+            // the JSON specified.  Set that for debugging.
+            filename = pass["codefile"];
+        } else {
+            // If we find neither "codefile" nor "full_code_filename",
+            // then the shader came out of the renderpass "code", so
+            // at least use the pass name to aid debugging.
+            filename = std::string("shader from pass ") + pass["name"].get<std::string>();
+        }
+        shader_code = pass["code"];
+
+        for(auto& input: pass["inputs"]) {
+            auto src = input["src"].get<std::string>();
+            bool isABuffer = (src.find("/media/previz/buffer") != std::string::npos)
+            if(isABuffer) {
+
+                /* pass */
+
+            } else if(input.find("locally_saved") == input.end()) {
+
+                throw std::runtime_error("downloading assets is not supported; didn't find \"locally_saved\" key for an asset");
+
+            } else {
+
+                if(input["type"] != "texture") {
+                    throw std::runtime_error("unsupported input type " + input["type"].get<std::string>());
+                }
+
+                std::string asset_filename = getFilepathAdjacentToPath(input0["locally_saved"].get<std::string>(), filename);
+
+                unsigned int textureWidth, textureHeight;
+                float *textureData;
+
+                FILE *fp = fopen(asset_filename.c_str(), "rb");
+                if(!pnmRead(fp, &textureWidth, &textureHeight, &textureData, NULL, NULL)) {
+                    std::cerr << "couldn't read image from " << asset_filename;
+                    exit(EXIT_FAILURE);
+                }
+
+                ImagePtr image(new Image(Image::FORMAT_R32G32B32A32_SFLOAT, Image::DIM_2D, textureWidth, textureHeight));
+
+                if((input0.find("vflip") != input0.end()) && (input0["vflip"].get<std::string>() == std::string("true"))) {
+                } else {
+                    unsigned char* s = reinterpret_cast<unsigned char*>(textureData);
+                    unsigned char* d = reinterpret_cast<unsigned char*>(texture->storage);
+                    int rowsize = textureWidth * Image::getPixelSize(Image::FORMAT_R32G32B32A32_SFLOAT);
+                    for(int row = 0; row < textureHeight; row++) {
+                        std::copy(s + rowsize * row, s + rowsize * (row + 1), d + rowsize * (textureHeight - row - 1));
+                    }
+                }
+
+                fclose(fp);
+
+            }
+        }
+    }
+
+    // Hook up images from inputs to outputs
+        shaderPreamble = shaderPreamble + "layout (binding = 1) uniform sampler2D iChannel0;\n";
+
+    ShaderToyImage input(texture, Sampler {});
+
+    ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, imageWidth, imageHeight));
+    ShaderToyImage output(image, Sampler {});
+
+    RenderPassPtr pass(new RenderPass(
+        "Image",
+        (texture == NULL) ? {} : {t}, 
+        {output},
+        common_code,
+        shader_code,
+        throwOnUnimplemented,
+        beVerbose));
+
+    glslang::TShader *shader = new glslang::TShader(EShLangFragment);
+
+    {
+        const char* strings[4] = { shaderPreamble.c_str(), pass.shader_code.c_str(), pass.common_code.c_str(), epilogue.c_str() };
+        const char* names[4] = { shaderPreambleFilename.c_str(), pass.common_code_filename.c_str(), pass.shader_code_filename.c_str(), epilogueFilename.c_str() };
+        shader->setStringsWithLengthsAndNames(strings, NULL, names, 4);
+    }
+
+    shader->setEnvInput(glslang::EShSourceGlsl, EShLangFragment, glslang::EShClientVulkan, glslang::EShTargetVulkan_1_0);
+
+    shader->setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_1);
+
+    shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_3);
+
+    EShMessages messages = (EShMessages)(EShMsgDefault | EShMsgSpvRules | EShMsgVulkanRules | EShMsgDebugInfo);
+
+    glslang::TShader::ForbidIncluder includer;
+    TBuiltInResource resources;
+
+    resources = glslang::DefaultTBuiltInResource;
+
+    ShInitialize();
+
+    glslang::TProgram& program = *new glslang::TProgram;
+
+    if (!shader->parse(&resources, 110, false, messages, includer)) {
+        std::cerr << "compile failed\n";
+        std::cerr << shader->getInfoLog();
+        exit(EXIT_FAILURE);
+    }
+
+    program.addShader(shader);
+
+    if(!program.link(messages)) {
+        std::cerr << "link failed\n";
+        std::cerr << program.getInfoLog();
+        exit(EXIT_FAILURE);
+    }
+
+    spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_3;
+
+    std::vector<uint32_t> spirv;
+    std::string warningsErrors;
+    spv::SpvBuildLogger logger;
+    glslang::SpvOptions options;
+    options.generateDebugInfo = debug;
+    options.disableOptimizer = !optimize;
+    options.optimizeSize = false;
+    glslang::TIntermediate *shaderInterm = program.getIntermediate(EShLangFragment);
+    glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
+
+    if (optimize) {
+        spvtools::Optimizer optimizer(targetEnv);
+        optimizer.SetMessageConsumer(earwigMessageConsumer);
+        optimizer.RegisterPerformancePasses();
+        // optimizer.SetPrintAll(&std::cerr);
+        spvtools::OptimizerOptions optimizerOptions;
+        bool success = optimizer.Run(spirv.data(), spirv.size(), &spirv, optimizerOptions);
+        if (!success) {
+            std::cout << "Warning: Optimizer failed.\n";
+        }
+    }
+
+    if(disassemble) {
+        spv::Disassemble(std::cout, spirv);
+    }
+
+    if(false) {
+        FILE *fp = fopen("spirv", "wb");
+        fwrite(spirv.data(), 1, spirv.size() * 4, fp);
+        fclose(fp);
+    }
+
+    spv_context context = spvContextCreate(targetEnv);
+    spvBinaryParse(context, &pass.pgm, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
+
+    pass.pgm.postParse();
+
+}
+#endif
+
 int main(int argc, char **argv)
 {
     bool debug = false;
@@ -3436,6 +3671,8 @@ int main(int argc, char **argv)
     int imageStart = 0, imageEnd = 0;
     int imageWidth = 640/2; // ShaderToy default is 640
     int imageHeight = 360/2; // ShaderToy default is 360
+
+    ShInitialize();
 
     char *progname = argv[0];
     argv++; argc--;
@@ -3524,86 +3761,42 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    std::string preambleFilename = "preamble.frag";
-    std::string preamble = readFileContents(preambleFilename);
-    std::string epilogueFilename = "epilogue.frag";
-    std::string epilogue = readFileContents(epilogueFilename);
+    shaderPreamble = readFileContents(shaderPreambleFilename);
+    shaderEpilogue = readFileContents(shaderEpilogueFilename);
+
+    std::vector<RenderPassPtr> renderPasses;
 
     std::string filename = argv[0];
-    std::string text = readFileContents(filename);
+    std::string shader_code;
 
-    if(inputIsJSON) {
-        json j = json::parse(text);
+    if(!inputIsJSON) {
 
-        // Go through the render passes.  If special key "codefile" is
-        // present, use that file as the shader code instead of the value
-        // of key "code".
-        auto& passes = j["Shader"]["renderpass"];
-        for (json::iterator it = passes.begin(); it != passes.end(); ++it) {
-            auto& pass = *it;
-            if(pass.find("codefile") != pass.end()) {
-                std::string code_filename = pass["codefile"];
+        shader_code = readFileContents(filename);
 
-                code_filename = getFilepathAdjacentToPath(code_filename, filename);
+        ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, imageWidth, imageHeight));
+        ShaderToyImage output {image, Sampler {}};
 
-                pass["full_code_filename"] = code_filename;
-                pass["code"] = readFileContents(code_filename);
-            }
-        }
+        RenderPassPtr pass(new RenderPass("image", {}, {output}, "", "", shader_code, filename, throwOnUnimplemented, beVerbose));
 
-        auto& pass0 = j["Shader"]["renderpass"][0];
+        renderPasses.push_back(pass);
 
-        // Do special casing for single pass, since that's all we handle now.
-        if(pass0.find("full_code_filename") != pass0.end()) {
-	    // If we find "full_code_filename", that's the
-	    // fully-qualified absolute on-disk path we loaded.  Set
-	    // that for debugging.
-            filename = pass0["full_code_filename"];
-        } else if(pass0.find("codefile") != pass0.end()) {
-	    // If we find only "codefile", that's the on-disk path
-	    // the JSON specified.  Set that for debugging.
-            filename = pass0["codefile"];
-        } else {
-	    // If we find neither "codefile" nor "full_code_filename",
-	    // then the shader came out of the renderpass "code", so
-	    // at least use the pass name to aid debugging.
-            filename = std::string("shader from pass ") + pass0["name"].get<std::string>();
-        }
-        text = pass0["code"];
+    } else {
 
-        if(pass0.find("inputs") != pass0.end()) {
-            auto& input0 = pass0["inputs"][0];
-            if(input0.find("locally_saved") != input0.end()) {
-                std::string asset_filename = getFilepathAdjacentToPath(input0["locally_saved"].get<std::string>(), filename);
-                FILE *fp = fopen(asset_filename.c_str(), "rb");
-                unsigned int textureWidth, textureHeight;
-                float *textureData;
-                if(!pnmRead(fp, &textureWidth, &textureHeight, &textureData, NULL, NULL)) {
-                    std::cerr << "couldn't read image from " << asset_filename;
-                    exit(EXIT_FAILURE);
-                }
-                texture = new Image(Image::FORMAT_R32G32B32A32_SFLOAT, Image::DIM_2D, textureWidth, textureHeight);
-                if((input0.find("vflip") != input0.end()) && (input0["vflip"].get<std::string>() == std::string("true"))) {
-                } else {
-                    unsigned char* s = reinterpret_cast<unsigned char*>(textureData);
-                    unsigned char* d = reinterpret_cast<unsigned char*>(texture->storage);
-                    int rowsize = textureWidth * Image::getPixelSize(Image::FORMAT_R32G32B32A32_SFLOAT);
-                    for(int row = 0; row < textureHeight; row++) {
-                        std::copy(s + rowsize * row, s + rowsize * (row + 1), d + rowsize * (textureHeight - row - 1));
-                    }
-                }
-                fclose(fp);
-                preamble = preamble + "layout (binding = 1) uniform sampler2D iChannel0;\n";
-            }
-        }
+        // getRenderPassesFromJSON(readFileContents(filename), renderPasses);
+
     }
+
+    // Do passes
+
+    RenderPassPtr pass = renderPasses[0];
+    ShaderToyImage output = pass->outputs[0];
 
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 
     {
-        const char* strings[3] = { preamble.c_str(), text.c_str(), epilogue.c_str() };
-        const char* names[3] = { preambleFilename.c_str(), filename.c_str(), epilogueFilename.c_str() };
-        shader->setStringsWithLengthsAndNames(strings, NULL, names, 3);
+        const char* strings[4] = { shaderPreamble.c_str(), pass->shader_code.c_str(), pass->common_code.c_str(), shaderEpilogue.c_str() };
+        const char* names[4] = { shaderPreambleFilename.c_str(), pass->common_code_filename.c_str(), pass->shader_code_filename.c_str(), shaderEpilogueFilename.c_str() };
+        shader->setStringsWithLengthsAndNames(strings, NULL, names, 4);
     }
 
     shader->setEnvInput(glslang::EShSourceGlsl, EShLangFragment, glslang::EShClientVulkan, glslang::EShTargetVulkan_1_0);
@@ -3618,8 +3811,6 @@ int main(int argc, char **argv)
     TBuiltInResource resources;
 
     resources = glslang::DefaultTBuiltInResource;
-
-    ShInitialize();
 
     glslang::TProgram& program = *new glslang::TProgram;
 
@@ -3671,18 +3862,17 @@ int main(int argc, char **argv)
         fclose(fp);
     }
 
-    Program pgm(throwOnUnimplemented, beVerbose);
     spv_context context = spvContextCreate(targetEnv);
-    spvBinaryParse(context, &pgm, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
+    spvBinaryParse(context, &pass->pgm, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
 
-    if (pgm.hasUnimplemented) {
+    pass->pgm.postParse();
+
+    if (pass->pgm.hasUnimplemented) {
         exit(1);
     }
 
-    pgm.postParse();
-
     if (compile) {
-        bool success = compileProgram(pgm);
+        bool success = compileProgram(pass->pgm);
         exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
     }
 
@@ -3692,26 +3882,24 @@ int main(int argc, char **argv)
 
     int threadCount = std::thread::hardware_concurrency();
     std::cout << "Using " << threadCount << " threads.\n";
-
-    Image image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, imageWidth, imageHeight);
-
     for(int imageNumber = imageStart; imageNumber <= imageEnd; imageNumber++) {
 
+        ImagePtr image = output.image;
         auto startTime = std::chrono::steady_clock::now();
 
         // Workers decrement rowsLeft at the end of each row.
-        rowsLeft = image.height;
+        rowsLeft = output.image->height;
 
         std::vector<std::thread *> thread;
 
         // Generate the rows on multiple threads.
         for (int t = 0; t < threadCount; t++) {
-            thread.push_back(new std::thread(render, &pgm, t, threadCount, &image, imageNumber / 60.0));
+            thread.push_back(new std::thread(render, &pass->pgm, t, threadCount, output.image, imageNumber / 60.0));
             // std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         // Progress information.
-        thread.push_back(new std::thread(showProgress, image.height, startTime));
+        thread.push_back(new std::thread(showProgress, output.image->height, startTime));
 
         // Wait for worker threads to quit.
         for (int t = 0; t < thread.size(); t++) {
@@ -3726,13 +3914,13 @@ int main(int argc, char **argv)
             std::chrono::steady_clock::period::num/
             std::chrono::steady_clock::period::den;
         std::cout << "Shading took " << elapsedSeconds << " seconds ("
-            << long(image.width*image.height/elapsedSeconds) << " pixels per second)\n";
+            << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
 
         std::ostringstream ss;
         ss << "image" << std::setfill('0') << std::setw(4) << imageNumber << std::setw(0) << ".ppm";
         std::ofstream imageFile(ss.str(), std::ios::out | std::ios::binary);
-        imageFile << "P6 " << image.width << " " << image.height << " 255\n";
-        imageFile.write(reinterpret_cast<char *>(image.getPixelAddress(0, 0)), 3 * image.width * image.height);
+        imageFile << "P6 " << image->width << " " << image->height << " 255\n";
+        imageFile.write(reinterpret_cast<char *>(image->getPixelAddress(0, 0)), 3 * image->width * image->height);
         imageFile.close();
     }
 

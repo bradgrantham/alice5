@@ -147,4 +147,10 @@ private:
     }
 };
 
+struct Sampler
+{
+};
+
+typedef std::shared_ptr<Image> ImagePtr;
+
 #endif /* IMAGE_H */
