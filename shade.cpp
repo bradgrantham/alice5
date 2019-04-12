@@ -3636,6 +3636,19 @@ bool createSPIRVFromSources(const std::vector<ShaderSource>& sources, bool debug
     return true;
 }
 
+void optimizeSPIRV(bool optimize, spv_target_env targetEnv, std::vector<uint32_t>& spirv)
+{
+    spvtools::Optimizer optimizer(targetEnv);
+    optimizer.SetMessageConsumer(earwigMessageConsumer);
+    optimizer.RegisterPerformancePasses();
+    // optimizer.SetPrintAll(&std::cerr);
+    spvtools::OptimizerOptions optimizerOptions;
+    bool success = optimizer.Run(spirv.data(), spirv.size(), &spirv, optimizerOptions);
+    if (!success) {
+        std::cout << "Warning: Optimizer failed.\n";
+    }
+}
+
 bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool optimize, bool disassemble, Program& program)
 {
     std::vector<uint32_t> spirv;
@@ -3648,15 +3661,7 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
     spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_3;
 
     if (optimize) {
-        spvtools::Optimizer optimizer(targetEnv);
-        optimizer.SetMessageConsumer(earwigMessageConsumer);
-        optimizer.RegisterPerformancePasses();
-        // optimizer.SetPrintAll(&std::cerr);
-        spvtools::OptimizerOptions optimizerOptions;
-        bool success = optimizer.Run(spirv.data(), spirv.size(), &spirv, optimizerOptions);
-        if (!success) {
-            std::cout << "Warning: Optimizer failed.\n";
-        }
+        optimizeSPIRV(optimize, targetEnv, spirv);
     }
 
     if(disassemble) {
