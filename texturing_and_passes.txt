@@ -1,13 +1,11 @@
-Implement Sampler and sample()
-    test on single texture input
-Write Python program to fetch JSON and local-ize shaders and assets
-    test on a different sample
 Parse JSON into Pass, Image, Sampler
     test dump from multipass shader (wall effect?)
 Use Passes correctly
     try a BUNCH of shaders
 Pixel kill?
 Test C64
+Implement Sampler and sample()
+    test on single texture input
 
 Sampler {
     // populated from json
