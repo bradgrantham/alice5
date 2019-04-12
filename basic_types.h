@@ -208,6 +208,10 @@ struct Function
 
     // Index into the "code" array.
     uint32_t start;
+
+    // ID of the start label. Don't jump here, this is for block dominance calculations.
+    // This is NO_BLOCK_ID if it's not yet been set.
+    uint32_t labelId;
 };
 
 struct Pointer

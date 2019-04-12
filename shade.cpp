@@ -34,6 +34,7 @@
 #include "basic_types.h"
 #include "image.h"
 #include "interpreter.h"
+#include "timer.h"
 
 static void skipComments(FILE *fp, char ***comments, size_t *commentCount)
 {
@@ -871,7 +872,7 @@ struct Program
                 uint32_t functionControl = nextu(); // bitfield hints for inlining, pure, etc.
                 uint32_t functionType = nextu();
                 uint32_t start = pgm->instructions.size();
-                pgm->functions[id] = Function {id, resultType, functionControl, functionType, start };
+                pgm->functions[id] = Function {id, resultType, functionControl, functionType, start , NO_BLOCK_ID};
                 pgm->currentFunction = &pgm->functions[id];
                 if(pgm->verbose) {
                     std::cout << "Function " << id
@@ -886,6 +887,10 @@ struct Program
             case SpvOpLabel: {
                 uint32_t id = nextu();
                 pgm->labels[id] = pgm->instructions.size();
+                // The first label we run into after a function definition is its start block.
+                if(pgm->currentFunction->labelId == NO_BLOCK_ID) {
+                    pgm->currentFunction->labelId = id;
+                }
                 if(pgm->verbose) {
                     std::cout << "Label " << id
                         << " at " << pgm->labels[id]
@@ -1002,63 +1007,78 @@ struct Program
             }
         }
 
-        // Compute livein and liveout registers for each line. This is an inefficient
-        // way to do this, we should use a worklist algorithm.
-        bool changed = true;
-        while (changed) {
-            changed = false;
+        // Compute livein and liveout registers for each line.
+        Timer timer;
+        std::set<uint32_t> pc_worklist; // PCs left to work on.
+        for (int pc = 0; pc < instructions.size(); pc++) {
+            pc_worklist.insert(pc);
+        }
+        while (!pc_worklist.empty()) {
+            // Pick any PC to start with. Starting at the end is a bit more efficient
+            // since our predecessor depends on us.
+            auto itr = pc_worklist.rbegin();
+            uint32_t pc = *itr;
+            pc_worklist.erase(*itr);
 
-            for (int pc = 0; pc < instructions.size(); pc++) {
-                Instruction *instruction = instructions[pc].get();
-                std::set<uint32_t> oldLivein = instruction->livein;
-                std::set<uint32_t> oldLiveout = instruction->liveout;
+            Instruction *instruction = instructions[pc].get();
+            std::set<uint32_t> oldLivein = instruction->livein;
+            std::set<uint32_t> oldLiveout = instruction->liveout;
 
-                instruction->liveout.clear();
-                for (uint32_t succPc : instruction->succ) {
-                    Instruction *succInstruction = instructions[succPc].get();
-                    instruction->liveout.insert(succInstruction->livein.begin(),
+            instruction->liveout.clear();
+            for (uint32_t succPc : instruction->succ) {
+                Instruction *succInstruction = instructions[succPc].get();
+                instruction->liveout.insert(succInstruction->livein.begin(),
                         succInstruction->livein.end());
-                }
+            }
 
-                instruction->livein = instruction->liveout;
-                if (instruction->resId != NO_REGISTER) {
-                    instruction->livein.erase(instruction->resId);
-                }
-                for (uint32_t argId : instruction->argIds) {
-                    // Don't consider constants or variables, they're never in registers.
-                    if (constants.find(argId) == constants.end() &&
-                            variables.find(argId) == variables.end()) {
+            instruction->livein = instruction->liveout;
+            if (instruction->resId != NO_REGISTER) {
+                instruction->livein.erase(instruction->resId);
+            }
+            for (uint32_t argId : instruction->argIds) {
+                // Don't consider constants or variables, they're never in registers.
+                if (constants.find(argId) == constants.end() &&
+                        variables.find(argId) == variables.end()) {
 
-                        instruction->livein.insert(argId);
-                    }
+                    instruction->livein.insert(argId);
                 }
+            }
 
-                if (oldLivein != instruction->livein || oldLiveout != instruction->liveout) {
-                    changed = true;
+            if (oldLivein != instruction->livein || oldLiveout != instruction->liveout) {
+                // Our predecessors depend on us.
+                for (uint32_t predPc : instruction->pred) {
+                    pc_worklist.insert(predPc);
                 }
             }
         }
+        std::cout << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
 
         // Compute the dominance tree for blocks. Use a worklist. Do all blocks
         // simultaneously (across functions).
+        timer.reset();
         std::vector<uint32_t> worklist; // block IDs.
         // Make set of all label IDs.
         std::set<uint32_t> allLabelIds;
         for (auto& [labelId, block] : blocks) {
             allLabelIds.insert(labelId);
         }
+        std::set<uint32_t> unreached = allLabelIds;
         // Prepare every block.
         for (auto& [labelId, block] : blocks) {
-            if (block->pred.empty()) {
-                // First block of a function.
-                worklist.push_back(labelId);
-            }
             block->dom = allLabelIds;
+        }
+        // Insert every function's start block.
+        for (auto& [_, function] : functions) {
+            assert(function.labelId != NO_BLOCK_ID);
+            worklist.push_back(function.labelId);
         }
         while (!worklist.empty()) {
             // Take any item from worklist.
             uint32_t labelId = worklist.back();
             worklist.pop_back();
+
+            // We can reach this from the start node.
+            unreached.erase(labelId);
 
             Block *block = blocks.at(labelId).get();
 
@@ -1090,6 +1110,7 @@ struct Program
                 worklist.insert(worklist.end(), block->succ.begin(), block->succ.end());
             }
         }
+        std::cout << "Dominance tree took " << timer.elapsed() << " seconds.\n";
 
         // Compute immediate dom for each block.
         for (auto& [labelId, block] : blocks) {
@@ -1115,9 +1136,6 @@ struct Program
                     break;
                 }
             }
-
-            // It's okay to have no idom as long as you're the first block in the function.
-            assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
         }
 
         // Dump block info.
@@ -1145,6 +1163,27 @@ struct Program
                     std::cout << "    Immediate Dom: " << block->idom << "\n";
                 }
             }
+            std::cout << "-----------------------\n";
+            // http://www.webgraphviz.com/
+            std::cout << "digraph CFG {\n  rankdir=TB;\n";
+            for (auto& [labelId, block] : blocks) {
+                if (unreached.find(labelId) == unreached.end()) {
+                    for (auto pred : block->pred) {
+                        // XXX this is laid out much better if the function's start
+                        // block is mentioned first.
+                        if (unreached.find(pred) == unreached.end()) {
+                            std::cout << "  \"" << pred << "\" -> \"" << labelId << "\"";
+                            std::cout << ";\n";
+                        }
+                    }
+                    if (block->idom != NO_BLOCK_ID) {
+                        std::cout << "  \"" << labelId << "\" -> \"" << block->idom << "\"";
+                        std::cout << " [color=\"0.000, 0.999, 0.999\"]";
+                        std::cout << ";\n";
+                    }
+                }
+            }
+            std::cout << "}\n";
             std::cout << "-----------------------\n";
         }
 
@@ -1207,6 +1246,17 @@ struct Program
                 std::cout.copyfmt(oldState);
             }
             std::cout << "-----------------------\n";
+        }
+
+        for (auto& [labelId, block] : blocks) {
+            // It's okay to have no idom as long as you're the first block in the function.
+            if ((block->idom == NO_BLOCK_ID) != block->pred.empty()) {
+                std::cout << "----\n"
+                    << labelId << "\n"
+                    << block->idom << "\n"
+                    << block->pred.size() << "\n";
+            }
+            assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
         }
     }
 
@@ -3682,6 +3732,7 @@ int main(int argc, char **argv)
     glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
 
     if (optimize) {
+        Timer timer;
         spvtools::Optimizer optimizer(targetEnv);
         optimizer.SetMessageConsumer(earwigMessageConsumer);
         optimizer.RegisterPerformancePasses();
@@ -3691,6 +3742,7 @@ int main(int argc, char **argv)
         if (!success) {
             std::cout << "Warning: Optimizer failed.\n";
         }
+        std::cout << "Optimizing took " << timer.elapsed() << " seconds.\n";
     }
 
     if(disassemble) {
@@ -3711,7 +3763,11 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    pgm.postParse();
+    {
+        Timer timer;
+        pgm.postParse();
+        std::cout << "Post-parse took " << timer.elapsed() << " seconds.\n";
+    }
 
     if (compile) {
         bool success = compileProgram(pgm);
@@ -3729,7 +3785,7 @@ int main(int argc, char **argv)
 
     for(int imageNumber = imageStart; imageNumber <= imageEnd; imageNumber++) {
 
-        auto startTime = std::chrono::steady_clock::now();
+        Timer timer;
 
         // Workers decrement rowsLeft at the end of each row.
         rowsLeft = image.height;
@@ -3743,7 +3799,7 @@ int main(int argc, char **argv)
         }
 
         // Progress information.
-        thread.push_back(new std::thread(showProgress, image.height, startTime));
+        thread.push_back(new std::thread(showProgress, image.height, timer.startTime()));
 
         // Wait for worker threads to quit.
         for (int t = 0; t < thread.size(); t++) {
@@ -3752,11 +3808,7 @@ int main(int argc, char **argv)
             td->join();
         }
 
-        auto endTime = std::chrono::steady_clock::now();
-        auto elapsedTime = endTime - startTime;
-        auto elapsedSeconds = double(elapsedTime.count())*
-            std::chrono::steady_clock::period::num/
-            std::chrono::steady_clock::period::den;
+        double elapsedSeconds = timer.elapsed();
         std::cout << "Shading took " << elapsedSeconds << " seconds ("
             << long(image.width*image.height/elapsedSeconds) << " pixels per second)\n";
 
