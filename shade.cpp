@@ -3583,17 +3583,19 @@ void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPass
 }
 #endif
 
-bool createSPIRV(const ShaderSource& common, const ShaderSource& fragshader, bool debug, bool optimize, bool disassemble, std::vector<uint32_t>& spirv)
+bool createSPIRVFromSources(const std::vector<ShaderSource>& sources, bool debug, bool optimize, std::vector<uint32_t>& spirv)
 {
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 
     glslang::TProgram& glslang_program = *new glslang::TProgram;
 
-    {
-        const char* strings[4] = { preamble.code.c_str(), common.code.c_str(), fragshader.code.c_str(), epilogue.code.c_str() };
-        const char* names[4] = { preamble.filename.c_str(), common.filename.c_str(), fragshader.filename.c_str(), epilogue.filename.c_str() };
-        shader->setStringsWithLengthsAndNames(strings, NULL, names, 4);
+    std::vector<const char *> strings;
+    std::vector<const char *> names;
+    for(auto& source: sources) {
+        strings.push_back(source.code.c_str());
+        names.push_back(source.filename.c_str());
     }
+    shader->setStringsWithLengthsAndNames(strings.data(), NULL, names.data(), sources.size());
 
     shader->setEnvInput(glslang::EShSourceGlsl, EShLangFragment, glslang::EShClientVulkan, glslang::EShTargetVulkan_1_0);
 
@@ -3634,11 +3636,11 @@ bool createSPIRV(const ShaderSource& common, const ShaderSource& fragshader, boo
     return true;
 }
 
-bool createProgram(const ShaderSource& common, const ShaderSource& fragshader, bool debug, bool optimize, bool disassemble, Program& program)
+bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool optimize, bool disassemble, Program& program)
 {
     std::vector<uint32_t> spirv;
 
-    bool result = createSPIRV(common, fragshader, debug, optimize, disassemble, spirv);
+    bool result = createSPIRVFromSources(sources, debug, optimize, spirv);
     if(!result) {
         return result;
     }
@@ -3809,7 +3811,7 @@ int main(int argc, char **argv)
     RenderPassPtr pass = renderPasses[0];
     ShaderToyImage output = pass->outputs[0];
 
-    bool success = createProgram(pass->common, pass->shader, debug, optimize, disassemble, pass->pgm);
+    bool success = createProgram({preamble, pass->common, pass->shader, epilogue}, debug, optimize, disassemble, pass->pgm);
     if(!success) {
         exit(EXIT_FAILURE);
     }
