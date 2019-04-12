@@ -3429,16 +3429,16 @@ struct ShaderToyImage
     Sampler sampler;
 };
 
-const std::string shaderPreambleFilename = "preamble.frag";
-const std::string shaderEpilogueFilename = "epilogue.frag";
-std::string shaderPreamble;
-std::string shaderEpilogue;
-
 struct ShaderSource
 {
     std::string code;
     std::string filename;
 };
+
+const std::string shaderPreambleFilename = "preamble.frag";
+const std::string shaderEpilogueFilename = "epilogue.frag";
+ShaderSource preamble { readFileContents(shaderPreambleFilename), shaderPreambleFilename };
+ShaderSource epilogue { readFileContents(shaderEpilogueFilename), shaderEpilogueFilename };
 
 struct RenderPass
 {
@@ -3579,11 +3579,19 @@ void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPass
         throwOnUnimplemented,
         beVerbose));
 
+
+}
+#endif
+
+bool createSPIRV(const ShaderSource& common, const ShaderSource& fragshader, bool debug, bool optimize, bool disassemble, std::vector<uint32_t>& spirv)
+{
     glslang::TShader *shader = new glslang::TShader(EShLangFragment);
 
+    glslang::TProgram& glslang_program = *new glslang::TProgram;
+
     {
-        const char* strings[4] = { shaderPreamble.c_str(), pass.shader_code.c_str(), pass.common_code.c_str(), epilogue.c_str() };
-        const char* names[4] = { shaderPreambleFilename.c_str(), pass.common_code_filename.c_str(), pass.shader_code_filename.c_str(), epilogueFilename.c_str() };
+        const char* strings[4] = { preamble.code.c_str(), common.code.c_str(), fragshader.code.c_str(), epilogue.code.c_str() };
+        const char* names[4] = { preamble.filename.c_str(), common.filename.c_str(), fragshader.filename.c_str(), epilogue.filename.c_str() };
         shader->setStringsWithLengthsAndNames(strings, NULL, names, 4);
     }
 
@@ -3600,35 +3608,42 @@ void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPass
 
     resources = glslang::DefaultTBuiltInResource;
 
-    ShInitialize();
-
-    glslang::TProgram& program = *new glslang::TProgram;
-
     if (!shader->parse(&resources, 110, false, messages, includer)) {
         std::cerr << "compile failed\n";
         std::cerr << shader->getInfoLog();
-        exit(EXIT_FAILURE);
+        return false;
     }
 
-    program.addShader(shader);
+    glslang_program.addShader(shader);
 
-    if(!program.link(messages)) {
+    if(!glslang_program.link(messages)) {
         std::cerr << "link failed\n";
-        std::cerr << program.getInfoLog();
-        exit(EXIT_FAILURE);
+        std::cerr << glslang_program.getInfoLog();
+        return false;
     }
 
-    spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_3;
-
-    std::vector<uint32_t> spirv;
     std::string warningsErrors;
     spv::SpvBuildLogger logger;
     glslang::SpvOptions options;
     options.generateDebugInfo = debug;
     options.disableOptimizer = !optimize;
     options.optimizeSize = false;
-    glslang::TIntermediate *shaderInterm = program.getIntermediate(EShLangFragment);
+    glslang::TIntermediate *shaderInterm = glslang_program.getIntermediate(EShLangFragment);
     glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
+
+    return true;
+}
+
+bool createProgram(const ShaderSource& common, const ShaderSource& fragshader, bool debug, bool optimize, bool disassemble, Program& program)
+{
+    std::vector<uint32_t> spirv;
+
+    bool result = createSPIRV(common, fragshader, debug, optimize, disassemble, spirv);
+    if(!result) {
+        return result;
+    }
+
+    spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_3;
 
     if (optimize) {
         spvtools::Optimizer optimizer(targetEnv);
@@ -3653,12 +3668,16 @@ void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPass
     }
 
     spv_context context = spvContextCreate(targetEnv);
-    spvBinaryParse(context, &pass.pgm, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
+    spvBinaryParse(context, &program, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
 
-    pass.pgm.postParse();
+    program.postParse();
 
+    if (program.hasUnimplemented) {
+        return false;
+    }
+
+    return true;
 }
-#endif
 
 int main(int argc, char **argv)
 {
@@ -3763,9 +3782,6 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    ShaderSource preamble { readFileContents(shaderPreambleFilename), shaderPreambleFilename };
-    ShaderSource epilogue { readFileContents(shaderEpilogueFilename), shaderEpilogueFilename };
-
     std::vector<RenderPassPtr> renderPasses;
 
     std::string filename = argv[0];
@@ -3793,84 +3809,9 @@ int main(int argc, char **argv)
     RenderPassPtr pass = renderPasses[0];
     ShaderToyImage output = pass->outputs[0];
 
-    glslang::TShader *shader = new glslang::TShader(EShLangFragment);
-
-    {
-        const char* strings[4] = { preamble.code.c_str(), pass->common.code.c_str(), pass->shader.code.c_str(), epilogue.code.c_str() };
-        const char* names[4] = { preamble.filename.c_str(), pass->common.filename.c_str(), pass->shader.filename.c_str(), epilogue.filename.c_str() };
-        shader->setStringsWithLengthsAndNames(strings, NULL, names, 4);
-    }
-
-    shader->setEnvInput(glslang::EShSourceGlsl, EShLangFragment, glslang::EShClientVulkan, glslang::EShTargetVulkan_1_0);
-
-    shader->setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_1);
-
-    shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_3);
-
-    EShMessages messages = (EShMessages)(EShMsgDefault | EShMsgSpvRules | EShMsgVulkanRules | EShMsgDebugInfo);
-
-    glslang::TShader::ForbidIncluder includer;
-    TBuiltInResource resources;
-
-    resources = glslang::DefaultTBuiltInResource;
-
-    glslang::TProgram& program = *new glslang::TProgram;
-
-    if (!shader->parse(&resources, 110, false, messages, includer)) {
-        std::cerr << "compile failed\n";
-        std::cerr << shader->getInfoLog();
+    bool success = createProgram(pass->common, pass->shader, debug, optimize, disassemble, pass->pgm);
+    if(!success) {
         exit(EXIT_FAILURE);
-    }
-
-    program.addShader(shader);
-
-    if(!program.link(messages)) {
-        std::cerr << "link failed\n";
-        std::cerr << program.getInfoLog();
-        exit(EXIT_FAILURE);
-    }
-
-    spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_3;
-
-    std::vector<uint32_t> spirv;
-    std::string warningsErrors;
-    spv::SpvBuildLogger logger;
-    glslang::SpvOptions options;
-    options.generateDebugInfo = debug;
-    options.disableOptimizer = !optimize;
-    options.optimizeSize = false;
-    glslang::TIntermediate *shaderInterm = program.getIntermediate(EShLangFragment);
-    glslang::GlslangToSpv(*shaderInterm, spirv, &logger, &options);
-
-    if (optimize) {
-        spvtools::Optimizer optimizer(targetEnv);
-        optimizer.SetMessageConsumer(earwigMessageConsumer);
-        optimizer.RegisterPerformancePasses();
-        // optimizer.SetPrintAll(&std::cerr);
-        spvtools::OptimizerOptions optimizerOptions;
-        bool success = optimizer.Run(spirv.data(), spirv.size(), &spirv, optimizerOptions);
-        if (!success) {
-            std::cout << "Warning: Optimizer failed.\n";
-        }
-    }
-
-    if(disassemble) {
-        spv::Disassemble(std::cout, spirv);
-    }
-
-    if(false) {
-        FILE *fp = fopen("spirv", "wb");
-        fwrite(spirv.data(), 1, spirv.size() * 4, fp);
-        fclose(fp);
-    }
-
-    spv_context context = spvContextCreate(targetEnv);
-    spvBinaryParse(context, &pass->pgm, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
-
-    pass->pgm.postParse();
-
-    if (pass->pgm.hasUnimplemented) {
-        exit(1);
     }
 
     if (compile) {
