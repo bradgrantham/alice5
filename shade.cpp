@@ -3687,8 +3687,9 @@ bool createSPIRVFromSources(const std::vector<ShaderSource>& sources, bool debug
     return true;
 }
 
-void optimizeSPIRV(bool optimize, spv_target_env targetEnv, std::vector<uint32_t>& spirv)
+void optimizeSPIRV(spv_target_env targetEnv, std::vector<uint32_t>& spirv)
 {
+    Timer timer;
     spvtools::Optimizer optimizer(targetEnv);
     optimizer.SetMessageConsumer(earwigMessageConsumer);
     optimizer.RegisterPerformancePasses();
@@ -3698,6 +3699,7 @@ void optimizeSPIRV(bool optimize, spv_target_env targetEnv, std::vector<uint32_t
     if (!success) {
         std::cout << "Warning: Optimizer failed.\n";
     }
+    std::cout << "Optimizing took " << timer.elapsed() << " seconds.\n";
 }
 
 bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool optimize, bool disassemble, Program& program)
@@ -3712,7 +3714,11 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
     spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_3;
 
     if (optimize) {
-        optimizeSPIRV(optimize, targetEnv, spirv);
+        if(disassemble) {
+            spv::Disassemble(std::cout, spirv);
+        }
+
+        optimizeSPIRV(targetEnv, spirv);
     }
 
     if(disassemble) {
@@ -3727,20 +3733,6 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
 
     spv_context context = spvContextCreate(targetEnv);
     spvBinaryParse(context, &program, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
-
-    if (optimize) {
-        Timer timer;
-        spvtools::Optimizer optimizer(targetEnv);
-        optimizer.SetMessageConsumer(earwigMessageConsumer);
-        optimizer.RegisterPerformancePasses();
-        // optimizer.SetPrintAll(&std::cerr);
-        spvtools::OptimizerOptions optimizerOptions;
-        bool success = optimizer.Run(spirv.data(), spirv.size(), &spirv, optimizerOptions);
-        if (!success) {
-            std::cout << "Warning: Optimizer failed.\n";
-        }
-        std::cout << "Optimizing took " << timer.elapsed() << " seconds.\n";
-    }
 
     if (program.hasUnimplemented) {
         return false;
