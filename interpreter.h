@@ -21,6 +21,7 @@ struct Interpreter
     uint32_t previousBlockId;
 
     unsigned char *memory;
+    bool *memoryInitialized;
 
     const Program *pgm;
 
@@ -29,14 +30,17 @@ struct Interpreter
     virtual ~Interpreter()
     {
         delete[] memory;
+        delete[] memoryInitialized;
     }
 
-    // Copy a variable of type "type" from "src" to "dst" in memory.
-    void copy(uint32_t type, size_t src, size_t dst);
+    // Check that this memory region has been initialized.
+    void checkMemory(size_t offset, size_t size);
+    // Mark this memory region as initialized.
+    void markMemory(size_t offset, size_t size);
 
     // Pointer to object in memory in specified storage class at specified offset.
     template <class T>
-    T& objectInClassAt(SpvStorageClass clss, size_t offset);
+    T& objectInClassAt(SpvStorageClass clss, size_t offset, bool reading, size_t size);
 
     // Get a register's data by ID as the specified type.
     template <class T>

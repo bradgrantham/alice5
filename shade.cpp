@@ -36,6 +36,9 @@
 #include "interpreter.h"
 #include "timer.h"
 
+// Enable this to check if our virtual RAM is being initialized properly.
+#undef CHECK_MEMORY_ACCESS
+
 static void skipComments(FILE *fp, char ***comments, size_t *commentCount)
 {
     int c;
@@ -1284,9 +1287,11 @@ Interpreter::Interpreter(const Program *pgm)
     : pgm(pgm)
 {
     memory = new unsigned char[pgm->memorySize];
+    memoryInitialized = new bool[pgm->memorySize];
 
     // So we can catch errors.
     std::fill(memory, memory + pgm->memorySize, 0xFF);
+    std::fill(memoryInitialized, memoryInitialized + pgm->memorySize, false);
 
     // Allocate registers so they aren't allocated during run()
     for(auto [id, type]: pgm->resultTypes) {
@@ -1294,15 +1299,34 @@ Interpreter::Interpreter(const Program *pgm)
     }
 }
 
-void Interpreter::copy(uint32_t type, size_t src, size_t dst)
+void Interpreter::checkMemory(size_t offset, size_t size)
 {
-    std::copy(memory + src, memory + src + pgm->typeSizes.at(type), memory + dst);
+#ifdef CHECK_MEMORY_ACCESS
+    for (size_t addr = offset; addr < offset + size; addr++) {
+        if (!memoryInitialized[addr]) {
+            std::cerr << "Warning: Reading uninitialized memory " << addr << "\n";
+        }
+    }
+#endif
+}
+
+void Interpreter::markMemory(size_t offset, size_t size)
+{
+#ifdef CHECK_MEMORY_ACCESS
+    std::fill(memoryInitialized + offset, memoryInitialized + offset + size, true);
+#endif
 }
 
 template <class T>
-T& Interpreter::objectInClassAt(SpvStorageClass clss, size_t offset)
+T& Interpreter::objectInClassAt(SpvStorageClass clss, size_t offset, bool reading, size_t size)
 {
-    return *reinterpret_cast<T*>(memory + pgm->memoryRegions.at(clss).base + offset);
+    size_t addr = pgm->memoryRegions.at(clss).base + offset;
+    if (reading) {
+        checkMemory(addr, size);
+    } else {
+        markMemory(addr, size);
+    }
+    return *reinterpret_cast<T*>(memory + addr);
 }
 
 template <class T>
@@ -1316,6 +1340,7 @@ void Interpreter::clearPrivateVariables()
     // Global variables are cleared for each run.
     const MemoryRegion &mr = pgm->memoryRegions.at(SpvStorageClassPrivate);
     std::fill(memory + mr.base, memory + mr.top, 0x00);
+    markMemory(mr.base, mr.top - mr.base);
 }
 
 void Interpreter::stepNop(const InsnNop& insn)
@@ -1332,7 +1357,9 @@ void Interpreter::stepLoad(const InsnLoad& insn)
 {
     Pointer& ptr = pointers.at(insn.pointerId);
     Register& obj = registers[insn.resultId];
-    std::copy(memory + ptr.offset, memory + ptr.offset + pgm->typeSizes.at(insn.type), obj.data);
+    size_t size = pgm->typeSizes.at(insn.type);
+    checkMemory(ptr.offset, size);
+    std::copy(memory + ptr.offset, memory + ptr.offset + size, obj.data);
     if(false) {
         std::cout << "load result is";
         pgm->dumpTypeAt(pgm->types.at(insn.type), obj.data);
@@ -1345,6 +1372,7 @@ void Interpreter::stepStore(const InsnStore& insn)
     Pointer& ptr = pointers.at(insn.pointerId);
     Register& obj = registers[insn.objectId];
     std::copy(obj.data, obj.data + obj.size, memory + ptr.offset);
+    markMemory(ptr.offset, obj.size);
 }
 
 void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
@@ -2923,13 +2951,13 @@ void Interpreter::step()
 template <class T>
 void Interpreter::set(SpvStorageClass clss, size_t offset, const T& v)
 {
-    objectInClassAt<T>(clss, offset) = v;
+    objectInClassAt<T>(clss, offset, false, sizeof(v)) = v;
 }
 
 template <class T>
 void Interpreter::get(SpvStorageClass clss, size_t offset, T& v)
 {
-    v = objectInClassAt<T>(clss, offset);
+    v = objectInClassAt<T>(clss, offset, true, sizeof(v));
 }
 
 void Interpreter::run()
