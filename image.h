@@ -104,6 +104,11 @@ struct Image
     // Read(filename, format); // XXX should construct an image with this and use move semantics
     // Write(filename);
 
+    void writePpm(std::ostream &os) {
+        os << "P6 " << width << " " << height << " 255\n";
+        os.write(reinterpret_cast<char *>(getPixelAddress(0, 0)), 3*width*height);
+    }
+
 private:
     void get(const unsigned char *pixel, v4float& v)
     {

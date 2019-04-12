@@ -3314,6 +3314,7 @@ void usage(const char* progname)
     printf("\t-S        show the disassembly of the SPIR-V code\n");
     printf("\t-c        compile to our own ISA\n");
     printf("\t--json    input file is a ShaderToy JSON file\n");
+    printf("\t--term    draw output image on terminal (in addition to file)\n");
 }
 
 // Number of rows still left to shade (for progress report).
@@ -3686,6 +3687,31 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
     return true;
 }
 
+// https://stackoverflow.com/a/34571089/211234
+static const char *BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+std::string base64Encode(const std::string &in) {
+    std::string out;
+    int val = 0;
+    int valb = -6;
+
+    for (uint8_t c : in) {
+        val = (val << 8) + c;
+        valb += 8;
+        while (valb >= 0) {
+            out.push_back(BASE64_ALPHABET[(val >> valb) & 0x3F]);
+            valb -= 6;
+        }
+    }
+    if (valb > -6) {
+        out.push_back(BASE64_ALPHABET[((val << 8) >> (valb + 8)) & 0x3F]);
+    }
+    while (out.size() % 4 != 0) {
+        out.push_back('=');
+    }
+
+    return out;
+}
+
 int main(int argc, char **argv)
 {
     bool debug = false;
@@ -3695,6 +3721,7 @@ int main(int argc, char **argv)
     bool throwOnUnimplemented = false;
     bool doNotShade = false;
     bool inputIsJSON = false;
+    bool imageToTerminal = false;
     bool compile = false;
     int imageStart = 0, imageEnd = 0;
     int imageWidth = 640/2; // ShaderToy default is 640
@@ -3714,6 +3741,11 @@ int main(int argc, char **argv)
         } else if(strcmp(argv[0], "--json") == 0) {
 
             inputIsJSON = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "--term") == 0) {
+
+            imageToTerminal = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-S") == 0) {
@@ -3869,9 +3901,18 @@ int main(int argc, char **argv)
         std::ostringstream ss;
         ss << "image" << std::setfill('0') << std::setw(4) << imageNumber << std::setw(0) << ".ppm";
         std::ofstream imageFile(ss.str(), std::ios::out | std::ios::binary);
-        imageFile << "P6 " << image->width << " " << image->height << " 255\n";
-        imageFile.write(reinterpret_cast<char *>(image->getPixelAddress(0, 0)), 3 * image->width * image->height);
+        image->writePpm(imageFile);
         imageFile.close();
+
+        if (imageToTerminal) {
+            // https://www.iterm2.com/documentation-images.html
+            std::ostringstream ss;
+            image->writePpm(ss);
+            std::cout << "\033]1337;File=width="
+                << image->width << "px;height="
+                << image->height << "px;inline=1:"
+                << base64Encode(ss.str()) << "\007\n";
+        }
     }
 
     exit(EXIT_SUCCESS);
