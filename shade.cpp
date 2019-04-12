@@ -3844,59 +3844,73 @@ int main(int argc, char **argv)
     }
 
     // Do passes
+    std::vector<RenderPassPtr> passesSortedByDependency;
 
-    RenderPassPtr pass = renderPasses[0];
-    ShaderToyImage output = pass->outputs[0];
+    passesSortedByDependency = renderPasses;
 
-    bool success = createProgram({preamble, pass->common, pass->shader, epilogue}, debug, optimize, disassemble, pass->pgm);
-    if(!success) {
-        exit(EXIT_FAILURE);
-    }
+    for(auto& pass: passesSortedByDependency) {
 
-    if (compile) {
-        bool success = compileProgram(pass->pgm);
-        exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
-    }
+        ShaderToyImage output = pass->outputs[0];
 
-    if (doNotShade) {
-        exit(EXIT_SUCCESS);
+        bool success = createProgram({preamble, pass->common, pass->shader, epilogue}, debug, optimize, disassemble, pass->pgm);
+        if(!success) {
+            exit(EXIT_FAILURE);
+        }
+
+        if (compile) {
+            bool success = compileProgram(pass->pgm);
+            exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
+        }
+
+        if (doNotShade) {
+            exit(EXIT_SUCCESS);
+        }
     }
 
     int threadCount = std::thread::hardware_concurrency();
     std::cout << "Using " << threadCount << " threads.\n";
+
     for(int imageNumber = imageStart; imageNumber <= imageEnd; imageNumber++) {
+        for(auto& pass: passesSortedByDependency) {
 
+            auto startTime = std::chrono::steady_clock::now();
+
+            ShaderToyImage output = pass->outputs[0];
+            ImagePtr image = output.image;
+
+            // Workers decrement rowsLeft at the end of each row.
+            rowsLeft = image->height;
+
+            std::vector<std::thread *> thread;
+
+            // Generate the rows on multiple threads.
+            for (int t = 0; t < threadCount; t++) {
+                thread.push_back(new std::thread(render, &pass->pgm, t, threadCount, image, imageNumber / 60.0));
+                // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+
+            // Progress information.
+            thread.push_back(new std::thread(showProgress, image->height, startTime));
+
+            // Wait for worker threads to quit.
+            for (int t = 0; t < thread.size(); t++) {
+                std::thread* td = thread.back();
+                thread.pop_back();
+                td->join();
+            }
+
+            auto endTime = std::chrono::steady_clock::now();
+            auto elapsedTime = endTime - startTime;
+            auto elapsedSeconds = double(elapsedTime.count())*
+                std::chrono::steady_clock::period::num/
+                std::chrono::steady_clock::period::den;
+
+            std::cout << "Shading pass " << pass->name << " took " << elapsedSeconds << " seconds ("
+                << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
+        }
+
+        ShaderToyImage output = passesSortedByDependency.back()->outputs[0];
         ImagePtr image = output.image;
-        auto startTime = std::chrono::steady_clock::now();
-
-        // Workers decrement rowsLeft at the end of each row.
-        rowsLeft = output.image->height;
-
-        std::vector<std::thread *> thread;
-
-        // Generate the rows on multiple threads.
-        for (int t = 0; t < threadCount; t++) {
-            thread.push_back(new std::thread(render, &pass->pgm, t, threadCount, output.image, imageNumber / 60.0));
-            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-
-        // Progress information.
-        thread.push_back(new std::thread(showProgress, output.image->height, startTime));
-
-        // Wait for worker threads to quit.
-        for (int t = 0; t < thread.size(); t++) {
-            std::thread* td = thread.back();
-            thread.pop_back();
-            td->join();
-        }
-
-        auto endTime = std::chrono::steady_clock::now();
-        auto elapsedTime = endTime - startTime;
-        auto elapsedSeconds = double(elapsedTime.count())*
-            std::chrono::steady_clock::period::num/
-            std::chrono::steady_clock::period::den;
-        std::cout << "Shading took " << elapsedSeconds << " seconds ("
-            << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
 
         std::ostringstream ss;
         ss << "image" << std::setfill('0') << std::setw(4) << imageNumber << std::setw(0) << ".ppm";
