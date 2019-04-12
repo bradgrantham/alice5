@@ -3833,7 +3833,7 @@ int main(int argc, char **argv)
         ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, imageWidth, imageHeight));
         ShaderToyImage output {image, Sampler {}};
 
-        RenderPassPtr pass(new RenderPass("image", {}, {output}, {"", ""}, {shader_code, filename}, throwOnUnimplemented, beVerbose));
+        RenderPassPtr pass(new RenderPass("Image", {}, {output}, {"", ""}, {shader_code, filename}, throwOnUnimplemented, beVerbose));
 
         renderPasses.push_back(pass);
 
@@ -3905,8 +3905,10 @@ int main(int argc, char **argv)
                 std::chrono::steady_clock::period::num/
                 std::chrono::steady_clock::period::den;
 
-            std::cout << "Shading pass " << pass->name << " took " << elapsedSeconds << " seconds ("
-                << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
+            std::cout << "Shading pass \"" << pass->name << "\" took "
+                << elapsedSeconds << " seconds ("
+                << long(image->width*image->height/elapsedSeconds)
+                << " pixels per second)\n";
         }
 
         ShaderToyImage output = passesSortedByDependency.back()->outputs[0];
