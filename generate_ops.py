@@ -215,7 +215,12 @@ def main():
                         ", ".join(params),
                         ", ".join(inits)))
             for operand in operands:
-                if operand.is_argument:
+                if opname == "OpPhi" and operand.cpp_name == "operandId":
+                    # Special case the phi operands.
+                    opcode_structs_f.write("        for (int i = 0; i < %s.size(); i += 2) {\n" % operand.cpp_name)
+                    opcode_structs_f.write("            argIds.insert(%s[i]);\n" % operand.cpp_name)
+                    opcode_structs_f.write("        }\n")
+                elif operand.is_argument:
                     if operand.quantifier == "*":
                         opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
                         opcode_structs_f.write("            argIds.insert(_argId);\n")
@@ -230,7 +235,8 @@ def main():
                     operand.cpp_name, operand.cpp_comment,
                     " (optional)" if operand.quantifier == "?" else ""))
             opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % short_opname)
-            opcode_structs_f.write("    virtual std::string name() { return \"%s\"; }\n" % opname)
+            opcode_structs_f.write("    virtual uint32_t opcode() const { return Spv%s; }\n" % opname)
+            opcode_structs_f.write("    virtual std::string name() const { return \"%s\"; }\n" % opname)
             if short_opname in emitting:
                 opcode_structs_f.write("    virtual void emit(Compiler *compiler);\n")
             is_branch = opname in ["OpBranch", "OpBranchConditional", "OpSwitch",
@@ -341,7 +347,9 @@ def main():
                     operand.cpp_name, operand.cpp_comment,
                     " (optional)" if operand.quantifier == "?" else ""))
             opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % opname)
-            opcode_structs_f.write("    virtual std::string name() { return \"%s\"; }\n" % opname)
+            # Not sure about these opcodes. I think they're even in a different namespace.
+            opcode_structs_f.write("    virtual uint32_t opcode() const { return 0; }\n")
+            opcode_structs_f.write("    virtual std::string name() const { return \"%s\"; }\n" % opname)
             if opname in emitting:
                 opcode_structs_f.write("    virtual void emit(Compiler *compiler);\n")
             opcode_structs_f.write("};\n\n")

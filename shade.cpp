@@ -3156,6 +3156,21 @@ struct Compiler
         }
     }
 
+    // Determine whether these two virtual register IDs are currently assigned
+    // to the same physical register. Returns false if one or both aren't
+    // assigned at all. Index is the index into the vector, if it is one.
+    bool isSamePhysicalRegister(uint32_t id1, uint32_t id2, int index) const {
+        auto r1 = registers.find(id1);
+        if (r1 != registers.end() && index < r1->second.phy.size()) {
+            auto r2 = registers.find(id2);
+            if (r2 != registers.end() && index < r2->second.phy.size()) {
+                return r1->second.phy[index] == r2->second.phy[index];
+            }
+        }
+
+        return false;
+    }
+
     // String for a virtual register ("r12" or more).
     std::string reg(uint32_t id, int index = 0) const {
         std::ostringstream ss;
@@ -3224,6 +3239,54 @@ struct Compiler
         std::cout << "\n";
 
         std::cout.copyfmt(oldState);
+    }
+
+    // Just before a Branch or BranchConditional instruction, copy any
+    // registers that a target OpPhi instruction might need.
+    void emitPhiCopy(Instruction *instruction) {
+        assert(instruction->succ.size() == 1);
+        uint32_t succInstId = *instruction->succ.begin();
+        uint32_t succBlockId = pgm->instructions.at(succInstId)->blockId;
+        Block *block = pgm->blocks.at(succBlockId).get();
+        for (int pc = block->begin; pc < block->end; pc++) {
+            Instruction *nextInstruction = pgm->instructions[pc].get();
+            if (nextInstruction->opcode() != SpvOpPhi) {
+                // No more phi instructions for this block.
+                break;
+            }
+
+            InsnPhi *phi = dynamic_cast<InsnPhi *>(nextInstruction);
+
+            // Find the block corresponding to ours.
+            bool found = false;
+            for (int i = 0; !found && i < phi->operandId.size(); i += 2) {
+                uint32_t srcId = phi->operandId[i];
+                uint32_t parentId = phi->operandId[i + 1];
+
+                if (parentId == instruction->blockId) {
+                    found = true;
+
+                    // XXX need to iterate over all registers of a vector.
+                    std::ostringstream ss;
+                    if (isSamePhysicalRegister(phi->resultId, srcId, 0)) {
+                        ss << "; ";
+                    }
+                    ss << "mov " << reg(phi->resultId)
+                        << ", " << reg(srcId);
+                    emit(ss.str(), "phi elimination");
+                }
+            }
+            if (!found) {
+                std::cerr << "Error: Can't find source block " << instruction->blockId
+                    << " in phi assigning to " << phi->resultId << "\n";
+            }
+        }
+    }
+
+    // Assert that the block at the label ID does not start with a Phi instruction.
+    void assertNoPhi(uint32_t labelId) {
+        Block *block = pgm->blocks.at(labelId).get();
+        assert(pgm->instructions[block->begin]->opcode() != SpvOpPhi);
     }
 };
 
@@ -3302,6 +3365,9 @@ void InsnStore::emit(Compiler *compiler)
 
 void InsnBranch::emit(Compiler *compiler)
 {
+    // See if we need to emit any copies for Phis at our target.
+    compiler->emitPhiCopy(this);
+
     std::ostringstream ss;
     ss << "jmp label" << targetLabelId;
     compiler->emit(ss.str(), "");
@@ -3319,6 +3385,11 @@ void InsnReturnValue::emit(Compiler *compiler)
     compiler->emit(ss.str(), "");
 }
 
+void InsnPhi::emit(Compiler *compiler)
+{
+    compiler->emit("", "phi instruction, nothing to do.");
+}
+
 void InsnFOrdLessThanEqual::emit(Compiler *compiler)
 {
     compiler->emitBinaryOp("lte", resultId, operand1Id, operand2Id);
@@ -3326,6 +3397,11 @@ void InsnFOrdLessThanEqual::emit(Compiler *compiler)
 
 void InsnBranchConditional::emit(Compiler *compiler)
 {
+    // Make sure we're not branching to a block that starts with Phi. We don't
+    // handle that now, and I'm not sure it ever happens.
+    compiler->assertNoPhi(trueLabelId);
+    compiler->assertNoPhi(falseLabelId);
+
     std::ostringstream ss;
     ss << "jmp " << compiler->reg(conditionId)
         << ", label" << trueLabelId

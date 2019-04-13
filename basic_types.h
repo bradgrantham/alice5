@@ -312,8 +312,11 @@ struct Instruction {
     // Emit compiler output for this instruction.
     virtual void emit(Compiler *compiler);
 
+    // The opcode of this instruction (e.g., SpvOpFMul).
+    virtual uint32_t opcode() const = 0;
+
     // The name of this instruction (e.g., "OpFMul").
-    virtual std::string name() = 0;
+    virtual std::string name() const = 0;
 
     // Whether this is a branch instruction (OpBranch, OpBranchConditional,
     // OpSwitch, OpReturn, or OpReturnValue).
