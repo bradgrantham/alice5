@@ -3220,16 +3220,16 @@ struct Compiler
         emit("nop", ss.str());
     }
 
-    void emitBinaryOp(const std::string &opName, int op1, int op2, int result)
+    void emitBinaryOp(const std::string &opName, int result, int op1, int op2)
     {
         auto r = registers.find(result);
         int count = r == registers.end() ? 1 : r->second.count;
 
         for (int i = 0; i < count; i++) {
             std::ostringstream ss1;
-            ss1 << opName << " " << reg(op1, i) << ", " << reg(op2, i) << ", " << reg(result, i);
+            ss1 << opName << " " << reg(result, i) << ", " << reg(op1, i) << ", " << reg(op2, i);
             std::ostringstream ss2;
-            ss2 << "r" << op1 << " = r" << op2 << " " << opName << " r" << result;
+            ss2 << "r" << result << " = " << opName << " r" << op1 << " r" << op2;
             emit(ss1.str(), ss2.str());
         }
     }
@@ -3419,17 +3419,17 @@ void InsnBranchConditional::emit(Compiler *compiler)
     std::ostringstream ss1;
     ss1 << "beq " << compiler->reg(conditionId)
         << ", x0, " << localLabel;
-    compiler->emit(ss1.str(), "");
-    // False path.
-    compiler->emitPhiCopy(this, falseLabelId);
-    std::ostringstream ss2;
-    ss2 << "j label" << falseLabelId;
-    compiler->emit(ss2.str(), "");
+    compiler->emit(ss1.str(), (std::ostringstream() << "r" << conditionId).str());
     // True path.
-    compiler->emitLabel(localLabel);
     compiler->emitPhiCopy(this, trueLabelId);
+    std::ostringstream ss2;
+    ss2 << "j label" << trueLabelId;
+    compiler->emit(ss2.str(), "");
+    // False path.
+    compiler->emitLabel(localLabel);
+    compiler->emitPhiCopy(this, falseLabelId);
     std::ostringstream ss3;
-    ss3 << "j label" << trueLabelId;
+    ss3 << "j label" << falseLabelId;
     compiler->emit(ss3.str(), "");
 }
 
