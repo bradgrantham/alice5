@@ -3071,9 +3071,9 @@ struct Compiler
             registers[id] = CompilerRegister {type, count};
         }
 
-        // Fake physical registers for now, pretend we have 32 of them.
+        // Assume 32 registers; x0 is always zero.
         std::set<uint32_t> PHY_REGS;
-        for (int i = 0; i < 32; i++) {
+        for (int i = 1; i < 32; i++) {
             PHY_REGS.insert(i);
         }
 
@@ -3188,24 +3188,24 @@ struct Compiler
     std::string reg(uint32_t id, int index = 0) const {
         std::ostringstream ss;
 
-        ss << "r" << id;
-
-        auto name = pgm->names.find(id);
-        if (name != pgm->names.end()) {
-            ss << "{" << name->second << "}";
-        }
-
-        auto constant = pgm->constants.find(id);
-        if (constant != pgm->constants.end()) {
-            if (std::holds_alternative<TypeFloat>(pgm->types.at(constant->second.type))) {
-                const float *f = reinterpret_cast<float *>(constant->second.data);
-                ss << "{=" << *f << "}";
-            }
-        }
-
         auto r = registers.find(id);
         if (r != registers.end() && index < r->second.phy.size()) {
-            ss << "{x" << r->second.phy[index] << "}";
+            ss << "x" << r->second.phy[index];
+        } else {
+            auto constant = pgm->constants.find(id);
+            if (constant != pgm->constants.end() &&
+                    std::holds_alternative<TypeFloat>(pgm->types.at(constant->second.type))) {
+
+                const float *f = reinterpret_cast<float *>(constant->second.data);
+                ss << *f;
+            } else {
+                auto name = pgm->names.find(id);
+                if (name != pgm->names.end()) {
+                    ss << name->second;
+                } else {
+                    ss << "r" << id;
+                }
+            }
         }
 
         return ss.str();
@@ -3223,16 +3223,14 @@ struct Compiler
     void emitBinaryOp(const std::string &opName, int op1, int op2, int result)
     {
         auto r = registers.find(result);
-        if (r == registers.end()) {
-            std::ostringstream ss;
-            ss << opName << " " << reg(op1) << ", " << reg(op2) << ", " << reg(result);
-            emit(ss.str(), "");
-        } else {
-            for (int i = 0; i < r->second.count; i++) {
-                std::ostringstream ss;
-                ss << opName << " " << reg(op1, i) << ", " << reg(op2, i) << ", " << reg(result, i);
-                emit(ss.str(), "");
-            }
+        int count = r == registers.end() ? 1 : r->second.count;
+
+        for (int i = 0; i < count; i++) {
+            std::ostringstream ss1;
+            ss1 << opName << " " << reg(op1, i) << ", " << reg(op2, i) << ", " << reg(result, i);
+            std::ostringstream ss2;
+            ss2 << "r" << op1 << " = r" << op2 << " " << opName << " r" << result;
+            emit(ss1.str(), ss2.str());
         }
     }
 
@@ -3347,34 +3345,38 @@ void InsnFunctionParameter::emit(Compiler *compiler)
 void InsnLoad::emit(Compiler *compiler)
 {
     auto r = compiler->registers.find(resultId);
-    if (r == compiler->registers.end()) {
-        std::ostringstream ss;
-        ss << "mov " << compiler->reg(resultId) << ", (" << compiler->reg(pointerId) << ")";
-        compiler->emit(ss.str(), "");
-    } else {
-        for (int i = 0; i < r->second.count; i++) {
-            std::ostringstream ss;
-            ss << "mov " << compiler->reg(resultId, i)
-                << ", (" << compiler->reg(pointerId) << ")" << (i*4);
-            compiler->emit(ss.str(), "");
+    int count = r == compiler->registers.end() ? 1 : r->second.count;
+    for (int i = 0; i < count; i++) {
+        std::ostringstream ss1;
+        ss1 << "lw " << compiler->reg(resultId, i) << ", ";
+        if (count != 1) {
+            ss1 << (i*4);
         }
+        ss1 << "(" << compiler->reg(pointerId) << ")";
+        std::ostringstream ss2;
+        if (i == 0) {
+            ss2 << "r" << resultId << " = (r" << pointerId << ")";
+        }
+        compiler->emit(ss1.str(), ss2.str());
     }
 }
 
 void InsnStore::emit(Compiler *compiler)
 {
     auto r = compiler->registers.find(objectId);
-    if (r == compiler->registers.end()) {
-        std::ostringstream ss;
-        ss << "mov (" << compiler->reg(pointerId) << "), " << compiler->reg(objectId);
-        compiler->emit(ss.str(), "");
-    } else {
-        for (int i = 0; i < r->second.count; i++) {
-            std::ostringstream ss;
-            ss << "mov (" << compiler->reg(pointerId) << ")" << (i*4)
-                << ", " << compiler->reg(objectId, i);
-            compiler->emit(ss.str(), "");
+    int count = r == compiler->registers.end() ? 1 : r->second.count;
+    for (int i = 0; i < r->second.count; i++) {
+        std::ostringstream ss1;
+        ss1 << "sw ";
+        if (count != 1) {
+            ss1 << (i*4);
         }
+        ss1 << "(" << compiler->reg(pointerId) << ")" << ", " << compiler->reg(objectId, i);
+        std::ostringstream ss2;
+        if (i == 0) {
+            ss2 << "(r" << pointerId << ") = r" << objectId;
+        }
+        compiler->emit(ss1.str(), ss2.str());
     }
 }
 
@@ -3384,7 +3386,7 @@ void InsnBranch::emit(Compiler *compiler)
     compiler->emitPhiCopy(this, targetLabelId);
 
     std::ostringstream ss;
-    ss << "jmp label" << targetLabelId;
+    ss << "j label" << targetLabelId;
     compiler->emit(ss.str(), "");
 }
 
