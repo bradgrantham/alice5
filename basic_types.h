@@ -208,6 +208,10 @@ struct Function
 
     // Index into the "code" array.
     uint32_t start;
+
+    // ID of the start label. Don't jump here, this is for block dominance calculations.
+    // This is NO_BLOCK_ID if it's not yet been set.
+    uint32_t labelId;
 };
 
 struct Pointer
@@ -308,8 +312,11 @@ struct Instruction {
     // Emit compiler output for this instruction.
     virtual void emit(Compiler *compiler);
 
+    // The opcode of this instruction (e.g., SpvOpFMul).
+    virtual uint32_t opcode() const = 0;
+
     // The name of this instruction (e.g., "OpFMul").
-    virtual std::string name() = 0;
+    virtual std::string name() const = 0;
 
     // Whether this is a branch instruction (OpBranch, OpBranchConditional,
     // OpSwitch, OpReturn, or OpReturnValue).

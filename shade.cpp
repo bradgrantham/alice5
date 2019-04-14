@@ -34,6 +34,10 @@
 #include "basic_types.h"
 #include "image.h"
 #include "interpreter.h"
+#include "timer.h"
+
+// Enable this to check if our virtual RAM is being initialized properly.
+#undef CHECK_MEMORY_ACCESS
 
 static void skipComments(FILE *fp, char ***comments, size_t *commentCount)
 {
@@ -871,7 +875,7 @@ struct Program
                 uint32_t functionControl = nextu(); // bitfield hints for inlining, pure, etc.
                 uint32_t functionType = nextu();
                 uint32_t start = pgm->instructions.size();
-                pgm->functions[id] = Function {id, resultType, functionControl, functionType, start };
+                pgm->functions[id] = Function {id, resultType, functionControl, functionType, start , NO_BLOCK_ID};
                 pgm->currentFunction = &pgm->functions[id];
                 if(pgm->verbose) {
                     std::cout << "Function " << id
@@ -886,6 +890,10 @@ struct Program
             case SpvOpLabel: {
                 uint32_t id = nextu();
                 pgm->labels[id] = pgm->instructions.size();
+                // The first label we run into after a function definition is its start block.
+                if(pgm->currentFunction->labelId == NO_BLOCK_ID) {
+                    pgm->currentFunction->labelId = id;
+                }
                 if(pgm->verbose) {
                     std::cout << "Label " << id
                         << " at " << pgm->labels[id]
@@ -1002,63 +1010,78 @@ struct Program
             }
         }
 
-        // Compute livein and liveout registers for each line. This is an inefficient
-        // way to do this, we should use a worklist algorithm.
-        bool changed = true;
-        while (changed) {
-            changed = false;
+        // Compute livein and liveout registers for each line.
+        Timer timer;
+        std::set<uint32_t> pc_worklist; // PCs left to work on.
+        for (int pc = 0; pc < instructions.size(); pc++) {
+            pc_worklist.insert(pc);
+        }
+        while (!pc_worklist.empty()) {
+            // Pick any PC to start with. Starting at the end is a bit more efficient
+            // since our predecessor depends on us.
+            auto itr = pc_worklist.rbegin();
+            uint32_t pc = *itr;
+            pc_worklist.erase(*itr);
 
-            for (int pc = 0; pc < instructions.size(); pc++) {
-                Instruction *instruction = instructions[pc].get();
-                std::set<uint32_t> oldLivein = instruction->livein;
-                std::set<uint32_t> oldLiveout = instruction->liveout;
+            Instruction *instruction = instructions[pc].get();
+            std::set<uint32_t> oldLivein = instruction->livein;
+            std::set<uint32_t> oldLiveout = instruction->liveout;
 
-                instruction->liveout.clear();
-                for (uint32_t succPc : instruction->succ) {
-                    Instruction *succInstruction = instructions[succPc].get();
-                    instruction->liveout.insert(succInstruction->livein.begin(),
+            instruction->liveout.clear();
+            for (uint32_t succPc : instruction->succ) {
+                Instruction *succInstruction = instructions[succPc].get();
+                instruction->liveout.insert(succInstruction->livein.begin(),
                         succInstruction->livein.end());
-                }
+            }
 
-                instruction->livein = instruction->liveout;
-                if (instruction->resId != NO_REGISTER) {
-                    instruction->livein.erase(instruction->resId);
-                }
-                for (uint32_t argId : instruction->argIds) {
-                    // Don't consider constants or variables, they're never in registers.
-                    if (constants.find(argId) == constants.end() &&
-                            variables.find(argId) == variables.end()) {
+            instruction->livein = instruction->liveout;
+            if (instruction->resId != NO_REGISTER) {
+                instruction->livein.erase(instruction->resId);
+            }
+            for (uint32_t argId : instruction->argIds) {
+                // Don't consider constants or variables, they're never in registers.
+                if (constants.find(argId) == constants.end() &&
+                        variables.find(argId) == variables.end()) {
 
-                        instruction->livein.insert(argId);
-                    }
+                    instruction->livein.insert(argId);
                 }
+            }
 
-                if (oldLivein != instruction->livein || oldLiveout != instruction->liveout) {
-                    changed = true;
+            if (oldLivein != instruction->livein || oldLiveout != instruction->liveout) {
+                // Our predecessors depend on us.
+                for (uint32_t predPc : instruction->pred) {
+                    pc_worklist.insert(predPc);
                 }
             }
         }
+        std::cout << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
 
         // Compute the dominance tree for blocks. Use a worklist. Do all blocks
         // simultaneously (across functions).
+        timer.reset();
         std::vector<uint32_t> worklist; // block IDs.
         // Make set of all label IDs.
         std::set<uint32_t> allLabelIds;
         for (auto& [labelId, block] : blocks) {
             allLabelIds.insert(labelId);
         }
+        std::set<uint32_t> unreached = allLabelIds;
         // Prepare every block.
         for (auto& [labelId, block] : blocks) {
-            if (block->pred.empty()) {
-                // First block of a function.
-                worklist.push_back(labelId);
-            }
             block->dom = allLabelIds;
+        }
+        // Insert every function's start block.
+        for (auto& [_, function] : functions) {
+            assert(function.labelId != NO_BLOCK_ID);
+            worklist.push_back(function.labelId);
         }
         while (!worklist.empty()) {
             // Take any item from worklist.
             uint32_t labelId = worklist.back();
             worklist.pop_back();
+
+            // We can reach this from the start node.
+            unreached.erase(labelId);
 
             Block *block = blocks.at(labelId).get();
 
@@ -1090,6 +1113,7 @@ struct Program
                 worklist.insert(worklist.end(), block->succ.begin(), block->succ.end());
             }
         }
+        std::cout << "Dominance tree took " << timer.elapsed() << " seconds.\n";
 
         // Compute immediate dom for each block.
         for (auto& [labelId, block] : blocks) {
@@ -1115,9 +1139,6 @@ struct Program
                     break;
                 }
             }
-
-            // It's okay to have no idom as long as you're the first block in the function.
-            assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
         }
 
         // Dump block info.
@@ -1145,6 +1166,27 @@ struct Program
                     std::cout << "    Immediate Dom: " << block->idom << "\n";
                 }
             }
+            std::cout << "-----------------------\n";
+            // http://www.webgraphviz.com/
+            std::cout << "digraph CFG {\n  rankdir=TB;\n";
+            for (auto& [labelId, block] : blocks) {
+                if (unreached.find(labelId) == unreached.end()) {
+                    for (auto pred : block->pred) {
+                        // XXX this is laid out much better if the function's start
+                        // block is mentioned first.
+                        if (unreached.find(pred) == unreached.end()) {
+                            std::cout << "  \"" << pred << "\" -> \"" << labelId << "\"";
+                            std::cout << ";\n";
+                        }
+                    }
+                    if (block->idom != NO_BLOCK_ID) {
+                        std::cout << "  \"" << labelId << "\" -> \"" << block->idom << "\"";
+                        std::cout << " [color=\"0.000, 0.999, 0.999\"]";
+                        std::cout << ";\n";
+                    }
+                }
+            }
+            std::cout << "}\n";
             std::cout << "-----------------------\n";
         }
 
@@ -1208,6 +1250,17 @@ struct Program
             }
             std::cout << "-----------------------\n";
         }
+
+        for (auto& [labelId, block] : blocks) {
+            // It's okay to have no idom as long as you're the first block in the function.
+            if ((block->idom == NO_BLOCK_ID) != block->pred.empty()) {
+                std::cout << "----\n"
+                    << labelId << "\n"
+                    << block->idom << "\n"
+                    << block->pred.size() << "\n";
+            }
+            assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
+        }
     }
 
     // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
@@ -1234,9 +1287,11 @@ Interpreter::Interpreter(const Program *pgm)
     : pgm(pgm)
 {
     memory = new unsigned char[pgm->memorySize];
+    memoryInitialized = new bool[pgm->memorySize];
 
     // So we can catch errors.
     std::fill(memory, memory + pgm->memorySize, 0xFF);
+    std::fill(memoryInitialized, memoryInitialized + pgm->memorySize, false);
 
     // Allocate registers so they aren't allocated during run()
     for(auto [id, type]: pgm->resultTypes) {
@@ -1244,15 +1299,34 @@ Interpreter::Interpreter(const Program *pgm)
     }
 }
 
-void Interpreter::copy(uint32_t type, size_t src, size_t dst)
+void Interpreter::checkMemory(size_t offset, size_t size)
 {
-    std::copy(memory + src, memory + src + pgm->typeSizes.at(type), memory + dst);
+#ifdef CHECK_MEMORY_ACCESS
+    for (size_t addr = offset; addr < offset + size; addr++) {
+        if (!memoryInitialized[addr]) {
+            std::cerr << "Warning: Reading uninitialized memory " << addr << "\n";
+        }
+    }
+#endif
+}
+
+void Interpreter::markMemory(size_t offset, size_t size)
+{
+#ifdef CHECK_MEMORY_ACCESS
+    std::fill(memoryInitialized + offset, memoryInitialized + offset + size, true);
+#endif
 }
 
 template <class T>
-T& Interpreter::objectInClassAt(SpvStorageClass clss, size_t offset)
+T& Interpreter::objectInClassAt(SpvStorageClass clss, size_t offset, bool reading, size_t size)
 {
-    return *reinterpret_cast<T*>(memory + pgm->memoryRegions.at(clss).base + offset);
+    size_t addr = pgm->memoryRegions.at(clss).base + offset;
+    if (reading) {
+        checkMemory(addr, size);
+    } else {
+        markMemory(addr, size);
+    }
+    return *reinterpret_cast<T*>(memory + addr);
 }
 
 template <class T>
@@ -1266,6 +1340,7 @@ void Interpreter::clearPrivateVariables()
     // Global variables are cleared for each run.
     const MemoryRegion &mr = pgm->memoryRegions.at(SpvStorageClassPrivate);
     std::fill(memory + mr.base, memory + mr.top, 0x00);
+    markMemory(mr.base, mr.top - mr.base);
 }
 
 void Interpreter::stepNop(const InsnNop& insn)
@@ -1282,7 +1357,9 @@ void Interpreter::stepLoad(const InsnLoad& insn)
 {
     Pointer& ptr = pointers.at(insn.pointerId);
     Register& obj = registers[insn.resultId];
-    std::copy(memory + ptr.offset, memory + ptr.offset + pgm->typeSizes.at(insn.type), obj.data);
+    size_t size = pgm->typeSizes.at(insn.type);
+    checkMemory(ptr.offset, size);
+    std::copy(memory + ptr.offset, memory + ptr.offset + size, obj.data);
     if(false) {
         std::cout << "load result is";
         pgm->dumpTypeAt(pgm->types.at(insn.type), obj.data);
@@ -1295,6 +1372,7 @@ void Interpreter::stepStore(const InsnStore& insn)
     Pointer& ptr = pointers.at(insn.pointerId);
     Register& obj = registers[insn.objectId];
     std::copy(obj.data, obj.data + obj.size, memory + ptr.offset);
+    markMemory(ptr.offset, obj.size);
 }
 
 void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
@@ -2873,13 +2951,13 @@ void Interpreter::step()
 template <class T>
 void Interpreter::set(SpvStorageClass clss, size_t offset, const T& v)
 {
-    objectInClassAt<T>(clss, offset) = v;
+    objectInClassAt<T>(clss, offset, false, sizeof(v)) = v;
 }
 
 template <class T>
 void Interpreter::get(SpvStorageClass clss, size_t offset, T& v)
 {
-    v = objectInClassAt<T>(clss, offset);
+    v = objectInClassAt<T>(clss, offset, true, sizeof(v));
 }
 
 void Interpreter::run()
@@ -2941,8 +3019,10 @@ struct Compiler
 {
     const Program *pgm;
     std::map<uint32_t, CompilerRegister> registers;
+    uint32_t localLabelCounter;
 
-    Compiler(const Program *pgm) : pgm(pgm)
+    Compiler(const Program *pgm)
+        : pgm(pgm), localLabelCounter(1)
     {
         // Nothing.
     }
@@ -2956,20 +3036,29 @@ struct Compiler
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
                     std::string name = pgm->cleanUpFunctionName(function.first);
-                    std::cout
-                        << "; ---------------------------- function " << name << "\n"
-                        << name << ":\n";
+                    std::cout << "; ---------------------------- function \"" << name << "\"\n";
+                    emitLabel(name);
                 }
             }
 
             for(auto &label : pgm->labels) {
                 if(pc == label.second) {
-                    std::cout << "label" << label.first << ":\n";
+                    std::ostringstream ss;
+                    ss << "label" << label.first;
+                    emitLabel(ss.str());
                 }
             }
 
             pgm->instructions.at(pc)->emit(this);
         }
+    }
+
+    // Make a new label that can be used for local jumps.
+    std::string makeLocalLabel() {
+        std::ostringstream ss;
+        ss << "local" << localLabelCounter;
+        localLabelCounter++;
+        return ss.str();
     }
 
     void assignRegisters() {
@@ -3078,6 +3167,21 @@ struct Compiler
         }
     }
 
+    // Determine whether these two virtual register IDs are currently assigned
+    // to the same physical register. Returns false if one or both aren't
+    // assigned at all. Index is the index into the vector, if it is one.
+    bool isSamePhysicalRegister(uint32_t id1, uint32_t id2, int index) const {
+        auto r1 = registers.find(id1);
+        if (r1 != registers.end() && index < r1->second.phy.size()) {
+            auto r2 = registers.find(id2);
+            if (r2 != registers.end() && index < r2->second.phy.size()) {
+                return r1->second.phy[index] == r2->second.phy[index];
+            }
+        }
+
+        return false;
+    }
+
     // String for a virtual register ("r12" or more).
     std::string reg(uint32_t id, int index = 0) const {
         std::ostringstream ss;
@@ -3130,6 +3234,11 @@ struct Compiler
         }
     }
 
+    void emitLabel(const std::string &label)
+    {
+        std::cout << label << ":\n";
+    }
+
     void emit(const std::string &op, const std::string comment)
     {
         std::ios oldState(nullptr);
@@ -3146,6 +3255,51 @@ struct Compiler
         std::cout << "\n";
 
         std::cout.copyfmt(oldState);
+    }
+
+    // Just before a Branch or BranchConditional instruction, copy any
+    // registers that a target OpPhi instruction might need.
+    void emitPhiCopy(Instruction *instruction, uint32_t labelId) {
+        Block *block = pgm->blocks.at(labelId).get();
+        for (int pc = block->begin; pc < block->end; pc++) {
+            Instruction *nextInstruction = pgm->instructions[pc].get();
+            if (nextInstruction->opcode() != SpvOpPhi) {
+                // No more phi instructions for this block.
+                break;
+            }
+
+            InsnPhi *phi = dynamic_cast<InsnPhi *>(nextInstruction);
+
+            // Find the block corresponding to ours.
+            bool found = false;
+            for (int i = 0; !found && i < phi->operandId.size(); i += 2) {
+                uint32_t srcId = phi->operandId[i];
+                uint32_t parentId = phi->operandId[i + 1];
+
+                if (parentId == instruction->blockId) {
+                    found = true;
+
+                    // XXX need to iterate over all registers of a vector.
+                    std::ostringstream ss;
+                    if (isSamePhysicalRegister(phi->resultId, srcId, 0)) {
+                        ss << "; ";
+                    }
+                    ss << "mov " << reg(phi->resultId)
+                        << ", " << reg(srcId);
+                    emit(ss.str(), "phi elimination");
+                }
+            }
+            if (!found) {
+                std::cerr << "Error: Can't find source block " << instruction->blockId
+                    << " in phi assigning to " << phi->resultId << "\n";
+            }
+        }
+    }
+
+    // Assert that the block at the label ID does not start with a Phi instruction.
+    void assertNoPhi(uint32_t labelId) {
+        Block *block = pgm->blocks.at(labelId).get();
+        assert(pgm->instructions[block->begin]->opcode() != SpvOpPhi);
     }
 };
 
@@ -3224,6 +3378,9 @@ void InsnStore::emit(Compiler *compiler)
 
 void InsnBranch::emit(Compiler *compiler)
 {
+    // See if we need to emit any copies for Phis at our target.
+    compiler->emitPhiCopy(this, targetLabelId);
+
     std::ostringstream ss;
     ss << "jmp label" << targetLabelId;
     compiler->emit(ss.str(), "");
@@ -3241,6 +3398,11 @@ void InsnReturnValue::emit(Compiler *compiler)
     compiler->emit(ss.str(), "");
 }
 
+void InsnPhi::emit(Compiler *compiler)
+{
+    compiler->emit("", "phi instruction, nothing to do.");
+}
+
 void InsnFOrdLessThanEqual::emit(Compiler *compiler)
 {
     compiler->emitBinaryOp("lte", resultId, operand1Id, operand2Id);
@@ -3248,11 +3410,23 @@ void InsnFOrdLessThanEqual::emit(Compiler *compiler)
 
 void InsnBranchConditional::emit(Compiler *compiler)
 {
-    std::ostringstream ss;
-    ss << "jmp " << compiler->reg(conditionId)
-        << ", label" << trueLabelId
-        << ", label" << falseLabelId;
-    compiler->emit(ss.str(), "");
+    std::string localLabel = compiler->makeLocalLabel();
+
+    std::ostringstream ss1;
+    ss1 << "beq " << compiler->reg(conditionId)
+        << ", x0, " << localLabel;
+    compiler->emit(ss1.str(), "");
+    // False path.
+    compiler->emitPhiCopy(this, falseLabelId);
+    std::ostringstream ss2;
+    ss2 << "j label" << falseLabelId;
+    compiler->emit(ss2.str(), "");
+    // True path.
+    compiler->emitLabel(localLabel);
+    compiler->emitPhiCopy(this, trueLabelId);
+    std::ostringstream ss3;
+    ss3 << "j label" << trueLabelId;
+    compiler->emit(ss3.str(), "");
 }
 
 // -----------------------------------------------------------------------------------
@@ -3637,8 +3811,9 @@ bool createSPIRVFromSources(const std::vector<ShaderSource>& sources, bool debug
     return true;
 }
 
-void optimizeSPIRV(bool optimize, spv_target_env targetEnv, std::vector<uint32_t>& spirv)
+void optimizeSPIRV(spv_target_env targetEnv, std::vector<uint32_t>& spirv)
 {
+    Timer timer;
     spvtools::Optimizer optimizer(targetEnv);
     optimizer.SetMessageConsumer(earwigMessageConsumer);
     optimizer.RegisterPerformancePasses();
@@ -3648,6 +3823,7 @@ void optimizeSPIRV(bool optimize, spv_target_env targetEnv, std::vector<uint32_t
     if (!success) {
         std::cout << "Warning: Optimizer failed.\n";
     }
+    std::cout << "Optimizing took " << timer.elapsed() << " seconds.\n";
 }
 
 bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool optimize, bool disassemble, Program& program)
@@ -3662,7 +3838,11 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
     spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_3;
 
     if (optimize) {
-        optimizeSPIRV(optimize, targetEnv, spirv);
+        if(disassemble) {
+            spv::Disassemble(std::cout, spirv);
+        }
+
+        optimizeSPIRV(targetEnv, spirv);
     }
 
     if(disassemble) {
@@ -3678,10 +3858,14 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
     spv_context context = spvContextCreate(targetEnv);
     spvBinaryParse(context, &program, spirv.data(), spirv.size(), Program::handleHeader, Program::handleInstruction, nullptr);
 
-    program.postParse();
-
     if (program.hasUnimplemented) {
         return false;
+    }
+
+    {
+        Timer timer;
+        program.postParse();
+        std::cout << "Post-parse took " << timer.elapsed() << " seconds.\n";
     }
 
     return true;
@@ -3873,7 +4057,7 @@ int main(int argc, char **argv)
     for(int imageNumber = imageStart; imageNumber <= imageEnd; imageNumber++) {
         for(auto& pass: passesSortedByDependency) {
 
-            auto startTime = std::chrono::steady_clock::now();
+            Timer timer;
 
             ShaderToyImage output = pass->outputs[0];
             ImagePtr image = output.image;
@@ -3890,26 +4074,20 @@ int main(int argc, char **argv)
             }
 
             // Progress information.
-            thread.push_back(new std::thread(showProgress, image->height, startTime));
+            thread.push_back(new std::thread(showProgress, image->height, timer.startTime()));
 
             // Wait for worker threads to quit.
             for (int t = 0; t < thread.size(); t++) {
                 std::thread* td = thread.back();
                 thread.pop_back();
                 td->join();
-            }
-
-            auto endTime = std::chrono::steady_clock::now();
-            auto elapsedTime = endTime - startTime;
-            auto elapsedSeconds = double(elapsedTime.count())*
-                std::chrono::steady_clock::period::num/
-                std::chrono::steady_clock::period::den;
-
-            std::cout << "Shading pass \"" << pass->name << "\" took "
-                << elapsedSeconds << " seconds ("
-                << long(image->width*image->height/elapsedSeconds)
-                << " pixels per second)\n";
         }
+
+        double elapsedSeconds = timer.elapsed();
+            std::cout << "Shading pass " << pass->name << " took " << elapsedSeconds << " seconds ("
+            << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
+        }
+
 
         ShaderToyImage output = passesSortedByDependency.back()->outputs[0];
         ImagePtr image = output.image;
