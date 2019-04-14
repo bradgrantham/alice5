@@ -3019,8 +3019,10 @@ struct Compiler
 {
     const Program *pgm;
     std::map<uint32_t, CompilerRegister> registers;
+    uint32_t localLabelCounter;
 
-    Compiler(const Program *pgm) : pgm(pgm)
+    Compiler(const Program *pgm)
+        : pgm(pgm), localLabelCounter(1)
     {
         // Nothing.
     }
@@ -3034,20 +3036,29 @@ struct Compiler
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
                     std::string name = pgm->cleanUpFunctionName(function.first);
-                    std::cout
-                        << "; ---------------------------- function " << name << "\n"
-                        << name << ":\n";
+                    std::cout << "; ---------------------------- function \"" << name << "\"\n";
+                    emitLabel(name);
                 }
             }
 
             for(auto &label : pgm->labels) {
                 if(pc == label.second) {
-                    std::cout << "label" << label.first << ":\n";
+                    std::ostringstream ss;
+                    ss << "label" << label.first;
+                    emitLabel(ss.str());
                 }
             }
 
             pgm->instructions.at(pc)->emit(this);
         }
+    }
+
+    // Make a new label that can be used for local jumps.
+    std::string makeLocalLabel() {
+        std::ostringstream ss;
+        ss << "local" << localLabelCounter;
+        localLabelCounter++;
+        return ss.str();
     }
 
     void assignRegisters() {
@@ -3223,6 +3234,11 @@ struct Compiler
         }
     }
 
+    void emitLabel(const std::string &label)
+    {
+        std::cout << label << ":\n";
+    }
+
     void emit(const std::string &op, const std::string comment)
     {
         std::ios oldState(nullptr);
@@ -3243,11 +3259,8 @@ struct Compiler
 
     // Just before a Branch or BranchConditional instruction, copy any
     // registers that a target OpPhi instruction might need.
-    void emitPhiCopy(Instruction *instruction) {
-        assert(instruction->succ.size() == 1);
-        uint32_t succInstId = *instruction->succ.begin();
-        uint32_t succBlockId = pgm->instructions.at(succInstId)->blockId;
-        Block *block = pgm->blocks.at(succBlockId).get();
+    void emitPhiCopy(Instruction *instruction, uint32_t labelId) {
+        Block *block = pgm->blocks.at(labelId).get();
         for (int pc = block->begin; pc < block->end; pc++) {
             Instruction *nextInstruction = pgm->instructions[pc].get();
             if (nextInstruction->opcode() != SpvOpPhi) {
@@ -3366,7 +3379,7 @@ void InsnStore::emit(Compiler *compiler)
 void InsnBranch::emit(Compiler *compiler)
 {
     // See if we need to emit any copies for Phis at our target.
-    compiler->emitPhiCopy(this);
+    compiler->emitPhiCopy(this, targetLabelId);
 
     std::ostringstream ss;
     ss << "jmp label" << targetLabelId;
@@ -3397,16 +3410,23 @@ void InsnFOrdLessThanEqual::emit(Compiler *compiler)
 
 void InsnBranchConditional::emit(Compiler *compiler)
 {
-    // Make sure we're not branching to a block that starts with Phi. We don't
-    // handle that now, and I'm not sure it ever happens.
-    compiler->assertNoPhi(trueLabelId);
-    compiler->assertNoPhi(falseLabelId);
+    std::string localLabel = compiler->makeLocalLabel();
 
-    std::ostringstream ss;
-    ss << "jmp " << compiler->reg(conditionId)
-        << ", label" << trueLabelId
-        << ", label" << falseLabelId;
-    compiler->emit(ss.str(), "");
+    std::ostringstream ss1;
+    ss1 << "beq " << compiler->reg(conditionId)
+        << ", x0, " << localLabel;
+    compiler->emit(ss1.str(), "");
+    // False path.
+    compiler->emitPhiCopy(this, falseLabelId);
+    std::ostringstream ss2;
+    ss2 << "j label" << falseLabelId;
+    compiler->emit(ss2.str(), "");
+    // True path.
+    compiler->emitLabel(localLabel);
+    compiler->emitPhiCopy(this, trueLabelId);
+    std::ostringstream ss3;
+    ss3 << "j label" << trueLabelId;
+    compiler->emit(ss3.str(), "");
 }
 
 // -----------------------------------------------------------------------------------
