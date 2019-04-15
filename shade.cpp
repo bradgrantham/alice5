@@ -247,10 +247,18 @@ T& objectAt(unsigned char* data)
     return *reinterpret_cast<T*>(data);
 }
 
-struct UniformBinding
+struct UniformInfo
 {
     uint32_t binding;       // The "binding" attribute for this element's parent
-    size_t offset;          // The offset within the parent's binding for this element
+    size_t offset;          // The offset within the binding
+    size_t size;            // Size in bytes of this element for type checking
+};
+
+struct InputInfo
+{
+    uint32_t location;      // The "location" attribute for this element or this element's parent
+    size_t offset;          // The offset within the location
+    size_t size;            // Size in bytes of this element for type checking
 };
 
 // The static state of the program.
@@ -295,7 +303,8 @@ struct Program
     // Map from virtual register ID to its type. Only used for results of instructions.
     std::map<uint32_t, uint32_t> resultTypes;
     std::map<uint32_t, Register> constants;
-    // std::map<std::string, UniformBinding> uniformVariables;
+    std::map<std::string, UniformInfo> uniformVariables;
+    std::map<std::string, InputInfo> inputVariables;
 
     Function* currentFunction;
     // Map from label ID to index into instructions vector.
@@ -955,6 +964,61 @@ struct Program
         return SPV_SUCCESS;
     }
 
+    void storeUniformInformation(const std::string& name, uint32_t typeId, uint32_t binding, size_t offset)
+    {
+        std::visit([this, name, typeId, binding, offset](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeStruct>) {
+
+                for(int i = 0; i < type.memberTypes.size(); i++) {
+                    uint32_t membertype = type.memberTypes[i];
+                    std::string fullname = ((name == "") ? "" : (name + ".")) + memberNames[typeId][i];
+                    storeUniformInformation(fullname, membertype, binding, offset + memberDecorations[typeId][i][SpvDecorationOffset][0]);
+                }
+
+            } else if constexpr (std::is_same_v<T, TypeVector> || std::is_same_v<T, TypeFloat> || std::is_same_v<T, TypeInt> || std::is_same_v<T, TypeSampledImage> || std::is_same_v<T, TypeBool> || std::is_same_v<T, TypeMatrix>) {
+
+                uniformVariables[name] = {binding, offset, typeSizes.at(typeId)};
+
+            } else {
+
+                std::cout << "Unhandled type for finding uniform variable offset and size\n";
+
+            }
+        }, types[typeId]);
+
+    }
+
+    void storeInputInformation(const std::string& name, uint32_t typeId, uint32_t location, size_t offset)
+    {
+        std::visit([this, name, typeId, location, offset](auto&& type) {
+
+            using T = std::decay_t<decltype(type)>;
+
+            if constexpr (std::is_same_v<T, TypeStruct>) {
+
+                for(int i = 0; i < type.memberTypes.size(); i++) {
+                    uint32_t membertype = type.memberTypes[i];
+                    std::string fullname = ((name == "") ? "" : (name + ".")) + memberNames[typeId][i];
+                    storeInputInformation(fullname, membertype, location, offset + memberDecorations[typeId][i][SpvDecorationOffset][0]);
+                }
+
+            } else if constexpr (std::is_same_v<T, TypeVector> || std::is_same_v<T, TypeFloat> || std::is_same_v<T, TypeInt> || std::is_same_v<T, TypeSampledImage> || std::is_same_v<T, TypeBool> || std::is_same_v<T, TypeMatrix>) {
+
+                inputVariables[name] = {location, offset, typeSizes.at(typeId)};
+
+            } else {
+
+                std::cout << "Unhandled type for finding input variable offset and size\n";
+
+            }
+        }, types[typeId]);
+
+    }
+
+
     // Post-parsing work.
     void postParse() {
         // Find the main function.
@@ -965,14 +1029,26 @@ struct Program
             }
         }
 
-#if 0
         // Compute locations of Uniform and Input variables
-        for(auto& v: variables) {
-            if(v.storageClass = SpvStorageClassUniform) {
-                std::vector<uint32_t> type = v.type;
+        for(auto& [id, var]: variables) {
+            if(var.storageClass == SpvStorageClassUniform) {
+                uint32_t binding = decorations[id][SpvDecorationBinding][0];
+                storeUniformInformation(names[id], var.type, binding, 0);
+            }
+            if(var.storageClass == SpvStorageClassInput) {
+                uint32_t location = decorations[id][SpvDecorationLocation][0];
+                storeInputInformation(names[id], var.type, location, 0);
             }
         }
-#endif
+        if(verbose) {
+            std::cout << "----------------------- Variable binding and location info\n";
+            for(auto& [name, info]: uniformVariables) {
+                std::cout << "uniform " << name << " is binding " << info.binding << " with offset " << info.offset << " and size " << info.size << '\n';
+            }
+            for(auto& [name, info]: inputVariables) {
+                std::cout << "input " << name << " is location " << info.location << " with offset " << info.offset << " and size " << info.size << '\n';
+            }
+        }
 
         // Figure out our basic blocks. These start on an OpLabel and end on
         // a terminating instruction.
