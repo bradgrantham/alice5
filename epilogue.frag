@@ -3,6 +3,6 @@
 
 void main()
 {
-    mainImage(color, fragCoord);
+    mainImage(color, gl_FragCoord.xy);
 }
 

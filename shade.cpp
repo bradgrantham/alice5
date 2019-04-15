@@ -332,11 +332,11 @@ struct Program
         auto anotherRegion = [this](size_t size){MemoryRegion r(memorySize, size); memorySize += size; return r;};
         memoryRegions[SpvStorageClassUniformConstant] = anotherRegion(1024);
         memoryRegions[SpvStorageClassInput] = anotherRegion(1024);
-        memoryRegions[SpvStorageClassUniform] = anotherRegion(1024);
+        memoryRegions[SpvStorageClassUniform] = anotherRegion(4096);
         memoryRegions[SpvStorageClassOutput] = anotherRegion(1024);
         memoryRegions[SpvStorageClassWorkgroup] = anotherRegion(0);
         memoryRegions[SpvStorageClassCrossWorkgroup] = anotherRegion(0);
-        memoryRegions[SpvStorageClassPrivate] = anotherRegion(65536); // XXX still needed?
+        memoryRegions[SpvStorageClassPrivate] = anotherRegion(16384); // XXX still needed?
         memoryRegions[SpvStorageClassFunction] = anotherRegion(16384);
         memoryRegions[SpvStorageClassGeneric] = anotherRegion(0);
         memoryRegions[SpvStorageClassPushConstant] = anotherRegion(0);
@@ -363,25 +363,32 @@ struct Program
         return allocate(static_cast<SpvStorageClass>(clss), type);
     }
 
-    // Returns the type of the member of "t" at index "i". For vectors,
-    // "i" is ignored and the type of any element is returned. For matrices,
-    // "i" is ignored and the type of any column is returned. For structs,
-    // the type of field "i" (0-indexed) is returned.
-    uint32_t getConstituentType(uint32_t t, int i) const
+    // Returns the type of and byte offset to the member of "t" at
+    // index "i".
+    // For vectors, "i" is ignored and the type of any
+    // element is returned and the offset by type is returned.
+    // For matrices, "i" is ignored and the type of any column is
+    // returned and the offset by column type is returned.
+    // For structs, the type of field "i" (0-indexed) is returned
+    // and the offset is looked up in offset decorations.
+    std::tuple<uint32_t, size_t> getConstituentInfo(uint32_t t, int i) const
     {
         const Type& type = types.at(t);
         if(std::holds_alternative<TypeVector>(type)) {
-            return std::get<TypeVector>(type).type;
+            uint32_t elementType = std::get<TypeVector>(type).type;
+            return std::make_tuple(elementType, typeSizes.at(elementType) * i);
         } else if(std::holds_alternative<TypeMatrix>(type)) {
-            return std::get<TypeMatrix>(type).columnType;
+            uint32_t columnType = std::get<TypeMatrix>(type).columnType;
+            return std::make_tuple(columnType, typeSizes.at(columnType) * i);
         } else if (std::holds_alternative<TypeStruct>(type)) {
-            return std::get<TypeStruct>(type).memberTypes[i];
+            uint32_t memberType = std::get<TypeStruct>(type).memberTypes[i];
+            return std::make_tuple(memberType, memberDecorations.at(t).at(i).at(SpvDecorationOffset)[0]);
         // XXX } else if (std::holds_alternative<TypeArray>(type)) {
         } else {
             std::cout << type.index() << "\n";
             assert(false && "getConstituentType of invalid type?!");
         }
-        return 0; // not reached
+        return std::make_tuple(0, 0); // not reached
     }
 
     // If the type ID refers to a TypeVector, returns it. Otherwise returns null.
@@ -782,10 +789,9 @@ struct Program
                 uint32_t storageClass = nextu();
                 uint32_t initializer = nextu(NO_INITIALIZER);
                 uint32_t pointedType = std::get<TypePointer>(pgm->types[type]).type;
-                size_t offset = pgm->allocate(storageClass, pointedType);
-                pgm->variables[id] = {pointedType, storageClass, initializer, offset};
+                pgm->variables[id] = {pointedType, storageClass, initializer, 0xFFFFFFFF};
                 if(pgm->verbose) {
-                    std::cout << "Variable " << id << " type " << type << " to type " << pointedType << " storageClass " << storageClass << " offset " << offset;
+                    std::cout << "Variable " << id << " type " << type << " to type " << pointedType << " storageClass " << storageClass;
                     if(initializer != NO_INITIALIZER)
                         std::cout << " initializer " << initializer;
                     std::cout << "\n";
@@ -1029,15 +1035,22 @@ struct Program
             }
         }
 
-        // Compute locations of Uniform and Input variables
+        // Allocated variables 
         for(auto& [id, var]: variables) {
             if(var.storageClass == SpvStorageClassUniform) {
-                uint32_t binding = decorations[id][SpvDecorationBinding][0];
+                uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
                 storeUniformInformation(names[id], var.type, binding, 0);
-            }
-            if(var.storageClass == SpvStorageClassInput) {
-                uint32_t location = decorations[id][SpvDecorationLocation][0];
+                var.offset = binding * 256;
+            } else if(var.storageClass == SpvStorageClassInput) {
+                if(decorations.find(id) != decorations.end())
+                    throw std::runtime_error("no decorations available for input " + std::to_string(id));
+                if(decorations.at(id).find(SpvDecorationLocation) != decorations.at(id).end())
+                    throw std::runtime_error("no Location decoration available for input " + std::to_string(id));
+                uint32_t location = decorations.at(id).at(SpvDecorationLocation)[0];
                 storeInputInformation(names[id], var.type, location, 0);
+                var.offset = location * 256;
+            } else {
+                var.offset = allocate(var.storageClass, var.type);
             }
         }
         if(verbose) {
@@ -1484,10 +1497,9 @@ void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
     uint32_t type = src.type;
     size_t offset = 0;
     for(auto& j: insn.indexesId) {
-        for(int i = 0; i < j; i++) {
-            offset += pgm->typeSizes.at(pgm->getConstituentType(type, i));
-        }
-        type = pgm->getConstituentType(type, j);
+        uint32_t constituentOffset;
+        std::tie(type, constituentOffset) = pgm->getConstituentInfo(type, j);
+        offset += constituentOffset;
     }
     std::copy(src.data + offset, src.data + offset + pgm->typeSizes.at(obj.type), obj.data);
     if(false) {
@@ -1513,10 +1525,9 @@ void Interpreter::stepCompositeInsert(const InsnCompositeInsert& insn)
     uint32_t type = res.type;
     size_t offset = 0;
     for(auto& j: insn.indexesId) {
-        for(int i = 0; i < j; i++) {
-            offset += pgm->typeSizes.at(pgm->getConstituentType(type, i));
-        }
-        type = pgm->getConstituentType(type, j);
+        uint32_t constituentOffset;
+        std::tie(type, constituentOffset) = pgm->getConstituentInfo(type, j);
+        offset += constituentOffset;
     }
     std::copy(obj.data, obj.data + pgm->typeSizes.at(obj.type), res.data);
 }
@@ -2248,10 +2259,9 @@ void Interpreter::stepAccessChain(const InsnAccessChain& insn)
     size_t offset = basePointer.offset;
     for(auto& id: insn.indexesId) {
         int32_t j = registerAs<int32_t>(id);
-        for(int i = 0; i < j; i++) {
-            offset += pgm->typeSizes.at(pgm->getConstituentType(type, i));
-        }
-        type = pgm->getConstituentType(type, j);
+        uint32_t constituentOffset;
+        std::tie(type, constituentOffset) = pgm->getConstituentInfo(type, j);
+        offset += constituentOffset;
     }
     if(false) {
         std::cout << "accesschain of " << basePointer.offset << " yielded " << offset << "\n";
@@ -3611,9 +3621,9 @@ void render(const Program *pgm, int startRow, int skip, ImagePtr output, float w
     // XXX We should discover from SPIR-V.
     interpreter.set(SpvStorageClassUniform, 8, when);
 
-    // iMouse is uniform @16 in preamble, but we don't align properly, so ours is at 12.
+    // iMouse is uniform @16 in preamble, but we don't align properly, so ours is at 16.
     // XXX We should discover from SPIR-V.
-    interpreter.set(SpvStorageClassUniform, 12, v4float {0, 0, 0, 0});
+    interpreter.set(SpvStorageClassUniform, 16, v4float {0, 0, 0, 0});
 
     // This loop acts like a rasterizer fixed function block.  Maybe it should
     // set inputs and read outputs also.
