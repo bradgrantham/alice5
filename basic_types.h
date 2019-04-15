@@ -49,17 +49,6 @@ struct EntryPoint
     std::map<uint32_t, std::vector<uint32_t>> executionModesToOperands;
 };
 
-// XXX A decoration tells us something about a type or variable, but I'm not sure what, maybe
-// how to access it from outside the shader and the offset of fields within a struct.
-struct Decoration
-{
-    // The ID of a type or variable.
-    uint32_t decoration;
-
-    // XXX Specific operands for this decoration.
-    std::vector<uint32_t> operands;
-};
-
 // Information about the source code for the shader.
 struct Source
 {
@@ -75,6 +64,20 @@ struct Source
     // XXX Filename of the shader source?
     std::string source;
 };
+
+// A decoration tells us something about a type or variable, like 
+// how to access it from outside the shader (OpDecorationBinding),
+// the offset of fields within a struct (OpDecorationOffset), or
+// the stride of elements with in an array (OpDecorationArrayStride,
+// or whether a scalar can have relaxed precision (OpDecorateRelaxedPrecision).
+// See the SPIR-V spec for "OpDecorate" for more details on the
+// available decorations.
+//
+// This type represents a list of decoration ids (e.g. OpDecorationLocation)
+// mapped to the decoration's operands.  At the time of SPIR-V 1.2, all
+// decorations have 0 or 1 operands except OpDecorationLinkageAttributes,
+// which has 2.  So the operands vector almost always has 0 or 1 operands.
+typedef std::map<uint32_t, std::vector<uint32_t> > Decorations;
 
 // XXX Unused.
 struct MemberName

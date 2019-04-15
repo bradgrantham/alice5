@@ -247,6 +247,12 @@ T& objectAt(unsigned char* data)
     return *reinterpret_cast<T*>(data);
 }
 
+struct UniformBinding
+{
+    uint32_t binding;       // The "binding" attribute for this element's parent
+    size_t offset;          // The offset within the parent's binding for this element
+};
+
 // The static state of the program.
 struct Program 
 {
@@ -264,12 +270,21 @@ struct Program
     uint32_t memoryModel;
     uint32_t addressingModel;
     std::map<uint32_t, EntryPoint> entryPoints;
-    std::map<uint32_t, Decoration> decorations;
+
     std::map<uint32_t, std::string> names;
+    std::map<uint32_t, std::map<uint32_t, std::string> > memberNames;
+
+    // decorations is indexed by id, then decoration type, yielding operands.
+    // e.g. offset = decorations[variable_fragCoord][SpvDecorationLocation][0];
+    std::map<uint32_t, Decorations > decorations;
+
+    // memberDecorations is indexed by id, then member number,
+    // then decoration type, yielding operands.
+    // e.g. offset = decorations[var_params][mem_iTime][SpvDecorationOffset][0];
+    std::map<uint32_t, std::map<uint32_t, Decorations> > memberDecorations;
+
     std::vector<Source> sources;
     std::vector<std::string> processes;
-    std::map<uint32_t, std::map<uint32_t, std::string> > memberNames;
-    std::map<uint32_t, std::map<uint32_t, Decoration> > memberDecorations;
     std::map<uint32_t, Type> types;
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
@@ -280,6 +295,7 @@ struct Program
     // Map from virtual register ID to its type. Only used for results of instructions.
     std::map<uint32_t, uint32_t> resultTypes;
     std::map<uint32_t, Register> constants;
+    // std::map<std::string, UniformBinding> uniformVariables;
 
     Function* currentFunction;
     // Map from label ID to index into instructions vector.
@@ -596,10 +612,10 @@ struct Program
                 uint32_t id = nextu();
                 uint32_t decoration = nextu();
                 std::vector<uint32_t> operands = nextv();
-                pgm->decorations[id] = {decoration, operands};
+                pgm->decorations[id][decoration] = operands;
                 if(pgm->verbose) {
                     std::cout << "OpDecorate " << id << " " << decoration;
-                    for(auto& i: pgm->decorations[id].operands)
+                    for(auto& i: pgm->decorations[id][decoration])
                         std::cout << " " << i;
                     std::cout << "\n";
                 }
@@ -611,10 +627,10 @@ struct Program
                 uint32_t member = nextu();
                 uint32_t decoration = nextu();
                 std::vector<uint32_t> operands = nextv();
-                pgm->memberDecorations[id][member] = {decoration, operands};
+                pgm->memberDecorations[id][member][decoration] = operands;
                 if(pgm->verbose) {
                     std::cout << "OpMemberDecorate " << id << " " << member << " " << decoration;
-                    for(auto& i: pgm->memberDecorations[id][member].operands)
+                    for(auto& i: pgm->memberDecorations[id][member][decoration])
                         std::cout << " " << i;
                     std::cout << "\n";
                 }
@@ -948,6 +964,15 @@ struct Program
                 mainFunction = &functions[e.first];
             }
         }
+
+#if 0
+        // Compute locations of Uniform and Input variables
+        for(auto& v: variables) {
+            if(v.storageClass = SpvStorageClassUniform) {
+                std::vector<uint32_t> type = v.type;
+            }
+        }
+#endif
 
         // Figure out our basic blocks. These start on an OpLabel and end on
         // a terminating instruction.
