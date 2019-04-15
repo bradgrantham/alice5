@@ -1042,11 +1042,21 @@ struct Program
                 storeUniformInformation(names[id], var.type, binding, 0);
                 var.offset = binding * 256;
             } else if(var.storageClass == SpvStorageClassInput) {
-                if(decorations.find(id) != decorations.end())
-                    throw std::runtime_error("no decorations available for input " + std::to_string(id));
-                if(decorations.at(id).find(SpvDecorationLocation) != decorations.at(id).end())
-                    throw std::runtime_error("no Location decoration available for input " + std::to_string(id));
-                uint32_t location = decorations.at(id).at(SpvDecorationLocation)[0];
+                uint32_t location;
+                if(names[id] == "gl_FragCoord") {
+                    location = 0;
+                } else if(names[id].find("gl_") == 0) {
+                    throw std::runtime_error("builtin input variable " + names[id] + " specified with no location available");
+                } else {
+                    if(decorations.find(id) != decorations.end()) {
+                        throw std::runtime_error("no decorations available for input " + std::to_string(id) + ", name \"" + names[id] + "\"");
+                    }
+                    if(decorations.at(id).find(SpvDecorationLocation) != decorations.at(id).end()) {
+                        throw std::runtime_error("no Location decoration available for input " + std::to_string(id));
+                    }
+
+                    location = decorations.at(id).at(SpvDecorationLocation)[0];
+                }
                 storeInputInformation(names[id], var.type, location, 0);
                 var.offset = location * 256;
             } else {
