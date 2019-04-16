@@ -13,7 +13,7 @@ layout (binding = 0) uniform params {
 
 // layout (binding = 1) uniform sampler2D iChannel0;
 
-// layout (location = 0) in vec4 gl_FragCoord;
+// layout (location = 0) in vec4 gl_FragCoord; // Builtin to Vulkan SPIR-V environment
 
 layout (location = 0) out vec4 color;
 
