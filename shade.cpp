@@ -250,14 +250,14 @@ T& objectAt(unsigned char* data)
 struct UniformInfo
 {
     uint32_t binding;       // The "binding" attribute for this element's parent
-    size_t offset;          // The offset within the binding
+    size_t offsetWithinBinding;          // The offset within the binding
     size_t size;            // Size in bytes of this element for type checking
 };
 
 struct InputInfo
 {
     uint32_t location;      // The "location" attribute for this element or this element's parent
-    size_t offset;          // The offset within the location
+    size_t offsetWithinLocation;          // The offset within the location
     size_t size;            // Size in bytes of this element for type checking
 };
 
@@ -354,9 +354,9 @@ struct Program
             std::cout << "object is size " << typeSizes[type] << "\n";
         }
         assert(reg.top + typeSizes[type] <= reg.base + reg.size);
-        size_t offset = reg.top;
+        size_t address = reg.top;
         reg.top += typeSizes[type];
-        return offset;
+        return address;
     }
     size_t allocate(uint32_t clss, uint32_t type)
     {
@@ -1040,7 +1040,7 @@ struct Program
             if(var.storageClass == SpvStorageClassUniform) {
                 uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
                 storeUniformInformation(names[id], var.type, binding, 0);
-                var.offset = memoryRegions[SpvStorageClassUniform].base + binding * 256;
+                var.address = memoryRegions[SpvStorageClassUniform].base + binding * 256;
             } else if(var.storageClass == SpvStorageClassInput) {
                 uint32_t location;
                 if(names[id] == "gl_FragCoord") {
@@ -1058,18 +1058,18 @@ struct Program
                     location = decorations.at(id).at(SpvDecorationLocation)[0];
                 }
                 storeInputInformation(names[id], var.type, location, 0);
-                var.offset = memoryRegions[SpvStorageClassInput].base + location * 256;
+                var.address = memoryRegions[SpvStorageClassInput].base + location * 256;
             } else {
-                var.offset = allocate(var.storageClass, var.type);
+                var.address = allocate(var.storageClass, var.type);
             }
         }
         if(verbose) {
             std::cout << "----------------------- Variable binding and location info\n";
             for(auto& [name, info]: uniformVariables) {
-                std::cout << "uniform " << name << " is binding " << info.binding << " with offset " << info.offset << " and size " << info.size << '\n';
+                std::cout << "uniform " << name << " is binding " << info.binding << " with offset " << info.offsetWithinBinding << " and size " << info.size << '\n';
             }
             for(auto& [name, info]: inputVariables) {
-                std::cout << "input " << name << " is location " << info.location << " with offset " << info.offset << " and size " << info.size << '\n';
+                std::cout << "input " << name << " is location " << info.location << " with offset " << info.offsetWithinLocation << " and size " << info.size << '\n';
             }
         }
 
@@ -1423,21 +1423,21 @@ Interpreter::Interpreter(const Program *pgm)
     }
 }
 
-void Interpreter::checkMemory(size_t offset, size_t size)
+void Interpreter::checkMemory(size_t address, size_t size)
 {
 #ifdef CHECK_MEMORY_ACCESS
-    for (size_t addr = offset; addr < offset + size; addr++) {
-        if (!memoryInitialized[addr]) {
-            std::cerr << "Warning: Reading uninitialized memory " << addr << "\n";
+    for (size_t a = address; a < address + size; a++) {
+        if (!memoryInitialized[a]) {
+            std::cerr << "Warning: Reading uninitialized memory " << a << "\n";
         }
     }
 #endif
 }
 
-void Interpreter::markMemory(size_t offset, size_t size)
+void Interpreter::markMemory(size_t address, size_t size)
 {
 #ifdef CHECK_MEMORY_ACCESS
-    std::fill(memoryInitialized + offset, memoryInitialized + offset + size, true);
+    std::fill(memoryInitialized + address, memoryInitialized + address + size, true);
 #endif
 }
 
@@ -1482,8 +1482,8 @@ void Interpreter::stepLoad(const InsnLoad& insn)
     Pointer& ptr = pointers.at(insn.pointerId);
     Register& obj = registers[insn.resultId];
     size_t size = pgm->typeSizes.at(insn.type);
-    checkMemory(ptr.offset, size);
-    std::copy(memory + ptr.offset, memory + ptr.offset + size, obj.data);
+    checkMemory(ptr.address, size);
+    std::copy(memory + ptr.address, memory + ptr.address + size, obj.data);
     if(false) {
         std::cout << "load result is";
         pgm->dumpTypeAt(pgm->types.at(insn.type), obj.data);
@@ -1495,8 +1495,8 @@ void Interpreter::stepStore(const InsnStore& insn)
 {
     Pointer& ptr = pointers.at(insn.pointerId);
     Register& obj = registers[insn.objectId];
-    std::copy(obj.data, obj.data + obj.size, memory + ptr.offset);
-    markMemory(ptr.offset, obj.size);
+    std::copy(obj.data, obj.data + obj.size, memory + ptr.address);
+    markMemory(ptr.address, obj.size);
 }
 
 void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
@@ -2266,18 +2266,18 @@ void Interpreter::stepAccessChain(const InsnAccessChain& insn)
 {
     Pointer& basePointer = pointers.at(insn.baseId);
     uint32_t type = basePointer.type;
-    size_t offset = basePointer.offset;
+    size_t address = basePointer.address;
     for(auto& id: insn.indexesId) {
         int32_t j = registerAs<int32_t>(id);
         uint32_t constituentOffset;
         std::tie(type, constituentOffset) = pgm->getConstituentInfo(type, j);
-        offset += constituentOffset;
+        address += constituentOffset;
     }
     if(false) {
-        std::cout << "accesschain of " << basePointer.offset << " yielded " << offset << "\n";
+        std::cout << "accesschain of " << basePointer.address << " yielded " << address << "\n";
     }
     uint32_t pointedType = std::get<TypePointer>(pgm->types.at(insn.type)).type;
-    pointers[insn.resultId] = Pointer { pointedType, basePointer.storageClass, offset };
+    pointers[insn.resultId] = Pointer { pointedType, basePointer.storageClass, address };
 }
 
 void Interpreter::stepFunctionParameter(const InsnFunctionParameter& insn)
@@ -3076,6 +3076,26 @@ void Interpreter::set(SpvStorageClass clss, size_t offset, const T& v)
 }
 
 template <class T>
+void Interpreter::set(const std::string& name, const T& v)
+{
+    if(pgm->uniformVariables.find(name) != pgm->uniformVariables.end()) {
+        const UniformInfo& u = pgm->uniformVariables.at(name);
+        if(false) {
+            std::cout << "set uniform " << name << " at binding " << u.binding << ", offset " << u.offsetWithinBinding << '\n';
+        }
+        objectInClassAt<T>(SpvStorageClassUniform, u.binding * 256 + u.offsetWithinBinding, false, sizeof(v)) = v;
+    } else if(pgm->inputVariables.find(name) != pgm->inputVariables.end()) {
+        const InputInfo& i = pgm->inputVariables.at(name);
+        if(false) {
+            std::cout << "set uniform " << name << " at location " << i.location << ", offset " << i.offsetWithinLocation << '\n';
+        }
+        objectInClassAt<T>(SpvStorageClassInput, i.location * 256 + i.offsetWithinLocation, false, sizeof(v)) = v;
+    } else {
+        throw std::runtime_error("couldn't find variable " + name + " in Interpreter::set");
+    }
+}
+
+template <class T>
 void Interpreter::get(SpvStorageClass clss, size_t offset, T& v)
 {
     v = objectInClassAt<T>(clss, offset, true, sizeof(v));
@@ -3094,7 +3114,7 @@ void Interpreter::run()
     // init Function variables with initializers before each invocation
     // XXX also need to initialize within function calls?
     for(auto& [id, var]: pgm->variables) {
-        pointers[id] = Pointer { var.type, var.storageClass, var.offset };
+        pointers[id] = Pointer { var.type, var.storageClass, var.address };
         if(var.storageClass == SpvStorageClassFunction) {
             assert(var.initializer == NO_INITIALIZER); // XXX will do initializers later
         }
@@ -3567,7 +3587,7 @@ bool compileProgram(const Program &pgm)
 void eval(Interpreter &interpreter, float x, float y, v4float& color)
 {
     interpreter.clearPrivateVariables();
-    interpreter.set(SpvStorageClassInput, 0, v4float {x, y}); // fragCoord is in #0 in preamble
+    interpreter.set(SpvStorageClassInput, 0, v4float {x, y}); // gl_FragCoord is always #0 
     interpreter.run();
     interpreter.get(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
 }
@@ -3624,16 +3644,13 @@ void render(const Program *pgm, int startRow, int skip, ImagePtr output, float w
     // we could change preamble.frag without needing to change code here.
 
     // iResolution is uniform @0 in preamble
-    // XXX We should discover from SPIR-V.
-    interpreter.set(SpvStorageClassUniform, 0, v2float {static_cast<float>(output->width), static_cast<float>(output->height)});
+    interpreter.set("iResolution", v2float {static_cast<float>(output->width), static_cast<float>(output->height)});
 
     // iTime is uniform @8 in preamble
-    // XXX We should discover from SPIR-V.
-    interpreter.set(SpvStorageClassUniform, 8, when);
+    interpreter.set("iTime", when);
 
     // iMouse is uniform @16 in preamble, but we don't align properly, so ours is at 16.
-    // XXX We should discover from SPIR-V.
-    interpreter.set(SpvStorageClassUniform, 16, v4float {0, 0, 0, 0});
+    interpreter.set("iMouse", v4float {0, 0, 0, 0});
 
     // This loop acts like a rasterizer fixed function block.  Maybe it should
     // set inputs and read outputs also.

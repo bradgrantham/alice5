@@ -42,6 +42,9 @@ struct Interpreter
     template <class T>
     T& objectInClassAt(SpvStorageClass clss, size_t offset, bool reading, size_t size);
 
+    template <class T>
+    T& objectInClassAt(size_t addr, bool reading, size_t size);
+
     // Get a register's data by ID as the specified type.
     template <class T>
     T& registerAs(int id);
@@ -50,6 +53,9 @@ struct Interpreter
     void set(SpvStorageClass clss, size_t offset, const T& v);
     template <class T>
     void get(SpvStorageClass clss, size_t offset, T& v);
+
+    template <class T>
+    void set(const std::string& name, const T& v);
 
     void clearPrivateVariables();
 

@@ -29,8 +29,8 @@ struct Variable
     // XXX Not sure, or NO_INITIALIZER.
     uint32_t initializer;
 
-    // Offset into the memory for the specific storage class.
-    size_t offset;
+    // Address in memory array
+    size_t address;
 };
 
 // Entry point for the shader.
@@ -221,7 +221,7 @@ struct Pointer
 {
     uint32_t type;
     uint32_t storageClass;
-    size_t offset; // offset into memory, not into Region
+    size_t address; // address in memory
 };
 
 // SSA (virtual) register.
