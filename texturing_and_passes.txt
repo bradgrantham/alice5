@@ -1,3 +1,62 @@
+implement 
+    inputs can also be structs. (we probably won't have any though.)
+    uniforms can be structs of structs, and the offset of elements is relative to the inner struct
+    make new functions
+        interpreter.setUniform(const std::string& name, const T& v)
+        interpreter.setInput(std::string& name, const T& v);
+    interpreter.setUniform("iResolution", v2float {static_cast<float>(output->width), static_cast<float>(output->height)});
+    interpreter.setUniform("iChannel0", SampledImage {image[0], sampler[0]})
+    interpreter.setInput("fragCoord", v2float {x, y}); // fragCoord is in #0 in preamble
+    fail if path doesn't resolve to a vector or scalar or Image or Sampler or SampledImage?
+    fail if size of constituent doesn't match size of passed value
+    need to know for inputs
+        mapping of names to locations
+        mapping of locations to memory addresses
+    need to know for uniforms
+        mapping of names to binding point and offsets
+        mapping of binding point to location in uniform memory
+        size of uniform constituent for asserting sizes match
+    on postParse, for every variable in uniform storage
+        recursively descend constituents, constructing name and adding offsets from type sizes
+            set location from variable allocated and offset
+            store full name and memory address
+
+                              Name 51  "fragCoord"
+                              Name 49  "color"
+                              Name 53  "param"
+                              Name 59  "params"
+                              MemberName 59(params) 0  "iResolution"
+                              Name 61  ""
+                              Decorate 49(color) Location 0
+                              Decorate 51(fragCoord) Location 0
+                              MemberDecorate 59(params) 0 Offset 0
+                              Decorate 59(params) Block
+                              Decorate 61 DescriptorSet 0
+                              Decorate 61 Binding 0
+               6:             TypeFloat 32
+              12:             TypeVector 6(float) 4
+              14:             TypeVector 6(float) 2
+              15:             TypePointer Function 14(fvec2)
+              48:             TypePointer Output 12(fvec4)
+       49(color):     48(ptr) Variable Output
+              50:             TypePointer Input 14(fvec2)
+   51(fragCoord):     50(ptr) Variable Input
+              58:             TypeVector 57(int) 4
+      59(params):             TypeStruct 14(fvec2) 6(float) 58(ivec4)
+              60:             TypePointer Uniform 59(params)
+              61:     60(ptr) Variable Uniform
+       53(param):     15(ptr) Variable Function
+              50:             TypePointer Input 14(fvec2)
+   51(fragCoord):     50(ptr) Variable Input
+
+        61 (has no name) is a uniform variable of type 60-pointer, which points to a 59 (we can know size from type 59)
+            61 is descriptorset 0 (ignore)
+            61 is binding 0 (so we can map binding 0 to address from alloc)
+            61 has no name, so its children are top-level variables?
+                so 61 cannot be set directly.
+            type 59's members 0, 1, and 2 are iResolution, iTime, and iMouse
+                their offsets are 0, 8, and 16
+                so we don't need to know alignment requirements if setting vector/scalar values?
 Parse JSON into Pass, Image, Sampler
     test dump from multipass shader (wall effect?)
 Use Passes correctly
@@ -6,17 +65,6 @@ Pixel kill?
 Test C64
 Implement Sampler and sample()
     test on single texture input
-
-Sampler {
-    // populated from json
-    enum { REPEAT = 0, CLAMP_TO_EDGE = 2, } uAddressMode, vAddressMode;
-    enum { NEAREST = 0, LINEAR = 1, } filterMode;
-    enum { NEAREST = 0, LINEAR = 1, } mipmapMode;
-    bool isSRGB;
-    bool vflip;
-
-    sample<(Image, const v4float& coordinates, float lod, Register& result);
-}
 
 From JSON:
     std::map<int, int> outputidToPass

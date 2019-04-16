@@ -3777,17 +3777,27 @@ struct RenderPass
 
 typedef std::shared_ptr<RenderPass> RenderPassPtr;
 
-#if 0
-void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPassPtr>& renderPasses)
+struct CommandLineParameters
+{
+    int outputWidth;
+    int outputHeight;
+    bool beVerbose;
+    bool throwOnUnimplemented;
+};
+
+void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPassPtr>& renderPasses, const CommandLineParameters& params)
 {
     std::string common_code;
-    json j = json::parse(text);
+    std::string common_filename;
+    json j = json::parse(readFileContents(filename));
 
     // Go through the render passes and do preprocessing.
     
-    auto& renderPasses = j["Shader"]["renderpass"];
-    for (json::iterator it = renderPasses.begin(); it != renderPasses.end(); ++it) {
-        auto& pass = *it;
+    // Go through the render passes and load code in from files as necessary
+    auto& renderPassesInJSON = j["Shader"]["renderpass"];
+    // for (json::iterator it = renderPassesInJSON.begin(); it != renderPassesInJSON.end(); ++it) {
+        // auto& pass = *it;
+    for (auto& pass: renderPassesInJSON) {
 
         // If special key "codefile" is present, use that file as
         // the shader code instead of the value of key "code".
@@ -3805,11 +3815,17 @@ void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPass
 	// preprended to all other passes.
 
         if(pass["type"] == "common") {
-            common_code = pass["code"]
+            common_code = pass["code"];
+            if(pass.find("codefile") != pass.end()) {
+                common_filename = pass["codefile"];
+            } else {
+                common_filename = pass["name"].get<std::string>() + " JSON inline";
+            }
         }
     }
 
-    for (json::iterator it = renderPasses.begin(); it != renderPasses.end(); ++it) {
+#if 0
+    for (json::iterator it = renderPassesInJSON.begin(); it != renderPassesInJSON.end(); ++it) {
         auto& pass = *it;
 
         if(pass.find("full_code_filename") != pass.end()) {
@@ -3869,6 +3885,8 @@ void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPass
                     }
                 }
 
+                texture = image;
+
                 fclose(fp);
 
             }
@@ -3876,25 +3894,38 @@ void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPass
     }
 
     // Hook up images from inputs to outputs
-        shaderPreamble = shaderPreamble + "layout (binding = 1) uniform sampler2D iChannel0;\n";
+        // shaderPreamble = shaderPreamble + "layout (binding = 1) uniform sampler2D iChannel0;\n";
 
-    ShaderToyImage input(texture, Sampler {});
+#endif
 
-    ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, imageWidth, imageHeight));
-    ShaderToyImage output(image, Sampler {});
+    // XXX Special case a single pass to get texturing working again 
+    // ShaderToyImage input(texture, Sampler {});
+
+    ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, params.outputWidth, params.outputHeight));
+    ShaderToyImage output {image, Sampler {}};
+
+    // Assuming this is Image!
+    auto& pass0 = renderPassesInJSON[0];
+
+    std::string shader_code = pass0["code"];
+    std::string shader_filename;
+    if(pass0.find("codefile") != pass0.end()) {
+        shader_filename = pass0["codefile"];
+    } else {
+        shader_filename = pass0["name"].get<std::string>() + " JSON inline";
+    }
 
     RenderPassPtr pass(new RenderPass(
         "Image",
-        (texture == NULL) ? {} : {t}, 
+        {},
         {output},
-        common_code,
-        shader_code,
-        throwOnUnimplemented,
-        beVerbose));
+        { common_code, common_filename },
+        { shader_code, shader_filename },
+        params.throwOnUnimplemented,
+        params.beVerbose));
 
-
+    renderPasses.push_back(pass);
 }
-#endif
 
 bool createSPIRVFromSources(const std::vector<ShaderSource>& sources, bool debug, bool optimize, std::vector<uint32_t>& spirv)
 {
@@ -4039,15 +4070,17 @@ int main(int argc, char **argv)
     bool debug = false;
     bool disassemble = false;
     bool optimize = false;
-    bool beVerbose = false;
-    bool throwOnUnimplemented = false;
     bool doNotShade = false;
     bool inputIsJSON = false;
     bool imageToTerminal = false;
     bool compile = false;
     int imageStart = 0, imageEnd = 0;
-    int imageWidth = 640/2; // ShaderToy default is 640
-    int imageHeight = 360/2; // ShaderToy default is 360
+    CommandLineParameters params;
+
+    params.outputWidth = 640/2;
+    params.outputHeight = 360/2;
+    params.beVerbose = false;
+    params.throwOnUnimplemented = false;
 
     ShInitialize();
 
@@ -4081,8 +4114,8 @@ int main(int argc, char **argv)
                 usage(progname);
                 exit(EXIT_FAILURE);
             }
-            imageWidth = atoi(argv[1]);
-            imageHeight = atoi(argv[2]);
+            params.outputWidth = atoi(argv[1]);
+            params.outputHeight = atoi(argv[2]);
             argv += 3; argc -= 3;
 
         } else if(strcmp(argv[0], "-f") == 0) {
@@ -4097,12 +4130,12 @@ int main(int argc, char **argv)
 
         } else if(strcmp(argv[0], "-v") == 0) {
 
-            beVerbose = true;
+            params.beVerbose = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-t") == 0) {
 
-            throwOnUnimplemented = true;
+            params.throwOnUnimplemented = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-O") == 0) {
@@ -4152,16 +4185,16 @@ int main(int argc, char **argv)
 
         shader_code = readFileContents(filename);
 
-        ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, imageWidth, imageHeight));
+        ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, params.outputWidth, params.outputHeight));
         ShaderToyImage output {image, Sampler {}};
 
-        RenderPassPtr pass(new RenderPass("Image", {}, {output}, {"", ""}, {shader_code, filename}, throwOnUnimplemented, beVerbose));
+        RenderPassPtr pass(new RenderPass("Image", {}, {output}, {"", ""}, {shader_code, filename}, params.throwOnUnimplemented, params.beVerbose));
 
         renderPasses.push_back(pass);
 
     } else {
 
-        // getRenderPassesFromJSON(readFileContents(filename), renderPasses);
+        getRenderPassesFromJSON(filename, renderPasses, params);
 
     }
 

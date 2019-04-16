@@ -152,10 +152,25 @@ private:
     }
 };
 
+typedef std::shared_ptr<Image> ImagePtr;
+
 struct Sampler
 {
-};
+    enum AddressMode {
+        REPEAT = 0,
+        CLAMP_TO_EDGE = 2,
+    } uAddressMode, vAddressMode;
+    enum FilterMode {
+        NEAREST = 0,
+        LINEAR = 1,
+    } filterMode;
+    enum MipMapMode {
+        NEAREST_MIPMAP = 0,
+        LINEAR_MIPMAP = 1,
+    } mipmapMode;
+    bool isSRGB;
 
-typedef std::shared_ptr<Image> ImagePtr;
+    void sample(ImagePtr, const v4float& coordinates, float lod, Register& result);
+};
 
 #endif /* IMAGE_H */
