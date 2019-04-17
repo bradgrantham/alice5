@@ -197,4 +197,11 @@ struct Sampler
     void sample(ImagePtr, const v4float& coordinates, float lod, Register& result);
 };
 
+struct SampledImage
+{
+    ImagePtr image;
+    Sampler sampler;
+};
+
+
 #endif /* IMAGE_H */

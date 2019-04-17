@@ -3501,16 +3501,10 @@ void render(const Program *pgm, int startRow, int skip, ImagePtr output, float w
 {
     Interpreter interpreter(pgm);
 
-    // If we discovered the location of Uniform variables from SPIR-V, then
-    // we could change preamble.frag without needing to change code here.
-
-    // iResolution is uniform @0 in preamble
     interpreter.set("iResolution", v2float {static_cast<float>(output->width), static_cast<float>(output->height)});
 
-    // iTime is uniform @8 in preamble
     interpreter.set("iTime", when);
 
-    // iMouse is uniform @16 in preamble, but we don't align properly, so ours is at 16.
     interpreter.set("iMouse", v4float {0, 0, 0, 0});
 
     // This loop acts like a rasterizer fixed function block.  Maybe it should
@@ -3596,12 +3590,6 @@ void earwigMessageConsumer(spv_message_level_t level, const char *source,
 {
     std::cout << source << ": " << message << "\n";
 }
-
-struct SampledImage
-{
-    ImagePtr image;
-    Sampler sampler;
-};
 
 struct ShaderToyImage
 {
