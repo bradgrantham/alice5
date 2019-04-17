@@ -3748,6 +3748,14 @@ struct ShaderSource
     std::string filename;
 };
 
+struct CommandLineParameters
+{
+    int outputWidth;
+    int outputHeight;
+    bool beVerbose;
+    bool throwOnUnimplemented;
+};
+
 const std::string shaderPreambleFilename = "preamble.frag";
 const std::string shaderEpilogueFilename = "epilogue.frag";
 ShaderSource preamble { readFileContents(shaderPreambleFilename), shaderPreambleFilename };
@@ -3764,26 +3772,18 @@ struct RenderPass
     void Render(void) {
         // set input images, uniforms, output images, call run()
     }
-    RenderPass(const std::string& name_, std::vector<ShaderToyImage> inputs_, std::vector<ShaderToyImage> outputs_, const ShaderSource& common_, const ShaderSource& shader_, bool throwOnUnimplemented, bool beVerbose) :
+    RenderPass(const std::string& name_, std::vector<ShaderToyImage> inputs_, std::vector<ShaderToyImage> outputs_, const ShaderSource& common_, const ShaderSource& shader_, const CommandLineParameters& params) :
         name(name_),
         inputs(inputs_),
         outputs(outputs_),
         common(common_),
         shader(shader_),
-        pgm(throwOnUnimplemented, beVerbose)
+        pgm(params.throwOnUnimplemented, params.beVerbose)
     {
     }
 };
 
 typedef std::shared_ptr<RenderPass> RenderPassPtr;
-
-struct CommandLineParameters
-{
-    int outputWidth;
-    int outputHeight;
-    bool beVerbose;
-    bool throwOnUnimplemented;
-};
 
 void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPassPtr>& renderPasses, const CommandLineParameters& params)
 {
@@ -3921,8 +3921,7 @@ void getRenderPassesFromJSON(const std::string& filename, std::vector<RenderPass
         {output},
         { common_code, common_filename },
         { shader_code, shader_filename },
-        params.throwOnUnimplemented,
-        params.beVerbose));
+        params));
 
     renderPasses.push_back(pass);
 }
@@ -4188,7 +4187,7 @@ int main(int argc, char **argv)
         ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, params.outputWidth, params.outputHeight));
         ShaderToyImage output {image, Sampler {}};
 
-        RenderPassPtr pass(new RenderPass("Image", {}, {output}, {"", ""}, {shader_code, filename}, params.throwOnUnimplemented, params.beVerbose));
+        RenderPassPtr pass(new RenderPass("Image", {}, {output}, {"", ""}, {shader_code, filename}, params));
 
         renderPasses.push_back(pass);
 
