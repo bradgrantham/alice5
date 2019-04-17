@@ -165,10 +165,27 @@ struct Sampler
         LINEAR = 1,
     } filterMode;
     enum MipMapMode {
-        NEAREST_MIPMAP = 0,
-        LINEAR_MIPMAP = 1,
-    } mipmapMode;
+        MIPMAP_NEAREST = 0,
+        MIPMAP_LINEAR = 1,
+    } mipMapMode;
     bool isSRGB;
+
+    Sampler() :
+        uAddressMode(REPEAT),
+        vAddressMode(REPEAT),
+        filterMode(NEAREST),
+        mipMapMode(MIPMAP_NEAREST),
+        isSRGB(false)
+        {}
+
+    Sampler(AddressMode uMode, AddressMode vMode, FilterMode filterMode_, MipMapMode mipMapMode_, bool isSRGB_) :
+        uAddressMode(uMode),
+        vAddressMode(vMode),
+        filterMode(filterMode_),
+        mipMapMode(mipMapMode_),
+        isSRGB(isSRGB_)
+    {
+    }
 
     void sample(ImagePtr, const v4float& coordinates, float lod, Register& result);
 };
