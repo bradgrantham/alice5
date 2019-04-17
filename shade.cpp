@@ -4074,7 +4074,7 @@ int main(int argc, char **argv)
     bool inputIsJSON = false;
     bool imageToTerminal = false;
     bool compile = false;
-    int imageStart = 0, imageEnd = 0;
+    int frameStart = 0, frameEnd = 0;
     CommandLineParameters params;
 
     params.outputWidth = 640/2;
@@ -4124,8 +4124,8 @@ int main(int argc, char **argv)
                 usage(progname);
                 exit(EXIT_FAILURE);
             }
-            imageStart = atoi(argv[1]);
-            imageEnd = atoi(argv[2]);
+            frameStart = atoi(argv[1]);
+            frameEnd = atoi(argv[2]);
             argv += 3; argc -= 3;
 
         } else if(strcmp(argv[0], "-v") == 0) {
@@ -4225,7 +4225,7 @@ int main(int argc, char **argv)
     int threadCount = std::thread::hardware_concurrency();
     std::cout << "Using " << threadCount << " threads.\n";
 
-    for(int imageNumber = imageStart; imageNumber <= imageEnd; imageNumber++) {
+    for(int frameNumber = frameStart; frameNumber <= frameEnd; frameNumber++) {
         for(auto& pass: passesSortedByDependency) {
 
             Timer timer;
@@ -4240,7 +4240,7 @@ int main(int argc, char **argv)
 
             // Generate the rows on multiple threads.
             for (int t = 0; t < threadCount; t++) {
-                thread.push_back(new std::thread(render, &pass->pgm, t, threadCount, image, imageNumber / 60.0));
+                thread.push_back(new std::thread(render, &pass->pgm, t, threadCount, image, frameNumber / 60.0));
                 // std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
 
@@ -4264,7 +4264,7 @@ int main(int argc, char **argv)
         ImagePtr image = output.image;
 
         std::ostringstream ss;
-        ss << "image" << std::setfill('0') << std::setw(4) << imageNumber << std::setw(0) << ".ppm";
+        ss << "image" << std::setfill('0') << std::setw(4) << frameNumber << std::setw(0) << ".ppm";
         std::ofstream imageFile(ss.str(), std::ios::out | std::ios::binary);
         image->writePpm(imageFile);
         imageFile.close();
