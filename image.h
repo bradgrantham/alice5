@@ -44,15 +44,15 @@ struct Image
     uint32_t width, height, depth, slices;
     unsigned char *storage;
 
-    unsigned char *getPixelAddress(int i, int j, int k, int l)
+    unsigned char *getPixelAddress(int i, int j, int k, int l) const
     {
         return storage + (l * depth * width * height + k * width * height + j * width + i) * pixelSize;
     }
-    unsigned char *getPixelAddress(int i, int j, int k)
+    unsigned char *getPixelAddress(int i, int j, int k) const
     {
         return storage + (k * width * height + j * width + i) * pixelSize;
     }
-    unsigned char *getPixelAddress(int i, int j)
+    unsigned char *getPixelAddress(int i, int j) const
     {
         return storage + (j * width + i) * pixelSize;
     }
@@ -91,9 +91,9 @@ struct Image
         assert(dim == DIM_2D);
         set(getPixelAddress(i, j), v);
     }
-    // void get(int i, int j, int k, int l, v4float& v) {}
-    // void get(int i, int j, int k, v4float& v) {}
-    void get(int i, int j, v4float& v)
+    // void get(int i, int j, int k, int l, v4float& v) const {} 
+    // void get(int i, int j, int k, v4float& v) const {}
+    void get(int i, int j, v4float& v) const
     {
         assert((i >= 0) || (j >= 0) || (i < width) || (j < height));
         assert(dim == DIM_2D);
@@ -110,7 +110,7 @@ struct Image
     }
 
 private:
-    void get(const unsigned char *pixel, v4float& v)
+    void get(const unsigned char *pixel, v4float& v) const
     {
         switch(format) {
             case FORMAT_R32G32B32A32_SFLOAT: {
