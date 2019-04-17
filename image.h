@@ -120,9 +120,16 @@ private:
                 break;
             }
                 
+            case FORMAT_R8G8B8A8_UNORM: {
+                for(int c = 0; c < 4; c++) {
+                    v[c] = pixel[c] / 255.99;
+                }
+                break;
+            }
+
             case FORMAT_R8G8B8_UNORM: {
                 for(int c = 0; c < 3; c++) {
-                    v[0] = pixel[c] / 255.99;
+                    v[c] = pixel[c] / 255.99;
                 }
                 v[3] = 1.0;
                 break;
