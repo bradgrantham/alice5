@@ -2959,7 +2959,7 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
             auto [u, v] = fromRegister<v2float>(insn.coordinateId);
 
-            int imageIndex = registerAs<int>(insn.sampledImageId);
+            int imageIndex = fromRegister<int>(insn.sampledImageId);
             const SampledImage& si = pgm->sampledImages[imageIndex];
 
             unsigned int s = std::clamp(static_cast<unsigned int>(u * si.image->width), 0u, si.image->width - 1);
