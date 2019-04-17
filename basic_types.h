@@ -230,6 +230,7 @@ struct Register
     uint32_t type;
     size_t size;
     unsigned char *data;
+    bool initialized;
 
     Register(const Register &other)
     {
@@ -238,12 +239,14 @@ struct Register
         size = other.size;
         data = new unsigned char[size];
         std::copy(other.data, other.data + size, data);
+        initialized = other.initialized;
     }
 
     Register(uint32_t type_, size_t size_) :
         type(type_),
         size(size_),
-        data(new unsigned char[size_])
+        data(new unsigned char[size_]),
+        initialized(false)
     {
         if(false)std::cout << "ctor allocated to " << this << " as " << &data << "\n";
     }
@@ -251,7 +254,8 @@ struct Register
     Register() :
         type(0xFFFFFFFF),
         size(0),
-        data(nullptr)
+        data(nullptr),
+        initialized(false)
     {
         if(false)std::cout << "ctor empty Register " << this << " \n";
     }
@@ -273,6 +277,7 @@ struct Register
             data = new unsigned char[size];
             if(false)std::cout << "op= allocated to " << this << " as " << &data << "\n";
             std::copy(other.data, other.data + size, data);
+            initialized = other.initialized;
         }
         return *this;
     }

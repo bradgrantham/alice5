@@ -42,7 +42,12 @@
 #include "timer.h"
 
 // Enable this to check if our virtual RAM is being initialized properly.
-#undef CHECK_MEMORY_ACCESS
+#define CHECK_MEMORY_ACCESS
+// Enable this to check if our virtual registers are being initialized properly.
+#define CHECK_REGISTER_ACCESS
+
+#define DEFAULT_WIDTH (640/2)
+#define DEFAULT_HEIGHT (360/2)
 
 using json = nlohmann::json;
 
@@ -173,8 +178,8 @@ struct Program
 
     Register& allocConstantObject(uint32_t id, uint32_t type)
     {
-        Register r {type, typeSizes[type]};
-        constants[id] = r;
+        constants[id] = Register {type, typeSizes[type]};
+        constants[id].initialized = true;
         return constants[id];
     }
 
@@ -666,6 +671,21 @@ struct Program
                 std::copy(data, data + pgm->typeSizes[typeId], r.data);
                 if(pgm->verbose) {
                     std::cout << "Constant " << id << " type " << typeId << " value " << value << "\n";
+                }
+                break;
+            }
+
+            case SpvOpUndef: {
+                uint32_t typeId = nextu();
+                uint32_t id = nextu();
+                // Treat like a constant.
+                Register& r = pgm->allocConstantObject(id, typeId);
+                std::fill(r.data, r.data + pgm->typeSizes[typeId], 0);
+                // Arguably here we should set r.initialized to false, so we
+                // can figure out if it's ever used, but just the fact that
+                // it's defined here means it'll be used somewhere later.
+                if(pgm->verbose) {
+                    std::cout << "Undef " << id << " type " << typeId << "\n";
                 }
                 break;
             }
@@ -1312,9 +1332,25 @@ T& Interpreter::objectInClassAt(SpvStorageClass clss, size_t offset, bool readin
 }
 
 template <class T>
-T& Interpreter::registerAs(int id)
+const T& Interpreter::fromRegister(int id)
 {
-    return *reinterpret_cast<T*>(registers[id].data);
+    Register &reg = registers.at(id);
+#ifdef CHECK_REGISTER_ACCESS
+    if (!reg.initialized) {
+        std::cerr << "Warning: Reading uninitialized register " << id << "\n";
+    }
+#endif
+    return *reinterpret_cast<T*>(reg.data);
+}
+
+template <class T>
+T& Interpreter::toRegister(int id)
+{
+    Register &reg = registers.at(id);
+#ifdef CHECK_REGISTER_ACCESS
+    reg.initialized = true;
+#endif
+    return *reinterpret_cast<T*>(reg.data);
 }
 
 void Interpreter::clearPrivateVariables()
@@ -1330,18 +1366,14 @@ void Interpreter::stepNop(const InsnNop& insn)
     // Nothing to do.
 }
 
-void Interpreter::stepUndef(const InsnUndef& insn)
-{
-    // Nothing to do.
-}
-
 void Interpreter::stepLoad(const InsnLoad& insn)
 {
     Pointer& ptr = pointers.at(insn.pointerId);
-    Register& obj = registers[insn.resultId];
+    Register& obj = registers.at(insn.resultId);
     size_t size = pgm->typeSizes.at(insn.type);
     checkMemory(ptr.address, size);
     std::copy(memory + ptr.address, memory + ptr.address + size, obj.data);
+    obj.initialized = true;
     if(false) {
         std::cout << "load result is";
         pgm->dumpTypeAt(pgm->types.at(insn.type), obj.data);
@@ -1352,15 +1384,25 @@ void Interpreter::stepLoad(const InsnLoad& insn)
 void Interpreter::stepStore(const InsnStore& insn)
 {
     Pointer& ptr = pointers.at(insn.pointerId);
-    Register& obj = registers[insn.objectId];
+    Register& obj = registers.at(insn.objectId);
+#ifdef CHECK_REGISTER_ACCESS
+    if (!obj.initialized) {
+        std::cerr << "Warning: Storing uninitialized register " << insn.objectId << "\n";
+    }
+#endif
     std::copy(obj.data, obj.data + obj.size, memory + ptr.address);
     markMemory(ptr.address, obj.size);
 }
 
 void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
 {
-    Register& obj = registers[insn.resultId];
-    Register& src = registers[insn.compositeId];
+    Register& obj = registers.at(insn.resultId);
+    Register& src = registers.at(insn.compositeId);
+#ifdef CHECK_REGISTER_ACCESS
+    if (!src.initialized) {
+        std::cerr << "Warning: Extracting uninitialized register " << insn.compositeId << "\n";
+    }
+#endif
     /* use indexes to walk blob */
     uint32_t type = src.type;
     size_t offset = 0;
@@ -1370,6 +1412,7 @@ void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
         offset += constituentOffset;
     }
     std::copy(src.data + offset, src.data + offset + pgm->typeSizes.at(obj.type), obj.data);
+    obj.initialized = true;
     if(false) {
         std::cout << "extracted from ";
         pgm->dumpTypeAt(pgm->types.at(src.type), src.data);
@@ -1382,12 +1425,22 @@ void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
 // XXX This method has not been tested.
 void Interpreter::stepCompositeInsert(const InsnCompositeInsert& insn)
 {
-    Register& res = registers[insn.resultId];
-    Register& obj = registers[insn.objectId];
-    Register& cmp = registers[insn.compositeId];
+    Register& res = registers.at(insn.resultId);
+    Register& obj = registers.at(insn.objectId);
+    Register& cmp = registers.at(insn.compositeId);
+
+#ifdef CHECK_REGISTER_ACCESS
+    if (!obj.initialized) {
+        std::cerr << "Warning: Inserting uninitialized register " << insn.objectId << "\n";
+    }
+    if (!cmp.initialized) {
+        std::cerr << "Warning: Inserting from uninitialized register " << insn.compositeId << "\n";
+    }
+#endif
 
     // Start by copying composite to result.
     std::copy(cmp.data, cmp.data + pgm->typeSizes.at(cmp.type), res.data);
+    res.initialized = true;
 
     /* use indexes to walk blob */
     uint32_t type = res.type;
@@ -1402,13 +1455,19 @@ void Interpreter::stepCompositeInsert(const InsnCompositeInsert& insn)
 
 void Interpreter::stepCompositeConstruct(const InsnCompositeConstruct& insn)
 {
-    Register& obj = registers[insn.resultId];
+    Register& obj = registers.at(insn.resultId);
     size_t offset = 0;
     for(auto& j: insn.constituentsId) {
-        Register& src = registers[j];
+        Register& src = registers.at(j);
+#ifdef CHECK_REGISTER_ACCESS
+        if (!src.initialized) {
+            std::cerr << "Warning: Compositing from uninitialized register " << j << "\n";
+        }
+#endif
         std::copy(src.data, src.data + pgm->typeSizes.at(src.type), obj.data + offset);
         offset += pgm->typeSizes.at(src.type);
     }
+    obj.initialized = true;
     if(false) {
         std::cout << "constructed ";
         pgm->dumpTypeAt(pgm->types.at(obj.type), obj.data);
@@ -1424,16 +1483,16 @@ void Interpreter::stepIAdd(const InsnIAdd& insn)
 
         if constexpr (std::is_same_v<T, TypeInt>) {
 
-            uint32_t operand1 = registerAs<uint32_t>(insn.operand1Id);
-            uint32_t operand2 = registerAs<uint32_t>(insn.operand2Id);
+            uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id);
+            uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id);
             uint32_t result = operand1 + operand2;
-            registerAs<uint32_t>(insn.resultId) = result;
+            toRegister<uint32_t>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            uint32_t* operand1 = &registerAs<uint32_t>(insn.operand1Id);
-            uint32_t* operand2 = &registerAs<uint32_t>(insn.operand2Id);
-            uint32_t* result = &registerAs<uint32_t>(insn.resultId);
+            const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id);
+            const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id);
+            uint32_t* result = &toRegister<uint32_t>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] + operand2[i];
             }
@@ -1454,16 +1513,16 @@ void Interpreter::stepFAdd(const InsnFAdd& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             float result = operand1 + operand2;
-            registerAs<float>(insn.resultId) = result;
+            toRegister<float>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] + operand2[i];
             }
@@ -1484,16 +1543,16 @@ void Interpreter::stepFSub(const InsnFSub& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             float result = operand1 - operand2;
-            registerAs<float>(insn.resultId) = result;
+            toRegister<float>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] - operand2[i];
             }
@@ -1514,16 +1573,16 @@ void Interpreter::stepFMul(const InsnFMul& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             float result = operand1 * operand2;
-            registerAs<float>(insn.resultId) = result;
+            toRegister<float>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] * operand2[i];
             }
@@ -1544,16 +1603,16 @@ void Interpreter::stepFDiv(const InsnFDiv& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             float result = operand1 / operand2;
-            registerAs<float>(insn.resultId) = result;
+            toRegister<float>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] / operand2[i];
             }
@@ -1574,16 +1633,16 @@ void Interpreter::stepFMod(const InsnFMod& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             float result = operand1 - floor(operand1/operand2)*operand2;
-            registerAs<float>(insn.resultId) = result;
+            toRegister<float>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] - floor(operand1[i]/operand2[i])*operand2[i];
             }
@@ -1604,16 +1663,16 @@ void Interpreter::stepFOrdLessThan(const InsnFOrdLessThan& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             bool result = operand1 < operand2;
-            registerAs<bool>(insn.resultId) = result;
+            toRegister<bool>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            bool* result = &registerAs<bool>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] < operand2[i];
             }
@@ -1634,16 +1693,16 @@ void Interpreter::stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             bool result = operand1 > operand2;
-            registerAs<bool>(insn.resultId) = result;
+            toRegister<bool>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            bool* result = &registerAs<bool>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] > operand2[i];
             }
@@ -1664,16 +1723,16 @@ void Interpreter::stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             bool result = operand1 <= operand2;
-            registerAs<bool>(insn.resultId) = result;
+            toRegister<bool>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            bool* result = &registerAs<bool>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] <= operand2[i];
             }
@@ -1694,18 +1753,18 @@ void Interpreter::stepFOrdEqual(const InsnFOrdEqual& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             // XXX I don't know the difference between ordered and equal
             // vs. unordered and equal, so I don't know which this is.
             bool result = operand1 == operand2;
-            registerAs<bool>(insn.resultId) = result;
+            toRegister<bool>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            bool* result = &registerAs<bool>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] == operand2[i];
             }
@@ -1726,12 +1785,12 @@ void Interpreter::stepFNegate(const InsnFNegate& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            registerAs<float>(insn.resultId) = -registerAs<float>(insn.operandId);
+            toRegister<float>(insn.resultId) = -fromRegister<float>(insn.operandId);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand = &registerAs<float>(insn.operandId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* operand = &fromRegister<float>(insn.operandId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = -operand[i];
             }
@@ -1749,7 +1808,7 @@ void Interpreter::stepFNegate(const InsnFNegate& insn)
 }
 
 // Computes the dot product of two vectors.
-float dotProduct(float *a, float *b, int count)
+float dotProduct(const float *a, const float *b, int count)
 {
     float dot = 0.0;
 
@@ -1771,9 +1830,9 @@ void Interpreter::stepDot(const InsnDot& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float* vector1 = &registerAs<float>(insn.vector1Id);
-            float* vector2 = &registerAs<float>(insn.vector2Id);
-            registerAs<float>(insn.resultId) = dotProduct(vector1, vector2, t1.count);
+            const float* vector1 = &fromRegister<float>(insn.vector1Id);
+            const float* vector2 = &fromRegister<float>(insn.vector2Id);
+            toRegister<float>(insn.resultId) = dotProduct(vector1, vector2, t1.count);
 
         } else {
 
@@ -1791,16 +1850,16 @@ void Interpreter::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float operand1 = registerAs<float>(insn.operand1Id);
-            float operand2 = registerAs<float>(insn.operand2Id);
+            float operand1 = fromRegister<float>(insn.operand1Id);
+            float operand2 = fromRegister<float>(insn.operand2Id);
             bool result = operand1 >= operand2;
-            registerAs<bool>(insn.resultId) = result;
+            toRegister<bool>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* operand1 = &registerAs<float>(insn.operand1Id);
-            float* operand2 = &registerAs<float>(insn.operand2Id);
-            bool* result = &registerAs<bool>(insn.resultId);
+            const float* operand1 = &fromRegister<float>(insn.operand1Id);
+            const float* operand2 = &fromRegister<float>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] >= operand2[i];
             }
@@ -1821,16 +1880,16 @@ void Interpreter::stepSLessThan(const InsnSLessThan& insn)
 
         if constexpr (std::is_same_v<T, TypeInt>) {
 
-            int32_t operand1 = registerAs<int32_t>(insn.operand1Id);
-            int32_t operand2 = registerAs<int32_t>(insn.operand2Id);
+            int32_t operand1 = fromRegister<int32_t>(insn.operand1Id);
+            int32_t operand2 = fromRegister<int32_t>(insn.operand2Id);
             bool result = operand1 < operand2;
-            registerAs<bool>(insn.resultId) = result;
+            toRegister<bool>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            int32_t* operand1 = &registerAs<int32_t>(insn.operand1Id);
-            int32_t* operand2 = &registerAs<int32_t>(insn.operand2Id);
-            bool* result = &registerAs<bool>(insn.resultId);
+            const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id);
+            const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] < operand2[i];
             }
@@ -1851,16 +1910,16 @@ void Interpreter::stepSDiv(const InsnSDiv& insn)
 
         if constexpr (std::is_same_v<T, TypeInt>) {
 
-            int32_t operand1 = registerAs<int32_t>(insn.operand1Id);
-            int32_t operand2 = registerAs<int32_t>(insn.operand2Id);
+            int32_t operand1 = fromRegister<int32_t>(insn.operand1Id);
+            int32_t operand2 = fromRegister<int32_t>(insn.operand2Id);
             int32_t result = operand1 / operand2;
-            registerAs<int32_t>(insn.resultId) = result;
+            toRegister<int32_t>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            int32_t* operand1 = &registerAs<int32_t>(insn.operand1Id);
-            int32_t* operand2 = &registerAs<int32_t>(insn.operand2Id);
-            int32_t* result = &registerAs<int32_t>(insn.resultId);
+            const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id);
+            const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id);
+            int32_t* result = &toRegister<int32_t>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] / operand2[i];
             }
@@ -1881,16 +1940,16 @@ void Interpreter::stepIEqual(const InsnIEqual& insn)
 
         if constexpr (std::is_same_v<T, TypeInt>) {
 
-            uint32_t operand1 = registerAs<uint32_t>(insn.operand1Id);
-            uint32_t operand2 = registerAs<uint32_t>(insn.operand2Id);
+            uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id);
+            uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id);
             bool result = operand1 == operand2;
-            registerAs<bool>(insn.resultId) = result;
+            toRegister<bool>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            uint32_t* operand1 = &registerAs<uint32_t>(insn.operand1Id);
-            uint32_t* operand2 = &registerAs<uint32_t>(insn.operand2Id);
-            bool* result = &registerAs<bool>(insn.resultId);
+            const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id);
+            const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] == operand2[i];
             }
@@ -1911,12 +1970,12 @@ void Interpreter::stepLogicalNot(const InsnLogicalNot& insn)
 
         if constexpr (std::is_same_v<T, TypeBool>) {
 
-            registerAs<bool>(insn.resultId) = !registerAs<bool>(insn.operandId);
+            toRegister<bool>(insn.resultId) = !fromRegister<bool>(insn.operandId);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            bool* operand = &registerAs<bool>(insn.operandId);
-            bool* result = &registerAs<bool>(insn.resultId);
+            const bool* operand = &fromRegister<bool>(insn.operandId);
+            bool* result = &toRegister<bool>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = !operand[i];
             }
@@ -1937,15 +1996,15 @@ void Interpreter::stepLogicalOr(const InsnLogicalOr& insn)
 
         if constexpr (std::is_same_v<T, TypeBool>) {
 
-            bool operand1 = registerAs<bool>(insn.operand1Id);
-            bool operand2 = registerAs<bool>(insn.operand2Id);
-            registerAs<bool>(insn.resultId) = operand1 || operand2;
+            bool operand1 = fromRegister<bool>(insn.operand1Id);
+            bool operand2 = fromRegister<bool>(insn.operand2Id);
+            toRegister<bool>(insn.resultId) = operand1 || operand2;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            bool* operand1 = &registerAs<bool>(insn.operand1Id);
-            bool* operand2 = &registerAs<bool>(insn.operand2Id);
-            bool* result = &registerAs<bool>(insn.resultId);
+            const bool* operand1 = &fromRegister<bool>(insn.operand1Id);
+            const bool* operand2 = &fromRegister<bool>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = operand1[i] || operand2[i];
             }
@@ -1966,19 +2025,19 @@ void Interpreter::stepSelect(const InsnSelect& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            bool condition = registerAs<bool>(insn.conditionId);
-            float object1 = registerAs<float>(insn.object1Id);
-            float object2 = registerAs<float>(insn.object2Id);
+            bool condition = fromRegister<bool>(insn.conditionId);
+            float object1 = fromRegister<float>(insn.object1Id);
+            float object2 = fromRegister<float>(insn.object2Id);
             float result = condition ? object1 : object2;
-            registerAs<float>(insn.resultId) = result;
+            toRegister<float>(insn.resultId) = result;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            bool* condition = &registerAs<bool>(insn.conditionId);
+            const bool* condition = &fromRegister<bool>(insn.conditionId);
             // XXX shouldn't assume floats here. Any data is valid.
-            float* object1 = &registerAs<float>(insn.object1Id);
-            float* object2 = &registerAs<float>(insn.object2Id);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* object1 = &fromRegister<float>(insn.object1Id);
+            const float* object2 = &fromRegister<float>(insn.object2Id);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = condition[i] ? object1[i] : object2[i];
             }
@@ -1993,9 +2052,9 @@ void Interpreter::stepSelect(const InsnSelect& insn)
 
 void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 {
-    float* vector = &registerAs<float>(insn.vectorId);
-    float scalar = registerAs<float>(insn.scalarId);
-    float* result = &registerAs<float>(insn.resultId);
+    const float* vector = &fromRegister<float>(insn.vectorId);
+    float scalar = fromRegister<float>(insn.scalarId);
+    float* result = &toRegister<float>(insn.resultId);
 
     const TypeVector &type = std::get<TypeVector>(pgm->types.at(insn.type));
 
@@ -2006,9 +2065,9 @@ void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 
 void Interpreter::stepMatrixTimesVector(const InsnMatrixTimesVector& insn)
 {
-    float* matrix = &registerAs<float>(insn.matrixId);
-    float* vector = &registerAs<float>(insn.vectorId);
-    float* result = &registerAs<float>(insn.resultId);
+    const float* matrix = &fromRegister<float>(insn.matrixId);
+    const float* vector = &fromRegister<float>(insn.vectorId);
+    float* result = &toRegister<float>(insn.resultId);
 
     const Register &vectorReg = registers[insn.vectorId];
 
@@ -2031,9 +2090,9 @@ void Interpreter::stepMatrixTimesVector(const InsnMatrixTimesVector& insn)
 
 void Interpreter::stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn)
 {
-    float* vector = &registerAs<float>(insn.vectorId);
-    float* matrix = &registerAs<float>(insn.matrixId);
-    float* result = &registerAs<float>(insn.resultId);
+    const float* vector = &fromRegister<float>(insn.vectorId);
+    const float* matrix = &fromRegister<float>(insn.matrixId);
+    float* result = &toRegister<float>(insn.resultId);
 
     const Register &vectorReg = registers[insn.vectorId];
 
@@ -2050,12 +2109,21 @@ void Interpreter::stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn)
 
 void Interpreter::stepVectorShuffle(const InsnVectorShuffle& insn)
 {
-    Register& obj = registers[insn.resultId];
-    const Register &r1 = registers[insn.vector1Id];
-    const Register &r2 = registers[insn.vector2Id];
+    Register& obj = registers.at(insn.resultId);
+    const Register &r1 = registers.at(insn.vector1Id);
+    const Register &r2 = registers.at(insn.vector2Id);
     const TypeVector &t1 = std::get<TypeVector>(pgm->types.at(r1.type));
     uint32_t n1 = t1.count;
     uint32_t elementSize = pgm->typeSizes.at(t1.type);
+
+#ifdef CHECK_REGISTER_ACCESS
+    if (!r1.initialized) {
+        std::cerr << "Warning: Shuffling register " << insn.vector1Id << "\n";
+    }
+    if (!r2.initialized) {
+        std::cerr << "Warning: Shuffling register " << insn.vector2Id << "\n";
+    }
+#endif
 
     for(int i = 0; i < insn.componentsId.size(); i++) {
         uint32_t component = insn.componentsId[i];
@@ -2064,6 +2132,7 @@ void Interpreter::stepVectorShuffle(const InsnVectorShuffle& insn)
             : r2.data + (component - n1)*elementSize;
         std::copy(src, src + elementSize, obj.data + i*elementSize);
     }
+    obj.initialized = true;
 }
 
 void Interpreter::stepConvertSToF(const InsnConvertSToF& insn)
@@ -2074,13 +2143,13 @@ void Interpreter::stepConvertSToF(const InsnConvertSToF& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            int32_t src = registerAs<int32_t>(insn.signedValueId);
-            registerAs<float>(insn.resultId) = src;
+            int32_t src = fromRegister<int32_t>(insn.signedValueId);
+            toRegister<float>(insn.resultId) = src;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            int32_t* src = &registerAs<int32_t>(insn.signedValueId);
-            float* dst = &registerAs<float>(insn.resultId);
+            const int32_t* src = &fromRegister<int32_t>(insn.signedValueId);
+            float* dst = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 dst[i] = src[i];
             }
@@ -2101,13 +2170,13 @@ void Interpreter::stepConvertFToS(const InsnConvertFToS& insn)
 
         if constexpr (std::is_same_v<T, TypeInt>) {
 
-            float src = registerAs<float>(insn.floatValueId);
-            registerAs<uint32_t>(insn.resultId) = src;
+            float src = fromRegister<float>(insn.floatValueId);
+            toRegister<uint32_t>(insn.resultId) = src;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* src = &registerAs<float>(insn.floatValueId);
-            uint32_t* dst = &registerAs<uint32_t>(insn.resultId);
+            const float* src = &fromRegister<float>(insn.floatValueId);
+            uint32_t* dst = &toRegister<uint32_t>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 dst[i] = src[i];
             }
@@ -2126,7 +2195,7 @@ void Interpreter::stepAccessChain(const InsnAccessChain& insn)
     uint32_t type = basePointer.type;
     size_t address = basePointer.address;
     for(auto& id: insn.indexesId) {
-        int32_t j = registerAs<int32_t>(id);
+        int32_t j = fromRegister<int32_t>(id);
         uint32_t constituentOffset;
         std::tie(type, constituentOffset) = pgm->getConstituentInfo(type, j);
         address += constituentOffset;
@@ -2156,7 +2225,15 @@ void Interpreter::stepReturnValue(const InsnReturnValue& insn)
 {
     // Return value.
     uint32_t returnId = callstack.back(); callstack.pop_back();
-    registers[returnId] = registers[insn.valueId];
+
+    Register &value = registers.at(insn.valueId);
+#ifdef CHECK_REGISTER_ACCESS
+    if (!value.initialized) {
+        std::cerr << "Warning: Returning uninitialized register " << insn.valueId << "\n";
+    }
+#endif
+
+    registers[returnId] = value;
 
     pc = callstack.back(); callstack.pop_back();
 }
@@ -2181,20 +2258,20 @@ void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float p0 = registerAs<float>(insn.p0Id);
-            float p1 = registerAs<float>(insn.p1Id);
+            float p0 = fromRegister<float>(insn.p0Id);
+            float p1 = fromRegister<float>(insn.p1Id);
             float radicand = (p1 - p0) * (p1 - p0);
-            registerAs<float>(insn.resultId) = sqrtf(radicand);
+            toRegister<float>(insn.resultId) = sqrtf(radicand);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* p0 = &registerAs<float>(insn.p0Id);
-            float* p1 = &registerAs<float>(insn.p1Id);
+            const float* p0 = &fromRegister<float>(insn.p0Id);
+            const float* p1 = &fromRegister<float>(insn.p1Id);
             float radicand = 0;
             for(int i = 0; i < type.count; i++) {
                 radicand += (p1[i] - p0[i]) * (p1[i] - p0[i]);
             }
-            registerAs<float>(insn.resultId) = sqrtf(radicand);
+            toRegister<float>(insn.resultId) = sqrtf(radicand);
 
         } else {
 
@@ -2212,17 +2289,17 @@ void Interpreter::stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = fabsf(x);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = fabsf(x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
+            const float* x = &fromRegister<float>(insn.xId);
             float length = 0;
             for(int i = 0; i < type.count; i++) {
                 length += x[i]*x[i];
             }
-            registerAs<float>(insn.resultId) = sqrtf(length);
+            toRegister<float>(insn.resultId) = sqrtf(length);
 
         } else {
 
@@ -2240,15 +2317,15 @@ void Interpreter::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            float y = registerAs<float>(insn.yId);
-            registerAs<float>(insn.resultId) = fmaxf(x, y);
+            float x = fromRegister<float>(insn.xId);
+            float y = fromRegister<float>(insn.yId);
+            toRegister<float>(insn.resultId) = fmaxf(x, y);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* y = &registerAs<float>(insn.yId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            const float* y = &fromRegister<float>(insn.yId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = fmaxf(x[i], y[i]);
             }
@@ -2269,15 +2346,15 @@ void Interpreter::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            float y = registerAs<float>(insn.yId);
-            registerAs<float>(insn.resultId) = fminf(x, y);
+            float x = fromRegister<float>(insn.xId);
+            float y = fromRegister<float>(insn.yId);
+            toRegister<float>(insn.resultId) = fminf(x, y);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* y = &registerAs<float>(insn.yId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            const float* y = &fromRegister<float>(insn.yId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = fminf(x[i], y[i]);
             }
@@ -2298,15 +2375,15 @@ void Interpreter::stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            float y = registerAs<float>(insn.yId);
-            registerAs<float>(insn.resultId) = powf(x, y);
+            float x = fromRegister<float>(insn.xId);
+            float y = fromRegister<float>(insn.yId);
+            toRegister<float>(insn.resultId) = powf(x, y);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* y = &registerAs<float>(insn.yId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            const float* y = &fromRegister<float>(insn.yId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = powf(x[i], y[i]);
             }
@@ -2327,19 +2404,19 @@ void Interpreter::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = x < 0 ? -1 : 1;
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = x < 0 ? -1 : 1;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
+            const float* x = &fromRegister<float>(insn.xId);
             float length = 0;
             for(int i = 0; i < type.count; i++) {
                 length += x[i]*x[i];
             }
             length = sqrtf(length);
 
-            float* result = &registerAs<float>(insn.resultId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = length == 0 ? 0 : x[i]/length;
             }
@@ -2360,13 +2437,13 @@ void Interpreter::stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = sin(x);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = sin(x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = sin(x[i]);
             }
@@ -2387,13 +2464,13 @@ void Interpreter::stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = cos(x);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = cos(x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = cos(x[i]);
             }
@@ -2414,13 +2491,13 @@ void Interpreter::stepGLSLstd450Atan(const InsnGLSLstd450Atan& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float y_over_x = registerAs<float>(insn.y_over_xId);
-            registerAs<float>(insn.resultId) = atanf(y_over_x);
+            float y_over_x = fromRegister<float>(insn.y_over_xId);
+            toRegister<float>(insn.resultId) = atanf(y_over_x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* y_over_x = &registerAs<float>(insn.y_over_xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* y_over_x = &fromRegister<float>(insn.y_over_xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = atanf(y_over_x[i]);
             }
@@ -2441,15 +2518,15 @@ void Interpreter::stepGLSLstd450Atan2(const InsnGLSLstd450Atan2& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float y = registerAs<float>(insn.yId);
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = atan2f(y, x);
+            float y = fromRegister<float>(insn.yId);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = atan2f(y, x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* y = &registerAs<float>(insn.yId);
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* y = &fromRegister<float>(insn.yId);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = atan2f(y[i], x[i]);
             }
@@ -2470,13 +2547,13 @@ void Interpreter::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = fabsf(x);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = fabsf(x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = fabsf(x[i]);
             }
@@ -2497,13 +2574,13 @@ void Interpreter::stepGLSLstd450Exp(const InsnGLSLstd450Exp& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = expf(x);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = expf(x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = expf(x[i]);
             }
@@ -2524,13 +2601,13 @@ void Interpreter::stepGLSLstd450Exp2(const InsnGLSLstd450Exp2& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = exp2f(x);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = exp2f(x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = exp2f(x[i]);
             }
@@ -2551,13 +2628,13 @@ void Interpreter::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = floor(x);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = floor(x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = floor(x[i]);
             }
@@ -2578,13 +2655,13 @@ void Interpreter::stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = x - floor(x);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = x - floor(x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = x[i] - floor(x[i]);
             }
@@ -2630,17 +2707,17 @@ void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            float minVal = registerAs<float>(insn.minValId);
-            float maxVal = registerAs<float>(insn.maxValId);
-            registerAs<float>(insn.resultId) = fclamp(x, minVal, maxVal);
+            float x = fromRegister<float>(insn.xId);
+            float minVal = fromRegister<float>(insn.minValId);
+            float maxVal = fromRegister<float>(insn.maxValId);
+            toRegister<float>(insn.resultId) = fclamp(x, minVal, maxVal);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* minVal = &registerAs<float>(insn.minValId);
-            float* maxVal = &registerAs<float>(insn.maxValId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            const float* minVal = &fromRegister<float>(insn.minValId);
+            const float* maxVal = &fromRegister<float>(insn.maxValId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = fclamp(x[i], minVal[i], maxVal[i]);
             }
@@ -2661,17 +2738,17 @@ void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float x = registerAs<float>(insn.xId);
-            float y = registerAs<float>(insn.yId);
-            float a = registerAs<float>(insn.aId);
-            registerAs<float>(insn.resultId) = fmix(x, y, a);
+            float x = fromRegister<float>(insn.xId);
+            float y = fromRegister<float>(insn.yId);
+            float a = fromRegister<float>(insn.aId);
+            toRegister<float>(insn.resultId) = fmix(x, y, a);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* y = &registerAs<float>(insn.yId);
-            float* a = &registerAs<float>(insn.aId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            const float* y = &fromRegister<float>(insn.yId);
+            const float* a = &fromRegister<float>(insn.aId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = fmix(x[i], y[i], a[i]);
             }
@@ -2692,17 +2769,17 @@ void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float edge0 = registerAs<float>(insn.edge0Id);
-            float edge1 = registerAs<float>(insn.edge1Id);
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = smoothstep(edge0, edge1, x);
+            float edge0 = fromRegister<float>(insn.edge0Id);
+            float edge1 = fromRegister<float>(insn.edge1Id);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = smoothstep(edge0, edge1, x);
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* edge0 = &registerAs<float>(insn.edge0Id);
-            float* edge1 = &registerAs<float>(insn.edge1Id);
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* edge0 = &fromRegister<float>(insn.edge0Id);
+            const float* edge1 = &fromRegister<float>(insn.edge1Id);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = smoothstep(edge0[i], edge1[i], x[i]);
             }
@@ -2723,15 +2800,15 @@ void Interpreter::stepGLSLstd450Step(const InsnGLSLstd450Step& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float edge = registerAs<float>(insn.edgeId);
-            float x = registerAs<float>(insn.xId);
-            registerAs<float>(insn.resultId) = x < edge ? 0.0 : 1.0;
+            float edge = fromRegister<float>(insn.edgeId);
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = x < edge ? 0.0 : 1.0;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* edge = &registerAs<float>(insn.edgeId);
-            float* x = &registerAs<float>(insn.xId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* edge = &fromRegister<float>(insn.edgeId);
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
             for(int i = 0; i < type.count; i++) {
                 result[i] = x[i] < edge[i] ? 0.0 : 1.0;
             }
@@ -2752,9 +2829,9 @@ void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 
         if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* x = &registerAs<float>(insn.xId);
-            float* y = &registerAs<float>(insn.yId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* x = &fromRegister<float>(insn.xId);
+            const float* y = &fromRegister<float>(insn.yId);
+            float* result = &toRegister<float>(insn.resultId);
 
             assert(type.count == 3);
 
@@ -2778,18 +2855,18 @@ void Interpreter::stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn)
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            float i = registerAs<float>(insn.iId);
-            float n = registerAs<float>(insn.nId);
+            float i = fromRegister<float>(insn.iId);
+            float n = fromRegister<float>(insn.nId);
 
             float dot = n*i;
 
-            registerAs<float>(insn.resultId) = i - 2.0*dot*n;
+            toRegister<float>(insn.resultId) = i - 2.0*dot*n;
 
         } else if constexpr (std::is_same_v<T, TypeVector>) {
 
-            float* i = &registerAs<float>(insn.iId);
-            float* n = &registerAs<float>(insn.nId);
-            float* result = &registerAs<float>(insn.resultId);
+            const float* i = &fromRegister<float>(insn.iId);
+            const float* n = &fromRegister<float>(insn.nId);
+            float* result = &toRegister<float>(insn.resultId);
 
             float dot = dotProduct(n, i, type.count);
 
@@ -2812,13 +2889,13 @@ void Interpreter::stepBranch(const InsnBranch& insn)
 
 void Interpreter::stepBranchConditional(const InsnBranchConditional& insn)
 {
-    bool condition = registerAs<bool>(insn.conditionId);
+    bool condition = fromRegister<bool>(insn.conditionId);
     pc = pgm->labels.at(condition ? insn.trueLabelId : insn.falseLabelId);
 }
 
 void Interpreter::stepPhi(const InsnPhi& insn)
 {
-    Register& obj = registers[insn.resultId];
+    Register& obj = registers.at(insn.resultId);
     uint32_t size = pgm->typeSizes.at(obj.type);
 
     bool found = false;
@@ -2827,13 +2904,20 @@ void Interpreter::stepPhi(const InsnPhi& insn)
         uint32_t parentId = insn.operandId[i + 1];
 
         if (parentId == previousBlockId) {
-            const Register &src = registers[srcId];
+            const Register &src = registers.at(srcId);
+#ifdef CHECK_REGISTER_ACCESS
+            if (!src.initialized) {
+                std::cerr << "Warning: Phi uninitialized register " << srcId << "\n";
+            }
+#endif
             std::copy(src.data, src.data + size, obj.data);
             found = true;
         }
     }
 
-    if (!found) {
+    if (found) {
+        obj.initialized = true;
+    } else {
         std::cout << "Error: Phi didn't find any label, previous " << previousBlockId
             << ", current " << currentBlockId << "\n";
         for(int i = 0; i < insn.operandId.size(); i += 2) {
@@ -2864,7 +2948,7 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
             assert(type.count == 2);
 
-            auto [u, v] = registerAs<v2float>(insn.coordinateId);
+            auto [u, v] = fromRegister<v2float>(insn.coordinateId);
 
             assert(texture);
             unsigned int s = std::clamp(static_cast<unsigned int>(u * texture->width), 0u, texture->width - 1);
@@ -2887,7 +2971,7 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
         if constexpr (std::is_same_v<T, TypeFloat>) {
 
-            registerAs<v4float>(insn.resultId) = rgba;
+            toRegister<v4float>(insn.resultId) = rgba;
 
         // else if constexpr (std::is_same_v<T, TypeInt>)
 
@@ -3482,8 +3566,11 @@ void usage(const char* progname)
     printf("usage: %s [options] shader.frag\n", progname);
     printf("provide \"-\" as a filename to read from stdin\n");
     printf("options:\n");
-    printf("\t-f S E    Render frames S through and including E\n");
-    printf("\t-d W H    Render frame at size W by H\n");
+    printf("\t-f S E    Render frames S through and including E [0 0]\n");
+    printf("\t-d W H    Render frame at size W by H [%d %d]\n",
+            int(DEFAULT_WIDTH), int(DEFAULT_HEIGHT));
+    printf("\t-j N      Use N threads [%d]\n",
+            int(std::thread::hardware_concurrency()));
     printf("\t-v        Print opcodes as they are parsed\n");
     printf("\t-g        Generate debugging information\n");
     printf("\t-O        Run optimizing passes\n");
@@ -3942,11 +4029,12 @@ int main(int argc, char **argv)
     bool inputIsJSON = false;
     bool imageToTerminal = false;
     bool compile = false;
+    int threadCount = std::thread::hardware_concurrency();
     int frameStart = 0, frameEnd = 0;
     CommandLineParameters params;
 
-    params.outputWidth = 640/2;
-    params.outputHeight = 360/2;
+    params.outputWidth = DEFAULT_WIDTH;
+    params.outputHeight = DEFAULT_HEIGHT;
     params.beVerbose = false;
     params.throwOnUnimplemented = false;
 
@@ -3995,6 +4083,15 @@ int main(int argc, char **argv)
             frameStart = atoi(argv[1]);
             frameEnd = atoi(argv[2]);
             argv += 3; argc -= 3;
+
+        } else if(strcmp(argv[0], "-j") == 0) {
+
+            if(argc < 2) {
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            threadCount = atoi(argv[1]);
+            argv += 2; argc -= 2;
 
         } else if(strcmp(argv[0], "-v") == 0) {
 
@@ -4099,7 +4196,6 @@ int main(int argc, char **argv)
         }
     }
 
-    int threadCount = std::thread::hardware_concurrency();
     std::cout << "Using " << threadCount << " threads.\n";
 
     for(int frameNumber = frameStart; frameNumber <= frameEnd; frameNumber++) {

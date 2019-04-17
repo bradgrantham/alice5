@@ -12,22 +12,6 @@ case SpvOpNop: {
     break;
 }
 
-case SpvOpUndef: {
-    uint32_t type = nextu();
-    uint32_t resultId = nextu();
-    pgm->instructions.push_back(std::make_unique<InsnUndef>(type, resultId));
-    pgm->resultTypes[resultId] = type;
-    if(pgm->verbose) {
-        std::cout << "Undef";
-        std::cout << " type ";
-        std::cout << type;
-        std::cout << " resultId ";
-        std::cout << resultId;
-        std::cout << "\n";
-    }
-    break;
-}
-
 case SpvOpFunctionParameter: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();

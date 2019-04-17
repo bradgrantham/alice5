@@ -14,17 +14,6 @@ struct InsnNop : public Instruction {
     virtual std::string name() const { return "OpNop"; }
 };
 
-// OpUndef instruction (code 1).
-struct InsnUndef : public Instruction {
-    InsnUndef(uint32_t type, uint32_t resultId) : Instruction(resultId), type(type), resultId(resultId) {
-    }
-    uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    virtual void step(Interpreter *interpreter) { interpreter->stepUndef(*this); }
-    virtual uint32_t opcode() const { return SpvOpUndef; }
-    virtual std::string name() const { return "OpUndef"; }
-};
-
 // OpFunctionParameter instruction (code 55).
 struct InsnFunctionParameter : public Instruction {
     InsnFunctionParameter(uint32_t type, uint32_t resultId) : Instruction(resultId), type(type), resultId(resultId) {

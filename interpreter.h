@@ -45,9 +45,12 @@ struct Interpreter
     template <class T>
     T& objectInClassAt(size_t addr, bool reading, size_t size);
 
-    // Get a register's data by ID as the specified type.
+    // For reading from a register.
     template <class T>
-    T& registerAs(int id);
+    const T& fromRegister(int id);
+    // For writing to a register.
+    template <class T>
+    T& toRegister(int id);
 
     template <class T>
     void set(SpvStorageClass clss, size_t offset, const T& v);
