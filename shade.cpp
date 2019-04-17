@@ -30,7 +30,12 @@
 #include <spirv-tools/optimizer.hpp>
 #include "spirv.h"
 #include "GLSL.std.450.h"
+
 #include "json.hpp"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #include "basic_types.h"
 #include "image.h"
 #include "interpreter.h"
@@ -38,160 +43,6 @@
 
 // Enable this to check if our virtual RAM is being initialized properly.
 #undef CHECK_MEMORY_ACCESS
-
-static void skipComments(FILE *fp, char ***comments, size_t *commentCount)
-{
-    int c;
-    char line[512];
-
-    while((c = fgetc(fp)) == '#') {
-        fgets(line, sizeof(line) - 1, fp);
-	line[strlen(line) - 1] = '\0';
-	if(comments != NULL) {
-	    *comments = (char **)
-	        realloc(*comments, sizeof(char *) * (*commentCount + 1));
-	    (*comments)[*commentCount] = strdup(line);
-	}
-	if(commentCount != NULL) {
-	    (*commentCount) ++;
-	}
-    }
-    ungetc(c, fp);
-}
-
-
-int pnmRead(FILE *file, unsigned int *w, unsigned int *h, float **pixels,
-    char ***comments, size_t *commentCount)
-{
-    unsigned char	dummyByte;
-    int			i;
-    float		max;
-    char		token;
-    int			width, height;
-    float		*rgbPixels;
-
-    if(commentCount != NULL)
-	*commentCount = 0;
-    if(comments != NULL)
-	*comments = NULL;
-
-    fscanf(file, " ");
-
-    skipComments(file, comments, commentCount);
-
-    if(fscanf(file, "P%c ", &token) != 1) {
-         fprintf(stderr, "pnmRead: Had trouble reading PNM tag\n");
-	 return 0;
-    }
-
-    skipComments(file, comments, commentCount);
-
-    if(fscanf(file, "%d ", &width) != 1) {
-         fprintf(stderr, "pnmRead: Had trouble reading PNM width\n");
-	 return 0;
-    }
-
-    skipComments(file, comments, commentCount);
-
-    if(fscanf(file, "%d ", &height) != 1) {
-         fprintf(stderr, "pnmRead: Had trouble reading PNM height\n");
-	 return 0;
-    }
-
-    skipComments(file, comments, commentCount);
-
-    if(token != '1' && token != '4')
-        if(fscanf(file, "%f", &max) != 1) {
-             fprintf(stderr, "pnmRead: Had trouble reading PNM max value\n");
-	     return 0;
-        }
-
-    rgbPixels = (float*) malloc(width * height * 4 * sizeof(float));
-    if(rgbPixels == NULL) {
-         fprintf(stderr, "pnmRead: Couldn't allocate %zd bytes\n",
-	     width * height * 4 * sizeof(float));
-         fprintf(stderr, "pnmRead: (For a %u by %u image)\n", width,
-	     height);
-	 return 0;
-    }
-
-    if(token != '4')
-	skipComments(file, comments, commentCount);
-
-    if(token != '4')
-    fread(&dummyByte, 1, 1, file);	/* chuck white space */
-
-    if(token == '1') {
-	for(i = 0; i < width * height; i++) {
-	    int pixel;
-	    fscanf(file, "%d", &pixel);
-	    pixel = 1 - pixel;
-	    rgbPixels[i * 4 + 0] = pixel;
-	    rgbPixels[i * 4 + 1] = pixel;
-	    rgbPixels[i * 4 + 2] = pixel;
-	    rgbPixels[i * 4 + 3] = 1.0;
-	}
-    } else if(token == '2') {
-	for(i = 0; i < width * height; i++) {
-	    int pixel;
-	    fscanf(file, "%d", &pixel);
-	    rgbPixels[i * 4 + 0] = pixel / max;
-	    rgbPixels[i * 4 + 1] = pixel / max;
-	    rgbPixels[i * 4 + 2] = pixel / max;
-	    rgbPixels[i * 4 + 3] = 1.0;
-	}
-    } else if(token == '3') {
-	for(i = 0; i < width * height; i++) {
-	    int r, g, b;
-	    fscanf(file, "%d %d %d", &r, &g, &b);
-	    rgbPixels[i * 4 + 0] = r / max;
-	    rgbPixels[i * 4 + 1] = g / max;
-	    rgbPixels[i * 4 + 2] = b / max;
-	    rgbPixels[i * 4 + 3] = 1.0;
-	}
-    } else if(token == '4') {
-        int bitnum = 0;
-        unsigned char value = 0;
-
-	for(i = 0; i < width * height; i++) {
-	    unsigned char pixel;
-
-	    if(bitnum == 0)
-	        fread(&value, 1, 1, file);
-
-	    pixel = (1 - ((value >> (7 - bitnum)) & 1));
-	    rgbPixels[i * 4 + 0] = pixel;
-	    rgbPixels[i * 4 + 1] = pixel;
-	    rgbPixels[i * 4 + 2] = pixel;
-	    rgbPixels[i * 4 + 3] = 1.0;
-
-	    if(++bitnum == 8 || ((i + 1) % width) == 0)
-	        bitnum = 0;
-	}
-    } else if(token == '5') {
-	for(i = 0; i < width * height; i++) {
-	    unsigned char pixel;
-	    fread(&pixel, 1, 1, file);
-	    rgbPixels[i * 4 + 0] = pixel / max;
-	    rgbPixels[i * 4 + 1] = pixel / max;
-	    rgbPixels[i * 4 + 2] = pixel / max;
-	    rgbPixels[i * 4 + 3] = 1.0;
-	}
-    } else if(token == '6') {
-	for(i = 0; i < width * height; i++) {
-	    unsigned char rgb[3];
-	    fread(rgb, 3, 1, file);
-	    rgbPixels[i * 4 + 0] = rgb[0] / max;
-	    rgbPixels[i * 4 + 1] = rgb[1] / max;
-	    rgbPixels[i * 4 + 2] = rgb[2] / max;
-	    rgbPixels[i * 4 + 3] = 1.0;
-	}
-    }
-    *w = width;
-    *h = height;
-    *pixels = rgbPixels;
-    return 1;
-}
 
 using json = nlohmann::json;
 
@@ -252,6 +103,11 @@ struct UniformInfo
     uint32_t binding;       // The "binding" attribute for this element's parent
     size_t offsetWithinBinding;          // The offset within the binding
     size_t size;            // Size in bytes of this element for type checking
+};
+
+struct UniformConstantInfo
+{
+    uint32_t binding;       // The "binding" attribute for this element's parent
 };
 
 struct InputInfo
@@ -865,6 +721,7 @@ struct Program
                 uint32_t id = nextu();
                 uint32_t imageType = nextu();
                 pgm->types[id] = TypeSampledImage { imageType };
+                pgm->typeSizes[id] = sizeof(uint32_t); // binding
                 if(pgm->verbose) {
                     std::cout << "TypeSampledImage " << id
                         << " imageType " << imageType
@@ -885,6 +742,7 @@ struct Program
                 uint32_t imageFormat = nextu();
                 uint32_t accessQualifier = nextu(NO_ACCESS_QUALIFIER);
                 pgm->types[id] = TypeImage { sampledType, dim, depth, arrayed, ms, sampled, imageFormat, accessQualifier };
+                pgm->typeSizes[id] = sizeof(uint32_t); // XXX ???
                 if(pgm->verbose) {
                     std::cout << "TypeImage " << id
                         << " sampledType " << sampledType
@@ -3084,12 +2942,14 @@ void Interpreter::set(const std::string& name, const T& v)
         if(false) {
             std::cout << "set uniform " << name << " at binding " << u.binding << ", offset " << u.offsetWithinBinding << '\n';
         }
+        assert(u.size == sizeof(T));
         objectInClassAt<T>(SpvStorageClassUniform, u.binding * 256 + u.offsetWithinBinding, false, sizeof(v)) = v;
     } else if(pgm->inputVariables.find(name) != pgm->inputVariables.end()) {
         const InputInfo& i = pgm->inputVariables.at(name);
         if(false) {
             std::cout << "set uniform " << name << " at location " << i.location << ", offset " << i.offsetWithinLocation << '\n';
         }
+        assert(i.size == sizeof(T));
         objectInClassAt<T>(SpvStorageClassInput, i.location * 256 + i.offsetWithinLocation, false, sizeof(v)) = v;
     } else {
         throw std::runtime_error("couldn't find variable " + name + " in Interpreter::set");
@@ -3737,11 +3597,16 @@ void earwigMessageConsumer(spv_message_level_t level, const char *source,
     std::cout << source << ": " << message << "\n";
 }
 
+struct SampledImage
+{
+    ImagePtr image;
+    Sampler sampler;
+};
+
 struct ShaderToyImage
 {
     int channelNumber;
-    ImagePtr image;
-    Sampler sampler;
+    SampledImage sampledImage;
 };
 
 struct ShaderSource
@@ -3858,32 +3723,36 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
 
                 std::string asset_filename = getFilepathAdjacentToPath(input["locally_saved"].get<std::string>(), filename);
 
-                unsigned int textureWidth, textureHeight;
-                float *textureData;
+                int textureWidth, textureHeight, textureComponents;
+                unsigned char *textureData;
 
-                FILE *fp = fopen(asset_filename.c_str(), "rb");
-                if(!pnmRead(fp, &textureWidth, &textureHeight, &textureData, NULL, NULL)) {
+                if((textureData = stbi_load(asset_filename.c_str(), &textureWidth, &textureHeight, &textureComponents, 4)) == NULL) {
                     std::cerr << "couldn't read image from " << asset_filename;
                     exit(EXIT_FAILURE);
                 }
 
-                ImagePtr image(new Image(Image::FORMAT_R32G32B32A32_SFLOAT, Image::DIM_2D, textureWidth, textureHeight));
+                ImagePtr image(new Image(Image::FORMAT_R8G8B8A8_UNORM, Image::DIM_2D, textureWidth, textureHeight));
 
-                if((input.find("vflip") != input.end()) && (input["vflip"].get<std::string>() == std::string("true"))) {
+                unsigned char* s = textureData;
+                unsigned char* d = image->storage;
+                int rowsize = textureWidth * Image::getPixelSize(image->format);
+                bool flipInY = ((input.find("vflip") != input.end()) && (input["vflip"].get<std::string>() == std::string("true")));
+
+                if(flipInY) {
+                    for(int row = 0; row < textureHeight; row++) {
+                        std::copy(s + rowsize * row, s + rowsize * (row + 1), d + rowsize * row);
+                    }
                 } else {
-                    unsigned char* s = reinterpret_cast<unsigned char*>(textureData);
-                    unsigned char* d = reinterpret_cast<unsigned char*>(image->storage);
-                    int rowsize = textureWidth * Image::getPixelSize(Image::FORMAT_R32G32B32A32_SFLOAT);
                     for(int row = 0; row < textureHeight; row++) {
                         std::copy(s + rowsize * row, s + rowsize * (row + 1), d + rowsize * (textureHeight - row - 1));
                     }
                 }
 
-                fclose(fp);
+                stbi_image_free(textureData);
 
                 int channelNumber = input["channel"].get<int>();
 
-                inputs.push_back({channelNumber, image, Sampler{Sampler::REPEAT, Sampler::REPEAT, Sampler::NEAREST, Sampler::MIPMAP_NEAREST, false}});
+                inputs.push_back({channelNumber, {image, {}}});
                 asset_preamble.code += "layout (binding = " + std::to_string(channelNumber + 1) + ") uniform sampler2D iChannel" + std::to_string(channelNumber) + ";\n";
             }
         }
@@ -3919,7 +3788,7 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
         sources.push_back(shader);
 
         ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, params.outputWidth, params.outputHeight));
-        ShaderToyImage output {0, image, Sampler {}};
+        ShaderToyImage output {0, { image, Sampler {}}};
         RenderPassPtr rpass(new RenderPass(
             "Image",
             {inputs},
@@ -4195,7 +4064,7 @@ int main(int argc, char **argv)
         shader_code = readFileContents(filename);
 
         ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, params.outputWidth, params.outputHeight));
-        ShaderToyImage output {0, image, Sampler {}};
+        ShaderToyImage output {0, {image, Sampler {}}};
 
         std::vector<ShaderSource> sources = { {"", ""}, {shader_code, filename}};
         RenderPassPtr pass(new RenderPass("Image", {}, {output}, sources, params));
@@ -4250,12 +4119,12 @@ int main(int argc, char **argv)
 
             assert(pass->inputs.size() < 2);
             if(pass->inputs.size() == 1)
-                texture = pass->inputs[0].image;
+                texture = pass->inputs[0].sampledImage.image;
             else
                 texture = nullptr;
 
             ShaderToyImage output = pass->outputs[0];
-            ImagePtr image = output.image;
+            ImagePtr image = output.sampledImage.image;
 
             // Workers decrement rowsLeft at the end of each row.
             rowsLeft = image->height;
@@ -4284,7 +4153,7 @@ int main(int argc, char **argv)
         }
 
         ShaderToyImage output = renderPasses.back()->outputs[0];
-        ImagePtr image = output.image;
+        ImagePtr image = output.sampledImage.image;
 
         std::ostringstream ss;
         ss << "image" << std::setfill('0') << std::setw(4) << frameNumber << std::setw(0) << ".ppm";
