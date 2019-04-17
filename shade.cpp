@@ -160,7 +160,10 @@ struct Program
     std::map<uint32_t, uint32_t> resultTypes;
     std::map<uint32_t, Register> constants;
     std::map<std::string, UniformInfo> uniformVariables;
+    std::map<std::string, UniformConstantInfo> uniformConstantVariables;
     std::map<std::string, InputInfo> inputVariables;
+
+    SampledImage sampledImages[16];
 
     Function* currentFunction;
     // Map from label ID to index into instructions vector.
@@ -895,10 +898,15 @@ struct Program
 
         // Allocated variables 
         for(auto& [id, var]: variables) {
-            if(var.storageClass == SpvStorageClassUniform) {
+            if(var.storageClass == SpvStorageClassUniformConstant) {
+                uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
+                var.address = memoryRegions[SpvStorageClassUniformConstant].base + binding * 16; // XXX magic number
+                uniformConstantVariables[names[id]] = {binding};
+
+            } else if(var.storageClass == SpvStorageClassUniform) {
                 uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
                 storeUniformInformation(names[id], var.type, binding, 0);
-                var.address = memoryRegions[SpvStorageClassUniform].base + binding * 256;
+                var.address = memoryRegions[SpvStorageClassUniform].base + binding * 256; // XXX magic number
             } else if(var.storageClass == SpvStorageClassInput) {
                 uint32_t location;
                 if(names[id] == "gl_FragCoord") {
@@ -916,13 +924,16 @@ struct Program
                     location = decorations.at(id).at(SpvDecorationLocation)[0];
                 }
                 storeInputInformation(names[id], var.type, location, 0);
-                var.address = memoryRegions[SpvStorageClassInput].base + location * 256;
+                var.address = memoryRegions[SpvStorageClassInput].base + location * 256; // XXX magic number
             } else {
                 var.address = allocate(var.storageClass, var.type);
             }
         }
         if(verbose) {
             std::cout << "----------------------- Variable binding and location info\n";
+            for(auto& [name, info]: uniformConstantVariables) {
+                std::cout << "uniformConstant " << name << " is binding " << info.binding << '\n';
+            }
             for(auto& [name, info]: uniformVariables) {
                 std::cout << "uniform " << name << " is binding " << info.binding << " with offset " << info.offsetWithinBinding << " and size " << info.size << '\n';
             }
@@ -2842,8 +2853,6 @@ void Interpreter::stepPhi(const InsnPhi& insn)
     }
 }
 
-ImagePtr texture;
-
 // XXX image binding
 // XXX implicit LOD level and thus texel interpolants
 void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn)
@@ -2866,10 +2875,12 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
             auto [u, v] = registerAs<v2float>(insn.coordinateId);
 
-            assert(texture);
-            unsigned int s = std::clamp(static_cast<unsigned int>(u * texture->width), 0u, texture->width - 1);
-            unsigned int t = std::clamp(static_cast<unsigned int>(v * texture->height), 0u, texture->height - 1);
-            texture->get(s, t, rgba);
+            int imageIndex = registerAs<int>(insn.sampledImageId);
+            const SampledImage& si = pgm->sampledImages[imageIndex];
+
+            unsigned int s = std::clamp(static_cast<unsigned int>(u * si.image->width), 0u, si.image->width - 1);
+            unsigned int t = std::clamp(static_cast<unsigned int>(v * si.image->height), 0u, si.image->height - 1);
+            si.image->get(s, t, rgba);
 
         } else {
 
@@ -2937,20 +2948,26 @@ void Interpreter::set(SpvStorageClass clss, size_t offset, const T& v)
 template <class T>
 void Interpreter::set(const std::string& name, const T& v)
 {
-    if(pgm->uniformVariables.find(name) != pgm->uniformVariables.end()) {
+    if(pgm->uniformConstantVariables.find(name) != pgm->uniformConstantVariables.end()) {
+        const UniformConstantInfo& u = pgm->uniformConstantVariables.at(name);
+        if(false) {
+            std::cout << "set uniform constant " << name << " at binding " << u.binding << '\n';
+        }
+        objectInClassAt<T>(SpvStorageClassUniformConstant, u.binding * 16, false, sizeof(v)) = v; // XXX magic number
+    } else if(pgm->uniformVariables.find(name) != pgm->uniformVariables.end()) {
         const UniformInfo& u = pgm->uniformVariables.at(name);
         if(false) {
             std::cout << "set uniform " << name << " at binding " << u.binding << ", offset " << u.offsetWithinBinding << '\n';
         }
         assert(u.size == sizeof(T));
-        objectInClassAt<T>(SpvStorageClassUniform, u.binding * 256 + u.offsetWithinBinding, false, sizeof(v)) = v;
+        objectInClassAt<T>(SpvStorageClassUniform, u.binding * 256 + u.offsetWithinBinding, false, sizeof(v)) = v; // XXX magic number
     } else if(pgm->inputVariables.find(name) != pgm->inputVariables.end()) {
         const InputInfo& i = pgm->inputVariables.at(name);
         if(false) {
             std::cout << "set uniform " << name << " at location " << i.location << ", offset " << i.offsetWithinLocation << '\n';
         }
         assert(i.size == sizeof(T));
-        objectInClassAt<T>(SpvStorageClassInput, i.location * 256 + i.offsetWithinLocation, false, sizeof(v)) = v;
+        objectInClassAt<T>(SpvStorageClassInput, i.location * 256 + i.offsetWithinLocation, false, sizeof(v)) = v; // XXX magic number
     } else {
         throw std::runtime_error("couldn't find variable " + name + " in Interpreter::set");
     }
@@ -3495,19 +3512,76 @@ void usage(const char* progname)
     printf("\t--term    draw output image on terminal (in addition to file)\n");
 }
 
+struct ShaderToyImage
+{
+    int channelNumber;
+    SampledImage sampledImage;
+};
+
+struct ShaderSource
+{
+    std::string code;
+    std::string filename;
+    ShaderSource() {}
+    ShaderSource(const std::string& code_, const std::string& filename_) :
+        code(code_),
+        filename(filename_)
+    {}
+};
+
+struct CommandLineParameters
+{
+    int outputWidth;
+    int outputHeight;
+    bool beVerbose;
+    bool throwOnUnimplemented;
+};
+
+const std::string shaderPreambleFilename = "preamble.frag";
+const std::string shaderEpilogueFilename = "epilogue.frag";
+
+struct RenderPass
+{
+    std::string name;
+    std::vector<ShaderToyImage> inputs; // in channel order
+    std::vector<ShaderToyImage> outputs;
+    std::vector<ShaderSource> sources;
+    Program pgm;
+    void Render(void) {
+        // set input images, uniforms, output images, call run()
+    }
+    RenderPass(const std::string& name_, std::vector<ShaderToyImage> inputs_, std::vector<ShaderToyImage> outputs_, const std::vector<ShaderSource>& sources_, const CommandLineParameters& params) :
+        name(name_),
+        inputs(inputs_),
+        outputs(outputs_),
+        sources(sources_),
+        pgm(params.throwOnUnimplemented, params.beVerbose)
+    {
+    }
+};
+
+typedef std::shared_ptr<RenderPass> RenderPassPtr;
+
+
 // Number of rows still left to shade (for progress report).
 static std::atomic_int rowsLeft;
 
 // Render rows starting at "startRow" every "skip".
-void render(const Program *pgm, int startRow, int skip, ImagePtr output, float when)
+void render(RenderPass* pass, int startRow, int skip, float when)
 {
-    Interpreter interpreter(pgm);
+    Interpreter interpreter(&pass->pgm);
+    ImagePtr output = pass->outputs[0].sampledImage.image;
 
     interpreter.set("iResolution", v2float {static_cast<float>(output->width), static_cast<float>(output->height)});
 
     interpreter.set("iTime", when);
 
     interpreter.set("iMouse", v4float {0, 0, 0, 0});
+
+    for(int i = 0; i < pass->inputs.size(); i++) {
+        auto& input = pass->inputs[i];
+        interpreter.set("iChannel" + std::to_string(input.channelNumber), i);
+    }
 
     // This loop acts like a rasterizer fixed function block.  Maybe it should
     // set inputs and read outputs also.
@@ -3592,56 +3666,6 @@ void earwigMessageConsumer(spv_message_level_t level, const char *source,
 {
     std::cout << source << ": " << message << "\n";
 }
-
-struct ShaderToyImage
-{
-    int channelNumber;
-    SampledImage sampledImage;
-};
-
-struct ShaderSource
-{
-    std::string code;
-    std::string filename;
-    ShaderSource() {}
-    ShaderSource(const std::string& code_, const std::string& filename_) :
-        code(code_),
-        filename(filename_)
-    {}
-};
-
-struct CommandLineParameters
-{
-    int outputWidth;
-    int outputHeight;
-    bool beVerbose;
-    bool throwOnUnimplemented;
-};
-
-const std::string shaderPreambleFilename = "preamble.frag";
-const std::string shaderEpilogueFilename = "epilogue.frag";
-
-struct RenderPass
-{
-    std::string name;
-    std::vector<ShaderToyImage> inputs; // in channel order
-    std::vector<ShaderToyImage> outputs;
-    std::vector<ShaderSource> sources;
-    Program pgm;
-    void Render(void) {
-        // set input images, uniforms, output images, call run()
-    }
-    RenderPass(const std::string& name_, std::vector<ShaderToyImage> inputs_, std::vector<ShaderToyImage> outputs_, const std::vector<ShaderSource>& sources_, const CommandLineParameters& params) :
-        name(name_),
-        inputs(inputs_),
-        outputs(outputs_),
-        sources(sources_),
-        pgm(params.throwOnUnimplemented, params.beVerbose)
-    {
-    }
-};
-
-typedef std::shared_ptr<RenderPass> RenderPassPtr;
 
 void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<RenderPassPtr>& renderPasses, const CommandLineParameters& params)
 {
@@ -4097,6 +4121,11 @@ int main(int argc, char **argv)
         if (doNotShade) {
             exit(EXIT_SUCCESS);
         }
+
+        for(int i = 0; i < pass->inputs.size(); i++) {
+            auto& toyImage = pass->inputs[i];
+            pass->pgm.sampledImages[i] = toyImage.sampledImage;
+        }
     }
 
     int threadCount = std::thread::hardware_concurrency();
@@ -4106,12 +4135,6 @@ int main(int argc, char **argv)
         for(auto& pass: renderPasses) {
 
             Timer timer;
-
-            assert(pass->inputs.size() < 2);
-            if(pass->inputs.size() == 1)
-                texture = pass->inputs[0].sampledImage.image;
-            else
-                texture = nullptr;
 
             ShaderToyImage output = pass->outputs[0];
             ImagePtr image = output.sampledImage.image;
@@ -4123,7 +4146,7 @@ int main(int argc, char **argv)
 
             // Generate the rows on multiple threads.
             for (int t = 0; t < threadCount; t++) {
-                thread.push_back(new std::thread(render, &pass->pgm, t, threadCount, image, frameNumber / 60.0));
+                thread.push_back(new std::thread(render, pass.get(), t, threadCount, frameNumber / 60.0));
                 // std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
 
