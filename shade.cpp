@@ -3465,7 +3465,7 @@ void InsnStore::emit(Compiler *compiler)
 {
     auto r = compiler->registers.find(objectId);
     int count = r == compiler->registers.end() ? 1 : r->second.count;
-    for (int i = 0; i < r->second.count; i++) {
+    for (int i = 0; i < count; i++) {
         std::ostringstream ss1;
         ss1 << "sw ";
         if (count != 1) {
@@ -3531,6 +3531,26 @@ void InsnBranchConditional::emit(Compiler *compiler)
     std::ostringstream ss3;
     ss3 << "j label" << falseLabelId;
     compiler->emit(ss3.str(), "");
+}
+
+void InsnAccessChain::emit(Compiler *compiler)
+{
+    /*
+    Pointer& basePointer = pointers.at(insn.baseId);
+    uint32_t type = basePointer.type;
+    size_t address = basePointer.address;
+    for(auto& id: insn.indexesId) {
+        int32_t j = fromRegister<int32_t>(id);
+        uint32_t constituentOffset;
+        std::tie(type, constituentOffset) = pgm->getConstituentInfo(type, j);
+        address += constituentOffset;
+    }
+    if(false) {
+        std::cout << "accesschain of " << basePointer.address << " yielded " << address << "\n";
+    }
+    uint32_t pointedType = std::get<TypePointer>(pgm->types.at(insn.type)).type;
+    pointers[insn.resultId] = Pointer { pointedType, basePointer.storageClass, address };
+    */
 }
 
 // -----------------------------------------------------------------------------------

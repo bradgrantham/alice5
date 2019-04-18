@@ -88,6 +88,7 @@ struct InsnAccessChain : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepAccessChain(*this); }
     virtual uint32_t opcode() const { return SpvOpAccessChain; }
     virtual std::string name() const { return "OpAccessChain"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpVectorShuffle instruction (code 79).
