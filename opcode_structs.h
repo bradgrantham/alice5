@@ -450,6 +450,21 @@ struct InsnSLessThan : public Instruction {
     virtual std::string name() const { return "OpSLessThan"; }
 };
 
+// OpSLessThanEqual instruction (code 179).
+struct InsnSLessThanEqual : public Instruction {
+    InsnSLessThanEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t operand1Id; // operand from register
+    uint32_t operand2Id; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepSLessThanEqual(*this); }
+    virtual uint32_t opcode() const { return SpvOpSLessThanEqual; }
+    virtual std::string name() const { return "OpSLessThanEqual"; }
+};
+
 // OpFOrdEqual instruction (code 180).
 struct InsnFOrdEqual : public Instruction {
     InsnFOrdEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
@@ -638,6 +653,19 @@ struct InsnGLSLstd450Fract : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Fract(*this); }
     virtual uint32_t opcode() const { return 0; }
     virtual std::string name() const { return "GLSLstd450Fract"; }
+};
+
+// GLSLstd450Radians instruction (code 11).
+struct InsnGLSLstd450Radians : public Instruction {
+    InsnGLSLstd450Radians(uint32_t type, uint32_t resultId, uint32_t degreesId) : Instruction(NO_REGISTER), type(type), resultId(resultId), degreesId(degreesId) {
+        argIds.insert(degreesId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t degreesId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Radians(*this); }
+    virtual uint32_t opcode() const { return 0; }
+    virtual std::string name() const { return "GLSLstd450Radians"; }
 };
 
 // GLSLstd450Sin instruction (code 13).
@@ -900,6 +928,23 @@ struct InsnGLSLstd450Reflect : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Reflect(*this); }
     virtual uint32_t opcode() const { return 0; }
     virtual std::string name() const { return "GLSLstd450Reflect"; }
+};
+
+// GLSLstd450Refract instruction (code 72).
+struct InsnGLSLstd450Refract : public Instruction {
+    InsnGLSLstd450Refract(uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId, uint32_t etaId) : Instruction(NO_REGISTER), type(type), resultId(resultId), iId(iId), nId(nId), etaId(etaId) {
+        argIds.insert(iId);
+        argIds.insert(nId);
+        argIds.insert(etaId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t iId; // operand from register
+    uint32_t nId; // operand from register
+    uint32_t etaId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Refract(*this); }
+    virtual uint32_t opcode() const { return 0; }
+    virtual std::string name() const { return "GLSLstd450Refract"; }
 };
 
 

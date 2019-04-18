@@ -127,6 +127,16 @@ struct TypeVector
     uint32_t count;
 };
 
+// Represents a vector type.
+struct TypeArray
+{
+    // Type of the element. This is a key in the "types" map.
+    uint32_t type;
+
+    // Number of elements.
+    uint32_t count;
+};
+
 // Represents a matrix type. Each matrix is a sequence of column vectors.
 // Matrix data is stored starting at the upper-left, going down the first
 // column, then the next column, etc.
@@ -189,7 +199,7 @@ struct TypeSampledImage
 };
 
 // Union of all known types.
-typedef std::variant<TypeVoid, TypeBool, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeMatrix, TypeInt, TypeStruct, TypeImage, TypeSampledImage> Type;
+typedef std::variant<TypeVoid, TypeBool, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeMatrix, TypeInt, TypeStruct, TypeImage, TypeSampledImage, TypeArray> Type;
 
 // A function parameter. This is on the receiving side, to set aside an SSA slot
 // for the value received from the caller.

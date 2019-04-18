@@ -33,6 +33,7 @@ struct InsnLogicalNot;
 struct InsnSelect;
 struct InsnIEqual;
 struct InsnSLessThan;
+struct InsnSLessThanEqual;
 struct InsnFOrdEqual;
 struct InsnFOrdLessThan;
 struct InsnFOrdGreaterThan;
@@ -46,6 +47,7 @@ struct InsnReturnValue;
 struct InsnGLSLstd450FAbs;
 struct InsnGLSLstd450Floor;
 struct InsnGLSLstd450Fract;
+struct InsnGLSLstd450Radians;
 struct InsnGLSLstd450Sin;
 struct InsnGLSLstd450Cos;
 struct InsnGLSLstd450Atan;
@@ -64,5 +66,6 @@ struct InsnGLSLstd450Distance;
 struct InsnGLSLstd450Cross;
 struct InsnGLSLstd450Normalize;
 struct InsnGLSLstd450Reflect;
+struct InsnGLSLstd450Refract;
 
 #endif // OPCODE_STRUCT_DECL_H

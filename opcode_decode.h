@@ -643,6 +643,28 @@ case SpvOpSLessThan: {
     break;
 }
 
+case SpvOpSLessThanEqual: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    pgm->instructions.push_back(std::make_unique<InsnSLessThanEqual>(type, resultId, operand1Id, operand2Id));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "SLessThanEqual";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpFOrdEqual: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
@@ -881,6 +903,23 @@ case GLSLstd450Fract: {
         std::cout << resultId;
         std::cout << " xId ";
         std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Radians: {
+    uint32_t degreesId = nextu();
+    pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Radians>(type, resultId, degreesId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Radians";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " degreesId ";
+        std::cout << degreesId;
         std::cout << "\n";
     }
     break;
@@ -1229,6 +1268,29 @@ case GLSLstd450Reflect: {
         std::cout << iId;
         std::cout << " nId ";
         std::cout << nId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Refract: {
+    uint32_t iId = nextu();
+    uint32_t nId = nextu();
+    uint32_t etaId = nextu();
+    pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Refract>(type, resultId, iId, nId, etaId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Refract";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " iId ";
+        std::cout << iId;
+        std::cout << " nId ";
+        std::cout << nId;
+        std::cout << " etaId ";
+        std::cout << etaId;
         std::cout << "\n";
     }
     break;

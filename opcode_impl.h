@@ -688,11 +688,6 @@ void Interpreter::stepULessThanEqual(const InsnULessThanEqual& insn)
     std::cerr << "stepULessThanEqual() not implemented\n";
 }
 
-void Interpreter::stepSLessThanEqual(const InsnSLessThanEqual& insn)
-{
-    std::cerr << "stepSLessThanEqual() not implemented\n";
-}
-
 void Interpreter::stepFUnordEqual(const InsnFUnordEqual& insn)
 {
     std::cerr << "stepFUnordEqual() not implemented\n";
@@ -1498,11 +1493,6 @@ void Interpreter::stepGLSLstd450Ceil(const InsnGLSLstd450Ceil& insn)
     std::cerr << "stepGLSLstd450Ceil() not implemented\n";
 }
 
-void Interpreter::stepGLSLstd450Radians(const InsnGLSLstd450Radians& insn)
-{
-    std::cerr << "stepGLSLstd450Radians() not implemented\n";
-}
-
 void Interpreter::stepGLSLstd450Degrees(const InsnGLSLstd450Degrees& insn)
 {
     std::cerr << "stepGLSLstd450Degrees() not implemented\n";
@@ -1711,11 +1701,6 @@ void Interpreter::stepGLSLstd450UnpackDouble2x32(const InsnGLSLstd450UnpackDoubl
 void Interpreter::stepGLSLstd450FaceForward(const InsnGLSLstd450FaceForward& insn)
 {
     std::cerr << "stepGLSLstd450FaceForward() not implemented\n";
-}
-
-void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
-{
-    std::cerr << "stepGLSLstd450Refract() not implemented\n";
 }
 
 void Interpreter::stepGLSLstd450FindILsb(const InsnGLSLstd450FindILsb& insn)

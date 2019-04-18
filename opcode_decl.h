@@ -33,6 +33,7 @@ void stepLogicalNot(const InsnLogicalNot& insn);
 void stepSelect(const InsnSelect& insn);
 void stepIEqual(const InsnIEqual& insn);
 void stepSLessThan(const InsnSLessThan& insn);
+void stepSLessThanEqual(const InsnSLessThanEqual& insn);
 void stepFOrdEqual(const InsnFOrdEqual& insn);
 void stepFOrdLessThan(const InsnFOrdLessThan& insn);
 void stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn);
@@ -46,6 +47,7 @@ void stepReturnValue(const InsnReturnValue& insn);
 void stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn);
 void stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn);
 void stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn);
+void stepGLSLstd450Radians(const InsnGLSLstd450Radians& insn);
 void stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn);
 void stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn);
 void stepGLSLstd450Atan(const InsnGLSLstd450Atan& insn);
@@ -64,5 +66,6 @@ void stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn);
 void stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn);
 void stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn);
 void stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn);
+void stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn);
 
 #endif // OPCODE_DECL_H

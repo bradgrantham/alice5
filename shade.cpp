@@ -241,13 +241,15 @@ struct Program
         if(std::holds_alternative<TypeVector>(type)) {
             uint32_t elementType = std::get<TypeVector>(type).type;
             return std::make_tuple(elementType, typeSizes.at(elementType) * i);
+        } else if(std::holds_alternative<TypeArray>(type)) {
+            uint32_t elementType = std::get<TypeArray>(type).type;
+            return std::make_tuple(elementType, typeSizes.at(elementType) * i);
         } else if(std::holds_alternative<TypeMatrix>(type)) {
             uint32_t columnType = std::get<TypeMatrix>(type).columnType;
             return std::make_tuple(columnType, typeSizes.at(columnType) * i);
         } else if (std::holds_alternative<TypeStruct>(type)) {
             uint32_t memberType = std::get<TypeStruct>(type).memberTypes[i];
             return std::make_tuple(memberType, memberDecorations.at(t).at(i).at(SpvDecorationOffset)[0]);
-        // XXX } else if (std::holds_alternative<TypeArray>(type)) {
         } else {
             std::cout << type.index() << "\n";
             assert(false && "getConstituentType of invalid type?!");
@@ -290,6 +292,16 @@ struct Program
                         std::cout << ", ";
                 }
                 std::cout << ">";
+            },
+            [&](const TypeArray& type) {
+                std::cout << "[";
+                for(int i = 0; i < type.count; i++) {
+                    dumpTypeAt(types.at(type.type), ptr);
+                    ptr += typeSizes.at(type.type);
+                    if(i < type.count - 1)
+                        std::cout << ", ";
+                }
+                std::cout << "]";
             },
             [&](const TypeMatrix& type) {
                 std::cout << "<";
@@ -598,6 +610,21 @@ struct Program
                 break;
             }
 
+            case SpvOpTypeArray: {
+                // XXX result id
+                uint32_t id = nextu();
+                uint32_t type = nextu();
+                uint32_t lengthId = nextu();
+                const Register& length = pgm->constants.at(lengthId);
+                uint32_t count = *reinterpret_cast<uint32_t*>(length.data);
+                pgm->types[id] = TypeArray {type, count};
+                pgm->typeSizes[id] = pgm->typeSizes[type] * count;
+                if(pgm->verbose) {
+                    std::cout << "TypeArray " << id << " of " << type << " count " << count << " (from register " << lengthId << ")\n";
+                }
+                break;
+            }
+
             case SpvOpTypeMatrix: {
                 // XXX result id
                 uint32_t id = nextu();
@@ -863,6 +890,14 @@ struct Program
                     uint32_t membertype = type.memberTypes[i];
                     std::string fullname = ((name == "") ? "" : (name + ".")) + memberNames[typeId][i];
                     storeUniformInformation(fullname, membertype, binding, offset + memberDecorations[typeId][i][SpvDecorationOffset][0]);
+                }
+
+            } else if constexpr (std::is_same_v<T, TypeArray>) {
+
+                for(int i = 0; i < type.count; i++) {
+                    uint32_t membertype = type.type;
+                    std::string fullname = name + "[" + std::to_string(i) + "]";
+                    storeUniformInformation(fullname, membertype, binding, offset + i * typeSizes.at(typeId));
                 }
 
             } else if constexpr (std::is_same_v<T, TypeVector> || std::is_same_v<T, TypeFloat> || std::is_same_v<T, TypeInt> || std::is_same_v<T, TypeSampledImage> || std::is_same_v<T, TypeBool> || std::is_same_v<T, TypeMatrix>) {
@@ -1881,6 +1916,36 @@ void Interpreter::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
 
         }
     }, pgm->types.at(registers[insn.operand1Id].type));
+} 
+
+void Interpreter::stepSLessThanEqual(const InsnSLessThanEqual& insn)
+{
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeInt>) {
+
+            int32_t operand1 = fromRegister<int32_t>(insn.operand1Id);
+            int32_t operand2 = fromRegister<int32_t>(insn.operand2Id);
+            bool result = operand1 <= operand2;
+            toRegister<bool>(insn.resultId) = result;
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id);
+            const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = operand1[i] <= operand2[i];
+            }
+
+        } else {
+
+            std::cout << "Unknown type for SLessThanEqual\n";
+
+        }
+    }, pgm->types.at(registers[insn.operand1Id].type));
 }
 
 void Interpreter::stepSLessThan(const InsnSLessThan& insn)
@@ -2440,6 +2505,33 @@ void Interpreter::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
     }, pgm->types.at(registers[insn.xId].type));
 }
 
+void Interpreter::stepGLSLstd450Radians(const InsnGLSLstd450Radians& insn)
+{
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float degrees = fromRegister<float>(insn.degreesId);
+            toRegister<float>(insn.resultId) = degrees / 180.0 * M_PI;
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            const float* degrees = &fromRegister<float>(insn.degreesId);
+            float* result = &toRegister<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = degrees[i] / 180.0 * M_PI;
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Radians\n";
+
+        }
+    }, pgm->types.at(registers[insn.degreesId].type));
+}
+
 void Interpreter::stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
 {
     std::visit([this, &insn](auto&& type) {
@@ -2888,6 +2980,56 @@ void Interpreter::stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn)
         } else {
 
             std::cout << "Unknown type for Reflect\n";
+
+        }
+    }, pgm->types.at(registers[insn.iId].type));
+}
+
+void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
+{
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float i = fromRegister<float>(insn.iId);
+            float n = fromRegister<float>(insn.nId);
+            float eta = fromRegister<float>(insn.nId);
+
+            float dot = n*i;
+
+            float k = 1.0 - eta * eta * (1.0 - dot * dot);
+
+            if(k < 0.0)
+                toRegister<float>(insn.resultId) = 0.0;
+            else
+                toRegister<float>(insn.resultId) = eta * i - (eta * dot + sqrtf(k)) * n;
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            const float* i = &fromRegister<float>(insn.iId);
+            const float* n = &fromRegister<float>(insn.nId);
+            float eta = fromRegister<float>(insn.nId);
+            float* result = &toRegister<float>(insn.resultId);
+
+            float dot = dotProduct(n, i, type.count);
+
+            float k = 1.0 - eta * eta * (1.0 - dot * dot);
+
+            if(k < 0.0) {
+                for (int k = 0; k < type.count; k++) {
+                    result[k] = 0.0;
+                }
+            } else {
+                for (int m = 0; m < type.count; m++) {
+                    result[m] = eta * i[m] - (eta * dot + sqrtf(m)) * n[m];
+                }
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Refract\n";
 
         }
     }, pgm->types.at(registers[insn.iId].type));
@@ -3760,6 +3902,10 @@ void render(RenderPass* pass, int startRow, int skip, float when)
     for(int i = 0; i < pass->inputs.size(); i++) {
         auto& input = pass->inputs[i];
         interpreter.set("iChannel" + std::to_string(input.channelNumber), i);
+        ImagePtr image = input.sampledImage.image;
+        float w = static_cast<float>(image->width);
+        float h = static_cast<float>(image->height);
+        interpreter.set("iChannelResolution[" + std::to_string(input.channelNumber) + "]", v3float{w, h, 0});
     }
 
     // This loop acts like a rasterizer fixed function block.  Maybe it should
@@ -3883,7 +4029,6 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
         }
     }
 
-
     // XXX START LOOP OVER ALL PASSES HERE, for now just do first pass
     {
 
@@ -3903,6 +4048,7 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
             if(isABuffer) {
 
                 /* pass, will hook up to output from source pass */
+                abort();
 
             } else if(input.find("locally_saved") == input.end()) {
 
