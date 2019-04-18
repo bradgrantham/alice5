@@ -3178,11 +3178,10 @@ struct Compiler
             PHY_REGS.insert(i);
         }
 
-        // Look for blocks at the start of functions.
-        for (auto& [labelId, block] : pgm->blocks) {
-            if (block->pred.empty()) {
-                assignRegisters(block.get(), PHY_REGS);
-            }
+        // Start with blocks at the start of functions.
+        for (auto& [id, function] : pgm->functions) {
+            Block *block = pgm->blocks.at(function.labelId).get();
+            assignRegisters(block, PHY_REGS);
         }
     }
 
