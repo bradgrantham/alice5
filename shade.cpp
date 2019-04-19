@@ -2995,7 +2995,7 @@ void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
 
             float i = fromRegister<float>(insn.iId);
             float n = fromRegister<float>(insn.nId);
-            float eta = fromRegister<float>(insn.nId);
+            float eta = fromRegister<float>(insn.etaId);
 
             float dot = n*i;
 
@@ -3010,7 +3010,7 @@ void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
 
             const float* i = &fromRegister<float>(insn.iId);
             const float* n = &fromRegister<float>(insn.nId);
-            float eta = fromRegister<float>(insn.nId);
+            float eta = fromRegister<float>(insn.etaId);
             float* result = &toRegister<float>(insn.resultId);
 
             float dot = dotProduct(n, i, type.count);
@@ -3018,12 +3018,12 @@ void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
             float k = 1.0 - eta * eta * (1.0 - dot * dot);
 
             if(k < 0.0) {
-                for (int k = 0; k < type.count; k++) {
-                    result[k] = 0.0;
+                for (int m = 0; m < type.count; m++) {
+                    result[m] = 0.0;
                 }
             } else {
                 for (int m = 0; m < type.count; m++) {
-                    result[m] = eta * i[m] - (eta * dot + sqrtf(m)) * n[m];
+                    result[m] = eta * i[m] - (eta * dot + sqrtf(k)) * n[m];
                 }
             }
 
@@ -3104,8 +3104,24 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
             int imageIndex = fromRegister<int>(insn.sampledImageId);
             const SampledImage& si = pgm->sampledImages[imageIndex];
 
-            unsigned int s = std::clamp(static_cast<unsigned int>(u * si.image->width), 0u, si.image->width - 1);
-            unsigned int t = std::clamp(static_cast<unsigned int>(v * si.image->height), 0u, si.image->height - 1);
+            unsigned int s, t;
+
+            if(si.sampler.uAddressMode == Sampler::CLAMP_TO_EDGE) {
+                s = std::clamp(static_cast<unsigned int>(u * si.image->width), 0u, si.image->width - 1);
+            } else {
+                float wrapped = (u >= 0) ? fmodf(u, 1.0f) : (1 + fmodf(u, 1.0f));
+                s = static_cast<unsigned int>(wrapped * si.image->width);
+            }
+
+            if(si.sampler.vAddressMode == Sampler::CLAMP_TO_EDGE) {
+                t = std::clamp(static_cast<unsigned int>(v * si.image->height), 0u, si.image->height - 1);
+            } else {
+                float wrapped = (v >= 0) ? fmodf(v, 1.0f) : (1 + fmodf(v, 1.0f));
+                t = static_cast<unsigned int>(wrapped * si.image->height);
+            }
+
+            assert(s < si.image->width);
+            assert(t < si.image->height);
             si.image->get(s, t, rgba);
 
         } else {
