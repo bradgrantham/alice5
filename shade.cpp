@@ -3109,14 +3109,18 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
             if(si.sampler.uAddressMode == Sampler::CLAMP_TO_EDGE) {
                 s = std::clamp(static_cast<unsigned int>(u * si.image->width), 0u, si.image->width - 1);
             } else {
-                float wrapped = (u >= 0) ? fmodf(u, 1.0f) : (0.99999994f + fmodf(u, 1.0f));
+                float wrapped = (u >= 0) ? fmodf(u, 1.0f) : (1 + fmodf(u, 1.0f));
+                if(wrapped == 1.0f) /* fmodf of a negative number could return 0, after which "wrapped" would be 1 */
+                    wrapped = 0.0f;
                 s = static_cast<unsigned int>(wrapped * si.image->width);
             }
 
             if(si.sampler.vAddressMode == Sampler::CLAMP_TO_EDGE) {
                 t = std::clamp(static_cast<unsigned int>(v * si.image->height), 0u, si.image->height - 1);
+                if(wrapped == 1.0f) /* fmodf of a negative number could return 0, after which "wrapped" would be 1 */
+                    wrapped = 0.0f;
             } else {
-                float wrapped = (v >= 0) ? fmodf(v, 1.0f) : (0.99999994f + fmodf(v, 1.0f));
+                float wrapped = (v >= 0) ? fmodf(v, 1.0f) : (1 + fmodf(v, 1.0f));
                 t = static_cast<unsigned int>(wrapped * si.image->height);
             }
 
