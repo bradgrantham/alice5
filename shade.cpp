@@ -3156,6 +3156,22 @@ struct Compiler
         }
     }
 
+    // If the virtual register "id" points to an integer constant, returns it
+    // in "value" and returns true. Otherwise returns false and leaves value
+    // untouched.
+    bool asIntegerConstant(uint32_t id, uint32_t &value) const {
+        auto r = pgm->constants.find(id);
+        if (r != pgm->constants.end()) {
+            Type type = pgm->types.at(r->second.type);
+            if (std::holds_alternative<TypeInt>(type)) {
+                value = *reinterpret_cast<uint32_t *>(r->second.data);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // Make a new label that can be used for local jumps.
     std::string makeLocalLabel() {
         std::ostringstream ss;
@@ -3195,7 +3211,7 @@ struct Compiler
         std::set<uint32_t> assigned;
 
         // Registers that are live going into this block have already been
-        // assigned. XXX not sure how that can be true.
+        // assigned.
         for (auto regId : pgm->instructions.at(block->begin)->livein) {
             auto r = registers.find(regId);
             if (r == registers.end()) {
@@ -3233,13 +3249,14 @@ struct Compiler
             if (resId != NO_REGISTER) {
                 auto r = registers.find(resId);
                 if (r == registers.end()) {
-                    std::cout << "Warning: Virtual register "
+                    std::cout << "Error: Virtual register "
                         << resId << " not found in block " << block->labelId << ".\n";
                     exit(EXIT_FAILURE);
                 }
 
+                // For each element in this virtual register...
                 for (int i = 0; i < r->second.count; i++) {
-                    // Find an available physical register for this virtual register.
+                    // Find an available physical register for this element.
                     bool found = false;
                     for (uint32_t phy : allPhy) {
                         if (assigned.find(phy) == assigned.end()) {
@@ -3256,6 +3273,7 @@ struct Compiler
                     if (!found) {
                         std::cout << "Error: No physical register available for "
                             << instruction->resId << "[" << i << "] on line " << pc << ".\n";
+                        exit(EXIT_FAILURE);
                     }
                 }
             }
@@ -3320,6 +3338,20 @@ struct Compiler
         emit("nop", ss.str());
     }
 
+    void emitUnaryOp(const std::string &opName, int result, int op)
+    {
+        auto r = registers.find(result);
+        int count = r == registers.end() ? 1 : r->second.count;
+
+        for (int i = 0; i < count; i++) {
+            std::ostringstream ss1;
+            ss1 << opName << " " << reg(result, i) << ", " << reg(op, i);
+            std::ostringstream ss2;
+            ss2 << "r" << result << " = " << opName << " r" << op;
+            emit(ss1.str(), ss2.str());
+        }
+    }
+
     void emitBinaryOp(const std::string &opName, int result, int op1, int op2)
     {
         auto r = registers.find(result);
@@ -3330,6 +3362,20 @@ struct Compiler
             ss1 << opName << " " << reg(result, i) << ", " << reg(op1, i) << ", " << reg(op2, i);
             std::ostringstream ss2;
             ss2 << "r" << result << " = " << opName << " r" << op1 << " r" << op2;
+            emit(ss1.str(), ss2.str());
+        }
+    }
+
+    void emitBinaryImmOp(const std::string &opName, int result, int op, uint32_t imm)
+    {
+        auto r = registers.find(result);
+        int count = r == registers.end() ? 1 : r->second.count;
+
+        for (int i = 0; i < count; i++) {
+            std::ostringstream ss1;
+            ss1 << opName << " " << reg(result, i) << ", " << reg(op, i) << ", " << imm;
+            std::ostringstream ss2;
+            ss2 << "r" << result << " = " << opName << " r" << op << " " << imm;
             emit(ss1.str(), ss2.str());
         }
     }
@@ -3427,6 +3473,20 @@ void InsnFMul::emit(Compiler *compiler)
     compiler->emitBinaryOp("fmul", resultId, operand1Id, operand2Id);
 }
 
+void InsnIAdd::emit(Compiler *compiler)
+{
+    uint32_t int_value;
+    if (compiler->asIntegerConstant(operand1Id, int_value)) {
+        // XXX Verify that immediate fits in 12 bits.
+        compiler->emitBinaryImmOp("addi", resultId, operand2Id, int_value);
+    } else if (compiler->asIntegerConstant(operand2Id, int_value)) {
+        // XXX Verify that immediate fits in 12 bits.
+        compiler->emitBinaryImmOp("addi", resultId, operand1Id, int_value);
+    } else {
+        compiler->emitBinaryOp("add", resultId, operand1Id, operand2Id);
+    }
+}
+
 void InsnFunctionCall::emit(Compiler *compiler)
 {
     compiler->emit("push pc", "");
@@ -3450,9 +3510,12 @@ void InsnLoad::emit(Compiler *compiler)
         std::ostringstream ss1;
         ss1 << "lw " << compiler->reg(resultId, i) << ", ";
         if (count != 1) {
-            ss1 << (i*4);
+            ss1 << "(";
         }
-        ss1 << "(" << compiler->reg(pointerId) << ")";
+        ss1 << compiler->reg(pointerId);
+        if (count != 1) {
+            ss1 << (i*4) << ")";
+        }
         std::ostringstream ss2;
         if (i == 0) {
             ss2 << "r" << resultId << " = (r" << pointerId << ")";
@@ -3467,11 +3530,15 @@ void InsnStore::emit(Compiler *compiler)
     int count = r == compiler->registers.end() ? 1 : r->second.count;
     for (int i = 0; i < count; i++) {
         std::ostringstream ss1;
-        ss1 << "sw ";
+        ss1 << "sw " << compiler->reg(objectId, i) << ", ";
         if (count != 1) {
-            ss1 << (i*4);
+            ss1 << "(";
         }
-        ss1 << "(" << compiler->reg(pointerId) << ")" << ", " << compiler->reg(objectId, i);
+        ss1 << compiler->reg(pointerId);
+        if (count != 1) {
+            ss1 << (i*4) << ")";
+        }
+        ss1 << "(x0)";
         std::ostringstream ss2;
         if (i == 0) {
             ss2 << "(r" << pointerId << ") = r" << objectId;
@@ -3492,14 +3559,17 @@ void InsnBranch::emit(Compiler *compiler)
 
 void InsnReturn::emit(Compiler *compiler)
 {
-    compiler->emit("ret r0", "");
+    compiler->emit("ret", "");
 }
 
 void InsnReturnValue::emit(Compiler *compiler)
 {
-    std::ostringstream ss;
-    ss << "ret " << compiler->reg(valueId);
-    compiler->emit(ss.str(), "");
+    std::ostringstream ss1;
+    ss1 << "mov x10, " << compiler->reg(valueId);
+    std::ostringstream ss2;
+    ss2 << "return " << valueId;
+    compiler->emit(ss1.str(), ss2.str());
+    compiler->emit("ret", "");
 }
 
 void InsnPhi::emit(Compiler *compiler)
@@ -3535,22 +3605,25 @@ void InsnBranchConditional::emit(Compiler *compiler)
 
 void InsnAccessChain::emit(Compiler *compiler)
 {
+    uint32_t offset = 0;
+
     /*
-    Pointer& basePointer = pointers.at(insn.baseId);
+    Pointer& basePointer = compiler->pgm->pointers.at(baseId);
     uint32_t type = basePointer.type;
-    size_t address = basePointer.address;
-    for(auto& id: insn.indexesId) {
-        int32_t j = fromRegister<int32_t>(id);
-        uint32_t constituentOffset;
-        std::tie(type, constituentOffset) = pgm->getConstituentInfo(type, j);
-        address += constituentOffset;
+    for (auto& id: indexesId) {
+        if (constant) {
+            int i = get_constant_value();
+            auto [type, constituentOffset] = pgm->getConstituentInfo(type, i);
+            offset += constituentOffset;
+        } else {
+            std::cerr << "Don't yet handle register offsets in AccessChain.\n";
+        }
     }
-    if(false) {
-        std::cout << "accesschain of " << basePointer.address << " yielded " << address << "\n";
-    }
-    uint32_t pointedType = std::get<TypePointer>(pgm->types.at(insn.type)).type;
-    pointers[insn.resultId] = Pointer { pointedType, basePointer.storageClass, address };
     */
+
+    std::cerr << "InsnAccessChain::emit() not implemented\n";
+    compiler->emitUnaryOp("mov", resultId, baseId);
+    compiler->emitBinaryImmOp("addi", resultId, resultId, offset);
 }
 
 // -----------------------------------------------------------------------------------

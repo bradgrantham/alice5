@@ -220,6 +220,7 @@ struct InsnIAdd : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepIAdd(*this); }
     virtual uint32_t opcode() const { return SpvOpIAdd; }
     virtual std::string name() const { return "OpIAdd"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFAdd instruction (code 129).
