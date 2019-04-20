@@ -13,11 +13,6 @@
 // Map from label name to address in bytes.
 std::map<std::string,uint32_t> gLabels;
 
-// Types of operators.
-enum OpType {
-    OP_TYPE_I,
-};
-
 // Return the pathname without the extension ("file.x" becomes "file").
 // If the pathname does not have an extension, it is returned unchanged.
 std::string stripExtension(const std::string &pathname) {
@@ -49,10 +44,32 @@ std::string readFileContents(const std::string &pathname)
 
 // ----------------------------------------------------------------------
 
+// Types of operators.
+enum OpType {
+    OP_TYPE_I,
+};
+
+// Information about each type of operator.
+struct Operator {
+    OpType opType;
+
+    // Bits 0 through 6.
+    uint32_t opcode;
+
+    // Bits 12 through 14.
+    uint32_t funct3;
+
+    // Bits 25 through 31.
+    uint32_t funct7;
+};
+
+// ----------------------------------------------------------------------
+
+// Main assembler class.
 class Assembler {
 private:
-    // Map from operator to instruction type.
-    std::map<std::string,OpType> operators;
+    // Map from operator name to operator information.
+    std::map<std::string,Operator> operators;
 
     // Map from register name to register number.
     std::map<std::string,int> registers;
@@ -81,7 +98,7 @@ public:
         : inPathname(inPathname), outPathname(outPathname) {
 
         // Build our maps.
-        operators["addi"] = OP_TYPE_I;
+        operators["addi"] = Operator{OP_TYPE_I, 0b010011, 0b000, 0};
 
         for (int reg = 0; reg < 32; reg++) {
             std::ostringstream ss;
@@ -166,15 +183,15 @@ private:
         // See if it's an operator.
         if (!opOrLabel.empty()) {
             // Parse parameters.
-            auto opType = operators.find(opOrLabel);
-            if (opType == operators.end()) {
+            auto op = operators.find(opOrLabel);
+            if (op == operators.end()) {
                 s = previousToken;
                 std::ostringstream ss;
                 ss << "Unknown operator \"" << opOrLabel << "\"";
                 error(ss.str());
             }
 
-            if (opType->second == OP_TYPE_I) {
+            if (op->second.opType == OP_TYPE_I) {
                 // Immediate.
                 int rd = readRegister("destination");
                 if (!foundChar(',')) {
@@ -185,7 +202,7 @@ private:
                     error("Expected comma");
                 }
                 uint32_t imm = readImmediate(12);
-                emitI(0, rd, rs, imm);
+                emitI(op->second, rd, rs, imm);
             }
         }
 
@@ -313,8 +330,8 @@ private:
         return reg->second;
     }
 
-    void emitI(uint32_t opcode, int rd, int rs, uint32_t imm) {
-        emit(opcode | (rd << 7) | (rs << 15) | (imm << 20));
+    void emitI(const Operator &op, int rd, int rs, uint32_t imm) {
+        emit(op.opcode | (rd << 7) | (rs << 15) | (imm << 20));
     }
 
     void emit(uint32_t instruction) {
