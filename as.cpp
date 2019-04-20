@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <map>
+#include <vector>
 #include <string>
 #include <iomanip>
 
@@ -34,7 +35,7 @@ std::string readFileContents(const std::string &pathname)
 {
     std::ifstream file(pathname, std::ios::in | std::ios::ate);
     if (!file.good()) {
-        std::cerr << "Can't open file \"" << pathname << "\"\n";
+        std::cerr << "Can't open file \"" << pathname << "\".\n";
         exit(EXIT_FAILURE);
     }
     std::ifstream::pos_type size = file.tellg();
@@ -60,9 +61,6 @@ private:
     std::string outPathname;
     bool verbose;
 
-    // Address we're assembling right now.
-    uint32_t addr;
-
     // Line number in the input file.
     uint32_t lineNumber;
 
@@ -74,6 +72,9 @@ private:
 
     // Pointer to the token we just read.
     const char *previousToken;
+
+    // Output binary.
+    std::vector<uint32_t> bin;
 
 public:
     Assembler(const std::string &inPathname, const std::string &outPathname)
@@ -98,24 +99,40 @@ public:
         // Read the whole assembly file at once.
         std::string in = readFileContents(inPathname);
 
-        addr = 0;
         lineNumber = 1;
         s = in.c_str();
         lineStart = s;
         previousToken = nullptr;
+        bin.clear();
 
         while (*s != '\0') {
-            uint32_t startAddr = addr;
+            size_t startSize = bin.size();
             std::string line = currentLine();
 
             // Read one line.
             readLine();
 
-            if (verbose && addr == startAddr) {
+            if (verbose && bin.size() == startSize) {
                 // Didn't advance, must be comment or blank line.
                 std::cout << std::string(14, ' ') << line << "\n";
             }
         }
+
+        // Write binary.
+        std::ofstream outFile(outPathname, std::ios::out | std::ios::binary);
+        if (!outFile.good()) {
+            std::cerr << "Can't open file \"" << outPathname << "\".\n";
+            exit(EXIT_FAILURE);
+        }
+        for (uint32_t instruction : bin) {
+            // Force little endian.
+            outFile
+                << uint8_t((instruction >> 0) & 0xFF)
+                << uint8_t((instruction >> 8) & 0xFF)
+                << uint8_t((instruction >> 16) & 0xFF)
+                << uint8_t((instruction >> 24) & 0xFF);
+        }
+        outFile.close();
     }
 
 private:
@@ -139,7 +156,7 @@ private:
                 }
 
                 // It's a label, record it.
-                gLabels[opOrLabel] = addr;
+                gLabels[opOrLabel] = bin.size()*4;
 
                 // Read the operator.
                 opOrLabel = readToken();
@@ -305,14 +322,14 @@ private:
             std::ios oldState(nullptr);
             oldState.copyfmt(std::cout);
             std::cout
-                << std::hex << std::setw(4) << std::setfill('0') << addr
+                << std::hex << std::setw(4) << std::setfill('0') << (bin.size()*4)
                 << " "
                 << std::hex << std::setw(8) << std::setfill('0') << instruction
                 << " " << currentLine() << "\n";
             std::cout.copyfmt(oldState);
         }
 
-        addr += 4;
+        bin.push_back(instruction);
     }
 };
 
