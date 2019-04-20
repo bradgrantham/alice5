@@ -1,4 +1,7 @@
 #include <iostream>
+#include <vector>
+#include <functional>
+#include <set>
 #include <cstdio>
 #include <fstream>
 #include <variant>
@@ -3899,6 +3902,7 @@ void usage(const char* progname)
 struct ShaderToyImage
 {
     int channelNumber;
+    int id;
     SampledImage sampledImage;
 };
 
@@ -3951,12 +3955,14 @@ typedef std::shared_ptr<RenderPass> RenderPassPtr;
 static std::atomic_int rowsLeft;
 
 // Render rows starting at "startRow" every "skip".
-void render(RenderPass* pass, int startRow, int skip, float when)
+void render(RenderPass* pass, int startRow, int skip, int frameNumber, float when)
 {
     Interpreter interpreter(&pass->pgm);
     ImagePtr output = pass->outputs[0].sampledImage.image;
 
     interpreter.set("iResolution", v2float {static_cast<float>(output->width), static_cast<float>(output->height)});
+
+    interpreter.set("iFrame", frameNumber);
 
     interpreter.set("iTime", when);
 
@@ -3976,9 +3982,7 @@ void render(RenderPass* pass, int startRow, int skip, float when)
     for(int y = startRow; y < output->height; y += skip) {
         for(int x = 0; x < output->width; x++) {
             v4float color;
-            // XXX what about pixel kill?  C64 demo requires it.  eval() will
-            // need to track whether output was written, and then set() below
-            // will need to be conditional.
+            output->get(x, output->height - 1 - y, color);
             eval(interpreter, x + 0.5f, y + 0.5f, color);
             output->set(x, output->height - 1 - y, color);
         }
@@ -4055,16 +4059,40 @@ void earwigMessageConsumer(spv_message_level_t level, const char *source,
     std::cout << source << ": " << message << "\n";
 }
 
-void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<RenderPassPtr>& renderPasses, const CommandLineParameters& params)
+void sortInDependencyOrder(
+    const std::vector<RenderPassPtr>& passes,
+    const std::map<int, RenderPassPtr>& channelIdsToPasses,
+    const std::map<std::string, RenderPassPtr>& namesToPasses,
+    std::vector<RenderPassPtr>& passesOrdered)
+{
+    std::set<RenderPassPtr> passesToVisit(passes.begin(), passes.end());
+
+    std::function<void(RenderPassPtr)> visit;
+
+    visit = [&visit, &passesToVisit, &channelIdsToPasses, &passesOrdered](RenderPassPtr pass) {
+        if(passesToVisit.count(pass) > 0) {
+            passesToVisit.erase(pass);
+            for(ShaderToyImage& input: pass->inputs) {
+                visit(channelIdsToPasses.at(input.id));
+            }
+            passesOrdered.push_back(pass);
+        }
+    };
+
+    visit(namesToPasses.at("Image"));
+}
+
+void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<RenderPassPtr>& renderPassesOrdered, const CommandLineParameters& params)
 {
     json j = json::parse(readFileContents(filename));
+
+    std::vector<RenderPassPtr> renderPasses;
 
     ShaderSource common_code;
 
     // Go through the render passes and load code in from files as necessary
     auto& renderPassesInJSON = j["Shader"]["renderpass"];
-    // for (json::iterator it = renderPassesInJSON.begin(); it != renderPassesInJSON.end(); ++it) {
-        // auto& pass = *it;
+
     for (auto& pass: renderPassesInJSON) {
 
         // If special key "codefile" is present, use that file as
@@ -4089,16 +4117,22 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
             } else {
                 common_code.filename = pass["name"].get<std::string>() + " JSON inline";
             }
-        }
+        } 
     }
 
-    // XXX START LOOP OVER ALL PASSES HERE, for now just do first pass
-    {
+    std::map<int, RenderPassPtr> channelIdsToPasses;
+    std::map<std::string, RenderPassPtr> namesToPasses;
 
-        // XXX Assuming this is pass "Image" for hardcoded first pass case
-        auto& pass = renderPassesInJSON[0];
-
+    for (auto& pass: renderPassesInJSON) {
         std::vector<ShaderSource> sources;
+
+        if(pass["type"] == "common") {
+            /* Don't make a renderpass for "common", it's just common preamble code for all passes */
+            continue;
+        }
+        if((pass["type"] != "buffer") && (pass["type"] != "image")) {
+            throw std::runtime_error("pass type \"" + pass["type"].get<std::string>() + "\" is not supported");
+        }
 
         ShaderSource asset_preamble;
         ShaderSource shader;
@@ -4106,12 +4140,19 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
         std::vector<ShaderToyImage> inputs;
 
         for(auto& input: pass["inputs"]) {
+            int channelNumber = input["channel"].get<int>();
+            int channelId = input["id"].get<int>();
+
             const std::string& src = input["src"].get<std::string>();
+
             bool isABuffer = (src.find("/media/previz/buffer") != std::string::npos);
+
             if(isABuffer) {
 
-                /* pass, will hook up to output from source pass */
-                abort();
+                /* will hook up to output from source pass */
+                if(false) printf("pass \"%s\", channel number %d and id %d\n", pass["name"].get<std::string>().c_str(), channelNumber, channelId);
+                inputs.push_back({channelNumber, channelId, {nullptr, {}}});
+                asset_preamble.code += "layout (binding = " + std::to_string(channelNumber + 1) + ") uniform sampler2D iChannel" + std::to_string(channelNumber) + ";\n";
 
             } else if(input.find("locally_saved") == input.end()) {
 
@@ -4152,15 +4193,12 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
 
                 stbi_image_free(textureData);
 
-                int channelNumber = input["channel"].get<int>();
-
-                inputs.push_back({channelNumber, {image, {}}});
+                inputs.push_back({channelNumber, channelId, {image, {}}});
                 asset_preamble.code += "layout (binding = " + std::to_string(channelNumber + 1) + ") uniform sampler2D iChannel" + std::to_string(channelNumber) + ";\n";
             }
         }
 
         if(asset_preamble.code != "") {
-            std::cout << "asset preamble is " << asset_preamble.code;
             asset_preamble.filename = "BuiltIn Asset Preamble";
             sources.push_back(asset_preamble);
         }
@@ -4186,25 +4224,35 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
         }
 
         shader.code = pass["code"];
-
         sources.push_back(shader);
 
+        int channelId = pass["outputs"][0]["id"].get<int>();
         ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, params.outputWidth, params.outputHeight));
-        ShaderToyImage output {0, { image, Sampler {}}};
+        ShaderToyImage output {0, channelId, { image, Sampler {}}};
         RenderPassPtr rpass(new RenderPass(
-            "Image",
+            pass["name"],
             {inputs},
             {output},
             sources,
             params));
 
+        channelIdsToPasses[channelId] = rpass;
+        namesToPasses[pass["name"]] = rpass;
         renderPasses.push_back(rpass);
     }
-    // XXX END LOOP OVER ALL PASSES HERE, for now just do first pass
 
-    // Hook up images from inputs to outputs
-
-    // Sort in dependency order?
+    // Hook up outputs to inputs
+    for(auto& pass: renderPasses) {
+        for(int i = 0; i < pass->inputs.size(); i++) {
+            ShaderToyImage& input = pass->inputs[i];
+            int channelId = input.id;
+            ShaderToyImage& source = channelIdsToPasses.at(channelId)->outputs[0];
+            pass->inputs[i].sampledImage = source.sampledImage;
+        }
+    }
+    
+    // and sort in dependency order
+    sortInDependencyOrder(renderPasses, channelIdsToPasses, namesToPasses, renderPassesOrdered);
 }
 
 bool createSPIRVFromSources(const std::vector<ShaderSource>& sources, bool debug, bool optimize, std::vector<uint32_t>& spirv)
@@ -4476,7 +4524,7 @@ int main(int argc, char **argv)
         shader_code = readFileContents(filename);
 
         ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, params.outputWidth, params.outputHeight));
-        ShaderToyImage output {0, {image, Sampler {}}};
+        ShaderToyImage output {0, 0, {image, Sampler {}}};
 
         std::vector<ShaderSource> sources = { {"", ""}, {shader_code, filename}};
         RenderPassPtr pass(new RenderPass("Image", {}, {output}, sources, params));
@@ -4543,7 +4591,7 @@ int main(int argc, char **argv)
 
             // Generate the rows on multiple threads.
             for (int t = 0; t < threadCount; t++) {
-                thread.push_back(new std::thread(render, pass.get(), t, threadCount, frameNumber / 60.0));
+                thread.push_back(new std::thread(render, pass.get(), t, threadCount, frameNumber, frameNumber / 60.0));
                 // std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
 
