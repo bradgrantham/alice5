@@ -648,7 +648,7 @@ case SpvOpSLessThanEqual: {
     uint32_t resultId = nextu();
     uint32_t operand1Id = nextu();
     uint32_t operand2Id = nextu();
-    pgm->instructions.push_back(std::make_unique<InsnSLessThanEqual>(type, resultId, operand1Id, operand2Id));
+    pgm->instructions.push_back(std::make_shared<InsnSLessThanEqual>(type, resultId, operand1Id, operand2Id));
     pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "SLessThanEqual";
@@ -874,6 +874,23 @@ case GLSLstd450FAbs: {
     break;
 }
 
+case GLSLstd450FSign: {
+    uint32_t xId = nextu();
+    pgm->instructions.push_back(std::make_shared<InsnGLSLstd450FSign>(type, resultId, xId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450FSign";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Floor: {
     uint32_t xId = nextu();
     pgm->instructions.push_back(std::make_shared<InsnGLSLstd450Floor>(type, resultId, xId));
@@ -910,7 +927,7 @@ case GLSLstd450Fract: {
 
 case GLSLstd450Radians: {
     uint32_t degreesId = nextu();
-    pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Radians>(type, resultId, degreesId));
+    pgm->instructions.push_back(std::make_shared<InsnGLSLstd450Radians>(type, resultId, degreesId));
     pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Radians";
@@ -1277,7 +1294,7 @@ case GLSLstd450Refract: {
     uint32_t iId = nextu();
     uint32_t nId = nextu();
     uint32_t etaId = nextu();
-    pgm->instructions.push_back(std::make_unique<InsnGLSLstd450Refract>(type, resultId, iId, nId, etaId));
+    pgm->instructions.push_back(std::make_shared<InsnGLSLstd450Refract>(type, resultId, iId, nId, etaId));
     pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Refract";

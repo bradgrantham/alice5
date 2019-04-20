@@ -45,6 +45,7 @@ struct InsnBranchConditional;
 struct InsnReturn;
 struct InsnReturnValue;
 struct InsnGLSLstd450FAbs;
+struct InsnGLSLstd450FSign;
 struct InsnGLSLstd450Floor;
 struct InsnGLSLstd450Fract;
 struct InsnGLSLstd450Radians;

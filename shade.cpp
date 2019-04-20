@@ -2646,6 +2646,33 @@ void Interpreter::stepGLSLstd450Atan2(const InsnGLSLstd450Atan2& insn)
     }, pgm->types.at(registers[insn.xId].type));
 }
 
+void Interpreter::stepGLSLstd450FSign(const InsnGLSLstd450FSign& insn)
+{
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = (x < 0.0f) ? -1.0f : ((x == 0.0f) ? 0.0f : 1.0f);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = x[i] < 0.0f ? -1.0f : ((x[i] == 0.0f) ? 0.0f : 1.0f);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for FSign\n";
+
+        }
+    }, pgm->types.at(registers[insn.xId].type));
+}
+
 void Interpreter::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
 {
     std::visit([this, &insn](auto&& type) {

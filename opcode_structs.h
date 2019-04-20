@@ -629,6 +629,19 @@ struct InsnGLSLstd450FAbs : public Instruction {
     virtual std::string name() const { return "GLSLstd450FAbs"; }
 };
 
+// GLSLstd450FSign instruction (code 6).
+struct InsnGLSLstd450FSign : public Instruction {
+    InsnGLSLstd450FSign(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FSign(*this); }
+    virtual uint32_t opcode() const { return 0; }
+    virtual std::string name() const { return "GLSLstd450FSign"; }
+};
+
 // GLSLstd450Floor instruction (code 8).
 struct InsnGLSLstd450Floor : public Instruction {
     InsnGLSLstd450Floor(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {

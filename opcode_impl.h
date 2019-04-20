@@ -1478,11 +1478,6 @@ void Interpreter::stepGLSLstd450SAbs(const InsnGLSLstd450SAbs& insn)
     std::cerr << "stepGLSLstd450SAbs() not implemented\n";
 }
 
-void Interpreter::stepGLSLstd450FSign(const InsnGLSLstd450FSign& insn)
-{
-    std::cerr << "stepGLSLstd450FSign() not implemented\n";
-}
-
 void Interpreter::stepGLSLstd450SSign(const InsnGLSLstd450SSign& insn)
 {
     std::cerr << "stepGLSLstd450SSign() not implemented\n";
