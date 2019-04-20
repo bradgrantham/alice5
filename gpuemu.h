@@ -27,7 +27,7 @@ struct GPUCore
     // void write32(uint32_t addr, uint32_t v);
     
     template <class T>
-    Status step(T& memory, bool dumpTrace);
+    Status step(T& memory);
 
     template <class T>
     void runUntilBREAK(T& memory, bool dumpTrace)
@@ -36,9 +36,16 @@ struct GPUCore
     }
 };
 
+uint32_t extendSign(uint32_t v, int width)
+{
+    uint32_t sign = v & (1 << (width - 1));
+    uint32_t extended = 0 - sign;
+    return v | extended;
+}
+
 uint32_t getBits(uint32_t v, int hi, int lo)
 {
-    return (v >> lo) & ((1u << (hi - lo + 1)) - 1);
+    return (v >> lo) & ((1u << (hi + 1 - lo)) - 1);
 }
 
 constexpr uint32_t makeOpcode(uint32_t bits6_2, uint32_t bits1_0)
@@ -47,45 +54,57 @@ constexpr uint32_t makeOpcode(uint32_t bits6_2, uint32_t bits1_0)
 }
 
 template <class T>
-GPUCore::Status GPUCore::step(T& memory, bool dumpTrace)
+GPUCore::Status GPUCore::step(T& memory)
 {
     uint32_t insn = memory.read32(pc);
+    pc += 4;
 
     Status status = RUNNING;
 
-    uint32_t opcode = getBits(insn, 6, 0);
     uint32_t rd = getBits(insn, 11, 7);
     uint32_t funct3 = getBits(insn, 14, 12);
     uint32_t funct7 = getBits(insn, 31, 25);
     uint32_t rs1 = getBits(insn, 19, 15);
     uint32_t rs2 = getBits(insn, 24, 20);
-    uint32_t immI = getBits(insn, 31, 20);
-    uint32_t immS = (getBits(insn, 31, 25) << 5) | getBits(insn, 11, 7);
-    uint32_t immSB = (getBits(insn, 31, 31) << 12) |
+    uint32_t immI = extendSign(getBits(insn, 31, 20), 12);
+    uint32_t immS = extendSign(
+        (getBits(insn, 31, 25) << 5) |
+        getBits(insn, 11, 7),
+        12);
+    uint32_t immSB = extendSign((getBits(insn, 31, 31) << 12) |
         (getBits(insn, 7, 7) << 11) | 
         (getBits(insn, 30, 25) << 5) | 
-        (getBits(insn, 11, 8) << 1);
+        (getBits(insn, 11, 8) << 1),
+        12);
     uint32_t immU = getBits(insn, 31, 12) << 12;
-    uint32_t immUJ = (getBits(insn, 31, 31) << 20) |
+    uint32_t immUJ = extendSign((getBits(insn, 31, 31) << 20) |
         (getBits(insn, 19, 12) << 12) | 
         (getBits(insn, 20, 20) << 11) | 
-        (getBits(insn, 30, 21) << 1);
+        (getBits(insn, 30, 21) << 1),
+        21);
 
-    switch(opcode) {
-        case makeOpcode(0x04, 3): { // addi
-            if(dumpTrace) {
-                printf("%08X: addi", pc);
-                printf(" x%-2d", rd);
-                printf(" x%-2d:%u(%d)", rs1, x[rs1], x[rs1]);
-                printf(" 0x%08X(%d)", immI, immI);
-                printf(" => 0x%08X(%d)", x[rd], x[rd]);
-                puts("");
-            }
-            x[rd] = x[rs1] + immI;
+    switch(insn & 0x7F) {
+        case makeOpcode(0x08, 3): { // sw
+            memory.write32(x[rs1] + immS, x[rs2]);
             break;
         }
+
+        case makeOpcode(0x0D, 3): { // lui
+            if(rd > 0) {
+                x[rd] = immU;
+            }
+            break;
+        }
+
+        case makeOpcode(0x04, 3): { // addi
+            if(rd > 0) {
+                x[rd] = x[rs1] + immI;
+            }
+            break;
+        }
+
         default: {
-            std::cerr << "unimplemented instruction " << insn << " with opcode " << opcode << '\n';
+            std::cerr << "unimplemented instruction " << insn << " with opcode " << (insn & 0x7F) << '\n';
         }
     }
     return status;
