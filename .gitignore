@@ -35,5 +35,6 @@
 # Our files.
 *.ppm
 /shade
+/as
 *.dSYM
 *.gif
