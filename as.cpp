@@ -58,6 +58,7 @@ private:
 
     std::string inPathname;
     std::string outPathname;
+    bool verbose;
 
     // Address we're assembling right now.
     uint32_t addr;
@@ -69,7 +70,7 @@ private:
     const char *s;
 
     // Pointer to start of the current line.
-    const char *line;
+    const char *lineStart;
 
     // Pointer to the token we just read.
     const char *previousToken;
@@ -88,6 +89,10 @@ public:
         }
     }
 
+    void setVerbose(bool verbose) {
+        this->verbose = verbose;
+    }
+
     // Assemble the file to the object file.
     void assemble() {
         // Read the whole assembly file at once.
@@ -96,77 +101,93 @@ public:
         addr = 0;
         lineNumber = 1;
         s = in.c_str();
-        line = s;
+        lineStart = s;
         previousToken = nullptr;
 
         while (*s != '\0') {
-            // Start of line. Skip whitespace.
-            skipWhitespace();
+            uint32_t startAddr = addr;
+            std::string line = currentLine();
 
-            // Grab a token. This could be a label or an operator.
-            std::string opOrLabel = readToken();
+            // Read one line.
+            readLine();
 
-            // See if it's a label.
-            if (!opOrLabel.empty()) {
-                if (foundChar(':')) {
-                    if (gLabels.find(opOrLabel) != gLabels.end()) {
-                        s = previousToken;
-                        std::ostringstream ss;
-                        ss << "Label \"" << opOrLabel << "\" is already defined";
-                        error(ss.str());
-                    }
-
-                    // It's a label, record it.
-                    gLabels[opOrLabel] = addr;
-
-                    // Read the operator.
-                    opOrLabel = readToken();
-                }
+            if (verbose && addr == startAddr) {
+                // Didn't advance, must be comment or blank line.
+                std::cout << std::string(14, ' ') << line << "\n";
             }
+        }
+    }
 
-            // See if it's an operator.
-            if (!opOrLabel.empty()) {
-                // Parse parameters.
-                auto opType = operators.find(opOrLabel);
-                if (opType == operators.end()) {
+private:
+    // Reads one line of input, either one character past
+    // the newline, or on the nul if there is no newline.
+    void readLine() {
+        // Start of line. Skip whitespace.
+        skipWhitespace();
+
+        // Grab a token. This could be a label or an operator.
+        std::string opOrLabel = readToken();
+
+        // See if it's a label.
+        if (!opOrLabel.empty()) {
+            if (foundChar(':')) {
+                if (gLabels.find(opOrLabel) != gLabels.end()) {
                     s = previousToken;
                     std::ostringstream ss;
-                    ss << "Unknown operator \"" << opOrLabel << "\"";
+                    ss << "Label \"" << opOrLabel << "\" is already defined";
                     error(ss.str());
                 }
 
-                if (opType->second == OP_TYPE_I) {
-                    // Immediate.
-                    int rd = readRegister("destination");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int rs = readRegister("source");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    uint32_t imm = readImmediate(12);
-                    emitI(0, rd, rs, imm);
-                }
+                // It's a label, record it.
+                gLabels[opOrLabel] = addr;
+
+                // Read the operator.
+                opOrLabel = readToken();
+            }
+        }
+
+        // See if it's an operator.
+        if (!opOrLabel.empty()) {
+            // Parse parameters.
+            auto opType = operators.find(opOrLabel);
+            if (opType == operators.end()) {
+                s = previousToken;
+                std::ostringstream ss;
+                ss << "Unknown operator \"" << opOrLabel << "\"";
+                error(ss.str());
             }
 
-            // See if there's a comment.
-            if (*s == ';') {
-                // Skip to end of line.
-                while (*s != '\n' && *s != '\0') {
-                    s++;
+            if (opType->second == OP_TYPE_I) {
+                // Immediate.
+                int rd = readRegister("destination");
+                if (!foundChar(',')) {
+                    error("Expected comma");
                 }
+                int rs = readRegister("source");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                uint32_t imm = readImmediate(12);
+                emitI(0, rd, rs, imm);
             }
+        }
 
-            // Make sure the whole line was parsed properly.
-            if (*s == '\n') {
+        // See if there's a comment.
+        if (*s == ';') {
+            // Skip to end of line.
+            while (*s != '\n' && *s != '\0') {
                 s++;
-                line = s;
-                lineNumber++;
-            } else if (*s != '\0') {
-                // Unknown error.
-                error("Error");
             }
+        }
+
+        // Make sure the whole line was parsed properly.
+        if (*s == '\n') {
+            s++;
+            lineStart = s;
+            lineNumber++;
+        } else if (*s != '\0') {
+            // Unknown error.
+            error("Error");
         }
     }
 
@@ -240,18 +261,18 @@ private:
     // Error function.
     void error(const std::string &message) {
         std::cerr << inPathname << ":" << lineNumber << ":"
-            << (s - line + 1) << ": " << message << "\n";
+            << (s - lineStart + 1) << ": " << message << "\n";
         std::cerr << currentLine() << "\n";
-        std::cerr << std::string(s - line, ' ') << "^\n";
+        std::cerr << std::string(s - lineStart, ' ') << "^\n";
         exit(EXIT_FAILURE);
     }
 
-    // Return the current line (the one that "line" points to), not including
+    // Return the current line (the one that "lineStart" points to), not including
     // the newline.
     std::string currentLine() {
-        auto endOfLine = strchr(line, '\n');
+        auto endOfLine = strchr(lineStart, '\n');
 
-        return endOfLine == nullptr ? line : std::string(line, endOfLine - line);
+        return endOfLine == nullptr ? lineStart : std::string(lineStart, endOfLine - lineStart);
     }
 
     // Read a register name and return its number. Emits an error
@@ -280,14 +301,16 @@ private:
     }
 
     void emit(uint32_t instruction) {
-        std::ios oldState(nullptr);
-        oldState.copyfmt(std::cout);
-        std::cout
-            << std::hex << std::setw(4) << std::setfill('0') << addr
-            << " "
-            << std::hex << std::setw(8) << std::setfill('0') << instruction
-            << " " << currentLine() << "\n";
-        std::cout.copyfmt(oldState);
+        if (verbose) {
+            std::ios oldState(nullptr);
+            oldState.copyfmt(std::cout);
+            std::cout
+                << std::hex << std::setw(4) << std::setfill('0') << addr
+                << " "
+                << std::hex << std::setw(8) << std::setfill('0') << instruction
+                << " " << currentLine() << "\n";
+            std::cout.copyfmt(oldState);
+        }
 
         addr += 4;
     }
@@ -340,7 +363,7 @@ int main(int argc, char *argv[]) {
     }
 
     Assembler assembler(inPathname, outPathname);
-    // assembler.setVerbose(verbose);
+    assembler.setVerbose(verbose);
     assembler.assemble();
 }
 
