@@ -1555,6 +1555,36 @@ void Interpreter::stepIAdd(const InsnIAdd& insn)
     }, pgm->types.at(insn.type));
 }
 
+void Interpreter::stepISub(const InsnISub& insn)
+{
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeInt>) {
+
+            uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id);
+            uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id);
+            uint32_t result = operand1 - operand2;
+            toRegister<uint32_t>(insn.resultId) = result;
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id);
+            const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id);
+            uint32_t* result = &toRegister<uint32_t>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = operand1[i] - operand2[i];
+            }
+
+        } else {
+
+            std::cout << "Unknown type for ISub\n";
+
+        }
+    }, pgm->types.at(insn.type));
+}
+
 void Interpreter::stepFAdd(const InsnFAdd& insn)
 {
     std::visit([this, &insn](auto&& type) {
@@ -2012,6 +2042,36 @@ void Interpreter::stepSDiv(const InsnSDiv& insn)
     }, pgm->types.at(registers[insn.operand1Id].type));
 }
 
+void Interpreter::stepINotEqual(const InsnINotEqual& insn)
+{
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeInt>) {
+
+            uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id);
+            uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id);
+            bool result = operand1 != operand2;
+            toRegister<bool>(insn.resultId) = result;
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id);
+            const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = operand1[i] != operand2[i];
+            }
+
+        } else {
+
+            std::cout << "Unknown type for INotEqual\n";
+
+        }
+    }, pgm->types.at(registers[insn.operand1Id].type));
+}
+
 void Interpreter::stepIEqual(const InsnIEqual& insn)
 {
     std::visit([this, &insn](auto&& type) {
@@ -2066,6 +2126,35 @@ void Interpreter::stepLogicalNot(const InsnLogicalNot& insn)
 
         }
     }, pgm->types.at(registers[insn.operandId].type));
+}
+
+void Interpreter::stepLogicalAnd(const InsnLogicalAnd& insn)
+{
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeBool>) {
+
+            bool operand1 = fromRegister<bool>(insn.operand1Id);
+            bool operand2 = fromRegister<bool>(insn.operand2Id);
+            toRegister<bool>(insn.resultId) = operand1 && operand2;
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            const bool* operand1 = &fromRegister<bool>(insn.operand1Id);
+            const bool* operand2 = &fromRegister<bool>(insn.operand2Id);
+            bool* result = &toRegister<bool>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = operand1[i] && operand2[i];
+            }
+
+        } else {
+
+            std::cout << "Unknown type for LogicalAnd\n";
+
+        }
+    }, pgm->types.at(registers[insn.operand1Id].type));
 }
 
 void Interpreter::stepLogicalOr(const InsnLogicalOr& insn)
@@ -2293,6 +2382,11 @@ void Interpreter::stepFunctionParameter(const InsnFunctionParameter& insn)
     // XXX is this ever a register?
     pointers[insn.resultId] = pointers[sourceId];
     if(false) std::cout << "function parameter " << insn.resultId << " receives " << sourceId << "\n";
+}
+
+void Interpreter::stepKill(const InsnKill& insn)
+{
+    pc = EXECUTION_ENDED;
 }
 
 void Interpreter::stepReturn(const InsnReturn& insn)

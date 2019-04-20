@@ -239,6 +239,21 @@ struct InsnFAdd : public Instruction {
     virtual void emit(Compiler *compiler);
 };
 
+// OpISub instruction (code 130).
+struct InsnISub : public Instruction {
+    InsnISub(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t operand1Id; // operand from register
+    uint32_t operand2Id; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepISub(*this); }
+    virtual uint32_t opcode() const { return SpvOpISub; }
+    virtual std::string name() const { return "OpISub"; }
+};
+
 // OpFSub instruction (code 131).
 struct InsnFSub : public Instruction {
     InsnFSub(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
@@ -390,6 +405,21 @@ struct InsnLogicalOr : public Instruction {
     virtual std::string name() const { return "OpLogicalOr"; }
 };
 
+// OpLogicalAnd instruction (code 167).
+struct InsnLogicalAnd : public Instruction {
+    InsnLogicalAnd(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t operand1Id; // operand from register
+    uint32_t operand2Id; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepLogicalAnd(*this); }
+    virtual uint32_t opcode() const { return SpvOpLogicalAnd; }
+    virtual std::string name() const { return "OpLogicalAnd"; }
+};
+
 // OpLogicalNot instruction (code 168).
 struct InsnLogicalNot : public Instruction {
     InsnLogicalNot(uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(resultId), type(type), resultId(resultId), operandId(operandId) {
@@ -433,6 +463,21 @@ struct InsnIEqual : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepIEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpIEqual; }
     virtual std::string name() const { return "OpIEqual"; }
+};
+
+// OpINotEqual instruction (code 171).
+struct InsnINotEqual : public Instruction {
+    InsnINotEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+        argIds.insert(operand1Id);
+        argIds.insert(operand2Id);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t operand1Id; // operand from register
+    uint32_t operand2Id; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepINotEqual(*this); }
+    virtual uint32_t opcode() const { return SpvOpINotEqual; }
+    virtual std::string name() const { return "OpINotEqual"; }
 };
 
 // OpSLessThan instruction (code 177).
@@ -587,6 +632,16 @@ struct InsnBranchConditional : public Instruction {
     virtual std::string name() const { return "OpBranchConditional"; }
     virtual void emit(Compiler *compiler);
     virtual bool isBranch() const { return true; }
+    virtual bool isTermination() const { return true; }
+};
+
+// OpKill instruction (code 252).
+struct InsnKill : public Instruction {
+    InsnKill() : Instruction(NO_REGISTER) {
+    }
+    virtual void step(Interpreter *interpreter) { interpreter->stepKill(*this); }
+    virtual uint32_t opcode() const { return SpvOpKill; }
+    virtual std::string name() const { return "OpKill"; }
     virtual bool isTermination() const { return true; }
 };
 

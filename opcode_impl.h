@@ -518,11 +518,6 @@ void Interpreter::stepSNegate(const InsnSNegate& insn)
     std::cerr << "stepSNegate() not implemented\n";
 }
 
-void Interpreter::stepISub(const InsnISub& insn)
-{
-    std::cerr << "stepISub() not implemented\n";
-}
-
 void Interpreter::stepIMul(const InsnIMul& insn)
 {
     std::cerr << "stepIMul() not implemented\n";
@@ -646,16 +641,6 @@ void Interpreter::stepLogicalEqual(const InsnLogicalEqual& insn)
 void Interpreter::stepLogicalNotEqual(const InsnLogicalNotEqual& insn)
 {
     std::cerr << "stepLogicalNotEqual() not implemented\n";
-}
-
-void Interpreter::stepLogicalAnd(const InsnLogicalAnd& insn)
-{
-    std::cerr << "stepLogicalAnd() not implemented\n";
-}
-
-void Interpreter::stepINotEqual(const InsnINotEqual& insn)
-{
-    std::cerr << "stepINotEqual() not implemented\n";
 }
 
 void Interpreter::stepUGreaterThan(const InsnUGreaterThan& insn)
@@ -956,11 +941,6 @@ void Interpreter::stepLabel(const InsnLabel& insn)
 void Interpreter::stepSwitch(const InsnSwitch& insn)
 {
     std::cerr << "stepSwitch() not implemented\n";
-}
-
-void Interpreter::stepKill(const InsnKill& insn)
-{
-    std::cerr << "stepKill() not implemented\n";
 }
 
 void Interpreter::stepUnreachable(const InsnUnreachable& insn)

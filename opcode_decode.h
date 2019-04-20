@@ -335,6 +335,28 @@ case SpvOpFAdd: {
     break;
 }
 
+case SpvOpISub: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    pgm->instructions.push_back(std::make_shared<InsnISub>(type, resultId, operand1Id, operand2Id));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "ISub";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpFSub: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
@@ -555,6 +577,28 @@ case SpvOpLogicalOr: {
     break;
 }
 
+case SpvOpLogicalAnd: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    pgm->instructions.push_back(std::make_shared<InsnLogicalAnd>(type, resultId, operand1Id, operand2Id));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "LogicalAnd";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpLogicalNot: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
@@ -608,6 +652,28 @@ case SpvOpIEqual: {
     pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "IEqual";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operand1Id ";
+        std::cout << operand1Id;
+        std::cout << " operand2Id ";
+        std::cout << operand2Id;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpINotEqual: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operand1Id = nextu();
+    uint32_t operand2Id = nextu();
+    pgm->instructions.push_back(std::make_shared<InsnINotEqual>(type, resultId, operand1Id, operand2Id));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "INotEqual";
         std::cout << " type ";
         std::cout << type;
         std::cout << " resultId ";
@@ -824,6 +890,15 @@ case SpvOpBranchConditional: {
         std::cout << " branchweightsId ";
         for(int i = 0; i < branchweightsId.size(); i++)
             std::cout << branchweightsId[i] << " ";
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpKill: {
+    pgm->instructions.push_back(std::make_shared<InsnKill>());
+    if(pgm->verbose) {
+        std::cout << "Kill";
         std::cout << "\n";
     }
     break;
