@@ -37,6 +37,7 @@
 #include "stb_image.h"
 
 #include "basic_types.h"
+#include "risc-v.h"
 #include "image.h"
 #include "interpreter.h"
 #include "timer.h"
@@ -158,7 +159,7 @@ struct Program
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
-    std::vector<std::unique_ptr<Instruction>> instructions;
+    std::vector<std::shared_ptr<Instruction>> instructions;
     // Map from label ID to block object.
     std::map<uint32_t, std::unique_ptr<Block>> blocks;
     // Map from virtual register ID to its type. Only used for results of instructions.
@@ -3283,6 +3284,7 @@ struct Compiler
     const Program *pgm;
     std::map<uint32_t, CompilerRegister> registers;
     uint32_t localLabelCounter;
+    std::vector<std::shared_ptr<Instruction>> instructions;
 
     Compiler(const Program *pgm)
         : pgm(pgm), localLabelCounter(1)
@@ -3292,10 +3294,13 @@ struct Compiler
 
     void compile()
     {
+        // Transform SPIR-V instructions to RISC-V instructions.
+        transformInstructions();
+
         // Perform physical register assignment.
         assignRegisters();
 
-        for(int pc = 0; pc < pgm->instructions.size(); pc++) {
+        for(int pc = 0; pc < instructions.size(); pc++) {
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
                     std::string name = pgm->cleanUpFunctionName(function.first);
@@ -3312,7 +3317,7 @@ struct Compiler
                 }
             }
 
-            pgm->instructions.at(pc)->emit(this);
+            instructions.at(pc)->emit(this);
         }
     }
 
@@ -3338,6 +3343,39 @@ struct Compiler
         ss << "local" << localLabelCounter;
         localLabelCounter++;
         return ss.str();
+    }
+
+    // Transform SPIR-V instructions to RISC-V instructions. Creates a new
+    // "instructions" array that's local to the compiler and is closer to
+    // machine instructions, but still using SSA.
+    void transformInstructions() {
+        instructions.clear();
+
+        for (uint32_t pc = 0; pc < pgm->instructions.size(); pc++) {
+            bool replaced = false;
+            const std::shared_ptr<Instruction> &instructionPtr = pgm->instructions[pc];
+            Instruction *instruction = instructionPtr.get();
+            if (instruction->opcode() == SpvOpIAdd) {
+                InsnIAdd *insnIAdd = dynamic_cast<InsnIAdd *>(instruction);
+
+                uint32_t imm;
+                if (asIntegerConstant(insnIAdd->operand1Id, imm)) {
+                    // XXX Verify that immediate fits in 12 bits.
+                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->type,
+                                insnIAdd->resultId, insnIAdd->operand2Id, imm));
+                    replaced = true;
+                } else if (asIntegerConstant(insnIAdd->operand2Id, imm)) {
+                    // XXX Verify that immediate fits in 12 bits.
+                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->type,
+                                insnIAdd->resultId, insnIAdd->operand1Id, imm));
+                    replaced = true;
+                }
+            }
+
+            if (!replaced) {
+                instructions.push_back(instructionPtr);
+            }
+        }
     }
 
     void assignRegisters() {
@@ -3372,7 +3410,7 @@ struct Compiler
 
         // Registers that are live going into this block have already been
         // assigned.
-        for (auto regId : pgm->instructions.at(block->begin)->livein) {
+        for (auto regId : instructions.at(block->begin)->livein) {
             auto r = registers.find(regId);
             if (r == registers.end()) {
                 std::cout << "Warning: Virtual register "
@@ -3388,7 +3426,7 @@ struct Compiler
         }
 
         for (int pc = block->begin; pc < block->end; pc++) {
-            Instruction *instruction = pgm->instructions.at(pc).get();
+            Instruction *instruction = instructions.at(pc).get();
 
             // Free up now-unused physical registers.
             for (auto argId : instruction->argIds) {
@@ -3568,7 +3606,7 @@ struct Compiler
     void emitPhiCopy(Instruction *instruction, uint32_t labelId) {
         Block *block = pgm->blocks.at(labelId).get();
         for (int pc = block->begin; pc < block->end; pc++) {
-            Instruction *nextInstruction = pgm->instructions[pc].get();
+            Instruction *nextInstruction = instructions[pc].get();
             if (nextInstruction->opcode() != SpvOpPhi) {
                 // No more phi instructions for this block.
                 break;
@@ -3605,9 +3643,16 @@ struct Compiler
     // Assert that the block at the label ID does not start with a Phi instruction.
     void assertNoPhi(uint32_t labelId) {
         Block *block = pgm->blocks.at(labelId).get();
-        assert(pgm->instructions[block->begin]->opcode() != SpvOpPhi);
+        assert(instructions[block->begin]->opcode() != SpvOpPhi);
     }
 };
+
+// -----------------------------------------------------------------------------------
+
+void RiscVAddi::emit(Compiler *compiler)
+{
+    compiler->emitBinaryImmOp("xaddi", resultId, rs1, imm);
+}
 
 // -----------------------------------------------------------------------------------
 

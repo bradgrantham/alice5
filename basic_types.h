@@ -219,7 +219,7 @@ struct Function
     uint32_t functionControl;
     uint32_t functionType;
 
-    // Index into the "code" array.
+    // Index into the "instructions" array.
     uint32_t start;
 
     // ID of the start label. Don't jump here, this is for block dominance calculations.

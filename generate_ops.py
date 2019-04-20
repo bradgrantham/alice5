@@ -256,7 +256,7 @@ def main():
                 opcode_decode_f.write("    %s %s = %s(%s);\n" %
                         (operand.cpp_type, operand.cpp_name,
                             operand.decode_function, operand.default_value))
-            opcode_decode_f.write("    pgm->instructions.push_back(std::make_unique<%s>(%s));\n" %
+            opcode_decode_f.write("    pgm->instructions.push_back(std::make_shared<%s>(%s));\n" %
                     (struct_opname, ", ".join(operand.cpp_name for operand in operands)))
             if 'IdResultType' in [op.kind for op in operands] and 'IdResult' in [op.kind for op in operands]:
                 opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")
@@ -363,7 +363,7 @@ def main():
                 opcode_decode_f.write("    %s %s = %s(%s);\n" %
                         (operand.cpp_type, operand.cpp_name,
                             operand.decode_function, operand.default_value))
-            opcode_decode_f.write("    pgm->instructions.push_back(std::make_unique<%s>(%s));\n" %
+            opcode_decode_f.write("    pgm->instructions.push_back(std::make_shared<%s>(%s));\n" %
                     (struct_opname, ", ".join(operand.cpp_name for operand in extinst_operands + operands)))
             opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")
             opcode_decode_f.write("    if(pgm->verbose) {\n")
