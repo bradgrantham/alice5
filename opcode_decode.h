@@ -533,6 +533,28 @@ case SpvOpMatrixTimesVector: {
     break;
 }
 
+case SpvOpMatrixTimesMatrix: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t leftMatrixId = nextu();
+    uint32_t rightMatrixId = nextu();
+    pgm->instructions.push_back(std::make_shared<InsnMatrixTimesMatrix>(type, resultId, leftMatrixId, rightMatrixId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "MatrixTimesMatrix";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " leftMatrixId ";
+        std::cout << leftMatrixId;
+        std::cout << " rightMatrixId ";
+        std::cout << rightMatrixId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpDot: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
@@ -1131,6 +1153,23 @@ case GLSLstd450Exp2: {
     pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Exp2";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Sqrt: {
+    uint32_t xId = nextu();
+    pgm->instructions.push_back(std::make_shared<InsnGLSLstd450Sqrt>(type, resultId, xId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Sqrt";
         std::cout << " type ";
         std::cout << type;
         std::cout << " resultId ";

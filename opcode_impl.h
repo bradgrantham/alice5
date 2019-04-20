@@ -553,11 +553,6 @@ void Interpreter::stepMatrixTimesScalar(const InsnMatrixTimesScalar& insn)
     std::cerr << "stepMatrixTimesScalar() not implemented\n";
 }
 
-void Interpreter::stepMatrixTimesMatrix(const InsnMatrixTimesMatrix& insn)
-{
-    std::cerr << "stepMatrixTimesMatrix() not implemented\n";
-}
-
 void Interpreter::stepOuterProduct(const InsnOuterProduct& insn)
 {
     std::cerr << "stepOuterProduct() not implemented\n";
@@ -1526,11 +1521,6 @@ void Interpreter::stepGLSLstd450Log(const InsnGLSLstd450Log& insn)
 void Interpreter::stepGLSLstd450Log2(const InsnGLSLstd450Log2& insn)
 {
     std::cerr << "stepGLSLstd450Log2() not implemented\n";
-}
-
-void Interpreter::stepGLSLstd450Sqrt(const InsnGLSLstd450Sqrt& insn)
-{
-    std::cerr << "stepGLSLstd450Sqrt() not implemented\n";
 }
 
 void Interpreter::stepGLSLstd450InverseSqrt(const InsnGLSLstd450InverseSqrt& insn)

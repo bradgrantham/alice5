@@ -2133,7 +2133,6 @@ void Interpreter::stepLogicalAnd(const InsnLogicalAnd& insn)
     std::visit([this, &insn](auto&& type) {
 
         using T = std::decay_t<decltype(type)>;
-
         if constexpr (std::is_same_v<T, TypeBool>) {
 
             bool operand1 = fromRegister<bool>(insn.operand1Id);
@@ -2229,6 +2228,43 @@ void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 
     for(int i = 0; i < type.count; i++) {
         result[i] = vector[i] * scalar;
+    }
+}
+
+void Interpreter::stepMatrixTimesMatrix(const InsnMatrixTimesMatrix& insn)
+{
+    const float* left = &fromRegister<float>(insn.leftMatrixId);
+    const float* right = &fromRegister<float>(insn.rightMatrixId);
+    float* result = &toRegister<float>(insn.resultId);
+
+    const Register &leftMatrixReg = registers[insn.leftMatrixId];
+
+    const TypeMatrix &leftMatrixType = std::get<TypeMatrix>(pgm->types.at(leftMatrixReg.type));
+    const TypeVector &leftMatrixVectorType = std::get<TypeVector>(pgm->types.at(leftMatrixType.columnType));
+
+    const TypeMatrix &rightMatrixType = std::get<TypeMatrix>(pgm->types.at(leftMatrixReg.type));
+    const TypeVector &rightMatrixVectorType = std::get<TypeVector>(pgm->types.at(rightMatrixType.columnType));
+
+    const TypeMatrix &resultType = std::get<TypeMatrix>(pgm->types.at(insn.type));
+    const TypeVector &resultVectorType = std::get<TypeVector>(pgm->types.at(resultType.columnType));
+
+    int resultColumnCount = resultType.columnCount;
+    int resultRowCount = resultVectorType.count;
+    int leftcols = leftMatrixType.columnCount;
+    int leftrows = leftMatrixVectorType.count;
+    int rightcols = rightMatrixType.columnCount;
+    int rightrows = leftMatrixVectorType.count;
+    assert(leftrows == rightcols);
+
+    for(int i = 0; i < resultRowCount; i++) {
+        for(int j = 0; j < resultColumnCount; j++) {
+            float dot = 0;
+
+            for(int k = 0; k < leftcols; k++) {
+                dot += left[k * leftrows + i] * right[k + rightcols * j];
+            }
+            result[j * resultRowCount + i] = dot;
+        }
     }
 }
 
@@ -2762,6 +2798,33 @@ void Interpreter::stepGLSLstd450FSign(const InsnGLSLstd450FSign& insn)
         } else {
 
             std::cout << "Unknown type for FSign\n";
+
+        }
+    }, pgm->types.at(registers[insn.xId].type));
+}
+
+void Interpreter::stepGLSLstd450Sqrt(const InsnGLSLstd450Sqrt& insn)
+{
+    std::visit([this, &insn](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            float x = fromRegister<float>(insn.xId);
+            toRegister<float>(insn.resultId) = sqrtf(x);
+
+        } else if constexpr (std::is_same_v<T, TypeVector>) {
+
+            const float* x = &fromRegister<float>(insn.xId);
+            float* result = &toRegister<float>(insn.resultId);
+            for(int i = 0; i < type.count; i++) {
+                result[i] = sqrtf(x[i]);
+            }
+
+        } else {
+
+            std::cout << "Unknown type for Sqrt\n";
 
         }
     }, pgm->types.at(registers[insn.xId].type));

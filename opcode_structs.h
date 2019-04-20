@@ -375,6 +375,21 @@ struct InsnMatrixTimesVector : public Instruction {
     virtual std::string name() const { return "OpMatrixTimesVector"; }
 };
 
+// OpMatrixTimesMatrix instruction (code 146).
+struct InsnMatrixTimesMatrix : public Instruction {
+    InsnMatrixTimesMatrix(uint32_t type, uint32_t resultId, uint32_t leftMatrixId, uint32_t rightMatrixId) : Instruction(resultId), type(type), resultId(resultId), leftMatrixId(leftMatrixId), rightMatrixId(rightMatrixId) {
+        argIds.insert(leftMatrixId);
+        argIds.insert(rightMatrixId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t leftMatrixId; // operand from register
+    uint32_t rightMatrixId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepMatrixTimesMatrix(*this); }
+    virtual uint32_t opcode() const { return SpvOpMatrixTimesMatrix; }
+    virtual std::string name() const { return "OpMatrixTimesMatrix"; }
+};
+
 // OpDot instruction (code 148).
 struct InsnDot : public Instruction {
     InsnDot(uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id) : Instruction(resultId), type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id) {
@@ -829,6 +844,19 @@ struct InsnGLSLstd450Exp2 : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp2(*this); }
     virtual uint32_t opcode() const { return 0; }
     virtual std::string name() const { return "GLSLstd450Exp2"; }
+};
+
+// GLSLstd450Sqrt instruction (code 31).
+struct InsnGLSLstd450Sqrt : public Instruction {
+    InsnGLSLstd450Sqrt(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+        argIds.insert(xId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t xId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Sqrt(*this); }
+    virtual uint32_t opcode() const { return 0; }
+    virtual std::string name() const { return "GLSLstd450Sqrt"; }
 };
 
 // GLSLstd450FMin instruction (code 37).
