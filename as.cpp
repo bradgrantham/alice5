@@ -433,18 +433,44 @@ private:
     }
 
     // Read an integer immediate value. The immediate must fit in the specified
-    // number of bits. Skips subsequent whitespace.
+    // number of bits. Skips subsequent whitespace. The immediate can be in
+    // decimal of hex (with a 0x prefix).
     uint32_t readImmediate(int bits) {
         uint32_t imm = 0;
         const char *start = s;
 
-        while (isdigit(*s)) {
-            imm = imm*10 + (*s - '0');
-            s++;
-        }
+        if (s[0] == '0' && tolower(s[1]) == 'x') {
+            // Hex.
+            s += 2;
+            while (true) {
+                char c = tolower(*s);
 
-        if (s == start) {
-            error("Expected immediate");
+                uint32_t value;
+                if (isdigit(c)) {
+                    value = c - '0';
+                } else if (c >= 'a' && c <= 'f') {
+                    value = c - 'a' + 10;
+                } else {
+                    break;
+                }
+                imm = imm*16 + value;
+
+                s++;
+            }
+
+            if (s == start + 2) {
+                error("Expected immediate");
+            }
+        } else {
+            // Decimal.
+            while (isdigit(*s)) {
+                imm = imm*10 + (*s - '0');
+                s++;
+            }
+
+            if (s == start) {
+                error("Expected immediate");
+            }
         }
 
         // Make sure we fit in 12 bits.
@@ -452,7 +478,8 @@ private:
             // Back up over immediate.
             s = start;
             std::ostringstream ss;
-            ss << "Immediate " << imm << " does not fit in "
+            ss << "Immediate " << imm << " (0x"
+                << std::hex << imm << std::dec << ") does not fit in "
                 << bits << (bits == 1 ? " bit" : " bits");
             error(ss.str());
         }
