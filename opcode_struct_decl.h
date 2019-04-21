@@ -14,6 +14,7 @@ struct InsnCompositeConstruct;
 struct InsnCompositeExtract;
 struct InsnCompositeInsert;
 struct InsnImageSampleImplicitLod;
+struct InsnImageSampleExplicitLod;
 struct InsnConvertFToS;
 struct InsnConvertSToF;
 struct InsnFNegate;

@@ -144,6 +144,13 @@ private:
     void set(unsigned char *pixel, const v4float& v)
     {
         switch(format) {
+            case FORMAT_R32G32B32A32_SFLOAT: {
+                for(int c = 0; c < 4; c++) {
+                    reinterpret_cast<float*>(pixel)[c] = v[c];
+                }
+                break;
+            }
+
             case FORMAT_R8G8B8_UNORM: {
                 for(int c = 0; c < 3; c++) {
                     // ShaderToy clamps the color.
@@ -151,6 +158,7 @@ private:
                 }
                 break;
             }
+
             default: {
                 throw std::runtime_error("set() : unimplemented image format " + std::to_string(format));
                 break; // not reached

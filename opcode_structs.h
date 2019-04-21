@@ -168,6 +168,22 @@ struct InsnImageSampleImplicitLod : public Instruction {
     virtual std::string name() const { return "OpImageSampleImplicitLod"; }
 };
 
+// OpImageSampleExplicitLod instruction (code 88).
+struct InsnImageSampleExplicitLod : public Instruction {
+    InsnImageSampleExplicitLod(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), sampledImageId(sampledImageId), coordinateId(coordinateId), imageOperands(imageOperands) {
+        argIds.insert(sampledImageId);
+        argIds.insert(coordinateId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t sampledImageId; // operand from register
+    uint32_t coordinateId; // operand from register
+    uint32_t imageOperands; // ImageOperands
+    virtual void step(Interpreter *interpreter) { interpreter->stepImageSampleExplicitLod(*this); }
+    virtual uint32_t opcode() const { return SpvOpImageSampleExplicitLod; }
+    virtual std::string name() const { return "OpImageSampleExplicitLod"; }
+};
+
 // OpConvertFToS instruction (code 110).
 struct InsnConvertFToS : public Instruction {
     InsnConvertFToS(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t floatValueId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), floatValueId(floatValueId) {

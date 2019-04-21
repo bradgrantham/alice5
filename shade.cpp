@@ -3315,7 +3315,6 @@ void Interpreter::stepPhi(const InsnPhi& insn)
     }
 }
 
-// XXX image binding
 // XXX implicit LOD level and thus texel interpolants
 void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn)
 {
@@ -3386,6 +3385,81 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
         } else {
 
             std::cout << "Unhandled type for ImageSampleImplicitLod result\n";
+
+        }
+    }, pgm->types.at(resultType));
+}
+
+// XXX explicit LOD level and thus texel interpolants
+void Interpreter::stepImageSampleExplicitLod(const InsnImageSampleExplicitLod& insn)
+{
+    // uint32_t type; // result type
+    // uint32_t resultId; // SSA register for result value
+    // uint32_t sampledImageId; // operand from register
+    // uint32_t coordinateId; // operand from register
+    // uint32_t imageOperands; // ImageOperands (optional)
+    v4float rgba;
+
+    // Sample the image
+    std::visit([this, &insn, &rgba](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeVector>) {
+
+            assert(type.count == 2);
+
+            auto [u, v] = fromRegister<v2float>(insn.coordinateId);
+
+            int imageIndex = fromRegister<int>(insn.sampledImageId);
+            const SampledImage& si = pgm->sampledImages[imageIndex];
+
+            unsigned int s, t;
+
+            if(si.sampler.uAddressMode == Sampler::CLAMP_TO_EDGE) {
+                s = std::clamp(static_cast<unsigned int>(u * si.image->width), 0u, si.image->width - 1);
+            } else {
+                float wrapped = (u >= 0) ? fmodf(u, 1.0f) : (1 + fmodf(u, 1.0f));
+                if(wrapped == 1.0f) /* fmodf of a negative number could return 0, after which "wrapped" would be 1 */
+                    wrapped = 0.0f;
+                s = static_cast<unsigned int>(wrapped * si.image->width);
+            }
+
+            if(si.sampler.vAddressMode == Sampler::CLAMP_TO_EDGE) {
+                t = std::clamp(static_cast<unsigned int>(v * si.image->height), 0u, si.image->height - 1);
+            } else {
+                float wrapped = (v >= 0) ? fmodf(v, 1.0f) : (1 + fmodf(v, 1.0f));
+                if(wrapped == 1.0f) /* fmodf of a negative number could return 0, after which "wrapped" would be 1 */
+                    wrapped = 0.0f;
+                t = static_cast<unsigned int>(wrapped * si.image->height);
+            }
+
+            si.image->get(s, si.image->height - 1 - t, rgba);
+
+        } else {
+
+            std::cout << "Unhandled type for ImageSampleExplicitLod coordinate\n";
+
+        }
+    }, pgm->types.at(registers[insn.coordinateId].type));
+
+    uint32_t resultType = std::get<TypeVector>(pgm->types.at(registers[insn.resultId].type)).type;
+
+    // Store the sample result in register
+    std::visit([this, &insn, rgba](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            toRegister<v4float>(insn.resultId) = rgba;
+
+        // else if constexpr (std::is_same_v<T, TypeInt>)
+
+
+        } else {
+
+            std::cout << "Unhandled type for ImageSampleExplicitLod result\n";
 
         }
     }, pgm->types.at(resultType));
@@ -4464,7 +4538,8 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
         sources.push_back(shader);
 
         int channelId = pass["outputs"][0]["id"].get<int>();
-        ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, params.outputWidth, params.outputHeight));
+        Image::Format format = (pass["name"].get<std::string>() == "Image") ? Image::FORMAT_R8G8B8_UNORM : Image::FORMAT_R32G32B32A32_SFLOAT;
+        ImagePtr image(new Image(format, Image::DIM_2D, params.outputWidth, params.outputHeight));
         ShaderToyImage output {0, channelId, { image, Sampler {}}};
         RenderPassPtr rpass(new RenderPass(
             pass["name"],

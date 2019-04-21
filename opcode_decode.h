@@ -234,6 +234,31 @@ case SpvOpImageSampleImplicitLod: {
     break;
 }
 
+case SpvOpImageSampleExplicitLod: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t sampledImageId = nextu();
+    uint32_t coordinateId = nextu();
+    uint32_t imageOperands = nextu();
+    pgm->instructions.push_back(std::make_shared<InsnImageSampleExplicitLod>(pgm->currentLine, type, resultId, sampledImageId, coordinateId, imageOperands));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "ImageSampleExplicitLod";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " sampledImageId ";
+        std::cout << sampledImageId;
+        std::cout << " coordinateId ";
+        std::cout << coordinateId;
+        std::cout << " imageOperands ";
+        std::cout << imageOperands;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpConvertFToS: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
