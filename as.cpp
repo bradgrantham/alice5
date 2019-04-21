@@ -10,9 +10,6 @@
 #include <string>
 #include <iomanip>
 
-// Map from label name to address in bytes.
-std::map<std::string,uint32_t> gLabels;
-
 // Return the pathname without the extension ("file.x" becomes "file").
 // If the pathname does not have an extension, it is returned unchanged.
 std::string stripExtension(const std::string &pathname) {
@@ -103,6 +100,9 @@ private:
 
     // Parallel array to "bin" indicating which source line emitted the instruction.
     std::vector<size_t> binLine;
+
+    // Map from label name to address in bytes.
+    std::map<std::string,uint32_t> labels;
 
 public:
     Assembler()
@@ -265,8 +265,8 @@ public:
         std::cout.copyfmt(oldState);
     }
 
+    // Save the binary file.
     void save(const std::string &outPathname) {
-        // Write binary.
         std::ofstream outFile(outPathname, std::ios::out | std::ios::binary);
         if (!outFile.good()) {
             std::cerr << "Can't open file \"" << outPathname << "\".\n";
@@ -309,7 +309,7 @@ private:
         // See if it's a label.
         if (!opOrLabel.empty()) {
             if (foundChar(':')) {
-                if (gLabels.find(opOrLabel) != gLabels.end()) {
+                if (labels.find(opOrLabel) != labels.end()) {
                     s = previousToken;
                     std::ostringstream ss;
                     ss << "Label \"" << opOrLabel << "\" is already defined";
@@ -317,7 +317,7 @@ private:
                 }
 
                 // It's a label, record it.
-                gLabels[opOrLabel] = bin.size()*4;
+                labels[opOrLabel] = bin.size()*4;
 
                 // Read the operator.
                 opOrLabel = readToken();
@@ -360,7 +360,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    uint32_t imm = readImmediate(op.bits);
+                    int32_t imm = readImmediate(op.bits);
                     emitI(op, rd, rs, imm);
                     break;
                 }
@@ -370,7 +370,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    uint32_t imm = readImmediate(op.bits);
+                    int32_t imm = readImmediate(op.bits);
                     if (!foundChar('(')) {
                         error("Expected open parenthesis");
                     }
@@ -387,7 +387,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    uint32_t imm = readImmediate(op.bits);
+                    int32_t imm = readImmediate(op.bits);
                     if (!foundChar('(')) {
                         error("Expected open parenthesis");
                     }
@@ -408,7 +408,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    uint32_t imm = readImmediate(op.bits);
+                    int32_t imm = readImmediate(op.bits);
                     if ((imm & 0x1) != 0) {
                         s = previousToken;
                         error("Immediate must be even");
@@ -422,7 +422,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    uint32_t imm = readImmediate(op.bits);
+                    int32_t imm = readImmediate(op.bits);
                     emitU(op, rd, imm);
                     break;
                 }
@@ -432,7 +432,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    uint32_t imm = readImmediate(op.bits);
+                    int32_t imm = readImmediate(op.bits);
                     if ((imm & 0x1) != 0) {
                         s = previousToken;
                         error("Immediate must be even");
@@ -450,9 +450,7 @@ private:
         // See if there's a comment.
         if (*s == ';') {
             // Skip to end of line.
-            while (*s != '\n' && *s != '\0') {
-                s++;
-            }
+            s += strlen(s);
         }
 
         // Make sure the whole line was parsed properly.
@@ -499,12 +497,18 @@ private:
         return token;
     }
 
-    // Read an integer immediate value. The immediate must fit in the specified
+    // Read a signed integer immediate value. The immediate must fit in the specified
     // number of bits. Skips subsequent whitespace. The immediate can be in
-    // decimal of hex (with a 0x prefix).
-    uint32_t readImmediate(int bits) {
-        uint32_t imm = 0;
+    // decimal or hex (with a 0x prefix).
+    int32_t readImmediate(int bits) {
+        bool found = false;
+        int32_t imm = 0;
         previousToken = s;
+
+        bool negative = *s == '-';
+        if (negative) {
+            s++;
+        }
 
         if (s[0] == '0' && tolower(s[1]) == 'x') {
             // Hex.
@@ -521,27 +525,31 @@ private:
                     break;
                 }
                 imm = imm*16 + value;
+                found = true;
 
                 s++;
-            }
-
-            if (s == previousToken + 2) {
-                error("Expected immediate");
             }
         } else {
             // Decimal.
             while (isdigit(*s)) {
                 imm = imm*10 + (*s - '0');
+                found = true;
                 s++;
-            }
-
-            if (s == previousToken) {
-                error("Expected immediate");
             }
         }
 
-        // Make sure we fit in 12 bits.
-        if (imm >= (1 << bits)) {
+        if (!found) {
+            s = previousToken;
+            error("Expected immediate");
+        }
+
+        if (negative) {
+            imm = -imm;
+        }
+
+        // Make sure we fit.
+        int32_t limit = 1 << (bits - 1);
+        if (negative ? -imm > limit : imm >= limit) {
             // Back up over immediate.
             s = previousToken;
             std::ostringstream ss;
@@ -604,7 +612,7 @@ private:
     }
 
     // Emit a FORMAT_I instruction.
-    void emitI(const Operator &op, int rd, int rs, uint32_t imm) {
+    void emitI(const Operator &op, int rd, int rs, int32_t imm) {
         emit(op.opcode
                 | rd << 7
                 | op.funct3 << 12
@@ -614,7 +622,7 @@ private:
     }
 
     // Emit a FORMAT_S instruction.
-    void emitS(const Operator &op, int rs2, uint32_t imm, int rs1) {
+    void emitS(const Operator &op, int rs2, int32_t imm, int rs1) {
         emit(op.opcode
                 | (imm & 0x1F) << 7
                 | op.funct3 << 12
@@ -624,7 +632,7 @@ private:
     }
 
     // Emit a FORMAT_SB instruction.
-    void emitSB(const Operator &op, int rs1, int rs2, uint32_t imm) {
+    void emitSB(const Operator &op, int rs1, int rs2, int32_t imm) {
         emit(op.opcode
                 | ((imm >> 11) & 0x1) << 7
                 | (imm & 0x1E) << 7
@@ -636,14 +644,14 @@ private:
     }
 
     // Emit a FORMAT_U instruction.
-    void emitU(const Operator &op, int rd, uint32_t imm) {
+    void emitU(const Operator &op, int rd, int32_t imm) {
         emit(op.opcode
                 | rd << 7
                 | imm << 12);
     }
 
     // Emit a FORMAT_UJ instruction.
-    void emitUJ(const Operator &op, int rd, uint32_t imm) {
+    void emitUJ(const Operator &op, int rd, int32_t imm) {
         emit(op.opcode
                 | rd << 7
                 | ((imm >> 12) & 0xFF) << 12
