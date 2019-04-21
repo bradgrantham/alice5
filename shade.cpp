@@ -47,8 +47,15 @@
 
 // Enable this to check if our virtual RAM is being initialized properly.
 #define CHECK_MEMORY_ACCESS
+const bool throwOnUninitializedMemoryRead = false;
 // Enable this to check if our virtual registers are being initialized properly.
 #define CHECK_REGISTER_ACCESS
+
+struct UninitializedMemoryReadException : std::runtime_error
+{
+    UninitializedMemoryReadException(const std::string& what) : std::runtime_error(what) {}
+};
+
 
 #define DEFAULT_WIDTH (640/2)
 #define DEFAULT_HEIGHT (360/2)
@@ -133,6 +140,8 @@ struct Program
     bool hasUnimplemented;
     bool verbose;
     std::set<uint32_t> capabilities;
+
+    LineInfo currentLine;
 
     // main id-to-thingie map containing extinstsets, types, variables, etc
     // secondary maps of entryPoint, decorations, names, etc
@@ -540,6 +549,18 @@ struct Program
                 pgm->typeSizes[id] = 0;
                 if(pgm->verbose) {
                     std::cout << "TypeVoid " << id << "\n";
+                }
+                break;
+            }
+
+            case SpvOpLine: {
+                // XXX result id
+                uint32_t fileId = nextu();
+                uint32_t line = nextu();
+                uint32_t column = nextu();
+                pgm->currentLine = LineInfo {fileId, line, column};
+                if(pgm->verbose) {
+                    std::cout << "Line " << fileId << " (\"" << pgm->strings[fileId] << "\") line " << line << " column " << column << "\n";
                 }
                 break;
             }
@@ -1356,7 +1377,11 @@ void Interpreter::checkMemory(size_t address, size_t size)
 #ifdef CHECK_MEMORY_ACCESS
     for (size_t a = address; a < address + size; a++) {
         if (!memoryInitialized[a]) {
-            std::cerr << "Warning: Reading uninitialized memory " << a << "\n";
+            if(throwOnUninitializedMemoryRead) {
+                throw UninitializedMemoryReadException("Warning: Reading uninitialized memory " + std::to_string(a) + " of size " + std::to_string(size) + "\n");
+            } else {
+                std::cerr << "Warning: Reading uninitialized memory " << a << " of size " << size << "\n";
+            }
         }
     }
 #endif
@@ -1421,7 +1446,23 @@ void Interpreter::stepLoad(const InsnLoad& insn)
     Pointer& ptr = pointers.at(insn.pointerId);
     Register& obj = registers.at(insn.resultId);
     size_t size = pgm->typeSizes.at(insn.type);
-    checkMemory(ptr.address, size);
+    try {
+        checkMemory(ptr.address, size);
+    } catch(const UninitializedMemoryReadException& e) {
+        std::cerr << "uninitialized read by stepLoad from pointer " << insn.pointerId;
+        if(pgm->names.find(insn.pointerId) != pgm->names.end()) {
+            std::cerr << " named \"" << pgm->names.at(insn.pointerId) << "\"";
+        } else {
+            std::cerr << " with no name";
+        }
+        if(insn.lineInfo.fileId != NO_FILE) {
+            std::cerr << " at file \"" << pgm->strings.at(insn.lineInfo.fileId) << "\":" << insn.lineInfo.line;
+        } else {
+            std::cerr << " with no source line information";
+        }
+        std::cerr << '\n';
+        throw;
+    }
     std::copy(memory + ptr.address, memory + ptr.address + size, obj.data);
     obj.initialized = true;
     if(false) {
@@ -3430,6 +3471,7 @@ void Interpreter::run()
         }
     }
 
+    callstack.clear();
     callstack.push_back(EXECUTION_ENDED); // caller PC
     callstack.push_back(NO_RETURN_REGISTER); // return register
     pc = pgm->mainFunction->start;
@@ -3548,13 +3590,13 @@ struct Compiler
                 uint32_t imm;
                 if (asIntegerConstant(insnIAdd->operand1Id, imm)) {
                     // XXX Verify that immediate fits in 12 bits.
-                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->type,
-                                insnIAdd->resultId, insnIAdd->operand2Id, imm));
+                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
+                                insnIAdd->type, insnIAdd->resultId, insnIAdd->operand2Id, imm));
                     replaced = true;
                 } else if (asIntegerConstant(insnIAdd->operand2Id, imm)) {
                     // XXX Verify that immediate fits in 12 bits.
-                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->type,
-                                insnIAdd->resultId, insnIAdd->operand1Id, imm));
+                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
+                                insnIAdd->type, insnIAdd->resultId, insnIAdd->operand1Id, imm));
                     replaced = true;
                 }
             }
@@ -3843,8 +3885,9 @@ void RiscVAddi::emit(Compiler *compiler)
 
 // -----------------------------------------------------------------------------------
 
-Instruction::Instruction(uint32_t resId)
-    : blockId(NO_BLOCK_ID),
+Instruction::Instruction(const LineInfo& lineInfo_, uint32_t resId)
+    : lineInfo(lineInfo_),
+      blockId(NO_BLOCK_ID),
       resId(resId)
 {
     // Nothing.

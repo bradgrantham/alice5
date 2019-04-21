@@ -9,7 +9,7 @@ enum {
 
 // "addi" instruction.
 struct RiscVAddi : public Instruction {
-    RiscVAddi(uint32_t type, uint32_t resultId, uint32_t rs1, uint32_t imm) : Instruction(resultId), type(type), resultId(resultId), rs1(rs1), imm(imm) {
+    RiscVAddi(LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t rs1, uint32_t imm) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), rs1(rs1), imm(imm) {
         argIds.insert(rs1);
     }
     uint32_t type; // result type
