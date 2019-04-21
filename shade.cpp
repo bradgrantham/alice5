@@ -3312,7 +3312,7 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
                 t = static_cast<unsigned int>(wrapped * si.image->height);
             }
 
-            si.image->get(s, t, rgba);
+            si.image->get(s, si.image->height - 1 - t, rgba);
 
         } else {
 
@@ -4257,7 +4257,9 @@ void sortInDependencyOrder(
         if(passesToVisit.count(pass) > 0) {
             passesToVisit.erase(pass);
             for(ShaderToyImage& input: pass->inputs) {
-                visit(channelIdsToPasses.at(input.id));
+                if(channelIdsToPasses.find(input.id) != channelIdsToPasses.end()) {
+                    visit(channelIdsToPasses.at(input.id));
+                }
             }
             passesOrdered.push_back(pass);
         }
@@ -4365,7 +4367,7 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
                 int rowsize = textureWidth * Image::getPixelSize(image->format);
                 bool flipInY = ((input.find("vflip") != input.end()) && (input["vflip"].get<std::string>() == std::string("true")));
 
-                if(flipInY) {
+                if(!flipInY) {
                     for(int row = 0; row < textureHeight; row++) {
                         std::copy(s + rowsize * row, s + rowsize * (row + 1), d + rowsize * row);
                     }
@@ -4429,9 +4431,11 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
     for(auto& pass: renderPasses) {
         for(int i = 0; i < pass->inputs.size(); i++) {
             ShaderToyImage& input = pass->inputs[i];
-            int channelId = input.id;
-            ShaderToyImage& source = channelIdsToPasses.at(channelId)->outputs[0];
-            pass->inputs[i].sampledImage = source.sampledImage;
+            if(!input.sampledImage.image) {
+                int channelId = input.id;
+                ShaderToyImage& source = channelIdsToPasses.at(channelId)->outputs[0];
+                pass->inputs[i].sampledImage = source.sampledImage;
+            }
         }
     }
     
@@ -4792,6 +4796,17 @@ int main(int argc, char **argv)
         double elapsedSeconds = timer.elapsed();
             std::cout << "Shading pass " << pass->name << " took " << elapsedSeconds << " seconds ("
             << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
+        }
+
+        if(false) {
+            ShaderToyImage output = renderPasses[0]->outputs[0];
+            ImagePtr image = output.sampledImage.image;
+
+            std::ostringstream ss;
+            ss << "pass0" << std::setfill('0') << std::setw(4) << frameNumber << std::setw(0) << ".ppm";
+            std::ofstream imageFile(ss.str(), std::ios::out | std::ios::binary);
+            image->writePpm(imageFile);
+            imageFile.close();
         }
 
         ShaderToyImage output = renderPasses.back()->outputs[0];
