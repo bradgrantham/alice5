@@ -79,17 +79,16 @@ private:
     std::map<std::string,int> registers;
 
     std::string inPathname;
-    std::string outPathname;
     bool verbose;
 
-    // Line number in the input file.
+    // Lines of source code.
+    std::vector<std::string> lines;
+
+    // Line number in the input file (0-based).
     uint32_t lineNumber;
 
     // Pointer we walk through the file.
     const char *s;
-
-    // Pointer to start of the current line.
-    const char *lineStart;
 
     // Pointer to the token we just read.
     const char *previousToken;
@@ -97,9 +96,12 @@ private:
     // Output binary.
     std::vector<uint32_t> bin;
 
+    // Parallel array to "bin" indicating which source line emitted the instruction.
+    std::vector<size_t> binLine;
+
 public:
-    Assembler(const std::string &inPathname, const std::string &outPathname)
-        : inPathname(inPathname), outPathname(outPathname) {
+    Assembler()
+        : inPathname("unspecified") {
 
         // Build our maps.
 
@@ -127,30 +129,92 @@ public:
         this->verbose = verbose;
     }
 
-    // Assemble the file to the object file.
-    void assemble() {
+    void load(const std::string &inPathname) {
+        this->inPathname = inPathname;
+
         // Read the whole assembly file at once.
         std::string in = readFileContents(inPathname);
 
-        lineNumber = 1;
-        s = in.c_str();
-        lineStart = s;
-        previousToken = nullptr;
+        // Convert to lines.
+        lines.clear();
+        const char *s = in.c_str();
+        while (true) {
+            auto endOfLine = strchr(s, '\n');
+            if (endOfLine == nullptr) {
+                lines.push_back(s);
+                break;
+            }
+            lines.push_back(std::string(s, endOfLine - s));
+            s = endOfLine + 1;
+        }
+    }
+
+    // Assemble the file to the object file.
+    void assemble() {
+        // Clear output.
         bin.clear();
+        binLine.clear();
 
-        while (*s != '\0') {
-            size_t startSize = bin.size();
-            std::string line = currentLine();
+        // Process each line.
+        for (lineNumber = 0; lineNumber < lines.size(); lineNumber++) {
+            parseLine();
+        }
+    }
 
-            // Read one line.
-            readLine();
+    void dumpListing() {
+        // Assume that the source and the binary are in the same order.
+        std::ios oldState(nullptr);
+        oldState.copyfmt(std::cout);
 
-            if (verbose && bin.size() == startSize) {
-                // Didn't advance, must be comment or blank line.
-                std::cout << std::string(14, ' ') << line << "\n";
+        // Next instruction to display.
+        size_t binIndex = 0;
+
+        // We have shown this source line to the user.
+        for (size_t sourceLine = 0; sourceLine < lines.size(); sourceLine++) {
+            // Next source line to display with an instruction.
+            size_t displaySourceLine;
+
+            while (true) {
+                // See what source line corresponds to the next instruction to display.
+                displaySourceLine = binIndex < bin.size()
+                    ? binLine[binIndex]
+                    : lines.size();
+
+                // See if previous source line generated multiple instructions.
+                if (displaySourceLine < sourceLine) {
+                    std::cout
+                        << std::hex << std::setw(4) << std::setfill('0') << (binIndex*4)
+                        << " "
+                        << std::hex << std::setw(8) << std::setfill('0') << bin[binIndex]
+                        << "\n";
+                    binIndex++;
+                } else {
+                    // No more catching up to do.
+                    break;
+                }
+            }
+
+            // Found matching source line.
+            if (displaySourceLine == sourceLine) {
+                std::cout
+                    << std::hex << std::setw(4) << std::setfill('0') << (binIndex*4)
+                    << " "
+                    << std::hex << std::setw(8) << std::setfill('0') << bin[binIndex]
+                    << " "
+                    << lines[sourceLine] << "\n";
+                binIndex++;
+            } else {
+                // Source line with no instruction. Must be comment, label, blank line, etc.
+                std::cout
+                    << std::string(14, ' ')
+                    << lines[sourceLine] << "\n";
             }
         }
 
+        std::cout.copyfmt(oldState);
+    }
+
+    void save(const std::string &outPathname) {
         // Write binary.
         std::ofstream outFile(outPathname, std::ios::out | std::ios::binary);
         if (!outFile.good()) {
@@ -171,7 +235,10 @@ public:
 private:
     // Reads one line of input, either one character past
     // the newline, or on the nul if there is no newline.
-    void readLine() {
+    void parseLine() {
+        s = currentLine().c_str();
+        previousToken = nullptr;
+
         // Start of line. Skip whitespace.
         skipWhitespace();
 
@@ -232,11 +299,7 @@ private:
         }
 
         // Make sure the whole line was parsed properly.
-        if (*s == '\n') {
-            s++;
-            lineStart = s;
-            lineNumber++;
-        } else if (*s != '\0') {
+        if (*s != '\0') {
             // Unknown error.
             error("Error");
         }
@@ -311,19 +374,18 @@ private:
 
     // Error function.
     void error(const std::string &message) {
-        std::cerr << inPathname << ":" << lineNumber << ":"
-            << (s - lineStart + 1) << ": " << message << "\n";
+        int col = s - currentLine().c_str();
+
+        std::cerr << inPathname << ":" << (lineNumber + 1) << ":"
+            << (col + 1) << ": " << message << "\n";
         std::cerr << currentLine() << "\n";
-        std::cerr << std::string(s - lineStart, ' ') << "^\n";
+        std::cerr << std::string(col, ' ') << "^\n";
         exit(EXIT_FAILURE);
     }
 
-    // Return the current line (the one that "lineStart" points to), not including
-    // the newline.
-    std::string currentLine() {
-        auto endOfLine = strchr(lineStart, '\n');
-
-        return endOfLine == nullptr ? lineStart : std::string(lineStart, endOfLine - lineStart);
+    // Return a reference to the current line.
+    const std::string &currentLine() {
+        return lines[lineNumber];
     }
 
     // Read a register name and return its number. Emits an error
@@ -357,18 +419,8 @@ private:
     }
 
     void emit(uint32_t instruction) {
-        if (verbose) {
-            std::ios oldState(nullptr);
-            oldState.copyfmt(std::cout);
-            std::cout
-                << std::hex << std::setw(4) << std::setfill('0') << (bin.size()*4)
-                << " "
-                << std::hex << std::setw(8) << std::setfill('0') << instruction
-                << " " << currentLine() << "\n";
-            std::cout.copyfmt(oldState);
-        }
-
         bin.push_back(instruction);
+        binLine.push_back(lineNumber);
     }
 };
 
@@ -418,8 +470,13 @@ int main(int argc, char *argv[]) {
         outPathname = stripExtension(inPathname) + ".o";
     }
 
-    Assembler assembler(inPathname, outPathname);
+    Assembler assembler;
     assembler.setVerbose(verbose);
+    assembler.load(inPathname);
     assembler.assemble();
+    assembler.save(outPathname);
+    if (verbose) {
+        assembler.dumpListing();
+    }
 }
 
