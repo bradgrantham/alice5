@@ -44,15 +44,19 @@ std::string readFileContents(const std::string &pathname)
 
 // ----------------------------------------------------------------------
 
-// Types of operators.
-enum OpType {
-    OP_TYPE_I,
-    OP_TYPE_IS,
+// Instruction formats.
+enum Format {
+    FORMAT_R,
+    FORMAT_I,
+    FORMAT_S,
+    FORMAT_SB,
+    FORMAT_U,
+    FORMAT_UJ,
 };
 
 // Information about each type of operator.
 struct Operator {
-    OpType opType;
+    Format format;
 
     // Bits 0 through 6.
     uint32_t opcode;
@@ -105,18 +109,35 @@ public:
 
         // Build our maps.
 
-        // Basic integer arithmetic.
-        operators["addi"]  = Operator{OP_TYPE_I, 0b010011, 0b000, 0b0000000, 12};
-        operators["andi"]  = Operator{OP_TYPE_I, 0b010011, 0b111, 0b0000000, 12};
-        operators["ori"]   = Operator{OP_TYPE_I, 0b010011, 0b110, 0b0000000, 12};
-        operators["xori"]  = Operator{OP_TYPE_I, 0b010011, 0b100, 0b0000000, 12};
-        operators["slti"]  = Operator{OP_TYPE_I, 0b010011, 0b010, 0b0000000, 12};
-        operators["sltiu"] = Operator{OP_TYPE_I, 0b010011, 0b011, 0b0000000, 12};
+        // Basic arithmetic.
+        operators["add"]   = Operator{FORMAT_R, 0b0110011, 0b000, 0b0000000, 0};
+        operators["sub"]   = Operator{FORMAT_R, 0b0110011, 0b000, 0b0100000, 0};
+        operators["sll"]   = Operator{FORMAT_R, 0b0110011, 0b001, 0b0000000, 0};
+        operators["slt"]   = Operator{FORMAT_R, 0b0110011, 0b010, 0b0000000, 0};
+        operators["sltu"]  = Operator{FORMAT_R, 0b0110011, 0b011, 0b0000000, 0};
+        operators["xor"]   = Operator{FORMAT_R, 0b0110011, 0b100, 0b0000000, 0};
+        operators["srl"]   = Operator{FORMAT_R, 0b0110011, 0b101, 0b0000000, 0};
+        operators["sra"]   = Operator{FORMAT_R, 0b0110011, 0b101, 0b0100000, 0};
+        operators["or"]    = Operator{FORMAT_R, 0b0110011, 0b110, 0b0000000, 0};
+        operators["and"]   = Operator{FORMAT_R, 0b0110011, 0b111, 0b0000000, 0};
+
+        // Immediates.
+        operators["addi"]  = Operator{FORMAT_I, 0b0010011, 0b000, 0b0000000, 12};
+        operators["andi"]  = Operator{FORMAT_I, 0b0010011, 0b111, 0b0000000, 12};
+        operators["ori"]   = Operator{FORMAT_I, 0b0010011, 0b110, 0b0000000, 12};
+        operators["xori"]  = Operator{FORMAT_I, 0b0010011, 0b100, 0b0000000, 12};
+        operators["slti"]  = Operator{FORMAT_I, 0b0010011, 0b010, 0b0000000, 12};
+        operators["sltiu"] = Operator{FORMAT_I, 0b0010011, 0b011, 0b0000000, 12};
 
         // Shifts.
-        operators["slli"]  = Operator{OP_TYPE_I, 0b010011, 0b001, 0b0000000, 5};
-        operators["srli"]  = Operator{OP_TYPE_I, 0b010011, 0b101, 0b0000000, 5};
-        operators["srai"]  = Operator{OP_TYPE_I, 0b010011, 0b101, 0b0100000, 5};
+        operators["slli"]  = Operator{FORMAT_I, 0b0010011, 0b001, 0b0000000, 5};
+        operators["srli"]  = Operator{FORMAT_I, 0b0010011, 0b101, 0b0000000, 5};
+        operators["srai"]  = Operator{FORMAT_I, 0b0010011, 0b101, 0b0100000, 5};
+
+        // Stores.
+        operators["sb"]    = Operator{FORMAT_S, 0b0100011, 0b000, 0b0100000, 12};
+        operators["sh"]    = Operator{FORMAT_S, 0b0100011, 0b001, 0b0100000, 12};
+        operators["sw"]    = Operator{FORMAT_S, 0b0100011, 0b010, 0b0100000, 12};
 
         // Registers.
         addRegisters("x", 0, 31, 0);
@@ -293,18 +314,55 @@ private:
             }
             const Operator &op = opItr->second;
 
-            if (op.opType == OP_TYPE_I) {
-                // Immediate.
-                int rd = readRegister("destination");
-                if (!foundChar(',')) {
-                    error("Expected comma");
+            switch (op.format) {
+                case FORMAT_R: {
+                    int rd = readRegister("destination");
+                    if (!foundChar(',')) {
+                        error("Expected comma");
+                    }
+                    int rs1 = readRegister("source");
+                    if (!foundChar(',')) {
+                        error("Expected comma");
+                    }
+                    int rs2 = readRegister("source");
+                    emitR(op, rd, rs1, rs2);
+                    break;
                 }
-                int rs = readRegister("source");
-                if (!foundChar(',')) {
-                    error("Expected comma");
+
+                case FORMAT_I: {
+                    int rd = readRegister("destination");
+                    if (!foundChar(',')) {
+                        error("Expected comma");
+                    }
+                    int rs = readRegister("source");
+                    if (!foundChar(',')) {
+                        error("Expected comma");
+                    }
+                    uint32_t imm = readImmediate(op.bits);
+                    emitI(op, rd, rs, imm);
+                    break;
                 }
-                uint32_t imm = readImmediate(op.bits);
-                emitI(op, rd, rs, imm);
+
+                case FORMAT_S: {
+                    int rs2 = readRegister("source");
+                    if (!foundChar(',')) {
+                        error("Expected comma");
+                    }
+                    uint32_t imm = readImmediate(op.bits);
+                    if (!foundChar('(')) {
+                        error("Expected open parenthesis");
+                    }
+                    int rs1 = readRegister("source");
+                    if (!foundChar(')')) {
+                        error("Expected close parenthesis");
+                    }
+                    emitS(op, rs2, imm, rs1);
+                    break;
+                }
+
+                default: {
+                    assert(false);
+                }
             }
         }
 
@@ -427,6 +485,17 @@ private:
         return reg->second;
     }
 
+    // Emit a FORMAT_R instruction.
+    void emitR(const Operator &op, int rd, int rs1, int rs2) {
+        emit(op.opcode
+                | rd << 7
+                | op.funct3 << 12
+                | rs1 << 15
+                | rs2 << 20
+                | op.funct7 << 25);
+    }
+
+    // Emit a FORMAT_I instruction.
     void emitI(const Operator &op, int rd, int rs, uint32_t imm) {
         emit(op.opcode
                 | rd << 7
@@ -436,6 +505,17 @@ private:
                 | op.funct7 << 25);
     }
 
+    // Emit a FORMAT_S instruction.
+    void emitS(const Operator &op, int rs2, uint32_t imm, int rs1) {
+        emit(op.opcode
+                | (imm & 0x1F) << 7
+                | op.funct3 << 12
+                | rs1 << 15
+                | rs2 << 20
+                | ((imm >> 5) & 0x7F) << 25);
+    }
+
+    // Emit an instruction for this source line.
     void emit(uint32_t instruction) {
         bin.push_back(instruction);
         binLine.push_back(lineNumber);
