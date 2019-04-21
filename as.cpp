@@ -303,8 +303,8 @@ private:
         // Start of line. Skip whitespace.
         skipWhitespace();
 
-        // Grab a token. This could be a label or an operator.
-        std::string opOrLabel = readToken();
+        // Grab an identifier. This could be a label or an operator.
+        std::string opOrLabel = readIdentifier();
 
         // See if it's a label.
         if (!opOrLabel.empty()) {
@@ -320,7 +320,7 @@ private:
                 labels[opOrLabel] = bin.size()*4;
 
                 // Read the operator.
-                opOrLabel = readToken();
+                opOrLabel = readIdentifier();
             }
         }
 
@@ -479,27 +479,27 @@ private:
         return false;
     }
 
-    // Return the next token, or an empty string if there isn't one.
-    // A token is any sequence of alpha-numeric characters, or underscore, not
+    // Return the next identifier, or an empty string if there isn't one.
+    // An identifier is any sequence of alpha-numeric characters, or underscore, not
     // starting with a digit. Always skips subsequent whitespace.
-    std::string readToken() {
-        std::string token;
+    std::string readIdentifier() {
+        std::string id;
 
         // Keep track of where we started, for error reporting.
         previousToken = s;
 
         while (isalnum(*s) || *s == '_') {
             if (isdigit(*s) && s == previousToken) {
-                // Can't start with digit, this isn't a token.
+                // Can't start with digit, this isn't an identifier.
                 return "";
             }
 
-            token += *s++;
+            id += *s++;
         }
 
         skipWhitespace();
 
-        return token;
+        return id;
     }
 
     // Read a signed integer immediate value. The immediate must fit in the specified
@@ -586,9 +586,9 @@ private:
     }
 
     // Read a register name and return its number. Emits an error
-    // if the token is missing or is not a register name.
+    // if the identifier is missing or is not a register name.
     int readRegister(const std::string &role) {
-        std::string regName = readToken();
+        std::string regName = readIdentifier();
         if (regName.empty()) {
             std::ostringstream ss;
             ss << "Expected " << role << " register";
