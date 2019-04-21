@@ -317,7 +317,7 @@ private:
                 }
 
                 // It's a label, record it.
-                labels[opOrLabel] = bin.size()*4;
+                labels[opOrLabel] = pc();
 
                 // Read the operator.
                 opOrLabel = readIdentifier();
@@ -408,7 +408,15 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int32_t imm = readImmediate(op.bits);
+                    std::string label = readIdentifier();
+                    int32_t imm;
+                    if (label.empty()) {
+                        imm = readImmediate(op.bits);
+                    } else {
+                        // Labels are PC-relative.
+                        uint32_t target = labels.at(label);
+                        imm = target - (pc() + 4);
+                    }
                     if ((imm & 0x1) != 0) {
                         s = previousToken;
                         error("Immediate must be even");
@@ -583,6 +591,11 @@ private:
     // Return a reference to the current line.
     const std::string &currentLine() {
         return lines[lineNumber];
+    }
+
+    // Return the PC of the instruction being assembled, in bytes.
+    uint32_t pc() {
+        return bin.size()*4;
     }
 
     // Read a register name and return its number. Emits an error
