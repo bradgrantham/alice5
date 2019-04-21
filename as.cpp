@@ -134,6 +134,10 @@ public:
         operators["srli"]  = Operator{FORMAT_I, 0b0010011, 0b101, 0b0000000, 5};
         operators["srai"]  = Operator{FORMAT_I, 0b0010011, 0b101, 0b0100000, 5};
 
+        // Uppers.
+        operators["lui"]   = Operator{FORMAT_U, 0b0110111, 0b000, 0b0000000, 22};
+        operators["auipc"] = Operator{FORMAT_U, 0b0010111, 0b000, 0b0000000, 22};
+
         // Stores.
         operators["sb"]    = Operator{FORMAT_S, 0b0100011, 0b000, 0b0100000, 12};
         operators["sh"]    = Operator{FORMAT_S, 0b0100011, 0b001, 0b0100000, 12};
@@ -360,6 +364,16 @@ private:
                     break;
                 }
 
+                case FORMAT_U: {
+                    int rd = readRegister("destination");
+                    if (!foundChar(',')) {
+                        error("Expected comma");
+                    }
+                    uint32_t imm = readImmediate(op.bits);
+                    emitU(op, rd, imm);
+                    break;
+                }
+
                 default: {
                     assert(false);
                 }
@@ -513,6 +527,13 @@ private:
                 | rs1 << 15
                 | rs2 << 20
                 | ((imm >> 5) & 0x7F) << 25);
+    }
+
+    // Emit a FORMAT_U instruction.
+    void emitU(const Operator &op, int rd, uint32_t imm) {
+        emit(op.opcode
+                | rd << 7
+                | imm << 12);
     }
 
     // Emit an instruction for this source line.
