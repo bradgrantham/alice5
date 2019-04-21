@@ -48,6 +48,7 @@ std::string readFileContents(const std::string &pathname)
 enum Format {
     FORMAT_R,
     FORMAT_I,
+    FORMAT_IL,  // For loads: same binary as FORMAT_I but different assembly.
     FORMAT_S,
     FORMAT_SB,
     FORMAT_U,
@@ -137,6 +138,13 @@ public:
         // Uppers.
         operators["lui"]   = Operator{FORMAT_U,  0b0110111, 0b000, 0b0000000, 22};
         operators["auipc"] = Operator{FORMAT_U,  0b0010111, 0b000, 0b0000000, 22};
+
+        // Loads.
+        operators["lb"]    = Operator{FORMAT_IL, 0b0000011, 0b000, 0b0000000, 12};
+        operators["lbu"]   = Operator{FORMAT_IL, 0b0000011, 0b100, 0b0000000, 12};
+        operators["lh"]    = Operator{FORMAT_IL, 0b0000011, 0b001, 0b0000000, 12};
+        operators["lhu"]   = Operator{FORMAT_IL, 0b0000011, 0b101, 0b0000000, 12};
+        operators["lw"]    = Operator{FORMAT_IL, 0b0000011, 0b010, 0b0000000, 12};
 
         // Stores.
         operators["sb"]    = Operator{FORMAT_S,  0b0100011, 0b000, 0b0100000, 12};
@@ -353,6 +361,23 @@ private:
                         error("Expected comma");
                     }
                     uint32_t imm = readImmediate(op.bits);
+                    emitI(op, rd, rs, imm);
+                    break;
+                }
+
+                case FORMAT_IL: {
+                    int rd = readRegister("destination");
+                    if (!foundChar(',')) {
+                        error("Expected comma");
+                    }
+                    uint32_t imm = readImmediate(op.bits);
+                    if (!foundChar('(')) {
+                        error("Expected open parenthesis");
+                    }
+                    int rs = readRegister("source");
+                    if (!foundChar(')')) {
+                        error("Expected close parenthesis");
+                    }
                     emitI(op, rd, rs, imm);
                     break;
                 }
