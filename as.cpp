@@ -47,6 +47,7 @@ std::string readFileContents(const std::string &pathname)
 // Types of operators.
 enum OpType {
     OP_TYPE_I,
+    OP_TYPE_IS,
 };
 
 // Information about each type of operator.
@@ -61,6 +62,9 @@ struct Operator {
 
     // Bits 25 through 31.
     uint32_t funct7;
+
+    // Max number of bits in immediate.
+    int bits;
 };
 
 // ----------------------------------------------------------------------
@@ -98,7 +102,19 @@ public:
         : inPathname(inPathname), outPathname(outPathname) {
 
         // Build our maps.
-        operators["addi"] = Operator{OP_TYPE_I, 0b010011, 0b000, 0};
+
+        // Basic integer arithmetic.
+        operators["addi"]  = Operator{OP_TYPE_I, 0b010011, 0b000, 0b0000000, 12};
+        operators["andi"]  = Operator{OP_TYPE_I, 0b010011, 0b111, 0b0000000, 12};
+        operators["ori"]   = Operator{OP_TYPE_I, 0b010011, 0b110, 0b0000000, 12};
+        operators["xori"]  = Operator{OP_TYPE_I, 0b010011, 0b100, 0b0000000, 12};
+        operators["slti"]  = Operator{OP_TYPE_I, 0b010011, 0b010, 0b0000000, 12};
+        operators["sltiu"] = Operator{OP_TYPE_I, 0b010011, 0b011, 0b0000000, 12};
+
+        // Shifts.
+        operators["slli"]  = Operator{OP_TYPE_I, 0b010011, 0b001, 0b0000000, 5};
+        operators["srli"]  = Operator{OP_TYPE_I, 0b010011, 0b101, 0b0000000, 5};
+        operators["srai"]  = Operator{OP_TYPE_I, 0b010011, 0b101, 0b0100000, 5};
 
         for (int reg = 0; reg < 32; reg++) {
             std::ostringstream ss;
@@ -183,15 +199,16 @@ private:
         // See if it's an operator.
         if (!opOrLabel.empty()) {
             // Parse parameters.
-            auto op = operators.find(opOrLabel);
-            if (op == operators.end()) {
+            auto opItr = operators.find(opOrLabel);
+            if (opItr == operators.end()) {
                 s = previousToken;
                 std::ostringstream ss;
                 ss << "Unknown operator \"" << opOrLabel << "\"";
                 error(ss.str());
             }
+            const Operator &op = opItr->second;
 
-            if (op->second.opType == OP_TYPE_I) {
+            if (op.opType == OP_TYPE_I) {
                 // Immediate.
                 int rd = readRegister("destination");
                 if (!foundChar(',')) {
@@ -201,8 +218,8 @@ private:
                 if (!foundChar(',')) {
                     error("Expected comma");
                 }
-                uint32_t imm = readImmediate(12);
-                emitI(op->second, rd, rs, imm);
+                uint32_t imm = readImmediate(op.bits);
+                emitI(op, rd, rs, imm);
             }
         }
 
@@ -331,7 +348,12 @@ private:
     }
 
     void emitI(const Operator &op, int rd, int rs, uint32_t imm) {
-        emit(op.opcode | (rd << 7) | (rs << 15) | (imm << 20));
+        emit(op.opcode
+                | rd << 7
+                | op.funct3 << 12
+                | rs << 15
+                | imm << 20
+                | op.funct7 << 25);
     }
 
     void emit(uint32_t instruction) {
