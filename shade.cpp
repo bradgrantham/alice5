@@ -47,10 +47,10 @@
 
 // Enable this to check if our virtual RAM is being initialized properly.
 #define CHECK_MEMORY_ACCESS
-const bool throwOnUninitializedMemoryRead = false;
 // Enable this to check if our virtual registers are being initialized properly.
 #define CHECK_REGISTER_ACCESS
 
+const bool throwOnUninitializedMemoryRead = false;
 struct UninitializedMemoryReadException : std::runtime_error
 {
     UninitializedMemoryReadException(const std::string& what) : std::runtime_error(what) {}
@@ -1372,19 +1372,17 @@ Interpreter::Interpreter(const Program *pgm)
     }
 }
 
-void Interpreter::checkMemory(size_t address, size_t size)
+const size_t MEMORY_CHECK_OKAY = 0xFFFFFFFF;
+size_t Interpreter::checkMemory(size_t address, size_t size)
 {
 #ifdef CHECK_MEMORY_ACCESS
     for (size_t a = address; a < address + size; a++) {
         if (!memoryInitialized[a]) {
-            if(throwOnUninitializedMemoryRead) {
-                throw UninitializedMemoryReadException("Warning: Reading uninitialized memory " + std::to_string(a) + " of size " + std::to_string(size) + "\n");
-            } else {
-                std::cerr << "Warning: Reading uninitialized memory " << a << " of size " << size << "\n";
-            }
+            return a;
         }
     }
 #endif
+    return MEMORY_CHECK_OKAY;
 }
 
 void Interpreter::markMemory(size_t address, size_t size)
@@ -1399,7 +1397,10 @@ T& Interpreter::objectInClassAt(SpvStorageClass clss, size_t offset, bool readin
 {
     size_t addr = pgm->memoryRegions.at(clss).base + offset;
     if (reading) {
-        checkMemory(addr, size);
+        size_t result = checkMemory(addr, size);
+        if(result != MEMORY_CHECK_OKAY) {
+            std::cerr << "Warning: Reading uninitialized byte " << (result - addr) << " within object at " << offset << " of size " << size << " within class " << clss << " (base " << pgm->memoryRegions.at(clss).base << ")\n";
+        }
     } else {
         markMemory(addr, size);
     }
@@ -1446,23 +1447,29 @@ void Interpreter::stepLoad(const InsnLoad& insn)
     Pointer& ptr = pointers.at(insn.pointerId);
     Register& obj = registers.at(insn.resultId);
     size_t size = pgm->typeSizes.at(insn.type);
-    try {
-        checkMemory(ptr.address, size);
-    } catch(const UninitializedMemoryReadException& e) {
-        std::cerr << "uninitialized read by stepLoad from pointer " << insn.pointerId;
+    size_t result = checkMemory(ptr.address, size);
+    if(result != MEMORY_CHECK_OKAY) {
+        std::cerr << "Warning: Reading uninitialized byte " << result << " within object at " << ptr.address << " of size " << size << " in stepLoad from pointer " << insn.pointerId;
+
         if(pgm->names.find(insn.pointerId) != pgm->names.end()) {
             std::cerr << " named \"" << pgm->names.at(insn.pointerId) << "\"";
         } else {
             std::cerr << " with no name";
         }
+
         if(insn.lineInfo.fileId != NO_FILE) {
             std::cerr << " at file \"" << pgm->strings.at(insn.lineInfo.fileId) << "\":" << insn.lineInfo.line;
         } else {
             std::cerr << " with no source line information";
         }
+
         std::cerr << '\n';
-        throw;
+
+        if(throwOnUninitializedMemoryRead) {
+            throw UninitializedMemoryReadException("Warning: Reading uninitialized memory " + std::to_string(ptr.address) + " of size " + std::to_string(size) + "\n");
+        }
     }
+
     std::copy(memory + ptr.address, memory + ptr.address + size, obj.data);
     obj.initialized = true;
     if(false) {
@@ -3442,7 +3449,7 @@ void Interpreter::set(const std::string& name, const T& v)
         assert(i.size == sizeof(T));
         objectInClassAt<T>(SpvStorageClassInput, i.location * 256 + i.offsetWithinLocation, false, sizeof(v)) = v; // XXX magic number
     } else {
-        throw std::runtime_error("couldn't find variable " + name + " in Interpreter::set");
+        std::cerr << "couldn't find variable \"" << name << "\" in Interpreter::set (may have been optimized away)\n";
     }
 }
 

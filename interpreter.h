@@ -34,7 +34,7 @@ struct Interpreter
     }
 
     // Check that this memory region has been initialized.
-    void checkMemory(size_t offset, size_t size);
+    size_t checkMemory(size_t offset, size_t size);
     // Mark this memory region as initialized.
     void markMemory(size_t offset, size_t size);
 
