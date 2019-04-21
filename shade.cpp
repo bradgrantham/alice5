@@ -4086,6 +4086,7 @@ void eval(Interpreter &interpreter, float x, float y, v4float& color)
 {
     interpreter.clearPrivateVariables();
     interpreter.set(SpvStorageClassInput, 0, v4float {x, y}); // gl_FragCoord is always #0 
+    interpreter.set(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
     interpreter.run();
     interpreter.get(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
 }
