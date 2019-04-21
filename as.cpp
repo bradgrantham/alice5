@@ -118,11 +118,19 @@ public:
         operators["srli"]  = Operator{OP_TYPE_I, 0b010011, 0b101, 0b0000000, 5};
         operators["srai"]  = Operator{OP_TYPE_I, 0b010011, 0b101, 0b0100000, 5};
 
-        for (int reg = 0; reg < 32; reg++) {
-            std::ostringstream ss;
-            ss << "x" << reg;
-            registers[ss.str()] = reg;
-        }
+        // Registers.
+        addRegisters("x", 0, 31, 0);
+        registers["ra"] = 1;
+        registers["sp"] = 2;
+        registers["gp"] = 3;
+        registers["tp"] = 4;
+        addRegisters("t", 0, 2, 5);
+        registers["fp"] = 8;
+        addRegisters("s", 0, 1, 8);
+        addRegisters("a", 0, 7, 10);
+        addRegisters("s", 2, 11, 18);
+        addRegisters("t", 3, 6, 28);
+        addRegisters("f", 0, 31, 32);
     }
 
     void setVerbose(bool verbose) {
@@ -233,6 +241,16 @@ public:
     }
 
 private:
+    // Add known registers with prefix from "first" to "last" inclusive, starting
+    // at physical register "start".
+    void addRegisters(const std::string &prefix, int first, int last, int start) {
+        for (int i = first; i <= last; i++) {
+            std::ostringstream ss;
+            ss << prefix << i;
+            registers[ss.str()] = i - first + start;
+        }
+    }
+
     // Reads one line of input, either one character past
     // the newline, or on the nul if there is no newline.
     void parseLine() {
