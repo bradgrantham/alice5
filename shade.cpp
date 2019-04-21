@@ -50,6 +50,13 @@
 // Enable this to check if our virtual registers are being initialized properly.
 #define CHECK_REGISTER_ACCESS
 
+const bool throwOnUninitializedMemoryRead = false;
+struct UninitializedMemoryReadException : std::runtime_error
+{
+    UninitializedMemoryReadException(const std::string& what) : std::runtime_error(what) {}
+};
+
+
 #define DEFAULT_WIDTH (640/2)
 #define DEFAULT_HEIGHT (360/2)
 
@@ -133,6 +140,8 @@ struct Program
     bool hasUnimplemented;
     bool verbose;
     std::set<uint32_t> capabilities;
+
+    LineInfo currentLine;
 
     // main id-to-thingie map containing extinstsets, types, variables, etc
     // secondary maps of entryPoint, decorations, names, etc
@@ -540,6 +549,18 @@ struct Program
                 pgm->typeSizes[id] = 0;
                 if(pgm->verbose) {
                     std::cout << "TypeVoid " << id << "\n";
+                }
+                break;
+            }
+
+            case SpvOpLine: {
+                // XXX result id
+                uint32_t fileId = nextu();
+                uint32_t line = nextu();
+                uint32_t column = nextu();
+                pgm->currentLine = LineInfo {fileId, line, column};
+                if(pgm->verbose) {
+                    std::cout << "Line " << fileId << " (\"" << pgm->strings[fileId] << "\") line " << line << " column " << column << "\n";
                 }
                 break;
             }
@@ -1351,15 +1372,17 @@ Interpreter::Interpreter(const Program *pgm)
     }
 }
 
-void Interpreter::checkMemory(size_t address, size_t size)
+const size_t MEMORY_CHECK_OKAY = 0xFFFFFFFF;
+size_t Interpreter::checkMemory(size_t address, size_t size)
 {
 #ifdef CHECK_MEMORY_ACCESS
     for (size_t a = address; a < address + size; a++) {
         if (!memoryInitialized[a]) {
-            std::cerr << "Warning: Reading uninitialized memory " << a << "\n";
+            return a;
         }
     }
 #endif
+    return MEMORY_CHECK_OKAY;
 }
 
 void Interpreter::markMemory(size_t address, size_t size)
@@ -1374,7 +1397,10 @@ T& Interpreter::objectInClassAt(SpvStorageClass clss, size_t offset, bool readin
 {
     size_t addr = pgm->memoryRegions.at(clss).base + offset;
     if (reading) {
-        checkMemory(addr, size);
+        size_t result = checkMemory(addr, size);
+        if(result != MEMORY_CHECK_OKAY) {
+            std::cerr << "Warning: Reading uninitialized byte " << (result - addr) << " within object at " << offset << " of size " << size << " within class " << clss << " (base " << pgm->memoryRegions.at(clss).base << ")\n";
+        }
     } else {
         markMemory(addr, size);
     }
@@ -1421,7 +1447,29 @@ void Interpreter::stepLoad(const InsnLoad& insn)
     Pointer& ptr = pointers.at(insn.pointerId);
     Register& obj = registers.at(insn.resultId);
     size_t size = pgm->typeSizes.at(insn.type);
-    checkMemory(ptr.address, size);
+    size_t result = checkMemory(ptr.address, size);
+    if(result != MEMORY_CHECK_OKAY) {
+        std::cerr << "Warning: Reading uninitialized byte " << result << " within object at " << ptr.address << " of size " << size << " in stepLoad from pointer " << insn.pointerId;
+
+        if(pgm->names.find(insn.pointerId) != pgm->names.end()) {
+            std::cerr << " named \"" << pgm->names.at(insn.pointerId) << "\"";
+        } else {
+            std::cerr << " with no name";
+        }
+
+        if(insn.lineInfo.fileId != NO_FILE) {
+            std::cerr << " at file \"" << pgm->strings.at(insn.lineInfo.fileId) << "\":" << insn.lineInfo.line;
+        } else {
+            std::cerr << " with no source line information";
+        }
+
+        std::cerr << '\n';
+
+        if(throwOnUninitializedMemoryRead) {
+            throw UninitializedMemoryReadException("Warning: Reading uninitialized memory " + std::to_string(ptr.address) + " of size " + std::to_string(size) + "\n");
+        }
+    }
+
     std::copy(memory + ptr.address, memory + ptr.address + size, obj.data);
     obj.initialized = true;
     if(false) {
@@ -3267,7 +3315,6 @@ void Interpreter::stepPhi(const InsnPhi& insn)
     }
 }
 
-// XXX image binding
 // XXX implicit LOD level and thus texel interpolants
 void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn)
 {
@@ -3312,7 +3359,7 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
                 t = static_cast<unsigned int>(wrapped * si.image->height);
             }
 
-            si.image->get(s, t, rgba);
+            si.image->get(s, si.image->height - 1 - t, rgba);
 
         } else {
 
@@ -3338,6 +3385,81 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
         } else {
 
             std::cout << "Unhandled type for ImageSampleImplicitLod result\n";
+
+        }
+    }, pgm->types.at(resultType));
+}
+
+// XXX explicit LOD level and thus texel interpolants
+void Interpreter::stepImageSampleExplicitLod(const InsnImageSampleExplicitLod& insn)
+{
+    // uint32_t type; // result type
+    // uint32_t resultId; // SSA register for result value
+    // uint32_t sampledImageId; // operand from register
+    // uint32_t coordinateId; // operand from register
+    // uint32_t imageOperands; // ImageOperands (optional)
+    v4float rgba;
+
+    // Sample the image
+    std::visit([this, &insn, &rgba](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeVector>) {
+
+            assert(type.count == 2);
+
+            auto [u, v] = fromRegister<v2float>(insn.coordinateId);
+
+            int imageIndex = fromRegister<int>(insn.sampledImageId);
+            const SampledImage& si = pgm->sampledImages[imageIndex];
+
+            unsigned int s, t;
+
+            if(si.sampler.uAddressMode == Sampler::CLAMP_TO_EDGE) {
+                s = std::clamp(static_cast<unsigned int>(u * si.image->width), 0u, si.image->width - 1);
+            } else {
+                float wrapped = (u >= 0) ? fmodf(u, 1.0f) : (1 + fmodf(u, 1.0f));
+                if(wrapped == 1.0f) /* fmodf of a negative number could return 0, after which "wrapped" would be 1 */
+                    wrapped = 0.0f;
+                s = static_cast<unsigned int>(wrapped * si.image->width);
+            }
+
+            if(si.sampler.vAddressMode == Sampler::CLAMP_TO_EDGE) {
+                t = std::clamp(static_cast<unsigned int>(v * si.image->height), 0u, si.image->height - 1);
+            } else {
+                float wrapped = (v >= 0) ? fmodf(v, 1.0f) : (1 + fmodf(v, 1.0f));
+                if(wrapped == 1.0f) /* fmodf of a negative number could return 0, after which "wrapped" would be 1 */
+                    wrapped = 0.0f;
+                t = static_cast<unsigned int>(wrapped * si.image->height);
+            }
+
+            si.image->get(s, si.image->height - 1 - t, rgba);
+
+        } else {
+
+            std::cout << "Unhandled type for ImageSampleExplicitLod coordinate\n";
+
+        }
+    }, pgm->types.at(registers[insn.coordinateId].type));
+
+    uint32_t resultType = std::get<TypeVector>(pgm->types.at(registers[insn.resultId].type)).type;
+
+    // Store the sample result in register
+    std::visit([this, &insn, rgba](auto&& type) {
+
+        using T = std::decay_t<decltype(type)>;
+
+        if constexpr (std::is_same_v<T, TypeFloat>) {
+
+            toRegister<v4float>(insn.resultId) = rgba;
+
+        // else if constexpr (std::is_same_v<T, TypeInt>)
+
+
+        } else {
+
+            std::cout << "Unhandled type for ImageSampleExplicitLod result\n";
 
         }
     }, pgm->types.at(resultType));
@@ -3401,7 +3523,7 @@ void Interpreter::set(const std::string& name, const T& v)
         assert(i.size == sizeof(T));
         objectInClassAt<T>(SpvStorageClassInput, i.location * 256 + i.offsetWithinLocation, false, sizeof(v)) = v; // XXX magic number
     } else {
-        throw std::runtime_error("couldn't find variable " + name + " in Interpreter::set");
+        std::cerr << "couldn't find variable \"" << name << "\" in Interpreter::set (may have been optimized away)\n";
     }
 }
 
@@ -3430,6 +3552,7 @@ void Interpreter::run()
         }
     }
 
+    callstack.clear();
     callstack.push_back(EXECUTION_ENDED); // caller PC
     callstack.push_back(NO_RETURN_REGISTER); // return register
     pc = pgm->mainFunction->start;
@@ -3548,13 +3671,13 @@ struct Compiler
                 uint32_t imm;
                 if (asIntegerConstant(insnIAdd->operand1Id, imm)) {
                     // XXX Verify that immediate fits in 12 bits.
-                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->type,
-                                insnIAdd->resultId, insnIAdd->operand2Id, imm));
+                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
+                                insnIAdd->type, insnIAdd->resultId, insnIAdd->operand2Id, imm));
                     replaced = true;
                 } else if (asIntegerConstant(insnIAdd->operand2Id, imm)) {
                     // XXX Verify that immediate fits in 12 bits.
-                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->type,
-                                insnIAdd->resultId, insnIAdd->operand1Id, imm));
+                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
+                                insnIAdd->type, insnIAdd->resultId, insnIAdd->operand1Id, imm));
                     replaced = true;
                 }
             }
@@ -3843,8 +3966,9 @@ void RiscVAddi::emit(Compiler *compiler)
 
 // -----------------------------------------------------------------------------------
 
-Instruction::Instruction(uint32_t resId)
-    : blockId(NO_BLOCK_ID),
+Instruction::Instruction(const LineInfo& lineInfo_, uint32_t resId)
+    : lineInfo(lineInfo_),
+      blockId(NO_BLOCK_ID),
       resId(resId)
 {
     // Nothing.
@@ -4036,6 +4160,7 @@ void eval(Interpreter &interpreter, float x, float y, v4float& color)
 {
     interpreter.clearPrivateVariables();
     interpreter.set(SpvStorageClassInput, 0, v4float {x, y}); // gl_FragCoord is always #0 
+    interpreter.set(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
     interpreter.run();
     interpreter.get(SpvStorageClassOutput, 0, color); // color is out #0 in preamble
 }
@@ -4257,7 +4382,9 @@ void sortInDependencyOrder(
         if(passesToVisit.count(pass) > 0) {
             passesToVisit.erase(pass);
             for(ShaderToyImage& input: pass->inputs) {
-                visit(channelIdsToPasses.at(input.id));
+                if(channelIdsToPasses.find(input.id) != channelIdsToPasses.end()) {
+                    visit(channelIdsToPasses.at(input.id));
+                }
             }
             passesOrdered.push_back(pass);
         }
@@ -4365,7 +4492,7 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
                 int rowsize = textureWidth * Image::getPixelSize(image->format);
                 bool flipInY = ((input.find("vflip") != input.end()) && (input["vflip"].get<std::string>() == std::string("true")));
 
-                if(flipInY) {
+                if(!flipInY) {
                     for(int row = 0; row < textureHeight; row++) {
                         std::copy(s + rowsize * row, s + rowsize * (row + 1), d + rowsize * row);
                     }
@@ -4411,7 +4538,8 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
         sources.push_back(shader);
 
         int channelId = pass["outputs"][0]["id"].get<int>();
-        ImagePtr image(new Image(Image::FORMAT_R8G8B8_UNORM, Image::DIM_2D, params.outputWidth, params.outputHeight));
+        Image::Format format = (pass["name"].get<std::string>() == "Image") ? Image::FORMAT_R8G8B8_UNORM : Image::FORMAT_R32G32B32A32_SFLOAT;
+        ImagePtr image(new Image(format, Image::DIM_2D, params.outputWidth, params.outputHeight));
         ShaderToyImage output {0, channelId, { image, Sampler {}}};
         RenderPassPtr rpass(new RenderPass(
             pass["name"],
@@ -4429,9 +4557,11 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
     for(auto& pass: renderPasses) {
         for(int i = 0; i < pass->inputs.size(); i++) {
             ShaderToyImage& input = pass->inputs[i];
-            int channelId = input.id;
-            ShaderToyImage& source = channelIdsToPasses.at(channelId)->outputs[0];
-            pass->inputs[i].sampledImage = source.sampledImage;
+            if(!input.sampledImage.image) {
+                int channelId = input.id;
+                ShaderToyImage& source = channelIdsToPasses.at(channelId)->outputs[0];
+                pass->inputs[i].sampledImage = source.sampledImage;
+            }
         }
     }
     
@@ -4792,6 +4922,17 @@ int main(int argc, char **argv)
         double elapsedSeconds = timer.elapsed();
             std::cout << "Shading pass " << pass->name << " took " << elapsedSeconds << " seconds ("
             << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
+        }
+
+        if(false) {
+            ShaderToyImage output = renderPasses[0]->outputs[0];
+            ImagePtr image = output.sampledImage.image;
+
+            std::ostringstream ss;
+            ss << "pass0" << std::setfill('0') << std::setw(4) << frameNumber << std::setw(0) << ".ppm";
+            std::ofstream imageFile(ss.str(), std::ios::out | std::ios::binary);
+            image->writePpm(imageFile);
+            imageFile.close();
         }
 
         ShaderToyImage output = renderPasses.back()->outputs[0];

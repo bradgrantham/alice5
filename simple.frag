@@ -67,4 +67,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // vec3 y = vec3(4.0, 5.0, 6.0);
     // vec3 z = x + y;
 
+    // swizzle test
+    if(false) {
+        vec4 p;
+        p.xy = vec2(2.0, 3.0);
+        p.zw = vec2(5.0, 7.0);
+    }
 }

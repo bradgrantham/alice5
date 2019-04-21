@@ -14,6 +14,7 @@ void stepCompositeConstruct(const InsnCompositeConstruct& insn);
 void stepCompositeExtract(const InsnCompositeExtract& insn);
 void stepCompositeInsert(const InsnCompositeInsert& insn);
 void stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn);
+void stepImageSampleExplicitLod(const InsnImageSampleExplicitLod& insn);
 void stepConvertFToS(const InsnConvertFToS& insn);
 void stepConvertSToF(const InsnConvertSToF& insn);
 void stepFNegate(const InsnFNegate& insn);

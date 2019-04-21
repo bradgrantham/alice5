@@ -7,7 +7,7 @@
 
 // OpNop instruction (code 0).
 struct InsnNop : public Instruction {
-    InsnNop() : Instruction(NO_REGISTER) {
+    InsnNop(const LineInfo& lineInfo_) : Instruction(lineInfo_, NO_REGISTER) {
     }
     virtual void step(Interpreter *interpreter) { interpreter->stepNop(*this); }
     virtual uint32_t opcode() const { return SpvOpNop; }
@@ -16,7 +16,7 @@ struct InsnNop : public Instruction {
 
 // OpFunctionParameter instruction (code 55).
 struct InsnFunctionParameter : public Instruction {
-    InsnFunctionParameter(uint32_t type, uint32_t resultId) : Instruction(resultId), type(type), resultId(resultId) {
+    InsnFunctionParameter(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId) {
     }
     uint32_t type; // result type
     uint32_t resultId; // SSA register for result value
@@ -28,7 +28,7 @@ struct InsnFunctionParameter : public Instruction {
 
 // OpFunctionCall instruction (code 57).
 struct InsnFunctionCall : public Instruction {
-    InsnFunctionCall(uint32_t type, uint32_t resultId, uint32_t functionId, std::vector<uint32_t> operandId) : Instruction(resultId), type(type), resultId(resultId), functionId(functionId), operandId(operandId) {
+    InsnFunctionCall(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t functionId, std::vector<uint32_t> operandId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), functionId(functionId), operandId(operandId) {
         for (auto _argId : operandId) {
             argIds.insert(_argId);
         }
@@ -45,7 +45,7 @@ struct InsnFunctionCall : public Instruction {
 
 // OpLoad instruction (code 61).
 struct InsnLoad : public Instruction {
-    InsnLoad(uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess) : Instruction(resultId), type(type), resultId(resultId), pointerId(pointerId), memoryAccess(memoryAccess) {
+    InsnLoad(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), pointerId(pointerId), memoryAccess(memoryAccess) {
         argIds.insert(pointerId);
     }
     uint32_t type; // result type
@@ -60,7 +60,7 @@ struct InsnLoad : public Instruction {
 
 // OpStore instruction (code 62).
 struct InsnStore : public Instruction {
-    InsnStore(uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess) : Instruction(NO_REGISTER), pointerId(pointerId), objectId(objectId), memoryAccess(memoryAccess) {
+    InsnStore(const LineInfo& lineInfo_, uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess) : Instruction(lineInfo_, NO_REGISTER), pointerId(pointerId), objectId(objectId), memoryAccess(memoryAccess) {
         argIds.insert(pointerId);
         argIds.insert(objectId);
     }
@@ -75,7 +75,7 @@ struct InsnStore : public Instruction {
 
 // OpAccessChain instruction (code 65).
 struct InsnAccessChain : public Instruction {
-    InsnAccessChain(uint32_t type, uint32_t resultId, uint32_t baseId, std::vector<uint32_t> indexesId) : Instruction(resultId), type(type), resultId(resultId), baseId(baseId), indexesId(indexesId) {
+    InsnAccessChain(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t baseId, std::vector<uint32_t> indexesId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), baseId(baseId), indexesId(indexesId) {
         argIds.insert(baseId);
         for (auto _argId : indexesId) {
             argIds.insert(_argId);
@@ -93,7 +93,7 @@ struct InsnAccessChain : public Instruction {
 
 // OpVectorShuffle instruction (code 79).
 struct InsnVectorShuffle : public Instruction {
-    InsnVectorShuffle(uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id, std::vector<uint32_t> componentsId) : Instruction(resultId), type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id), componentsId(componentsId) {
+    InsnVectorShuffle(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id, std::vector<uint32_t> componentsId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id), componentsId(componentsId) {
         argIds.insert(vector1Id);
         argIds.insert(vector2Id);
     }
@@ -109,7 +109,7 @@ struct InsnVectorShuffle : public Instruction {
 
 // OpCompositeConstruct instruction (code 80).
 struct InsnCompositeConstruct : public Instruction {
-    InsnCompositeConstruct(uint32_t type, uint32_t resultId, std::vector<uint32_t> constituentsId) : Instruction(resultId), type(type), resultId(resultId), constituentsId(constituentsId) {
+    InsnCompositeConstruct(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, std::vector<uint32_t> constituentsId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), constituentsId(constituentsId) {
         for (auto _argId : constituentsId) {
             argIds.insert(_argId);
         }
@@ -124,7 +124,7 @@ struct InsnCompositeConstruct : public Instruction {
 
 // OpCompositeExtract instruction (code 81).
 struct InsnCompositeExtract : public Instruction {
-    InsnCompositeExtract(uint32_t type, uint32_t resultId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(resultId), type(type), resultId(resultId), compositeId(compositeId), indexesId(indexesId) {
+    InsnCompositeExtract(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), compositeId(compositeId), indexesId(indexesId) {
         argIds.insert(compositeId);
     }
     uint32_t type; // result type
@@ -138,7 +138,7 @@ struct InsnCompositeExtract : public Instruction {
 
 // OpCompositeInsert instruction (code 82).
 struct InsnCompositeInsert : public Instruction {
-    InsnCompositeInsert(uint32_t type, uint32_t resultId, uint32_t objectId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(resultId), type(type), resultId(resultId), objectId(objectId), compositeId(compositeId), indexesId(indexesId) {
+    InsnCompositeInsert(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t objectId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), objectId(objectId), compositeId(compositeId), indexesId(indexesId) {
         argIds.insert(objectId);
         argIds.insert(compositeId);
     }
@@ -154,7 +154,7 @@ struct InsnCompositeInsert : public Instruction {
 
 // OpImageSampleImplicitLod instruction (code 87).
 struct InsnImageSampleImplicitLod : public Instruction {
-    InsnImageSampleImplicitLod(uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(resultId), type(type), resultId(resultId), sampledImageId(sampledImageId), coordinateId(coordinateId), imageOperands(imageOperands) {
+    InsnImageSampleImplicitLod(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), sampledImageId(sampledImageId), coordinateId(coordinateId), imageOperands(imageOperands) {
         argIds.insert(sampledImageId);
         argIds.insert(coordinateId);
     }
@@ -168,9 +168,25 @@ struct InsnImageSampleImplicitLod : public Instruction {
     virtual std::string name() const { return "OpImageSampleImplicitLod"; }
 };
 
+// OpImageSampleExplicitLod instruction (code 88).
+struct InsnImageSampleExplicitLod : public Instruction {
+    InsnImageSampleExplicitLod(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), sampledImageId(sampledImageId), coordinateId(coordinateId), imageOperands(imageOperands) {
+        argIds.insert(sampledImageId);
+        argIds.insert(coordinateId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t sampledImageId; // operand from register
+    uint32_t coordinateId; // operand from register
+    uint32_t imageOperands; // ImageOperands
+    virtual void step(Interpreter *interpreter) { interpreter->stepImageSampleExplicitLod(*this); }
+    virtual uint32_t opcode() const { return SpvOpImageSampleExplicitLod; }
+    virtual std::string name() const { return "OpImageSampleExplicitLod"; }
+};
+
 // OpConvertFToS instruction (code 110).
 struct InsnConvertFToS : public Instruction {
-    InsnConvertFToS(uint32_t type, uint32_t resultId, uint32_t floatValueId) : Instruction(resultId), type(type), resultId(resultId), floatValueId(floatValueId) {
+    InsnConvertFToS(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t floatValueId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), floatValueId(floatValueId) {
         argIds.insert(floatValueId);
     }
     uint32_t type; // result type
@@ -183,7 +199,7 @@ struct InsnConvertFToS : public Instruction {
 
 // OpConvertSToF instruction (code 111).
 struct InsnConvertSToF : public Instruction {
-    InsnConvertSToF(uint32_t type, uint32_t resultId, uint32_t signedValueId) : Instruction(resultId), type(type), resultId(resultId), signedValueId(signedValueId) {
+    InsnConvertSToF(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t signedValueId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), signedValueId(signedValueId) {
         argIds.insert(signedValueId);
     }
     uint32_t type; // result type
@@ -196,7 +212,7 @@ struct InsnConvertSToF : public Instruction {
 
 // OpFNegate instruction (code 127).
 struct InsnFNegate : public Instruction {
-    InsnFNegate(uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(resultId), type(type), resultId(resultId), operandId(operandId) {
+    InsnFNegate(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operandId(operandId) {
         argIds.insert(operandId);
     }
     uint32_t type; // result type
@@ -209,7 +225,7 @@ struct InsnFNegate : public Instruction {
 
 // OpIAdd instruction (code 128).
 struct InsnIAdd : public Instruction {
-    InsnIAdd(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnIAdd(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -225,7 +241,7 @@ struct InsnIAdd : public Instruction {
 
 // OpFAdd instruction (code 129).
 struct InsnFAdd : public Instruction {
-    InsnFAdd(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFAdd(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -241,7 +257,7 @@ struct InsnFAdd : public Instruction {
 
 // OpISub instruction (code 130).
 struct InsnISub : public Instruction {
-    InsnISub(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnISub(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -256,7 +272,7 @@ struct InsnISub : public Instruction {
 
 // OpFSub instruction (code 131).
 struct InsnFSub : public Instruction {
-    InsnFSub(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFSub(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -271,7 +287,7 @@ struct InsnFSub : public Instruction {
 
 // OpFMul instruction (code 133).
 struct InsnFMul : public Instruction {
-    InsnFMul(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFMul(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -287,7 +303,7 @@ struct InsnFMul : public Instruction {
 
 // OpSDiv instruction (code 135).
 struct InsnSDiv : public Instruction {
-    InsnSDiv(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnSDiv(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -302,7 +318,7 @@ struct InsnSDiv : public Instruction {
 
 // OpFDiv instruction (code 136).
 struct InsnFDiv : public Instruction {
-    InsnFDiv(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFDiv(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -317,7 +333,7 @@ struct InsnFDiv : public Instruction {
 
 // OpFMod instruction (code 141).
 struct InsnFMod : public Instruction {
-    InsnFMod(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFMod(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -332,7 +348,7 @@ struct InsnFMod : public Instruction {
 
 // OpVectorTimesScalar instruction (code 142).
 struct InsnVectorTimesScalar : public Instruction {
-    InsnVectorTimesScalar(uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t scalarId) : Instruction(resultId), type(type), resultId(resultId), vectorId(vectorId), scalarId(scalarId) {
+    InsnVectorTimesScalar(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t scalarId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), vectorId(vectorId), scalarId(scalarId) {
         argIds.insert(vectorId);
         argIds.insert(scalarId);
     }
@@ -347,7 +363,7 @@ struct InsnVectorTimesScalar : public Instruction {
 
 // OpVectorTimesMatrix instruction (code 144).
 struct InsnVectorTimesMatrix : public Instruction {
-    InsnVectorTimesMatrix(uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t matrixId) : Instruction(resultId), type(type), resultId(resultId), vectorId(vectorId), matrixId(matrixId) {
+    InsnVectorTimesMatrix(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t matrixId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), vectorId(vectorId), matrixId(matrixId) {
         argIds.insert(vectorId);
         argIds.insert(matrixId);
     }
@@ -362,7 +378,7 @@ struct InsnVectorTimesMatrix : public Instruction {
 
 // OpMatrixTimesVector instruction (code 145).
 struct InsnMatrixTimesVector : public Instruction {
-    InsnMatrixTimesVector(uint32_t type, uint32_t resultId, uint32_t matrixId, uint32_t vectorId) : Instruction(resultId), type(type), resultId(resultId), matrixId(matrixId), vectorId(vectorId) {
+    InsnMatrixTimesVector(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t matrixId, uint32_t vectorId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), matrixId(matrixId), vectorId(vectorId) {
         argIds.insert(matrixId);
         argIds.insert(vectorId);
     }
@@ -377,7 +393,7 @@ struct InsnMatrixTimesVector : public Instruction {
 
 // OpMatrixTimesMatrix instruction (code 146).
 struct InsnMatrixTimesMatrix : public Instruction {
-    InsnMatrixTimesMatrix(uint32_t type, uint32_t resultId, uint32_t leftMatrixId, uint32_t rightMatrixId) : Instruction(resultId), type(type), resultId(resultId), leftMatrixId(leftMatrixId), rightMatrixId(rightMatrixId) {
+    InsnMatrixTimesMatrix(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t leftMatrixId, uint32_t rightMatrixId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), leftMatrixId(leftMatrixId), rightMatrixId(rightMatrixId) {
         argIds.insert(leftMatrixId);
         argIds.insert(rightMatrixId);
     }
@@ -392,7 +408,7 @@ struct InsnMatrixTimesMatrix : public Instruction {
 
 // OpDot instruction (code 148).
 struct InsnDot : public Instruction {
-    InsnDot(uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id) : Instruction(resultId), type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id) {
+    InsnDot(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id) {
         argIds.insert(vector1Id);
         argIds.insert(vector2Id);
     }
@@ -407,7 +423,7 @@ struct InsnDot : public Instruction {
 
 // OpLogicalOr instruction (code 166).
 struct InsnLogicalOr : public Instruction {
-    InsnLogicalOr(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnLogicalOr(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -422,7 +438,7 @@ struct InsnLogicalOr : public Instruction {
 
 // OpLogicalAnd instruction (code 167).
 struct InsnLogicalAnd : public Instruction {
-    InsnLogicalAnd(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnLogicalAnd(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -437,7 +453,7 @@ struct InsnLogicalAnd : public Instruction {
 
 // OpLogicalNot instruction (code 168).
 struct InsnLogicalNot : public Instruction {
-    InsnLogicalNot(uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(resultId), type(type), resultId(resultId), operandId(operandId) {
+    InsnLogicalNot(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operandId(operandId) {
         argIds.insert(operandId);
     }
     uint32_t type; // result type
@@ -450,7 +466,7 @@ struct InsnLogicalNot : public Instruction {
 
 // OpSelect instruction (code 169).
 struct InsnSelect : public Instruction {
-    InsnSelect(uint32_t type, uint32_t resultId, uint32_t conditionId, uint32_t object1Id, uint32_t object2Id) : Instruction(resultId), type(type), resultId(resultId), conditionId(conditionId), object1Id(object1Id), object2Id(object2Id) {
+    InsnSelect(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t conditionId, uint32_t object1Id, uint32_t object2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), conditionId(conditionId), object1Id(object1Id), object2Id(object2Id) {
         argIds.insert(conditionId);
         argIds.insert(object1Id);
         argIds.insert(object2Id);
@@ -467,7 +483,7 @@ struct InsnSelect : public Instruction {
 
 // OpIEqual instruction (code 170).
 struct InsnIEqual : public Instruction {
-    InsnIEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnIEqual(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -482,7 +498,7 @@ struct InsnIEqual : public Instruction {
 
 // OpINotEqual instruction (code 171).
 struct InsnINotEqual : public Instruction {
-    InsnINotEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnINotEqual(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -497,7 +513,7 @@ struct InsnINotEqual : public Instruction {
 
 // OpSLessThan instruction (code 177).
 struct InsnSLessThan : public Instruction {
-    InsnSLessThan(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnSLessThan(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -512,7 +528,7 @@ struct InsnSLessThan : public Instruction {
 
 // OpSLessThanEqual instruction (code 179).
 struct InsnSLessThanEqual : public Instruction {
-    InsnSLessThanEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnSLessThanEqual(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -527,7 +543,7 @@ struct InsnSLessThanEqual : public Instruction {
 
 // OpFOrdEqual instruction (code 180).
 struct InsnFOrdEqual : public Instruction {
-    InsnFOrdEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdEqual(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -542,7 +558,7 @@ struct InsnFOrdEqual : public Instruction {
 
 // OpFOrdLessThan instruction (code 184).
 struct InsnFOrdLessThan : public Instruction {
-    InsnFOrdLessThan(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdLessThan(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -557,7 +573,7 @@ struct InsnFOrdLessThan : public Instruction {
 
 // OpFOrdGreaterThan instruction (code 186).
 struct InsnFOrdGreaterThan : public Instruction {
-    InsnFOrdGreaterThan(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdGreaterThan(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -572,7 +588,7 @@ struct InsnFOrdGreaterThan : public Instruction {
 
 // OpFOrdLessThanEqual instruction (code 188).
 struct InsnFOrdLessThanEqual : public Instruction {
-    InsnFOrdLessThanEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdLessThanEqual(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -588,7 +604,7 @@ struct InsnFOrdLessThanEqual : public Instruction {
 
 // OpFOrdGreaterThanEqual instruction (code 190).
 struct InsnFOrdGreaterThanEqual : public Instruction {
-    InsnFOrdGreaterThanEqual(uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdGreaterThanEqual(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
         argIds.insert(operand1Id);
         argIds.insert(operand2Id);
     }
@@ -603,7 +619,7 @@ struct InsnFOrdGreaterThanEqual : public Instruction {
 
 // OpPhi instruction (code 245).
 struct InsnPhi : public Instruction {
-    InsnPhi(uint32_t type, uint32_t resultId, std::vector<uint32_t> operandId) : Instruction(resultId), type(type), resultId(resultId), operandId(operandId) {
+    InsnPhi(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, std::vector<uint32_t> operandId) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), operandId(operandId) {
         for (int i = 0; i < operandId.size(); i += 2) {
             argIds.insert(operandId[i]);
         }
@@ -619,7 +635,7 @@ struct InsnPhi : public Instruction {
 
 // OpBranch instruction (code 249).
 struct InsnBranch : public Instruction {
-    InsnBranch(uint32_t targetLabelId) : Instruction(NO_REGISTER), targetLabelId(targetLabelId) {
+    InsnBranch(const LineInfo& lineInfo_, uint32_t targetLabelId) : Instruction(lineInfo_, NO_REGISTER), targetLabelId(targetLabelId) {
         targetLabelIds.insert(targetLabelId);
     }
     uint32_t targetLabelId; // operand from register
@@ -633,7 +649,7 @@ struct InsnBranch : public Instruction {
 
 // OpBranchConditional instruction (code 250).
 struct InsnBranchConditional : public Instruction {
-    InsnBranchConditional(uint32_t conditionId, uint32_t trueLabelId, uint32_t falseLabelId, std::vector<uint32_t> branchweightsId) : Instruction(NO_REGISTER), conditionId(conditionId), trueLabelId(trueLabelId), falseLabelId(falseLabelId), branchweightsId(branchweightsId) {
+    InsnBranchConditional(const LineInfo& lineInfo_, uint32_t conditionId, uint32_t trueLabelId, uint32_t falseLabelId, std::vector<uint32_t> branchweightsId) : Instruction(lineInfo_, NO_REGISTER), conditionId(conditionId), trueLabelId(trueLabelId), falseLabelId(falseLabelId), branchweightsId(branchweightsId) {
         argIds.insert(conditionId);
         targetLabelIds.insert(trueLabelId);
         targetLabelIds.insert(falseLabelId);
@@ -652,7 +668,7 @@ struct InsnBranchConditional : public Instruction {
 
 // OpKill instruction (code 252).
 struct InsnKill : public Instruction {
-    InsnKill() : Instruction(NO_REGISTER) {
+    InsnKill(const LineInfo& lineInfo_) : Instruction(lineInfo_, NO_REGISTER) {
     }
     virtual void step(Interpreter *interpreter) { interpreter->stepKill(*this); }
     virtual uint32_t opcode() const { return SpvOpKill; }
@@ -662,7 +678,7 @@ struct InsnKill : public Instruction {
 
 // OpReturn instruction (code 253).
 struct InsnReturn : public Instruction {
-    InsnReturn() : Instruction(NO_REGISTER) {
+    InsnReturn(const LineInfo& lineInfo_) : Instruction(lineInfo_, NO_REGISTER) {
     }
     virtual void step(Interpreter *interpreter) { interpreter->stepReturn(*this); }
     virtual uint32_t opcode() const { return SpvOpReturn; }
@@ -674,7 +690,7 @@ struct InsnReturn : public Instruction {
 
 // OpReturnValue instruction (code 254).
 struct InsnReturnValue : public Instruction {
-    InsnReturnValue(uint32_t valueId) : Instruction(NO_REGISTER), valueId(valueId) {
+    InsnReturnValue(const LineInfo& lineInfo_, uint32_t valueId) : Instruction(lineInfo_, NO_REGISTER), valueId(valueId) {
         argIds.insert(valueId);
     }
     uint32_t valueId; // operand from register
@@ -688,7 +704,7 @@ struct InsnReturnValue : public Instruction {
 
 // GLSLstd450FAbs instruction (code 4).
 struct InsnGLSLstd450FAbs : public Instruction {
-    InsnGLSLstd450FAbs(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450FAbs(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -701,7 +717,7 @@ struct InsnGLSLstd450FAbs : public Instruction {
 
 // GLSLstd450FSign instruction (code 6).
 struct InsnGLSLstd450FSign : public Instruction {
-    InsnGLSLstd450FSign(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450FSign(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -714,7 +730,7 @@ struct InsnGLSLstd450FSign : public Instruction {
 
 // GLSLstd450Floor instruction (code 8).
 struct InsnGLSLstd450Floor : public Instruction {
-    InsnGLSLstd450Floor(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Floor(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -727,7 +743,7 @@ struct InsnGLSLstd450Floor : public Instruction {
 
 // GLSLstd450Fract instruction (code 10).
 struct InsnGLSLstd450Fract : public Instruction {
-    InsnGLSLstd450Fract(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Fract(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -740,7 +756,7 @@ struct InsnGLSLstd450Fract : public Instruction {
 
 // GLSLstd450Radians instruction (code 11).
 struct InsnGLSLstd450Radians : public Instruction {
-    InsnGLSLstd450Radians(uint32_t type, uint32_t resultId, uint32_t degreesId) : Instruction(NO_REGISTER), type(type), resultId(resultId), degreesId(degreesId) {
+    InsnGLSLstd450Radians(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t degreesId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), degreesId(degreesId) {
         argIds.insert(degreesId);
     }
     uint32_t type; // result type
@@ -753,7 +769,7 @@ struct InsnGLSLstd450Radians : public Instruction {
 
 // GLSLstd450Sin instruction (code 13).
 struct InsnGLSLstd450Sin : public Instruction {
-    InsnGLSLstd450Sin(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Sin(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -766,7 +782,7 @@ struct InsnGLSLstd450Sin : public Instruction {
 
 // GLSLstd450Cos instruction (code 14).
 struct InsnGLSLstd450Cos : public Instruction {
-    InsnGLSLstd450Cos(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Cos(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -779,7 +795,7 @@ struct InsnGLSLstd450Cos : public Instruction {
 
 // GLSLstd450Atan instruction (code 18).
 struct InsnGLSLstd450Atan : public Instruction {
-    InsnGLSLstd450Atan(uint32_t type, uint32_t resultId, uint32_t y_over_xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), y_over_xId(y_over_xId) {
+    InsnGLSLstd450Atan(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t y_over_xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), y_over_xId(y_over_xId) {
         argIds.insert(y_over_xId);
     }
     uint32_t type; // result type
@@ -792,7 +808,7 @@ struct InsnGLSLstd450Atan : public Instruction {
 
 // GLSLstd450Atan2 instruction (code 25).
 struct InsnGLSLstd450Atan2 : public Instruction {
-    InsnGLSLstd450Atan2(uint32_t type, uint32_t resultId, uint32_t yId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), yId(yId), xId(xId) {
+    InsnGLSLstd450Atan2(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t yId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), yId(yId), xId(xId) {
         argIds.insert(yId);
         argIds.insert(xId);
     }
@@ -807,7 +823,7 @@ struct InsnGLSLstd450Atan2 : public Instruction {
 
 // GLSLstd450Pow instruction (code 26).
 struct InsnGLSLstd450Pow : public Instruction {
-    InsnGLSLstd450Pow(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
+    InsnGLSLstd450Pow(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
         argIds.insert(xId);
         argIds.insert(yId);
     }
@@ -822,7 +838,7 @@ struct InsnGLSLstd450Pow : public Instruction {
 
 // GLSLstd450Exp instruction (code 27).
 struct InsnGLSLstd450Exp : public Instruction {
-    InsnGLSLstd450Exp(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Exp(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -835,7 +851,7 @@ struct InsnGLSLstd450Exp : public Instruction {
 
 // GLSLstd450Exp2 instruction (code 29).
 struct InsnGLSLstd450Exp2 : public Instruction {
-    InsnGLSLstd450Exp2(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Exp2(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -848,7 +864,7 @@ struct InsnGLSLstd450Exp2 : public Instruction {
 
 // GLSLstd450Sqrt instruction (code 31).
 struct InsnGLSLstd450Sqrt : public Instruction {
-    InsnGLSLstd450Sqrt(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Sqrt(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -861,7 +877,7 @@ struct InsnGLSLstd450Sqrt : public Instruction {
 
 // GLSLstd450FMin instruction (code 37).
 struct InsnGLSLstd450FMin : public Instruction {
-    InsnGLSLstd450FMin(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
+    InsnGLSLstd450FMin(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
         argIds.insert(xId);
         argIds.insert(yId);
     }
@@ -876,7 +892,7 @@ struct InsnGLSLstd450FMin : public Instruction {
 
 // GLSLstd450FMax instruction (code 40).
 struct InsnGLSLstd450FMax : public Instruction {
-    InsnGLSLstd450FMax(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
+    InsnGLSLstd450FMax(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
         argIds.insert(xId);
         argIds.insert(yId);
     }
@@ -891,7 +907,7 @@ struct InsnGLSLstd450FMax : public Instruction {
 
 // GLSLstd450FClamp instruction (code 43).
 struct InsnGLSLstd450FClamp : public Instruction {
-    InsnGLSLstd450FClamp(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t minValId, uint32_t maxValId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), minValId(minValId), maxValId(maxValId) {
+    InsnGLSLstd450FClamp(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t minValId, uint32_t maxValId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId), minValId(minValId), maxValId(maxValId) {
         argIds.insert(xId);
         argIds.insert(minValId);
         argIds.insert(maxValId);
@@ -908,7 +924,7 @@ struct InsnGLSLstd450FClamp : public Instruction {
 
 // GLSLstd450FMix instruction (code 46).
 struct InsnGLSLstd450FMix : public Instruction {
-    InsnGLSLstd450FMix(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId, uint32_t aId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId), aId(aId) {
+    InsnGLSLstd450FMix(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId, uint32_t aId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId), aId(aId) {
         argIds.insert(xId);
         argIds.insert(yId);
         argIds.insert(aId);
@@ -925,7 +941,7 @@ struct InsnGLSLstd450FMix : public Instruction {
 
 // GLSLstd450Step instruction (code 48).
 struct InsnGLSLstd450Step : public Instruction {
-    InsnGLSLstd450Step(uint32_t type, uint32_t resultId, uint32_t edgeId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), edgeId(edgeId), xId(xId) {
+    InsnGLSLstd450Step(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t edgeId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), edgeId(edgeId), xId(xId) {
         argIds.insert(edgeId);
         argIds.insert(xId);
     }
@@ -940,7 +956,7 @@ struct InsnGLSLstd450Step : public Instruction {
 
 // GLSLstd450SmoothStep instruction (code 49).
 struct InsnGLSLstd450SmoothStep : public Instruction {
-    InsnGLSLstd450SmoothStep(uint32_t type, uint32_t resultId, uint32_t edge0Id, uint32_t edge1Id, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), edge0Id(edge0Id), edge1Id(edge1Id), xId(xId) {
+    InsnGLSLstd450SmoothStep(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t edge0Id, uint32_t edge1Id, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), edge0Id(edge0Id), edge1Id(edge1Id), xId(xId) {
         argIds.insert(edge0Id);
         argIds.insert(edge1Id);
         argIds.insert(xId);
@@ -957,7 +973,7 @@ struct InsnGLSLstd450SmoothStep : public Instruction {
 
 // GLSLstd450Length instruction (code 66).
 struct InsnGLSLstd450Length : public Instruction {
-    InsnGLSLstd450Length(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Length(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -970,7 +986,7 @@ struct InsnGLSLstd450Length : public Instruction {
 
 // GLSLstd450Distance instruction (code 67).
 struct InsnGLSLstd450Distance : public Instruction {
-    InsnGLSLstd450Distance(uint32_t type, uint32_t resultId, uint32_t p0Id, uint32_t p1Id) : Instruction(NO_REGISTER), type(type), resultId(resultId), p0Id(p0Id), p1Id(p1Id) {
+    InsnGLSLstd450Distance(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t p0Id, uint32_t p1Id) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), p0Id(p0Id), p1Id(p1Id) {
         argIds.insert(p0Id);
         argIds.insert(p1Id);
     }
@@ -985,7 +1001,7 @@ struct InsnGLSLstd450Distance : public Instruction {
 
 // GLSLstd450Cross instruction (code 68).
 struct InsnGLSLstd450Cross : public Instruction {
-    InsnGLSLstd450Cross(uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
+    InsnGLSLstd450Cross(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId), yId(yId) {
         argIds.insert(xId);
         argIds.insert(yId);
     }
@@ -1000,7 +1016,7 @@ struct InsnGLSLstd450Cross : public Instruction {
 
 // GLSLstd450Normalize instruction (code 69).
 struct InsnGLSLstd450Normalize : public Instruction {
-    InsnGLSLstd450Normalize(uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(NO_REGISTER), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Normalize(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), xId(xId) {
         argIds.insert(xId);
     }
     uint32_t type; // result type
@@ -1013,7 +1029,7 @@ struct InsnGLSLstd450Normalize : public Instruction {
 
 // GLSLstd450Reflect instruction (code 71).
 struct InsnGLSLstd450Reflect : public Instruction {
-    InsnGLSLstd450Reflect(uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId) : Instruction(NO_REGISTER), type(type), resultId(resultId), iId(iId), nId(nId) {
+    InsnGLSLstd450Reflect(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), iId(iId), nId(nId) {
         argIds.insert(iId);
         argIds.insert(nId);
     }
@@ -1028,7 +1044,7 @@ struct InsnGLSLstd450Reflect : public Instruction {
 
 // GLSLstd450Refract instruction (code 72).
 struct InsnGLSLstd450Refract : public Instruction {
-    InsnGLSLstd450Refract(uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId, uint32_t etaId) : Instruction(NO_REGISTER), type(type), resultId(resultId), iId(iId), nId(nId), etaId(etaId) {
+    InsnGLSLstd450Refract(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId, uint32_t etaId) : Instruction(lineInfo_, NO_REGISTER), type(type), resultId(resultId), iId(iId), nId(nId), etaId(etaId) {
         argIds.insert(iId);
         argIds.insert(nId);
         argIds.insert(etaId);

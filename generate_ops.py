@@ -205,8 +205,8 @@ def main():
             # Struct file.
             opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
             opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
-            params = []
-            inits = ["Instruction(%s)" % resultId]
+            params = ["const LineInfo& lineInfo_"]
+            inits = ["Instruction(lineInfo_, %s)" % resultId]
             for operand in operands:
                 params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
                 inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
@@ -257,7 +257,7 @@ def main():
                         (operand.cpp_type, operand.cpp_name,
                             operand.decode_function, operand.default_value))
             opcode_decode_f.write("    pgm->instructions.push_back(std::make_shared<%s>(%s));\n" %
-                    (struct_opname, ", ".join(operand.cpp_name for operand in operands)))
+                    (struct_opname, ", ".join(["pgm->currentLine",]+[operand.cpp_name for operand in operands])))
             if 'IdResultType' in [op.kind for op in operands] and 'IdResult' in [op.kind for op in operands]:
                 opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")
 
@@ -324,8 +324,8 @@ def main():
             # Struct file.
             opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
             opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
-            params = []
-            inits = ["Instruction(%s)" % resultId]
+            params = ["const LineInfo& lineInfo_"]
+            inits = ["Instruction(lineInfo_, %s)" % resultId]
             for operand in extinst_operands + operands:
                 params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
                 inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
@@ -364,7 +364,7 @@ def main():
                         (operand.cpp_type, operand.cpp_name,
                             operand.decode_function, operand.default_value))
             opcode_decode_f.write("    pgm->instructions.push_back(std::make_shared<%s>(%s));\n" %
-                    (struct_opname, ", ".join(operand.cpp_name for operand in extinst_operands + operands)))
+                    (struct_opname, ", ".join(["pgm->currentLine",]+[operand.cpp_name for operand in extinst_operands + operands])))
             opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")
             opcode_decode_f.write("    if(pgm->verbose) {\n")
             opcode_decode_f.write("        std::cout << \"%s\";\n" % opname)

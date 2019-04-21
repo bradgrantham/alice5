@@ -14,6 +14,28 @@ typedef std::array<float,4> v4float;
 typedef std::array<uint32_t,4> v4uint;
 typedef std::array<int32_t,4> v4int;
 
+const uint32_t NO_LINE = 0xFFFFFFFF;
+const uint32_t NO_FILE = 0xFFFFFFFF;
+const uint32_t NO_COLUMN = 0xFFFFFFFF;
+// Information about which file, line, and column an instruction is from
+struct LineInfo
+{
+    uint32_t fileId;
+    uint32_t line;
+    uint32_t column;
+    LineInfo() :
+        fileId(NO_FILE),
+        line(NO_LINE),
+        column(NO_COLUMN)
+        {}
+    LineInfo(uint32_t fileId_, uint32_t line_, uint32_t column_) :
+        fileId(fileId_),
+        line(line_),
+        column(column_)
+        {}
+};
+
+
 const uint32_t NO_REGISTER = 0xFFFFFFFF;
 const uint32_t NO_BLOCK_ID = 0xFFFFFFFF;
 
@@ -297,8 +319,11 @@ struct Interpreter;
 struct Compiler;
 
 struct Instruction {
-    Instruction(uint32_t resId);
+    Instruction(const LineInfo& lineInfo_, uint32_t resId);
     virtual ~Instruction() {};
+
+    // Source line information
+    LineInfo lineInfo;
 
     // Which block this instruction is in.
     uint32_t blockId;
