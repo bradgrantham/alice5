@@ -480,8 +480,8 @@ private:
     }
 
     // Return the next token, or an empty string if there isn't one.
-    // A token is any sequence of alpha-numeric characters, or underscore.
-    // Always skips subsequent whitespace.
+    // A token is any sequence of alpha-numeric characters, or underscore, not
+    // starting with a digit. Always skips subsequent whitespace.
     std::string readToken() {
         std::string token;
 
@@ -489,6 +489,11 @@ private:
         previousToken = s;
 
         while (isalnum(*s) || *s == '_') {
+            if (isdigit(*s) && s == previousToken) {
+                // Can't start with digit, this isn't a token.
+                return "";
+            }
+
             token += *s++;
         }
 
