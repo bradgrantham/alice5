@@ -426,35 +426,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    // See if we're branching to a label or an immediate.
-                    std::string label = readIdentifier();
-                    int32_t imm;
-                    if (label.empty()) {
-                        imm = readImmediate(op.bits);
-                    } else {
-                        uint32_t target;
-
-                        if (labels.find(label) == labels.end()) {
-                            if (pass == 0) {
-                                // Use anything, it doesn't matter.
-                                target = pc();
-                            } else {
-                                s = previousToken;
-                                std::ostringstream ss;
-                                ss << "Unknown label \"" << label << "\"";
-                                error(ss.str());
-                            }
-                        } else {
-                            target = labels.at(label);
-                        }
-
-                        // Labels are PC-relative.
-                        imm = target - (pc() + 4);
-                    }
-                    if ((imm & 0x1) != 0) {
-                        s = previousToken;
-                        error("Immediate must be even");
-                    }
+                    int32_t imm = readImmediateOrlabel(op);
                     emitSB(op, rs1, rs2, imm);
                     break;
                 }
@@ -474,11 +446,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int32_t imm = readImmediate(op.bits);
-                    if ((imm & 0x1) != 0) {
-                        s = previousToken;
-                        error("Immediate must be even");
-                    }
+                    int32_t imm = readImmediateOrlabel(op);
                     emitUJ(op, rd, imm);
                     break;
                 }
@@ -607,6 +575,44 @@ private:
         }
 
         skipWhitespace();
+
+        return imm;
+    }
+
+    // Read a signed immediate or a label. If label, returns
+    // as a PC-relative immediate.
+    int32_t readImmediateOrlabel(const Operator &op) {
+        int32_t imm;
+
+        // See if we're branching to a label or an immediate.
+        std::string label = readIdentifier();
+        if (label.empty()) {
+            imm = readImmediate(op.bits);
+        } else {
+            uint32_t target;
+
+            // Look up label.
+            if (labels.find(label) == labels.end()) {
+                if (pass == 0) {
+                    // Use anything, it doesn't matter.
+                    target = pc();
+                } else {
+                    s = previousToken;
+                    std::ostringstream ss;
+                    ss << "Unknown label \"" << label << "\"";
+                    error(ss.str());
+                }
+            } else {
+                target = labels.at(label);
+            }
+
+            // Labels are PC-relative.
+            imm = target - (pc() + 4);
+        }
+        if ((imm & 0x1) != 0) {
+            s = previousToken;
+            error("Immediate must be even");
+        }
 
         return imm;
     }
