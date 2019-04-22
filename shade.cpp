@@ -4105,7 +4105,9 @@ void InsnBranchConditional::emit(Compiler *compiler)
     std::ostringstream ss1;
     ss1 << "beq " << compiler->reg(conditionId)
         << ", x0, " << localLabel;
-    compiler->emit(ss1.str(), (std::ostringstream() << "r" << conditionId).str());
+    std::ostringstream ssid;
+    ssid << "r" << conditionId;
+    compiler->emit(ss1.str(), ssid.str());
     // True path.
     compiler->emitPhiCopy(this, trueLabelId);
     std::ostringstream ss2;
