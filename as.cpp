@@ -490,17 +490,17 @@ private:
     }
 
     // Return the next identifier, or an empty string if there isn't one.
-    // An identifier is any sequence of alpha-numeric characters, or underscore, not
-    // starting with a digit. Always skips subsequent whitespace.
+    // An identifier is any sequence of alpha-numeric characters, underscore, or dot, not
+    // starting with a digit or dot. Skips subsequent whitespace.
     std::string readIdentifier() {
         std::string id;
 
         // Keep track of where we started, for error reporting.
         previousToken = s;
 
-        while (isalnum(*s) || *s == '_') {
-            if (isdigit(*s) && s == previousToken) {
-                // Can't start with digit, this isn't an identifier.
+        while (isalnum(*s) || *s == '_' || *s == '.') {
+            if ((isdigit(*s) || *s == '.') && s == previousToken) {
+                // Can't start with digit or dot; this isn't an identifier.
                 return "";
             }
 
