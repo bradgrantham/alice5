@@ -23,8 +23,7 @@ std::string stripExtension(const std::string &pathname) {
     return pathname.substr(0, dot);
 }
 
-std::string readFileContents(const std::string &pathname)
-{
+std::string readFileContents(const std::string &pathname) {
     std::ifstream file(pathname, std::ios::in | std::ios::ate);
     if (!file.good()) {
         std::cerr << "Can't open file \"" << pathname << "\".\n";
@@ -180,6 +179,7 @@ public:
         this->verbose = verbose;
     }
 
+    // Load the assembly file.
     void load(const std::string &inPathname) {
         this->inPathname = inPathname;
 
@@ -200,7 +200,7 @@ public:
         }
     }
 
-    // Assemble the file to the object file.
+    // Assemble the file to a binary array.
     void assemble() {
         // Clear output.
         bin.clear();
@@ -212,19 +212,20 @@ public:
         }
     }
 
+    // Dump the assembly/binary listing.
     void dumpListing() {
-        // Assume that the source and the binary are in the same order.
         std::ios oldState(nullptr);
         oldState.copyfmt(std::cout);
 
         // Next instruction to display.
         size_t binIndex = 0;
 
-        // We have shown this source line to the user.
+        // Assume that the source and the binary are in the same order.
         for (size_t sourceLine = 0; sourceLine < lines.size(); sourceLine++) {
             // Next source line to display with an instruction.
             size_t displaySourceLine;
 
+            // Catch up to this source line, if necessary.
             while (true) {
                 // See what source line corresponds to the next instruction to display.
                 displaySourceLine = binIndex < bin.size()
@@ -245,8 +246,8 @@ public:
                 }
             }
 
-            // Found matching source line.
             if (displaySourceLine == sourceLine) {
+                // Found matching source line.
                 std::cout
                     << std::hex << std::setw(4) << std::setfill('0') << (binIndex*4)
                     << " "
@@ -294,13 +295,12 @@ private:
         }
     }
 
-    // Reads one line of input, either one character past
-    // the newline, or on the nul if there is no newline.
+    // Reads one line of input.
     void parseLine() {
         s = currentLine().c_str();
         previousToken = nullptr;
 
-        // Start of line. Skip whitespace.
+        // Skip initial whitespace.
         skipWhitespace();
 
         // Grab an identifier. This could be a label or an operator.
@@ -309,6 +309,7 @@ private:
         // See if it's a label.
         if (!opOrLabel.empty()) {
             if (foundChar(':')) {
+                // See if it's been defined before.
                 if (labels.find(opOrLabel) != labels.end()) {
                     s = previousToken;
                     std::ostringstream ss;
@@ -319,7 +320,7 @@ private:
                 // It's a label, record it.
                 labels[opOrLabel] = pc();
 
-                // Read the operator.
+                // Read the operator, if any.
                 opOrLabel = readIdentifier();
             }
         }
@@ -408,6 +409,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
+                    // See if we're branching to a label or an immediate.
                     std::string label = readIdentifier();
                     int32_t imm;
                     if (label.empty()) {
