@@ -82,6 +82,9 @@ private:
     std::string inPathname;
     bool verbose;
 
+    // Which pass we're doing (0 or 1).
+    int pass;
+
     // Lines of source code.
     std::vector<std::string> lines;
 
@@ -202,13 +205,20 @@ public:
 
     // Assemble the file to a binary array.
     void assemble() {
-        // Clear output.
-        bin.clear();
-        binLine.clear();
+        // We do two passes through the code. The first ignores
+        // references to labels it doesn't know, but keeps track
+        // of where each label ends up in the binary output. The
+        // second pass generates an error if it finds a references
+        // to an unknown label.
+        for (pass = 0; pass < 2; pass++) {
+            // Clear output.
+            bin.clear();
+            binLine.clear();
 
-        // Process each line.
-        for (lineNumber = 0; lineNumber < lines.size(); lineNumber++) {
-            parseLine();
+            // Process each line.
+            for (lineNumber = 0; lineNumber < lines.size(); lineNumber++) {
+                parseLine();
+            }
         }
     }
 
@@ -309,16 +319,23 @@ private:
         // See if it's a label.
         if (!opOrLabel.empty()) {
             if (foundChar(':')) {
-                // See if it's been defined before.
-                if (labels.find(opOrLabel) != labels.end()) {
-                    s = previousToken;
-                    std::ostringstream ss;
-                    ss << "Label \"" << opOrLabel << "\" is already defined";
-                    error(ss.str());
-                }
+                // Only keep track of labels in the first pass. We keep
+                // them around for the second pass.
+                if (pass == 0) {
+                    // See if it's been defined before.
+                    if (labels.find(opOrLabel) != labels.end()) {
+                        s = previousToken;
+                        std::ostringstream ss;
+                        ss << "Label \"" << opOrLabel << "\" is already defined";
+                        error(ss.str());
+                    }
 
-                // It's a label, record it.
-                labels[opOrLabel] = pc();
+                    // It's a label, record it.
+                    labels[opOrLabel] = pc();
+                } else {
+                    // Make sure it hasn't changed.
+                    assert(labels.at(opOrLabel) == pc());
+                }
 
                 // Read the operator, if any.
                 opOrLabel = readIdentifier();
@@ -415,8 +432,23 @@ private:
                     if (label.empty()) {
                         imm = readImmediate(op.bits);
                     } else {
+                        uint32_t target;
+
+                        if (labels.find(label) == labels.end()) {
+                            if (pass == 0) {
+                                // Use anything, it doesn't matter.
+                                target = pc();
+                            } else {
+                                s = previousToken;
+                                std::ostringstream ss;
+                                ss << "Unknown label \"" << label << "\"";
+                                error(ss.str());
+                            }
+                        } else {
+                            target = labels.at(label);
+                        }
+
                         // Labels are PC-relative.
-                        uint32_t target = labels.at(label);
                         imm = target - (pc() + 4);
                     }
                     if ((imm & 0x1) != 0) {
@@ -580,7 +612,7 @@ private:
     }
 
     // Error function.
-    void error(const std::string &message) {
+    [[noreturn]] void error(const std::string &message) {
         int col = s - currentLine().c_str();
 
         std::cerr << inPathname << ":" << (lineNumber + 1) << ":"
