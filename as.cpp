@@ -43,6 +43,7 @@ std::string readFileContents(const std::string &pathname) {
 // Instruction formats.
 enum Format {
     FORMAT_R,
+    FORMAT_R2,  // Two-operand (one source).
     FORMAT_I,
     FORMAT_IL,  // For loads: same binary as FORMAT_I but different assembly.
     FORMAT_S,
@@ -66,6 +67,69 @@ struct Operator {
 
     // Max number of bits in immediate.
     int bits;
+
+    // Whether destination, source1, or source2 are floating point registers.
+    bool dIsFloat;
+    bool s1IsFloat;
+    bool s2IsFloat;
+
+    // Hard-coded rs2 value, for FORMAT_R2 formats.
+    int r2;
+
+    Operator() {
+        // Nothing.
+    }
+
+    Operator(Format format, uint32_t opcode, uint32_t funct3, uint32_t funct7, int bits = 0)
+        : format(format), opcode(opcode), funct3(funct3), funct7(funct7), bits(bits),
+          dIsFloat(false), s1IsFloat(false), s2IsFloat(false), r2(0)
+    {
+        // Nothing.
+    }
+
+    Operator(const Operator &other) {
+        format = other.format;
+        opcode = other.opcode;
+        funct3 = other.funct3;
+        funct7 = other.funct7;
+        bits = other.bits;
+        dIsFloat = other.dIsFloat;
+        s1IsFloat = other.s1IsFloat;
+        s2IsFloat = other.s2IsFloat;
+    }
+
+    Operator &setDFloat() {
+        dIsFloat = true;
+        return *this;
+    }
+
+    Operator &setS1Float() {
+        s1IsFloat = true;
+        return *this;
+    }
+
+    Operator &setS2Float() {
+        s2IsFloat = true;
+        return *this;
+    }
+
+    Operator &setSFloat() {
+        s1IsFloat = true;
+        s2IsFloat = true;
+        return *this;
+    }
+
+    Operator &setAllFloat() {
+        dIsFloat = true;
+        s1IsFloat = true;
+        s2IsFloat = true;
+        return *this;
+    }
+
+    Operator &setR2(int r2) {
+        this->r2 = r2;
+        return *this;
+    }
 };
 
 // ----------------------------------------------------------------------
@@ -113,55 +177,97 @@ public:
         // Build our maps.
 
         // Basic arithmetic.
-        operators["add"]   = Operator{FORMAT_R,  0b0110011, 0b000, 0b0000000, 0};
-        operators["sub"]   = Operator{FORMAT_R,  0b0110011, 0b000, 0b0100000, 0};
-        operators["sll"]   = Operator{FORMAT_R,  0b0110011, 0b001, 0b0000000, 0};
-        operators["slt"]   = Operator{FORMAT_R,  0b0110011, 0b010, 0b0000000, 0};
-        operators["sltu"]  = Operator{FORMAT_R,  0b0110011, 0b011, 0b0000000, 0};
-        operators["xor"]   = Operator{FORMAT_R,  0b0110011, 0b100, 0b0000000, 0};
-        operators["srl"]   = Operator{FORMAT_R,  0b0110011, 0b101, 0b0000000, 0};
-        operators["sra"]   = Operator{FORMAT_R,  0b0110011, 0b101, 0b0100000, 0};
-        operators["or"]    = Operator{FORMAT_R,  0b0110011, 0b110, 0b0000000, 0};
-        operators["and"]   = Operator{FORMAT_R,  0b0110011, 0b111, 0b0000000, 0};
+        operators["add"]       = Operator{FORMAT_R,  0b0110011, 0b000, 0b0000000};
+        operators["sub"]       = Operator{FORMAT_R,  0b0110011, 0b000, 0b0100000};
+        operators["sll"]       = Operator{FORMAT_R,  0b0110011, 0b001, 0b0000000};
+        operators["slt"]       = Operator{FORMAT_R,  0b0110011, 0b010, 0b0000000};
+        operators["sltu"]      = Operator{FORMAT_R,  0b0110011, 0b011, 0b0000000};
+        operators["xor"]       = Operator{FORMAT_R,  0b0110011, 0b100, 0b0000000};
+        operators["srl"]       = Operator{FORMAT_R,  0b0110011, 0b101, 0b0000000};
+        operators["sra"]       = Operator{FORMAT_R,  0b0110011, 0b101, 0b0100000};
+        operators["or"]        = Operator{FORMAT_R,  0b0110011, 0b110, 0b0000000};
+        operators["and"]       = Operator{FORMAT_R,  0b0110011, 0b111, 0b0000000};
 
         // Immediates.
-        operators["addi"]  = Operator{FORMAT_I,  0b0010011, 0b000, 0b0000000, 12};
-        operators["andi"]  = Operator{FORMAT_I,  0b0010011, 0b111, 0b0000000, 12};
-        operators["ori"]   = Operator{FORMAT_I,  0b0010011, 0b110, 0b0000000, 12};
-        operators["xori"]  = Operator{FORMAT_I,  0b0010011, 0b100, 0b0000000, 12};
-        operators["slti"]  = Operator{FORMAT_I,  0b0010011, 0b010, 0b0000000, 12};
-        operators["sltiu"] = Operator{FORMAT_I,  0b0010011, 0b011, 0b0000000, 12};
+        operators["addi"]      = Operator{FORMAT_I,  0b0010011, 0b000, 0b0000000, 12};
+        operators["andi"]      = Operator{FORMAT_I,  0b0010011, 0b111, 0b0000000, 12};
+        operators["ori"]       = Operator{FORMAT_I,  0b0010011, 0b110, 0b0000000, 12};
+        operators["xori"]      = Operator{FORMAT_I,  0b0010011, 0b100, 0b0000000, 12};
+        operators["slti"]      = Operator{FORMAT_I,  0b0010011, 0b010, 0b0000000, 12};
+        operators["sltiu"]     = Operator{FORMAT_I,  0b0010011, 0b011, 0b0000000, 12};
 
         // Shifts.
-        operators["slli"]  = Operator{FORMAT_I,  0b0010011, 0b001, 0b0000000, 5};
-        operators["srli"]  = Operator{FORMAT_I,  0b0010011, 0b101, 0b0000000, 5};
-        operators["srai"]  = Operator{FORMAT_I,  0b0010011, 0b101, 0b0100000, 5};
+        operators["slli"]      = Operator{FORMAT_I,  0b0010011, 0b001, 0b0000000, 5};
+        operators["srli"]      = Operator{FORMAT_I,  0b0010011, 0b101, 0b0000000, 5};
+        operators["srai"]      = Operator{FORMAT_I,  0b0010011, 0b101, 0b0100000, 5};
 
         // Uppers.
-        operators["lui"]   = Operator{FORMAT_U,  0b0110111, 0b000, 0b0000000, 22};
-        operators["auipc"] = Operator{FORMAT_U,  0b0010111, 0b000, 0b0000000, 22};
+        operators["lui"]       = Operator{FORMAT_U,  0b0110111, 0b000, 0b0000000, 22};
+        operators["auipc"]     = Operator{FORMAT_U,  0b0010111, 0b000, 0b0000000, 22};
 
         // Loads.
-        operators["lb"]    = Operator{FORMAT_IL, 0b0000011, 0b000, 0b0000000, 12};
-        operators["lbu"]   = Operator{FORMAT_IL, 0b0000011, 0b100, 0b0000000, 12};
-        operators["lh"]    = Operator{FORMAT_IL, 0b0000011, 0b001, 0b0000000, 12};
-        operators["lhu"]   = Operator{FORMAT_IL, 0b0000011, 0b101, 0b0000000, 12};
-        operators["lw"]    = Operator{FORMAT_IL, 0b0000011, 0b010, 0b0000000, 12};
+        operators["lb"]        = Operator{FORMAT_IL, 0b0000011, 0b000, 0b0000000, 12};
+        operators["lbu"]       = Operator{FORMAT_IL, 0b0000011, 0b100, 0b0000000, 12};
+        operators["lh"]        = Operator{FORMAT_IL, 0b0000011, 0b001, 0b0000000, 12};
+        operators["lhu"]       = Operator{FORMAT_IL, 0b0000011, 0b101, 0b0000000, 12};
+        operators["lw"]        = Operator{FORMAT_IL, 0b0000011, 0b010, 0b0000000, 12};
 
         // Stores.
-        operators["sb"]    = Operator{FORMAT_S,  0b0100011, 0b000, 0b0100000, 12};
-        operators["sh"]    = Operator{FORMAT_S,  0b0100011, 0b001, 0b0100000, 12};
-        operators["sw"]    = Operator{FORMAT_S,  0b0100011, 0b010, 0b0100000, 12};
+        operators["sb"]        = Operator{FORMAT_S,  0b0100011, 0b000, 0b0100000, 12};
+        operators["sh"]        = Operator{FORMAT_S,  0b0100011, 0b001, 0b0100000, 12};
+        operators["sw"]        = Operator{FORMAT_S,  0b0100011, 0b010, 0b0100000, 12};
 
         // Branches and jumps.
-        operators["beq"]   = Operator{FORMAT_SB, 0b1100011, 0b000, 0b0000000, 13};
-        operators["bne"]   = Operator{FORMAT_SB, 0b1100011, 0b001, 0b0000000, 13};
-        operators["blt"]   = Operator{FORMAT_SB, 0b1100011, 0b100, 0b0000000, 13};
-        operators["bge"]   = Operator{FORMAT_SB, 0b1100011, 0b101, 0b0000000, 13};
-        operators["bltu"]  = Operator{FORMAT_SB, 0b1100011, 0b110, 0b0000000, 13};
-        operators["bgeu"]  = Operator{FORMAT_SB, 0b1100011, 0b111, 0b0000000, 13};
-        operators["jal"]   = Operator{FORMAT_UJ, 0b1101111, 0b000, 0b0000000, 21};
-        operators["jalr"]  = Operator{FORMAT_I,  0b1100111, 0b000, 0b0000000, 12};
+        operators["beq"]       = Operator{FORMAT_SB, 0b1100011, 0b000, 0b0000000, 13};
+        operators["bne"]       = Operator{FORMAT_SB, 0b1100011, 0b001, 0b0000000, 13};
+        operators["blt"]       = Operator{FORMAT_SB, 0b1100011, 0b100, 0b0000000, 13};
+        operators["bge"]       = Operator{FORMAT_SB, 0b1100011, 0b101, 0b0000000, 13};
+        operators["bltu"]      = Operator{FORMAT_SB, 0b1100011, 0b110, 0b0000000, 13};
+        operators["bgeu"]      = Operator{FORMAT_SB, 0b1100011, 0b111, 0b0000000, 13};
+        operators["jal"]       = Operator{FORMAT_UJ, 0b1101111, 0b000, 0b0000000, 21};
+        operators["jalr"]      = Operator{FORMAT_I,  0b1100111, 0b000, 0b0000000, 12};
+
+        // Floating point loads and stores.
+        operators["flw"]       = Operator{FORMAT_IL, 0b0000111, 0b010, 0b0000000, 12}.setDFloat();
+        operators["fsw"]       = Operator{FORMAT_S,  0b0100111, 0b010, 0b0000000, 12}.setS2Float();
+
+        // Float point move to/from integer register.
+        operators["fmv.x.s"]   = Operator{FORMAT_R2, 0b1010011, 0b000, 0b1110000}.setS1Float()
+            .setR2(0b00000);
+        operators["fmv.s.x"]   = Operator{FORMAT_R2, 0b1010011, 0b000, 0b1111000}.setDFloat()
+            .setR2(0b00000);
+
+        // Floating point sign manipulation.
+        operators["fsgnj.s"]   = Operator{FORMAT_R,  0b1010011, 0b000, 0b0010000}.setAllFloat();
+        operators["fsgnjn.s"]  = Operator{FORMAT_R,  0b1010011, 0b001, 0b0010000}.setAllFloat();
+        operators["fsgnjx.s"]  = Operator{FORMAT_R,  0b1010011, 0b010, 0b0010000}.setAllFloat();
+
+        // Floating point conversion.
+        operators["fcvt.w.s"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1100000}.setS1Float()
+            .setR2(0b00000);
+        operators["fcvt.wu.s"] = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1100000}.setS1Float()
+            .setR2(0b00001);
+        operators["fcvt.s.w"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1101000}.setDFloat()
+            .setR2(0b00000);
+        operators["fcvt.s.wu"] = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1101000}.setDFloat()
+            .setR2(0b00001);
+
+        // Floating point comparison
+        operators["feq.s"]     = Operator{FORMAT_R,  0b1010011, 0b010, 0b1010000}.setSFloat();
+        operators["flt.s"]     = Operator{FORMAT_R,  0b1010011, 0b001, 0b1010000}.setSFloat();
+        operators["fle.s"]     = Operator{FORMAT_R,  0b1010011, 0b000, 0b1010000}.setSFloat();
+        operators["fmin.s"]    = Operator{FORMAT_R,  0b1010011, 0b000, 0b0010100}.setAllFloat();
+        operators["fmax.s"]    = Operator{FORMAT_R,  0b1010011, 0b001, 0b0010100}.setAllFloat();
+        operators["fclass.s"]  = Operator{FORMAT_R2, 0b1010011, 0b001, 0b1110000}.setS1Float()
+            .setR2(0b00000);
+
+        // Floating point math.
+        operators["fadd.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0000000}.setAllFloat();
+        operators["fsub.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0000100}.setAllFloat();
+        operators["fmul.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0001000}.setAllFloat();
+        operators["fdiv.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0001100}.setAllFloat();
+        operators["fsqrt.s"]   = Operator{FORMAT_R2, 0b1010011, 0b010, 0b0101100}.setAllFloat()
+            .setR2(0b00000);
 
         // Registers.
         addRegisters("x", 0, 31, 0);
@@ -356,35 +462,45 @@ private:
 
             switch (op.format) {
                 case FORMAT_R: {
-                    int rd = readRegister("destination");
+                    int rd = readRegister(op.dIsFloat, "destination");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int rs1 = readRegister("source");
+                    int rs1 = readRegister(op.s1IsFloat, "source");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int rs2 = readRegister("source");
+                    int rs2 = readRegister(op.s2IsFloat, "source");
                     emitR(op, rd, rs1, rs2);
                     break;
                 }
 
-                case FORMAT_I: {
-                    int rd = readRegister("destination");
+                case FORMAT_R2: {
+                    int rd = readRegister(op.dIsFloat, "destination");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int rs = readRegister("source");
+                    int rs1 = readRegister(op.s1IsFloat, "source");
+                    emitR(op, rd, rs1, op.r2);
+                    break;
+                }
+
+                case FORMAT_I: {
+                    int rd = readRegister(op.dIsFloat, "destination");
+                    if (!foundChar(',')) {
+                        error("Expected comma");
+                    }
+                    int rs1 = readRegister(op.s1IsFloat, "source");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
                     int32_t imm = readImmediate(op.bits);
-                    emitI(op, rd, rs, imm);
+                    emitI(op, rd, rs1, imm);
                     break;
                 }
 
                 case FORMAT_IL: {
-                    int rd = readRegister("destination");
+                    int rd = readRegister(op.dIsFloat, "destination");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
@@ -392,16 +508,16 @@ private:
                     if (!foundChar('(')) {
                         error("Expected open parenthesis");
                     }
-                    int rs = readRegister("source");
+                    int rs1 = readRegister(op.s1IsFloat, "source");
                     if (!foundChar(')')) {
                         error("Expected close parenthesis");
                     }
-                    emitI(op, rd, rs, imm);
+                    emitI(op, rd, rs1, imm);
                     break;
                 }
 
                 case FORMAT_S: {
-                    int rs2 = readRegister("source");
+                    int rs2 = readRegister(op.s2IsFloat, "source");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
@@ -409,7 +525,7 @@ private:
                     if (!foundChar('(')) {
                         error("Expected open parenthesis");
                     }
-                    int rs1 = readRegister("source");
+                    int rs1 = readRegister(op.s1IsFloat, "source");
                     if (!foundChar(')')) {
                         error("Expected close parenthesis");
                     }
@@ -418,11 +534,11 @@ private:
                 }
 
                 case FORMAT_SB: {
-                    int rs1 = readRegister("source");
+                    int rs1 = readRegister(op.s1IsFloat, "source");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int rs2 = readRegister("source");
+                    int rs2 = readRegister(op.s2IsFloat, "source");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
@@ -432,7 +548,7 @@ private:
                 }
 
                 case FORMAT_U: {
-                    int rd = readRegister("destination");
+                    int rd = readRegister(op.dIsFloat, "destination");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
@@ -442,7 +558,7 @@ private:
                 }
 
                 case FORMAT_UJ: {
-                    int rd = readRegister("destination");
+                    int rd = readRegister(op.dIsFloat, "destination");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
@@ -640,7 +756,7 @@ private:
 
     // Read a register name and return its number. Emits an error
     // if the identifier is missing or is not a register name.
-    int readRegister(const std::string &role) {
+    int readRegister(bool isFloat, const std::string &role) {
         std::string regName = readIdentifier();
         if (regName.empty()) {
             std::ostringstream ss;
@@ -648,15 +764,36 @@ private:
             error(ss.str());
         }
 
-        auto reg = registers.find(regName);
-        if (reg == registers.end()) {
+        auto regItr = registers.find(regName);
+        if (regItr == registers.end()) {
             s = previousToken;
             std::ostringstream ss;
             ss << "\"" << regName << "\" is not a register name";
             error(ss.str());
         }
 
-        return reg->second;
+        int reg = regItr->second;
+
+        // Check that register is of the right type.
+        if (isFloat) {
+            if (reg < 32) {
+                s = previousToken;
+                std::ostringstream ss;
+                ss << "Expected float register for " << role;
+                error(ss.str());
+            } else {
+                reg -= 32;
+            }
+        } else {
+            if (reg >= 32) {
+                s = previousToken;
+                std::ostringstream ss;
+                ss << "Expected integer register for " << role;
+                error(ss.str());
+            }
+        }
+
+        return reg;
     }
 
     // Emit a FORMAT_R instruction.
@@ -670,11 +807,11 @@ private:
     }
 
     // Emit a FORMAT_I instruction.
-    void emitI(const Operator &op, int rd, int rs, int32_t imm) {
+    void emitI(const Operator &op, int rd, int rs1, int32_t imm) {
         emit(op.opcode
                 | rd << 7
                 | op.funct3 << 12
-                | rs << 15
+                | rs1 << 15
                 | imm << 20
                 | op.funct7 << 25);
     }
