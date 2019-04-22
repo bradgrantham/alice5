@@ -48,9 +48,9 @@ uint32_t getBits(uint32_t v, int hi, int lo)
     return (v >> lo) & ((1u << (hi + 1 - lo)) - 1);
 }
 
-constexpr uint32_t makeOpcode(uint32_t bits6_2, uint32_t bits1_0)
+constexpr uint32_t makeOpcode(uint32_t bits14_12, uint32_t bits6_2, uint32_t bits1_0)
 {
-    return (bits6_2 << 2) | bits1_0;
+    return (bits14_12 << 12) | (bits6_2 << 2) | bits1_0;
 }
 
 template <class T>
@@ -84,19 +84,43 @@ GPUCore::Status GPUCore::step(T& memory)
         21);
 
     switch(insn & 0x7F) {
-        case makeOpcode(0x08, 3): { // sw
+        case makeOpcode(0, 0x1C, 3): { // ebreak
+            if(insn == 0x00100073) {
+                status = BREAK;
+            } else {
+                std::cerr << "unimplemented instruction " << insn;
+                std::cerr << " with opcode 0x" << std::hex << (insn & 0x7F) << std::dec << '\n';
+            }
+            break;
+        }
+        case makeOpcode(0, 0x08, 3): { // sw
             memory.write32(x[rs1] + immS, x[rs2]);
             break;
         }
 
-        case makeOpcode(0x0D, 3): { // lui
+        case makeOpcode(0, 0x0D, 3):
+        case makeOpcode(1, 0x0D, 3):
+        case makeOpcode(2, 0x0D, 3):
+        case makeOpcode(3, 0x0D, 3):
+        case makeOpcode(4, 0x0D, 3):
+        case makeOpcode(5, 0x0D, 3):
+        case makeOpcode(6, 0x0D, 3):
+        case makeOpcode(7, 0x0D, 3):
+        { // lui
             if(rd > 0) {
                 x[rd] = immU;
             }
             break;
         }
+ 
+        case makeOpcode(0, 0x0C, 3): { // add
+            if(rd > 0) {
+                x[rd] = x[rs1] + x[rs2];
+            }
+            break;
+        }
 
-        case makeOpcode(0x04, 3): { // addi
+        case makeOpcode(0, 0x04, 3): { // addi
             if(rd > 0) {
                 x[rd] = x[rs1] + immI;
             }
@@ -104,8 +128,8 @@ GPUCore::Status GPUCore::step(T& memory)
         }
 
         default: {
-            std::cerr << "unimplemented instruction " << insn;
-            std::cerr << " with opcode 0x" << std::hex << (insn & 0x7F) << std::dec << '\n';
+            std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
+            std::cerr << " with 6..2=0x" << std::hex << std::setfill('0') << std::setw(2) << ((insn & 0x7F) >> 2) << std::dec << '\n';
         }
     }
     return status;
