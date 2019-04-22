@@ -104,7 +104,8 @@ GPUCore::Status GPUCore::step(T& memory)
         }
 
         default: {
-            std::cerr << "unimplemented instruction " << insn << " with opcode " << (insn & 0x7F) << '\n';
+            std::cerr << "unimplemented instruction " << insn;
+            std::cerr << " with opcode 0x" << std::hex << (insn & 0x7F) << std::dec << '\n';
         }
     }
     return status;
