@@ -30,9 +30,11 @@ struct GPUCore
     Status step(T& memory);
 
     template <class T>
-    void runUntilBREAK(T& memory, bool dumpTrace)
+    Status stepUntilException(T& memory)
     {
-        while(step(memory, dumpTrace) != BREAK);
+        Status status;
+        while((status = step(memory)) == RUNNING);
+        return status;
     }
 };
 
@@ -53,11 +55,12 @@ constexpr uint32_t makeOpcode(uint32_t bits14_12, uint32_t bits6_2, uint32_t bit
     return (bits14_12 << 12) | (bits6_2 << 2) | bits1_0;
 }
 
+const bool dump = false;
+
 template <class T>
 GPUCore::Status GPUCore::step(T& memory)
 {
     uint32_t insn = memory.read32(pc);
-    pc += 4;
 
     Status status = RUNNING;
 
@@ -67,6 +70,7 @@ GPUCore::Status GPUCore::step(T& memory)
     uint32_t rs1 = getBits(insn, 19, 15);
     uint32_t rs2 = getBits(insn, 24, 20);
     uint32_t immI = extendSign(getBits(insn, 31, 20), 12);
+    uint32_t shamt = getBits(insn, 34, 20);
     uint32_t immS = extendSign(
         (getBits(insn, 31, 25) << 5) |
         getBits(insn, 11, 7),
@@ -83,18 +87,56 @@ GPUCore::Status GPUCore::step(T& memory)
         (getBits(insn, 30, 21) << 1),
         21);
 
-    switch(insn & 0x7F) {
+    std::function<void(void)> unimpl = [&]() {
+        std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
+        std::cerr << " with 14..12=" << std::dec << std::setfill('0') << std::setw(1) << ((insn & 0x7000) >> 12);
+        std::cerr << " and 6..2=0x" << std::hex << std::setfill('0') << std::setw(2) << ((insn & 0x7F) >> 2) << std::dec << '\n';
+        status = UNIMPLEMENTED_OPCODE;
+    };
+
+    switch(insn & 0x707F) {
         case makeOpcode(0, 0x1C, 3): { // ebreak
+            if(dump) std::cout << "ebreak\n";
             if(insn == 0x00100073) {
                 status = BREAK;
             } else {
-                std::cerr << "unimplemented instruction " << insn;
-                std::cerr << " with opcode 0x" << std::hex << (insn & 0x7F) << std::dec << '\n';
+                unimpl();
             }
             break;
         }
-        case makeOpcode(0, 0x08, 3): { // sw
-            memory.write32(x[rs1] + immS, x[rs2]);
+
+        case makeOpcode(0, 0x08, 3):
+        case makeOpcode(1, 0x08, 3):
+        case makeOpcode(2, 0x08, 3):
+        { // sb, sh, sw
+            if(dump) std::cout << "sw\n";
+            switch(funct3) {
+                case 0: memory.write8(x[rs1] + immS, x[rs2] & 0xFF); break;
+                case 1: memory.write16(x[rs1] + immS, x[rs2] & 0xFFFF); break;
+                case 2: memory.write32(x[rs1] + immS, x[rs2]); break;
+            }
+            pc += 4;
+            break;
+        }
+
+        case makeOpcode(0, 0x00, 3):
+        case makeOpcode(1, 0x00, 3):
+        case makeOpcode(2, 0x00, 3):
+        case makeOpcode(4, 0x00, 3):
+        case makeOpcode(5, 0x00, 3):
+        { // lb, lh, lw, lbu, lhw
+            if(dump) std::cout << "load\n";
+            if(rd != 0) {
+                switch(funct3) {
+                    case 0: x[rd] = extendSign(memory.read8(x[rs1] + immI), 8); break;
+                    case 1: x[rd] = extendSign(memory.read16(x[rs1] + immI), 16); break;
+                    case 2: x[rd] = memory.read32(x[rs1] + immI); break;
+                    case 4: x[rd] = memory.read8(x[rs1] + immI); break;
+                    case 5: x[rd] = memory.read16(x[rs1] + immI); break;
+                    default: unimpl();
+                }
+            }
+            pc += 4;
             break;
         }
 
@@ -107,29 +149,73 @@ GPUCore::Status GPUCore::step(T& memory)
         case makeOpcode(6, 0x0D, 3):
         case makeOpcode(7, 0x0D, 3):
         { // lui
+            if(dump) std::cout << "lui\n";
             if(rd > 0) {
                 x[rd] = immU;
             }
+            pc += 4;
             break;
         }
  
-        case makeOpcode(0, 0x0C, 3): { // add
-            if(rd > 0) {
-                x[rd] = x[rs1] + x[rs2];
+        case makeOpcode(0, 0x18, 3):
+        case makeOpcode(1, 0x18, 3):
+        case makeOpcode(4, 0x18, 3):
+        case makeOpcode(5, 0x18, 3):
+        case makeOpcode(6, 0x18, 3):
+        case makeOpcode(7, 0x18, 3):
+        { // beq, bne, blt, bge, bltu, bgeu
+            if(dump) std::cout << "bge\n";
+            switch(funct3) {
+                case 0: pc += (x[rs1] == x[rs2]) ? immSB : 4; break;
+                case 1: pc += (x[rs1] != x[rs2]) ? immSB : 4; break;
+                case 4: pc += (static_cast<int32_t>(x[rs1]) < static_cast<int32_t>(x[rs2])) ? immSB : 4; break;
+                case 5: pc += (static_cast<int32_t>(x[rs1]) >= static_cast<int32_t>(x[rs2])) ? immSB : 4; break;
+                case 6: pc += (x[rs1] < x[rs2]) ? immSB : 4; break;
+                case 7: pc += (x[rs1] >= x[rs2]) ? immSB : 4; break;
+                default:
+                    unimpl();
             }
             break;
         }
 
-        case makeOpcode(0, 0x04, 3): { // addi
+        case makeOpcode(0, 0x0C, 3): { // add
+            if(dump) std::cout << "add\n";
             if(rd > 0) {
-                x[rd] = x[rs1] + immI;
+                x[rd] = x[rs1] + x[rs2];
             }
+            pc += 4;
+            break;
+        }
+
+        case makeOpcode(0, 0x1b, 3): { // jal
+            if(dump) std::cout << "jal\n";
+            if(rd > 0) {
+                x[rd] = pc + 4;
+            }
+            pc += immUJ;
+            break;
+        }
+
+        case makeOpcode(0, 0x04, 3):
+        case makeOpcode(1, 0x04, 3):
+        case makeOpcode(7, 0x04, 3):
+        { // addi
+            if(dump) std::cout << "addi\n";
+            if(rd > 0) {
+                switch(funct3) {
+                    case 0: x[rd] = x[rs1] + immI; break;
+                    case 1: x[rd] = x[rs1] << shamt; break;
+                    case 4: x[rd] = x[rs1] ^ immI; break;
+                    case 6: x[rd] = x[rs1] | immI; break;
+                    case 7: x[rd] = x[rs1] & immI; break;
+                }
+            }
+            pc += 4;
             break;
         }
 
         default: {
-            std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
-            std::cerr << " with 6..2=0x" << std::hex << std::setfill('0') << std::setw(2) << ((insn & 0x7F) >> 2) << std::dec << '\n';
+            unimpl();
         }
     }
     return status;
