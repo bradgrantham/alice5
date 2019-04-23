@@ -10,6 +10,10 @@
 #include <string>
 #include <iomanip>
 
+extern "C" {
+#include "gpuemutest/riscv-disas.h"
+}
+
 // Return the pathname without the extension ("file.x" becomes "file").
 // If the pathname does not have an extension, it is returned unchanged.
 std::string stripExtension(const std::string &pathname) {
@@ -350,11 +354,7 @@ public:
 
                 // See if previous source line generated multiple instructions.
                 if (displaySourceLine < sourceLine) {
-                    std::cout
-                        << std::hex << std::setw(4) << std::setfill('0') << (binIndex*4)
-                        << " "
-                        << std::hex << std::setw(8) << std::setfill('0') << bin[binIndex]
-                        << "\n";
+                    dumpInstructionListing(binIndex, "");
                     binIndex++;
                 } else {
                     // No more catching up to do.
@@ -364,22 +364,37 @@ public:
 
             if (displaySourceLine == sourceLine) {
                 // Found matching source line.
-                std::cout
-                    << std::hex << std::setw(4) << std::setfill('0') << (binIndex*4)
-                    << " "
-                    << std::hex << std::setw(8) << std::setfill('0') << bin[binIndex]
-                    << " "
-                    << lines[sourceLine] << "\n";
+                dumpInstructionListing(binIndex, lines[sourceLine]);
                 binIndex++;
             } else {
                 // Source line with no instruction. Must be comment, label, blank line, etc.
                 std::cout
-                    << std::string(14, ' ')
+                    << std::string(15, ' ')
                     << lines[sourceLine] << "\n";
             }
         }
 
         std::cout.copyfmt(oldState);
+    }
+
+    // Dump one instruction with optional source code.
+    void dumpInstructionListing(size_t binIndex, const std::string &source) {
+        uint32_t pc = binIndex*4;
+        uint32_t instruction = bin[binIndex];
+
+        // Print out original code.
+        std::cout
+            << std::hex << std::setw(4) << std::setfill('0') << pc
+            << " "
+            << std::hex << std::setw(8) << std::setfill('0') << instruction
+            << "  " << source << "\n";
+
+        // Print disassembled code, for comparison.
+        char buf[128];
+        disasm_inst(buf, sizeof(buf), rv32, pc, instruction);
+        std::cout
+            << std::string(5, ' ')
+            << buf << "\n";
     }
 
     // Save the binary file.
