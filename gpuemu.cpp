@@ -159,8 +159,8 @@ int main(int argc, char **argv)
     m.write32(iMouseAddress +  8, 0);
     m.write32(iMouseAddress + 12, 0);
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
-    for(int j = 0; j < 180; j++)
-        for(int i = 0; i < 180; i++) {
+    for(int j = 0; j < imageHeight; j++)
+        for(int i = 0; i < imageWidth; i++) {
             float x = i, y = j, z = 0, w = 0;
             m.write32(gl_FragCoordAddress +  0, *reinterpret_cast<uint32_t*>(&x));
             m.write32(gl_FragCoordAddress +  0, *reinterpret_cast<uint32_t*>(&y));
@@ -193,6 +193,8 @@ int main(int argc, char **argv)
             img[3 * (j * imageWidth + i) + 1] = static_cast<unsigned char>(g * 255.99);
             img[3 * (j * imageWidth + i) + 2] = static_cast<unsigned char>(b * 255.99);
         }
-    printf("P6 %d %d 255\n", imageWidth, imageHeight);
-    fwrite(img, 1, imageWidth * imageHeight * 3, stdout);
+    FILE *fp = fopen("emulated.ppm", "wb");
+    fprintf(fp, "P6 %d %d 255\n", imageWidth, imageHeight);
+    fwrite(img, 1, imageWidth * imageHeight * 3, fp);
+    fclose(fp);
 }
