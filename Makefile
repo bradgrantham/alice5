@@ -15,7 +15,7 @@ CXXFLAGS        :=      $(OPT) -Wall -I$(SPIRV_TOOLS_SOURCE_DIR)/include -I$(GLS
 LDFLAGS         :=      $(OPT)
 LDLIBS          :=      $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLANG_SOURCE_DIR)/build/SPIRV/libSPIRV.a $(GLSLANG_SOURCE_DIR)/build/SPIRV/libSPVRemapper.a $(GLSLANG_SOURCE_DIR)/build/StandAlone/libglslang-default-resource-limits.a -lpthread $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLANG_SOURCE_DIR)/build/OGLCompilersDLL/libOGLCompiler.a $(GLSLANG_SOURCE_DIR)/build/glslang/OSDependent/Unix/libOSDependent.a $(GLSLANG_SOURCE_DIR)/build/hlsl/libHLSL.a $(GLSLANG_SOURCE_DIR)/build/External/spirv-tools/source/opt/libSPIRV-Tools-opt.a $(GLSLANG_SOURCE_DIR)/build/External/spirv-tools/source/libSPIRV-Tools.a
 
-DIS_OBJ 	:=	gpuemutest/riscv-disas.o
+DIS_OBJ 	:=	riscv-disas.o
 
 # $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLANG_SOURCE_DIR)/build/glslang/OSDependent/Unix/libOSDependent.a
 
@@ -26,6 +26,9 @@ shade: shade.cpp GLSL.std.450.h GLSLstd450_opcode_to_string.h basic_types.h inte
 
 as: as.cpp $(DIS_OBJ)
 	$(CXX) --std=c++17 -Wall as.cpp $(DIS_OBJ) -o $@
+
+gpuemu: gpuemu.cpp $(DIS_OBJ)
+	$(CXX) --std=c++17 -Wall gpuemu.cpp $(DIS_OBJ) -o $@
 
 simple.spv: simple.frag
 	cat preamble.frag simple.frag epilogue.frag | $(GLSLANG_BINARY_DIR)/glslangValidator -H -V100 -d -o simple.spv --stdin -S frag
