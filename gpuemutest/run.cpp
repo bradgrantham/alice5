@@ -114,14 +114,16 @@ int main(int argc, char **argv)
 
     std::vector<uint8_t> bytes = readFileContents(argv[1]);
 
-    for(auto b: { 0x73, 0x00, 0x10, 0x00 }) // EBREAK, in case code has no exit
-        bytes.push_back(b);
+    // EBREAK, in case code has no exit or jra
+    bytes.insert(bytes.end(), { 0x73, 0x00, 0x10, 0x00 });
 
-    bytes.resize(0x10000);
+    bytes.resize(0x20000);
     GPUCore core;
     Memory m(bytes);
 
     core.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
+    core.x[2] = 0x20000; // Set SP to end of memory 
+    // PC is 0
 
     GPUCore::Status status;
 
