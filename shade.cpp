@@ -1012,13 +1012,19 @@ struct Program
         if(verbose) {
             std::cout << "----------------------- Variable binding and location info\n";
             for(auto& [name, info]: uniformConstantVariables) {
-                std::cout << "uniformConstant " << name << " is binding " << info.binding << '\n';
+                std::cout << "uniformConstant " << name << " is binding " << info.binding << ", resulting addr " << (memoryRegions[SpvStorageClassUniformConstant].base + info.binding * 16) << '\n';
             }
             for(auto& [name, info]: uniformVariables) {
-                std::cout << "uniform " << name << " is binding " << info.binding << " with offset " << info.offsetWithinBinding << " and size " << info.size << '\n';
+                std::cout << "uniform " << name << " is binding " << info.binding << " with offset " << info.offsetWithinBinding << " and size " << info.size;
+                std::cout << ", resulting addr ";
+                std::cout << (memoryRegions[SpvStorageClassUniform].base + info.binding * 256 + info.offsetWithinBinding); // XXX magic number
+                std::cout << '\n';
             }
             for(auto& [name, info]: inputVariables) {
-                std::cout << "input " << name << " is location " << info.location << " with offset " << info.offsetWithinLocation << " and size " << info.size << '\n';
+                std::cout << "input " << name << " is location " << info.location << " with offset " << info.offsetWithinLocation << " and size " << info.size;
+                std::cout << ", resulting addr ";
+                std::cout << (memoryRegions[SpvStorageClassInput].base + info.location * 256 + info.offsetWithinLocation); // XXX magic number
+                std::cout << '\n';
             }
         }
 
