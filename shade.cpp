@@ -2297,7 +2297,6 @@ void Interpreter::stepMatrixTimesMatrix(const InsnMatrixTimesMatrix& insn)
     const TypeVector &leftMatrixVectorType = std::get<TypeVector>(pgm->types.at(leftMatrixType.columnType));
 
     const TypeMatrix &rightMatrixType = std::get<TypeMatrix>(pgm->types.at(leftMatrixReg.type));
-    const TypeVector &rightMatrixVectorType = std::get<TypeVector>(pgm->types.at(rightMatrixType.columnType));
 
     const TypeMatrix &resultType = std::get<TypeMatrix>(pgm->types.at(insn.type));
     const TypeVector &resultVectorType = std::get<TypeVector>(pgm->types.at(resultType.columnType));
@@ -2307,7 +2306,6 @@ void Interpreter::stepMatrixTimesMatrix(const InsnMatrixTimesMatrix& insn)
     int leftcols = leftMatrixType.columnCount;
     int leftrows = leftMatrixVectorType.count;
     int rightcols = rightMatrixType.columnCount;
-    int rightrows = leftMatrixVectorType.count;
     assert(leftrows == rightcols);
 
     for(int i = 0; i < resultRowCount; i++) {
