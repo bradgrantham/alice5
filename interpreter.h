@@ -38,12 +38,13 @@ struct Interpreter
     // Mark this memory region as initialized.
     void markMemory(size_t offset, size_t size);
 
+    // Pointer to object in memory at specified address.
+    template <class T>
+    T& objectInMemoryAt(size_t addr, bool reading, size_t size);
+
     // Pointer to object in memory in specified storage class at specified offset.
     template <class T>
     T& objectInClassAt(SpvStorageClass clss, size_t offset, bool reading, size_t size);
-
-    template <class T>
-    T& objectInClassAt(size_t addr, bool reading, size_t size);
 
     // For reading from a register.
     template <class T>

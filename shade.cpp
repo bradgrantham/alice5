@@ -114,22 +114,9 @@ T& objectAt(unsigned char* data)
     return *reinterpret_cast<T*>(data);
 }
 
-struct UniformInfo
+struct VariableInfo
 {
-    uint32_t binding;       // The "binding" attribute for this element's parent
-    size_t offsetWithinBinding;          // The offset within the binding
-    size_t size;            // Size in bytes of this element for type checking
-};
-
-struct UniformConstantInfo
-{
-    uint32_t binding;       // The "binding" attribute for this element's parent
-};
-
-struct InputInfo
-{
-    uint32_t location;      // The "location" attribute for this element or this element's parent
-    size_t offsetWithinLocation;          // The offset within the location
+    uint32_t address;       // The address of this variable within memory
     size_t size;            // Size in bytes of this element for type checking
 };
 
@@ -177,9 +164,7 @@ struct Program
     // Map from virtual register ID to its type. Only used for results of instructions.
     std::map<uint32_t, uint32_t> resultTypes;
     std::map<uint32_t, Register> constants;
-    std::map<std::string, UniformInfo> uniformVariables;
-    std::map<std::string, UniformConstantInfo> uniformConstantVariables;
-    std::map<std::string, InputInfo> inputVariables;
+    std::map<std::string, VariableInfo> namedVariables;
 
     SampledImage sampledImages[16];
 
@@ -903,9 +888,9 @@ struct Program
         return SPV_SUCCESS;
     }
 
-    void storeUniformInformation(const std::string& name, uint32_t typeId, uint32_t binding, size_t offset)
+    void storeNamedVariableInfo(const std::string& name, uint32_t typeId, uint32_t address)
     {
-        std::visit([this, name, typeId, binding, offset](auto&& type) {
+        std::visit([this, name, typeId, address](auto&& type) {
 
             using T = std::decay_t<decltype(type)>;
 
@@ -914,7 +899,7 @@ struct Program
                 for(int i = 0; i < type.memberTypes.size(); i++) {
                     uint32_t membertype = type.memberTypes[i];
                     std::string fullname = ((name == "") ? "" : (name + ".")) + memberNames[typeId][i];
-                    storeUniformInformation(fullname, membertype, binding, offset + memberDecorations[typeId][i][SpvDecorationOffset][0]);
+                    storeNamedVariableInfo(fullname, membertype, address + memberDecorations[typeId][i][SpvDecorationOffset][0]);
                 }
 
             } else if constexpr (std::is_same_v<T, TypeArray>) {
@@ -922,12 +907,12 @@ struct Program
                 for(int i = 0; i < type.count; i++) {
                     uint32_t membertype = type.type;
                     std::string fullname = name + "[" + std::to_string(i) + "]";
-                    storeUniformInformation(fullname, membertype, binding, offset + i * typeSizes.at(typeId));
+                    storeNamedVariableInfo(fullname, membertype, address + i * typeSizes.at(membertype));
                 }
 
             } else if constexpr (std::is_same_v<T, TypeVector> || std::is_same_v<T, TypeFloat> || std::is_same_v<T, TypeInt> || std::is_same_v<T, TypeSampledImage> || std::is_same_v<T, TypeBool> || std::is_same_v<T, TypeMatrix>) {
 
-                uniformVariables[name] = {binding, offset, typeSizes.at(typeId)};
+                namedVariables[name] = {address, typeSizes.at(typeId)};
 
             } else {
 
@@ -937,34 +922,6 @@ struct Program
         }, types[typeId]);
 
     }
-
-    void storeInputInformation(const std::string& name, uint32_t typeId, uint32_t location, size_t offset)
-    {
-        std::visit([this, name, typeId, location, offset](auto&& type) {
-
-            using T = std::decay_t<decltype(type)>;
-
-            if constexpr (std::is_same_v<T, TypeStruct>) {
-
-                for(int i = 0; i < type.memberTypes.size(); i++) {
-                    uint32_t membertype = type.memberTypes[i];
-                    std::string fullname = ((name == "") ? "" : (name + ".")) + memberNames[typeId][i];
-                    storeInputInformation(fullname, membertype, location, offset + memberDecorations[typeId][i][SpvDecorationOffset][0]);
-                }
-
-            } else if constexpr (std::is_same_v<T, TypeVector> || std::is_same_v<T, TypeFloat> || std::is_same_v<T, TypeInt> || std::is_same_v<T, TypeSampledImage> || std::is_same_v<T, TypeBool> || std::is_same_v<T, TypeMatrix>) {
-
-                inputVariables[name] = {location, offset, typeSizes.at(typeId)};
-
-            } else {
-
-                std::cout << "Unhandled type for finding input variable offset and size\n";
-
-            }
-        }, types[typeId]);
-
-    }
-
 
     // Post-parsing work.
     void postParse() {
@@ -981,12 +938,21 @@ struct Program
             if(var.storageClass == SpvStorageClassUniformConstant) {
                 uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
                 var.address = memoryRegions[SpvStorageClassUniformConstant].base + binding * 16; // XXX magic number
-                uniformConstantVariables[names[id]] = {binding};
+                storeNamedVariableInfo(names[id], var.type, var.address);
 
             } else if(var.storageClass == SpvStorageClassUniform) {
                 uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
-                storeUniformInformation(names[id], var.type, binding, 0);
                 var.address = memoryRegions[SpvStorageClassUniform].base + binding * 256; // XXX magic number
+                storeNamedVariableInfo(names[id], var.type, var.address);
+            } else if(var.storageClass == SpvStorageClassOutput) {
+                uint32_t location;
+                if(decorations.at(id).find(SpvDecorationLocation) == decorations.at(id).end()) {
+                    throw std::runtime_error("no Location decoration available for output " + std::to_string(id));
+                }
+
+                location = decorations.at(id).at(SpvDecorationLocation)[0];
+                var.address = memoryRegions[SpvStorageClassOutput].base + location * 256; // XXX magic number
+                storeNamedVariableInfo(names[id], var.type, var.address);
             } else if(var.storageClass == SpvStorageClassInput) {
                 uint32_t location;
                 if(names[id] == "gl_FragCoord") {
@@ -1003,28 +969,16 @@ struct Program
 
                     location = decorations.at(id).at(SpvDecorationLocation)[0];
                 }
-                storeInputInformation(names[id], var.type, location, 0);
                 var.address = memoryRegions[SpvStorageClassInput].base + location * 256; // XXX magic number
+                storeNamedVariableInfo(names[id], var.type, var.address);
             } else {
                 var.address = allocate(var.storageClass, var.type);
             }
         }
         if(verbose) {
             std::cout << "----------------------- Variable binding and location info\n";
-            for(auto& [name, info]: uniformConstantVariables) {
-                std::cout << "uniformConstant " << name << " is binding " << info.binding << ", resulting addr " << (memoryRegions[SpvStorageClassUniformConstant].base + info.binding * 16) << '\n';
-            }
-            for(auto& [name, info]: uniformVariables) {
-                std::cout << "uniform " << name << " is binding " << info.binding << " with offset " << info.offsetWithinBinding << " and size " << info.size;
-                std::cout << ", resulting addr ";
-                std::cout << (memoryRegions[SpvStorageClassUniform].base + info.binding * 256 + info.offsetWithinBinding); // XXX magic number
-                std::cout << '\n';
-            }
-            for(auto& [name, info]: inputVariables) {
-                std::cout << "input " << name << " is location " << info.location << " with offset " << info.offsetWithinLocation << " and size " << info.size;
-                std::cout << ", resulting addr ";
-                std::cout << (memoryRegions[SpvStorageClassInput].base + info.location * 256 + info.offsetWithinLocation); // XXX magic number
-                std::cout << '\n';
+            for(auto& [name, info]: namedVariables) {
+                std::cout << "variable " << name << " is at " << info.address << '\n';
             }
         }
 
@@ -1396,6 +1350,20 @@ void Interpreter::markMemory(size_t address, size_t size)
 #ifdef CHECK_MEMORY_ACCESS
     std::fill(memoryInitialized + address, memoryInitialized + address + size, true);
 #endif
+}
+
+template <class T>
+T& Interpreter::objectInMemoryAt(size_t addr, bool reading, size_t size)
+{
+    if (reading) {
+        size_t result = checkMemory(addr, size);
+        if(result != MEMORY_CHECK_OKAY) {
+            std::cerr << "Warning: Reading uninitialized byte at " << (result - addr) << "\n";
+        }
+    } else {
+        markMemory(addr, size);
+    }
+    return *reinterpret_cast<T*>(memory + addr);
 }
 
 template <class T>
@@ -3506,26 +3474,13 @@ void Interpreter::set(SpvStorageClass clss, size_t offset, const T& v)
 template <class T>
 void Interpreter::set(const std::string& name, const T& v)
 {
-    if(pgm->uniformConstantVariables.find(name) != pgm->uniformConstantVariables.end()) {
-        const UniformConstantInfo& u = pgm->uniformConstantVariables.at(name);
+    if(pgm->namedVariables.find(name) != pgm->namedVariables.end()) {
+        const VariableInfo& info = pgm->namedVariables.at(name);
         if(false) {
-            std::cout << "set uniform constant " << name << " at binding " << u.binding << '\n';
+            std::cout << "set variable " << name << " at address " << info.address << '\n';
         }
-        objectInClassAt<T>(SpvStorageClassUniformConstant, u.binding * 16, false, sizeof(v)) = v; // XXX magic number
-    } else if(pgm->uniformVariables.find(name) != pgm->uniformVariables.end()) {
-        const UniformInfo& u = pgm->uniformVariables.at(name);
-        if(false) {
-            std::cout << "set uniform " << name << " at binding " << u.binding << ", offset " << u.offsetWithinBinding << '\n';
-        }
-        assert(u.size == sizeof(T));
-        objectInClassAt<T>(SpvStorageClassUniform, u.binding * 256 + u.offsetWithinBinding, false, sizeof(v)) = v; // XXX magic number
-    } else if(pgm->inputVariables.find(name) != pgm->inputVariables.end()) {
-        const InputInfo& i = pgm->inputVariables.at(name);
-        if(false) {
-            std::cout << "set uniform " << name << " at location " << i.location << ", offset " << i.offsetWithinLocation << '\n';
-        }
-        assert(i.size == sizeof(T));
-        objectInClassAt<T>(SpvStorageClassInput, i.location * 256 + i.offsetWithinLocation, false, sizeof(v)) = v; // XXX magic number
+        assert(info.size == sizeof(T));
+        objectInMemoryAt<T>(info.address, false, sizeof(v)) = v;
     } else {
         std::cerr << "couldn't find variable \"" << name << "\" in Interpreter::set (may have been optimized away)\n";
     }
