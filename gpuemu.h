@@ -223,13 +223,13 @@ GPUCore::Status GPUCore::step(T& memory)
 
 struct RunHeader
 {
-    uint32_t magic = 0x30354c41; // 'AL50', version 0 of Alice 5 header
-    uint32_t initialPC;
-    uint32_t initialSP;
-    uint32_t gl_FragCoordAddress;
-    uint32_t colorAddress;
-    uint32_t iTimeAddress;
-    uint32_t iMouseAddress;
-    uint32_t iResolution;
-    /* bytes to follow are loaded at 0 */
+    // Little-endian
+    uint32_t magic = 0x30354c41;        // 'AL50', version 0 of Alice 5 header
+    uint32_t initialPC;                 // Initial value PC is set to
+    uint32_t gl_FragCoordAddress;       // address of vec4 gl_FragCoord input
+    uint32_t colorAddress;              // address of vec4 color output
+    uint32_t iTimeAddress;              // address of float uniform
+    uint32_t iMouseAddress;             // address of ivec4 uniform
+    uint32_t iResolution;               // address of vec2 iResolution uniform
+    // Bytes to follow are loaded at 0
 };
