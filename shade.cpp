@@ -264,6 +264,20 @@ struct Program
             : nullptr;
     }
 
+    bool isTypeFloat(uint32_t typeId) const {
+        // Returns true if a type is a float, false if it's an integer,
+        // otherwise asserts.
+        Type type = types.at(typeId);
+        if (std::holds_alternative<TypeInt>(type)) {
+            return false;
+        } else if (std::holds_alternative<TypeFloat>(type)) {
+            return true;
+        } else {
+            std::cerr << "Error: Type " << typeId << " is neither int nor float.\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+
     void dumpTypeAt(const Type& type, unsigned char *ptr) const
     {
         std::visit(overloaded {
@@ -3588,11 +3602,11 @@ struct Compiler
                         assert(r->second.phy.size() == 1);
                         std::ostringstream ss;
                         if (isRegFloat(regId)) {
-                            ss << "flw x";
+                            ss << "flw f" << (r->second.phy.at(0) - 32);
                         } else {
-                            ss << "lw x";
+                            ss << "lw x" << r->second.phy.at(0);
                         }
-                        ss << r->second.phy.at(0) << ", .C" << regId << "(x0)";
+                        ss << ", .C" << regId << "(x0)";
                         emit(ss.str(), "Load constant");
                     }
                 }
@@ -3682,15 +3696,7 @@ struct Compiler
         auto r = registers.find(id);
         assert(r != registers.end());
 
-        Type type = pgm->types.at(r->second.type);
-        if (std::holds_alternative<TypeInt>(type)) {
-            return false;
-        } else if (std::holds_alternative<TypeFloat>(type)) {
-            return true;
-        } else {
-            std::cerr << "Error: Variable " << id << " is neither int nor float.\n";
-            exit(EXIT_FAILURE);
-        }
+        return pgm->isTypeFloat(r->second.type);
     }
 
     // Make a new label that can be used for local jumps.
@@ -3742,10 +3748,16 @@ struct Compiler
             registers[id] = CompilerRegister {type, count};
         }
 
-        // Assume 32 registers; x0 is always zero; x1 is ra.
-        std::set<uint32_t> PHY_REGS;
+        // 32 registers; x0 is always zero; x1 is ra.
+        std::set<uint32_t> PHY_INT_REGS;
         for (int i = 2; i < 32; i++) {
-            PHY_REGS.insert(i);
+            PHY_INT_REGS.insert(i);
+        }
+
+        // 32 float registers.
+        std::set<uint32_t> PHY_FLOAT_REGS;
+        for (int i = 0; i < 32; i++) {
+            PHY_FLOAT_REGS.insert(i + 32);
         }
 
         // Start with blocks at the start of functions.
@@ -3753,24 +3765,35 @@ struct Compiler
             Block *block = pgm->blocks.at(function.labelId).get();
 
             // Assign registers for constants.
-            std::set<uint32_t> constRegs = PHY_REGS;
+            std::set<uint32_t> constIntRegs = PHY_INT_REGS;
+            std::set<uint32_t> constFloatRegs = PHY_FLOAT_REGS;
             for (auto regId : instructions.at(block->begin)->livein) {
                 assert(registers.find(regId) == registers.end());
                 auto &c = pgm->constants.at(regId);
                 auto r = CompilerRegister {c.type, 1}; // XXX get real count.
-                assert(!constRegs.empty());
-                uint32_t phy = *constRegs.begin();
-                constRegs.erase(phy);
+                uint32_t phy;
+                if (pgm->isTypeFloat(c.type)) {
+                    assert(!constFloatRegs.empty());
+                    phy = *constFloatRegs.begin();
+                    constFloatRegs.erase(phy);
+                } else {
+                    assert(!constIntRegs.empty());
+                    phy = *constIntRegs.begin();
+                    constIntRegs.erase(phy);
+                }
                 r.phy.push_back(phy);
                 registers[regId] = r;
             }
 
-            assignRegisters(block, PHY_REGS);
+            assignRegisters(block, PHY_INT_REGS, PHY_FLOAT_REGS);
         }
     }
 
     // Assigns registers for this block.
-    void assignRegisters(Block *block, const std::set<uint32_t> &allPhy) {
+    void assignRegisters(Block *block,
+            const std::set<uint32_t> &allIntPhy,
+            const std::set<uint32_t> &allFloatPhy) {
+
         if (pgm->verbose) {
             std::cout << "assignRegisters(" << block->labelId << ")\n";
         }
@@ -3822,6 +3845,10 @@ struct Compiler
                     exit(EXIT_FAILURE);
                 }
 
+                // Register set to pick from for this register.
+                const std::set<uint32_t> &allPhy =
+                    pgm->isTypeFloat(r->second.type) ? allFloatPhy : allIntPhy;
+
                 // For each element in this virtual register...
                 for (int i = 0; i < r->second.count; i++) {
                     // Find an available physical register for this element.
@@ -3850,7 +3877,7 @@ struct Compiler
         // Go down dominance tree.
         for (auto& [labelId, subBlock] : pgm->blocks) {
             if (subBlock->idom == block->labelId) {
-                assignRegisters(subBlock.get(), allPhy);
+                assignRegisters(subBlock.get(), allIntPhy, allFloatPhy);
             }
         }
     }
@@ -3876,7 +3903,12 @@ struct Compiler
 
         auto r = registers.find(id);
         if (r != registers.end() && index < r->second.phy.size()) {
-            ss << "x" << r->second.phy[index];
+            uint32_t phy = r->second.phy[index];
+            if (phy < 32) {
+                ss << "x" << phy;
+            } else {
+                ss << "f" << (phy - 32);
+            }
         } else {
             auto constant = pgm->constants.find(id);
             if (constant != pgm->constants.end() &&
