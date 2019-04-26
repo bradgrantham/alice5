@@ -1073,7 +1073,7 @@ struct Program
             }
             for (uint32_t argId : instruction->argIds) {
                 // Don't consider constants or variables, they're never in registers.
-                if (constants.find(argId) == constants.end() &&
+                if (/*constants.find(argId) == constants.end() &&*/
                         variables.find(argId) == variables.end()) {
 
                     instruction->livein.insert(argId);
@@ -1087,7 +1087,7 @@ struct Program
                 }
             }
         }
-        std::cout << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
+        std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
 
         // Compute the dominance tree for blocks. Use a worklist. Do all blocks
         // simultaneously (across functions).
@@ -1146,7 +1146,7 @@ struct Program
                 worklist.insert(worklist.end(), block->succ.begin(), block->succ.end());
             }
         }
-        std::cout << "Dominance tree took " << timer.elapsed() << " seconds.\n";
+        std::cerr << "Dominance tree took " << timer.elapsed() << " seconds.\n";
 
         // Compute immediate dom for each block.
         for (auto& [labelId, block] : blocks) {
@@ -3580,6 +3580,16 @@ struct Compiler
                     std::string name = pgm->cleanUpFunctionName(function.first);
                     std::cout << "; ---------------------------- function \"" << name << "\"\n";
                     emitLabel(name);
+
+                    // Emit instructions to fill constants.
+                    for (auto regId : pgm->instructions.at(function.second.start)->livein) {
+                        auto r = registers.find(regId);
+                        assert(r != registers.end());
+                        assert(r->second.phy.size() == 1);
+                        std::ostringstream ss;
+                        ss << "lw x" << r->second.phy.at(0) << ", .C" << regId << "(x0)";
+                        emit(ss.str(), "Load constant");
+                    }
                 }
             }
 
@@ -3594,7 +3604,7 @@ struct Compiler
             instructions.at(pc)->emit(this);
         }
 
-        // Emit variables and constants.
+        // Emit variables.
         for (auto &[id, var] : pgm->variables) {
             auto name = pgm->names.find(id);
             if (name != pgm->names.end()) {
@@ -3609,6 +3619,30 @@ struct Compiler
                 }
             } else {
                 std::cerr << "Warning: Name of variable " << id << " not defined.\n";
+            }
+        }
+
+        // Emit constants.
+        for (auto &[id, reg] : pgm->constants) {
+            std::string name;
+            auto nameItr = pgm->names.find(id);
+            if (nameItr == pgm->names.end()) {
+                std::ostringstream ss;
+                ss << ".C" << id;
+                name = ss.str();
+            } else {
+                name = nameItr->second;
+            }
+            emitLabel(name);
+            Type type = pgm->types.at(reg.type);
+            if (std::holds_alternative<TypeInt>(type)) {
+                uint32_t value = *reinterpret_cast<uint32_t *>(reg.data);
+                std::ostringstream ss;
+                ss << ".word " << value;
+                emit(ss.str(), "");
+            } else {
+                std::cerr << "Error: Unhandled type for constant " << id << ".\n";
+                exit(EXIT_FAILURE);
             }
         }
     }
@@ -3687,6 +3721,20 @@ struct Compiler
         // Start with blocks at the start of functions.
         for (auto& [id, function] : pgm->functions) {
             Block *block = pgm->blocks.at(function.labelId).get();
+
+            // Assign registers for constants.
+            std::set<uint32_t> constRegs = PHY_REGS;
+            for (auto regId : instructions.at(block->begin)->livein) {
+                assert(registers.find(regId) == registers.end());
+                auto &c = pgm->constants.at(regId);
+                auto r = CompilerRegister {c.type, 1}; // XXX get real count.
+                assert(!constRegs.empty());
+                uint32_t phy = *constRegs.begin();
+                constRegs.erase(phy);
+                r.phy.push_back(phy);
+                registers[regId] = r;
+            }
+
             assignRegisters(block, PHY_REGS);
         }
     }
@@ -3705,10 +3753,10 @@ struct Compiler
         for (auto regId : instructions.at(block->begin)->livein) {
             auto r = registers.find(regId);
             if (r == registers.end()) {
-                std::cout << "Warning: Virtual register "
+                std::cerr << "Warning: Virtual register "
                     << regId << " not found in block " << block->labelId << ".\n";
             } else if (r->second.phy.empty()) {
-                std::cout << "Warning: Expected physical register for "
+                std::cerr << "Warning: Expected physical register for "
                     << regId << " in block " << block->labelId << ".\n";
             } else {
                 for (auto phy : r->second.phy) {
@@ -4619,7 +4667,7 @@ void optimizeSPIRV(spv_target_env targetEnv, std::vector<uint32_t>& spirv)
     if (!success) {
         std::cout << "Warning: Optimizer failed.\n";
     }
-    std::cout << "Optimizing took " << timer.elapsed() << " seconds.\n";
+    std::cerr << "Optimizing took " << timer.elapsed() << " seconds.\n";
 }
 
 bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool optimize, bool disassemble, Program& program)
@@ -4661,7 +4709,7 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
     {
         Timer timer;
         program.postParse();
-        std::cout << "Post-parse took " << timer.elapsed() << " seconds.\n";
+        std::cerr << "Post-parse took " << timer.elapsed() << " seconds.\n";
     }
 
     return true;
@@ -4905,7 +4953,7 @@ int main(int argc, char **argv)
         }
 
         double elapsedSeconds = timer.elapsed();
-            std::cout << "Shading pass " << pass->name << " took " << elapsedSeconds << " seconds ("
+            std::cerr << "Shading pass " << pass->name << " took " << elapsedSeconds << " seconds ("
             << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
         }
 
