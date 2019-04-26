@@ -131,6 +131,7 @@ int main(int argc, char **argv)
         do {
             disassemble(core.pc, m);
             status = core.step(m);
+            std::cout << status << "\n";
         } while(core.pc != 0xffffffff && status == GPUCore::RUNNING);
     } catch(const std::exception& e) {
         std::cerr << e.what() << '\n';

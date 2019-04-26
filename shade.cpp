@@ -3569,6 +3569,10 @@ struct Compiler
         // Perform physical register assignment.
         assignRegisters();
 
+        // Emit our header.
+        emit("jal ra, main", "");
+        emit("ebreak", "");
+
         for(int pc = 0; pc < instructions.size(); pc++) {
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
@@ -3655,9 +3659,9 @@ struct Compiler
             registers[id] = CompilerRegister {type, count};
         }
 
-        // Assume 32 registers; x0 is always zero.
+        // Assume 32 registers; x0 is always zero; x1 is ra.
         std::set<uint32_t> PHY_REGS;
-        for (int i = 1; i < 32; i++) {
+        for (int i = 2; i < 32; i++) {
             PHY_REGS.insert(i);
         }
 
@@ -3920,7 +3924,7 @@ struct Compiler
 
 void RiscVAddi::emit(Compiler *compiler)
 {
-    compiler->emitBinaryImmOp("xaddi", resultId, rs1, imm);
+    compiler->emitBinaryImmOp("addi", resultId, rs1, imm);
 }
 
 // -----------------------------------------------------------------------------------
@@ -3991,6 +3995,7 @@ void InsnLoad::emit(Compiler *compiler)
         if (count != 1) {
             ss1 << (i*4) << ")";
         }
+        ss1 << "(x0)";
         std::ostringstream ss2;
         if (i == 0) {
             ss2 << "r" << resultId << " = (r" << pointerId << ")";

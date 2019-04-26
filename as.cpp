@@ -11,7 +11,7 @@
 #include <iomanip>
 
 extern "C" {
-#include "gpuemutest/riscv-disas.h"
+#include "riscv-disas.h"
 }
 
 // Return the pathname without the extension ("file.x" becomes "file").
@@ -50,6 +50,7 @@ enum Format {
     FORMAT_R2,  // Two-operand (one source).
     FORMAT_I,
     FORMAT_IL,  // For loads: same binary as FORMAT_I but different assembly.
+    FORMAT_IZ,  // For system instructions. No parameters, they're all zero.
     FORMAT_S,
     FORMAT_SB,
     FORMAT_U,
@@ -273,6 +274,10 @@ public:
         operators["fsqrt.s"]   = Operator{FORMAT_R2, 0b1010011, 0b010, 0b0101100}.setAllFloat()
             .setR2(0b00000);
 
+        // Environment.
+        operators["ebreak"]    = Operator{FORMAT_IZ, 0b1110011, 0b000, 0b0000000}.
+            setR2(0b00001);
+
         // Registers.
         addRegisters("x", 0, 31, 0);
         registers["ra"] = 1;
@@ -330,6 +335,11 @@ public:
                 parseLine();
             }
         }
+
+        emit(0);// XXX remove.
+        emit(0);
+        emit(0);
+        emit(0);
     }
 
     // Dump the assembly/binary listing.
@@ -519,7 +529,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int32_t imm = readImmediate(op.bits);
+                    int32_t imm = readImmediateOrLabel(op, false);
                     if (!foundChar('(')) {
                         error("Expected open parenthesis");
                     }
@@ -531,12 +541,18 @@ private:
                     break;
                 }
 
+                case FORMAT_IZ: {
+                    // No parameters.
+                    emitR(op, 0, 0, op.r2);
+                    break;
+                }
+
                 case FORMAT_S: {
                     int rs2 = readRegister(op.s2IsFloat, "source");
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int32_t imm = readImmediate(op.bits);
+                    int32_t imm = readImmediateOrLabel(op, false);
                     if (!foundChar('(')) {
                         error("Expected open parenthesis");
                     }
@@ -557,7 +573,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int32_t imm = readImmediateOrlabel(op);
+                    int32_t imm = readImmediateOrLabel(op, true);
                     emitSB(op, rs1, rs2, imm);
                     break;
                 }
@@ -577,7 +593,7 @@ private:
                     if (!foundChar(',')) {
                         error("Expected comma");
                     }
-                    int32_t imm = readImmediateOrlabel(op);
+                    int32_t imm = readImmediateOrLabel(op, true);
                     emitUJ(op, rd, imm);
                     break;
                 }
@@ -711,8 +727,9 @@ private:
     }
 
     // Read a signed immediate or a label. If label, returns
-    // as a PC-relative immediate.
-    int32_t readImmediateOrlabel(const Operator &op) {
+    // as a PC-relative immediate (if pcRelative is true) or
+    // an absolute value (if pcRelative is false).
+    int32_t readImmediateOrLabel(const Operator &op, bool pcRelative) {
         int32_t imm;
 
         // See if we're branching to a label or an immediate.
@@ -737,10 +754,16 @@ private:
                 target = labels.at(label);
             }
 
-            // Labels are PC-relative.
-            imm = target - (pc() + 4);
+            if (pcRelative) {
+                // Jump labels are PC-relative.
+                imm = target - (pc() + 4);
+            } else {
+                imm = target;
+            }
+            // XXX check that it can fit in op.bits.
         }
         if ((imm & 0x1) != 0) {
+            // XXX I think this is only true of jump targets.
             s = previousToken;
             error("Immediate must be even");
         }
