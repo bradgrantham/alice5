@@ -1,5 +1,5 @@
 
-layout (location = 1) out int outtest;
+layout (location = 1) out float outtest;
 
 /*
 float foo(float n) {
@@ -58,9 +58,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // fragColor.x = 0.4;
     // fragColor.y = 0.5;
     // fragColor.z = 0.6;
-    outtest = 0;
+    outtest = 0.0;
     //for (int i = 0; i < 3; i++) {
-        outtest = 1 + outtest;
+        outtest = 1.0 + outtest;
     //}
 
     // vec3 x = vec3(1.0, 2.0, 3.0);

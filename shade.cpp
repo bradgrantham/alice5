@@ -3640,6 +3640,14 @@ struct Compiler
                 std::ostringstream ss;
                 ss << ".word " << value;
                 emit(ss.str(), "");
+            } else if (std::holds_alternative<TypeFloat>(type)) {
+                uint32_t intValue = *reinterpret_cast<uint32_t *>(reg.data);
+                float floatValue = *reinterpret_cast<float *>(reg.data);
+                std::ostringstream ss1;
+                ss1 << ".word 0x" << std::hex << intValue;
+                std::ostringstream ss2;
+                ss2 << "Float " << floatValue;
+                emit(ss1.str(), ss2.str());
             } else {
                 std::cerr << "Error: Unhandled type for constant " << id << ".\n";
                 exit(EXIT_FAILURE);
