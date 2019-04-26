@@ -664,7 +664,7 @@ private:
 
             if (pcRelative) {
                 // Jump labels are PC-relative.
-                imm = target - (pc() + 4);
+                imm = target - pc();
             } else {
                 imm = target;
             }
