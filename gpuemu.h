@@ -97,12 +97,30 @@ GPUCore::Status GPUCore::step(T& memory)
     };
 
     switch(insn & 0x707F) {
+        // fmv.x.s
+        // fmv.s.x
+        // fsgnj.s
+        // fsgnjn.s
+        // fsgnjx.s
+        // fcvt.w.s
+        // fcvt.wu.s
+        // fcvt.s.w
+        // fcvt.s.wu
+        // feq.s
+        // flt.s
+        // fle.s
+        // fmin.s
+        // fmax.s
+        // fclass.s
+        // fsub.s
+        // fmul.s
+        // fdiv.s
+        // fsqrt.s
 
         // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
         case makeOpcode(2, 0x01, 3): {
             if(dump) std::cout << "flw\n";
-            uint32_t t = memory.read32(x[rs1] + immI);
-            f[rd] = *reinterpret_cast<float*>(&t);
+            f[rd] = memory.readf(x[rs1] + immI);
             pc += 4;
             break;
         }
@@ -110,7 +128,7 @@ GPUCore::Status GPUCore::step(T& memory)
         // fsw       imm12hi rs1 rs2 imm12lo 14..12=2 6..2=0x09 1..0=3
         case makeOpcode(2, 0x09, 3): {
             if(dump) std::cout << "fsw\n";
-            memory.write32(x[rs1] + immS, *reinterpret_cast<uint32_t*>(&f[rs2]));
+            memory.writef(x[rs1] + immS, f[rs2]);
             pc += 4;
             break;
         }

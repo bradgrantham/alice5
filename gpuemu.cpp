@@ -62,6 +62,13 @@ struct Memory
         assert(addr + 3 < memorybytes.size());
         return *reinterpret_cast<uint32_t*>(memorybytes.data() + addr);
     }
+    uint32_t readf(uint32_t addr)
+    {
+        if(verbose) printf("read float from %08X\n", addr);
+        assert(addr < memorybytes.size());
+        assert(addr + 3 < memorybytes.size());
+        return *reinterpret_cast<float*>(memorybytes.data() + addr);
+    }
     void write8(uint32_t addr, uint32_t v)
     {
         if(verbose) printf("write 8 bits of %08X to %08X\n", v, addr);
@@ -80,6 +87,13 @@ struct Memory
         assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
         *reinterpret_cast<uint32_t*>(memorybytes.data() + addr) = v;
+    }
+    void writef(uint32_t addr, float v)
+    {
+        if(verbose) printf("write float %f to %08X\n", v, addr);
+        assert(addr < memorybytes.size());
+        assert(addr + 3 < memorybytes.size());
+        *reinterpret_cast<float*>(memorybytes.data() + addr) = v;
     }
 };
 
