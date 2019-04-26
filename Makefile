@@ -27,7 +27,7 @@ shade: shade.cpp GLSL.std.450.h GLSLstd450_opcode_to_string.h basic_types.h inte
 as: as.cpp $(DIS_OBJ)
 	$(CXX) --std=c++17 -Wall as.cpp $(DIS_OBJ) -o $@
 
-gpuemu: gpuemu.cpp $(DIS_OBJ)
+gpuemu: gpuemu.cpp $(DIS_OBJ) gpuemu.h
 	$(CXX) --std=c++17 -Wall gpuemu.cpp $(DIS_OBJ) -o $@
 
 simple.spv: simple.frag
