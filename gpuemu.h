@@ -187,7 +187,25 @@ GPUCore::Status GPUCore::step(T& memory)
             break;
         }
 
-        case makeOpcode(0, 0x1b, 3): { // jal
+        case makeOpcode(0, 0x19, 3): { // jalr
+            if(dump) std::cout << "jalr\n";
+            uint32_t ra = (x[rs1] + immI) & ~0x00000001; // spec says set least significant bit to zero
+            if(rd > 0) {
+                x[rd] = pc + 4;
+            }
+            pc = ra;
+            break;
+        }
+
+        case makeOpcode(0, 0x1b, 3):
+        case makeOpcode(1, 0x1b, 3):
+        case makeOpcode(2, 0x1b, 3):
+        case makeOpcode(3, 0x1b, 3):
+        case makeOpcode(4, 0x1b, 3):
+        case makeOpcode(5, 0x1b, 3):
+        case makeOpcode(6, 0x1b, 3):
+        case makeOpcode(7, 0x1b, 3):
+        { // jal
             if(dump) std::cout << "jal\n";
             if(rd > 0) {
                 x[rd] = pc + 4;
