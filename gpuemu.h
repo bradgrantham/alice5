@@ -230,6 +230,6 @@ struct RunHeader
     uint32_t colorAddress;              // address of vec4 color output
     uint32_t iTimeAddress;              // address of float uniform
     uint32_t iMouseAddress;             // address of ivec4 uniform
-    uint32_t iResolution;               // address of vec2 iResolution uniform
+    uint32_t iResolutionAddress;        // address of vec2 iResolution uniform
     // Bytes to follow are loaded at 0
 };
