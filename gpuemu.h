@@ -58,6 +58,16 @@ constexpr uint32_t makeOpcode(uint32_t bits14_12, uint32_t bits6_2, uint32_t bit
 
 const bool dump = false;
 
+#define CASE_MAKE_OPCODE_ALL_FUNCT3(a, b) \
+        case makeOpcode(0, (a), (b)): \
+        case makeOpcode(1, (a), (b)): \
+        case makeOpcode(2, (a), (b)): \
+        case makeOpcode(3, (a), (b)): \
+        case makeOpcode(4, (a), (b)): \
+        case makeOpcode(5, (a), (b)): \
+        case makeOpcode(6, (a), (b)): \
+        case makeOpcode(7, (a), (b)):
+
 template <class T>
 GPUCore::Status GPUCore::step(T& memory)
 {
@@ -97,6 +107,35 @@ GPUCore::Status GPUCore::step(T& memory)
     };
 
     switch(insn & 0x707F) {
+        // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
+        case makeOpcode(2, 0x01, 3): {
+            if(dump) std::cout << "flw\n";
+            f[rd] = memory.readf(x[rs1] + immI);
+            pc += 4;
+            break;
+        }
+
+        // fsw       imm12hi rs1 rs2 imm12lo 14..12=2 6..2=0x09 1..0=3
+        case makeOpcode(2, 0x09, 3): {
+            if(dump) std::cout << "fsw\n";
+            memory.writef(x[rs1] + immS, f[rs2]);
+            pc += 4;
+            break;
+        }
+
+        // fadd.s    rd rs1 rs2      31..27=0x00 rm       26..25=0 6..2=0x14 1..0=3
+        CASE_MAKE_OPCODE_ALL_FUNCT3(0x14, 3)
+        {
+            if(fmt == 0x0) {
+                if(dump) std::cout << "fadd.s\n";
+                f[rd] = f[rs1] + f[rs2];
+            } else {
+                unimpl();
+            }
+            pc += 4;
+            break;
+        }
+
         // fmv.x.s
         // fmv.s.x
         // fsgnj.s
@@ -117,41 +156,6 @@ GPUCore::Status GPUCore::step(T& memory)
         // fdiv.s
         // fsqrt.s
 
-        // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
-        case makeOpcode(2, 0x01, 3): {
-            if(dump) std::cout << "flw\n";
-            f[rd] = memory.readf(x[rs1] + immI);
-            pc += 4;
-            break;
-        }
-
-        // fsw       imm12hi rs1 rs2 imm12lo 14..12=2 6..2=0x09 1..0=3
-        case makeOpcode(2, 0x09, 3): {
-            if(dump) std::cout << "fsw\n";
-            memory.writef(x[rs1] + immS, f[rs2]);
-            pc += 4;
-            break;
-        }
-
-        // fadd.s    rd rs1 rs2      31..27=0x00 rm       26..25=0 6..2=0x14 1..0=3
-        case makeOpcode(0, 0x14, 3):
-        case makeOpcode(1, 0x14, 3):
-        case makeOpcode(2, 0x14, 3):
-        case makeOpcode(3, 0x14, 3):
-        case makeOpcode(4, 0x14, 3):
-        case makeOpcode(5, 0x14, 3):
-        case makeOpcode(6, 0x14, 3):
-        case makeOpcode(7, 0x14, 3):
-        {
-            if(fmt == 0x0) {
-                if(dump) std::cout << "fadd.s\n";
-                f[rd] = f[rs1] + f[rs2];
-            } else {
-                unimpl();
-            }
-            pc += 4;
-            break;
-        }
 
         case makeOpcode(0, 0x1C, 3): { // ebreak
             if(dump) std::cout << "ebreak\n";
@@ -177,11 +181,7 @@ GPUCore::Status GPUCore::step(T& memory)
             break;
         }
 
-        case makeOpcode(0, 0x00, 3):
-        case makeOpcode(1, 0x00, 3):
-        case makeOpcode(2, 0x00, 3):
-        case makeOpcode(4, 0x00, 3):
-        case makeOpcode(5, 0x00, 3):
+        CASE_MAKE_OPCODE_ALL_FUNCT3(0x00, 3)
         { // lb, lh, lw, lbu, lhw
             if(dump) std::cout << "load\n";
             if(rd != 0) {
@@ -191,21 +191,14 @@ GPUCore::Status GPUCore::step(T& memory)
                     case 2: x[rd] = memory.read32(x[rs1] + immI); break;
                     case 4: x[rd] = memory.read8(x[rs1] + immI); break;
                     case 5: x[rd] = memory.read16(x[rs1] + immI); break;
-                    default: unimpl();
+                    default: unimpl(); break;
                 }
             }
             pc += 4;
             break;
         }
 
-        case makeOpcode(0, 0x0D, 3):
-        case makeOpcode(1, 0x0D, 3):
-        case makeOpcode(2, 0x0D, 3):
-        case makeOpcode(3, 0x0D, 3):
-        case makeOpcode(4, 0x0D, 3):
-        case makeOpcode(5, 0x0D, 3):
-        case makeOpcode(6, 0x0D, 3):
-        case makeOpcode(7, 0x0D, 3):
+        CASE_MAKE_OPCODE_ALL_FUNCT3(0x0D, 3)
         { // lui
             if(dump) std::cout << "lui\n";
             if(rd > 0) {
@@ -215,13 +208,8 @@ GPUCore::Status GPUCore::step(T& memory)
             break;
         }
  
-        case makeOpcode(0, 0x18, 3):
-        case makeOpcode(1, 0x18, 3):
-        case makeOpcode(4, 0x18, 3):
-        case makeOpcode(5, 0x18, 3):
-        case makeOpcode(6, 0x18, 3):
-        case makeOpcode(7, 0x18, 3):
-        { // beq, bne, blt, bge, bltu, bgeu
+        CASE_MAKE_OPCODE_ALL_FUNCT3(0x18, 3)
+        { // beq, bne, blt, bge, bltu, bgeu etc
             if(dump) std::cout << "bge\n";
             switch(funct3) {
                 case 0: pc += (x[rs1] == x[rs2]) ? immSB : 4; break;
@@ -230,8 +218,7 @@ GPUCore::Status GPUCore::step(T& memory)
                 case 5: pc += (static_cast<int32_t>(x[rs1]) >= static_cast<int32_t>(x[rs2])) ? immSB : 4; break;
                 case 6: pc += (x[rs1] < x[rs2]) ? immSB : 4; break;
                 case 7: pc += (x[rs1] >= x[rs2]) ? immSB : 4; break;
-                default:
-                    unimpl();
+                default: unimpl(); break;
             }
             break;
         }
@@ -255,14 +242,7 @@ GPUCore::Status GPUCore::step(T& memory)
             break;
         }
 
-        case makeOpcode(0, 0x1b, 3):
-        case makeOpcode(1, 0x1b, 3):
-        case makeOpcode(2, 0x1b, 3):
-        case makeOpcode(3, 0x1b, 3):
-        case makeOpcode(4, 0x1b, 3):
-        case makeOpcode(5, 0x1b, 3):
-        case makeOpcode(6, 0x1b, 3):
-        case makeOpcode(7, 0x1b, 3):
+        CASE_MAKE_OPCODE_ALL_FUNCT3(0x1b, 3)
         { // jal
             if(dump) std::cout << "jal\n";
             if(rd > 0) {
@@ -272,9 +252,7 @@ GPUCore::Status GPUCore::step(T& memory)
             break;
         }
 
-        case makeOpcode(0, 0x04, 3):
-        case makeOpcode(1, 0x04, 3):
-        case makeOpcode(7, 0x04, 3):
+        CASE_MAKE_OPCODE_ALL_FUNCT3(0x04, 3)
         { // addi
             if(dump) std::cout << "addi\n";
             if(rd > 0) {
@@ -284,6 +262,7 @@ GPUCore::Status GPUCore::step(T& memory)
                     case 4: x[rd] = x[rs1] ^ immI; break;
                     case 6: x[rd] = x[rs1] | immI; break;
                     case 7: x[rd] = x[rs1] & immI; break;
+                    default: unimpl(); break;
                 }
             }
             pc += 4;
