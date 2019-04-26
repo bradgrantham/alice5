@@ -135,6 +135,12 @@ GPUCore::Status GPUCore::step(T& memory)
         // fmin.s    rd rs1 rs2      31..27=0x05 14..12=0 26..25=0 6..2=0x14 1..0=3
         // fmax.s    rd rs1 rs2      31..27=0x05 14..12=1 26..25=0 6..2=0x14 1..0=3
         // fsqrt.s   rd rs1 24..20=0 31..27=0x0B rm       26..25=0 6..2=0x14 1..0=3
+        // fle.s     rd rs1 rs2      31..27=0x14 14..12=0 26..25=0 6..2=0x14 1..0=3
+        // flt.s     rd rs1 rs2      31..27=0x14 14..12=1 26..25=0 6..2=0x14 1..0=3
+        // feq.s     rd rs1 rs2      31..27=0x14 14..12=2 26..25=0 6..2=0x14 1..0=3
+
+        // XXX ignoring the rounding-mode bits
+        // XXX haven't implemented anything but "S" (single) size
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x14, 3)
         {
             if(dump) std::cout << "fadd etc\n";
@@ -148,6 +154,18 @@ GPUCore::Status GPUCore::step(T& memory)
                 case 0x03: /* fdiv */ f[rd] = f[rs1] / f[rs2]; break;
                 case 0x05: /* fmin or fmax */ f[rd] = (funct3 == 0) ? fminf(f[rs1], f[rs2]) : fmaxf(f[rs1], f[rs2]); break;
                 case 0x0B: /* fsqrt */ f[rd] = sqrtf(f[rs1]); break;
+                case 0x14:  {
+                    if(rd > 0) {
+                        if(funct3 == 0x0) { 
+                            x[rd] = (f[rs1] <= f[rs2]) ? 1 : 0;
+                        } else if(funct3 == 0x1) {
+                            x[rd] = (f[rs1] < f[rs2]) ? 1 : 0;
+                        } else {
+                            x[rd] = (f[rs1] == f[rs2]) ? 1 : 0;
+                        }
+                    }
+                    break;
+                }
                 default: unimpl(); break;
             }
             pc += 4;
@@ -160,11 +178,6 @@ GPUCore::Status GPUCore::step(T& memory)
         // fcvt.wu.s
         // fcvt.s.w
         // fcvt.s.wu
-        // feq.s
-        // flt.s
-        // fle.s
-        // fmin.s
-        // fmax.s
         // fclass.s
 
         case makeOpcode(0, 0x1C, 3): { // ebreak
