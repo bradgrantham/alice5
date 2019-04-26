@@ -3587,7 +3587,12 @@ struct Compiler
                         assert(r != registers.end());
                         assert(r->second.phy.size() == 1);
                         std::ostringstream ss;
-                        ss << "lw x" << r->second.phy.at(0) << ", .C" << regId << "(x0)";
+                        if (isRegFloat(regId)) {
+                            ss << "flw x";
+                        } else {
+                            ss << "lw x";
+                        }
+                        ss << r->second.phy.at(0) << ", .C" << regId << "(x0)";
                         emit(ss.str(), "Load constant");
                     }
                 }
@@ -3669,6 +3674,23 @@ struct Compiler
         }
 
         return false;
+    }
+
+    // Returns true if the register is a float, false if it's an integer,
+    // otherwise asserts.
+    bool isRegFloat(uint32_t id) const {
+        auto r = registers.find(id);
+        assert(r != registers.end());
+
+        Type type = pgm->types.at(r->second.type);
+        if (std::holds_alternative<TypeInt>(type)) {
+            return false;
+        } else if (std::holds_alternative<TypeFloat>(type)) {
+            return true;
+        } else {
+            std::cerr << "Error: Variable " << id << " is neither int nor float.\n";
+            exit(EXIT_FAILURE);
+        }
     }
 
     // Make a new label that can be used for local jumps.
@@ -4019,12 +4041,12 @@ void Instruction::emit(Compiler *compiler)
 
 void InsnFAdd::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fadd", resultId, operand1Id, operand2Id);
+    compiler->emitBinaryOp("fadd.s", resultId, operand1Id, operand2Id);
 }
 
 void InsnFMul::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fmul", resultId, operand1Id, operand2Id);
+    compiler->emitBinaryOp("fmul.s", resultId, operand1Id, operand2Id);
 }
 
 void InsnIAdd::emit(Compiler *compiler)
@@ -4062,7 +4084,12 @@ void InsnLoad::emit(Compiler *compiler)
     int count = r == compiler->registers.end() ? 1 : r->second.count;
     for (int i = 0; i < count; i++) {
         std::ostringstream ss1;
-        ss1 << "lw " << compiler->reg(resultId, i) << ", ";
+        if (compiler->isRegFloat(resultId)) {
+            ss1 << "flw ";
+        } else {
+            ss1 << "lw ";
+        }
+        ss1 << compiler->reg(resultId, i) << ", ";
         if (count != 1) {
             ss1 << "(";
         }
@@ -4085,7 +4112,12 @@ void InsnStore::emit(Compiler *compiler)
     int count = r == compiler->registers.end() ? 1 : r->second.count;
     for (int i = 0; i < count; i++) {
         std::ostringstream ss1;
-        ss1 << "sw " << compiler->reg(objectId, i) << ", ";
+        if (compiler->isRegFloat(objectId)) {
+            ss1 << "fsw ";
+        } else {
+            ss1 << "sw ";
+        }
+        ss1 << compiler->reg(objectId, i) << ", ";
         if (count != 1) {
             ss1 << "(";
         }
