@@ -79,6 +79,7 @@ GPUCore::Status GPUCore::step(T& memory)
     uint32_t rd = getBits(insn, 11, 7);
     uint32_t funct3 = getBits(insn, 14, 12);
     // uint32_t funct7 = getBits(insn, 31, 25);
+    uint32_t ffunct = getBits(insn, 31, 27);
     uint32_t rs1 = getBits(insn, 19, 15);
     uint32_t rs2 = getBits(insn, 24, 20);
     uint32_t immI = extendSign(getBits(insn, 31, 20), 12);
@@ -124,13 +125,17 @@ GPUCore::Status GPUCore::step(T& memory)
         }
 
         // fadd.s    rd rs1 rs2      31..27=0x00 rm       26..25=0 6..2=0x14 1..0=3
+        // fmul.s    rd rs1 rs2      31..27=0x02 rm       26..25=0 6..2=0x14 1..0=3
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x14, 3)
         {
-            if(fmt == 0x0) {
-                if(dump) std::cout << "fadd.s\n";
-                f[rd] = f[rs1] + f[rs2];
-            } else {
+            if(dump) std::cout << "fadd etc\n";
+            if(fmt != 0x0) {
                 unimpl();
+            }
+            switch(ffunct) {
+                case 0x00: /* fadd */ f[rd] = f[rs1] + f[rs2]; break;
+                case 0x02: /* fmul */ f[rd] = f[rs1] * f[rs2]; break;
+                default: unimpl(); break;
             }
             pc += 4;
             break;
@@ -152,7 +157,6 @@ GPUCore::Status GPUCore::step(T& memory)
         // fmax.s
         // fclass.s
         // fsub.s
-        // fmul.s
         // fdiv.s
         // fsqrt.s
 
