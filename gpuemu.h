@@ -7,6 +7,7 @@ struct GPUCore
 
     uint32_t x[32]; // but 0 not accessed because it's readonly 0
     uint32_t pc;
+    float f[32]; // but 0 not accessed because it's readonly 0
     // XXX CSRs
     // XXX FCSRs
 
@@ -64,6 +65,7 @@ GPUCore::Status GPUCore::step(T& memory)
 
     Status status = RUNNING;
 
+    uint32_t fmt = getBits(insn, 26, 25);
     uint32_t rd = getBits(insn, 11, 7);
     uint32_t funct3 = getBits(insn, 14, 12);
     // uint32_t funct7 = getBits(insn, 31, 25);
@@ -95,6 +97,44 @@ GPUCore::Status GPUCore::step(T& memory)
     };
 
     switch(insn & 0x707F) {
+
+        // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
+        case makeOpcode(2, 0x01, 3): {
+            if(dump) std::cout << "flw\n";
+            uint32_t t = memory.read32(x[rs1] + immI);
+            f[rd] = *reinterpret_cast<float*>(&t);
+            pc += 4;
+            break;
+        }
+
+        // fsw       imm12hi rs1 rs2 imm12lo 14..12=2 6..2=0x09 1..0=3
+        case makeOpcode(2, 0x09, 3): {
+            if(dump) std::cout << "fsw\n";
+            memory.write32(x[rs1] + immS, *reinterpret_cast<uint32_t*>(&f[rs2]));
+            pc += 4;
+            break;
+        }
+
+        // fadd.s    rd rs1 rs2      31..27=0x00 rm       26..25=0 6..2=0x14 1..0=3
+        case makeOpcode(0, 0x14, 3):
+        case makeOpcode(1, 0x14, 3):
+        case makeOpcode(2, 0x14, 3):
+        case makeOpcode(3, 0x14, 3):
+        case makeOpcode(4, 0x14, 3):
+        case makeOpcode(5, 0x14, 3):
+        case makeOpcode(6, 0x14, 3):
+        case makeOpcode(7, 0x14, 3):
+        {
+            if(fmt == 0x0) {
+                if(dump) std::cout << "fadd.s\n";
+                f[rd] = f[rs1] + f[rs2];
+            } else {
+                unimpl();
+            }
+            pc += 4;
+            break;
+        }
+
         case makeOpcode(0, 0x1C, 3): { // ebreak
             if(dump) std::cout << "ebreak\n";
             if(insn == 0x00100073) {
