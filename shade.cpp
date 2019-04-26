@@ -3573,6 +3573,7 @@ struct Compiler
         emit("jal ra, main", "");
         emit("ebreak", "");
 
+        // Emit instructions.
         for(int pc = 0; pc < instructions.size(); pc++) {
             for(auto &function : pgm->functions) {
                 if(pc == function.second.start) {
@@ -3591,6 +3592,24 @@ struct Compiler
             }
 
             instructions.at(pc)->emit(this);
+        }
+
+        // Emit variables and constants.
+        for (auto &[id, var] : pgm->variables) {
+            auto name = pgm->names.find(id);
+            if (name != pgm->names.end()) {
+                // XXX Check storage class? (var.storageClass)
+                emitLabel(name->second);
+                size_t size = pgm->typeSizes.at(var.type);
+                for (size_t i = 0; i < size/4; i++) {
+                    emit(".word 0", "");
+                }
+                for (size_t i = 0; i < size%4; i++) {
+                    emit(".byte 0", "");
+                }
+            } else {
+                std::cerr << "Warning: Name of variable " << id << " not defined.\n";
+            }
         }
     }
 
@@ -3856,7 +3875,7 @@ struct Compiler
         std::cout << label << ":\n";
     }
 
-    void emit(const std::string &op, const std::string comment)
+    void emit(const std::string &op, const std::string &comment)
     {
         std::ios oldState(nullptr);
         oldState.copyfmt(std::cout);
@@ -4039,7 +4058,7 @@ void InsnBranch::emit(Compiler *compiler)
 
 void InsnReturn::emit(Compiler *compiler)
 {
-    compiler->emit("ret", "");
+    compiler->emit("jalr x0, ra, 0", "");
 }
 
 void InsnReturnValue::emit(Compiler *compiler)
@@ -4049,7 +4068,7 @@ void InsnReturnValue::emit(Compiler *compiler)
     std::ostringstream ss2;
     ss2 << "return " << valueId;
     compiler->emit(ss1.str(), ss2.str());
-    compiler->emit("ret", "");
+    compiler->emit("jalr x0, ra, 0", "");
 }
 
 void InsnPhi::emit(Compiler *compiler)

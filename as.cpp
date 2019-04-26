@@ -7,6 +7,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <set>
 #include <string>
 #include <iomanip>
 
@@ -175,6 +176,9 @@ private:
     // Map from label name to address in bytes.
     std::map<std::string,uint32_t> labels;
 
+    // Addresses that store an instruction (for disassembly).
+    std::set<uint32_t> instAddrs;
+
 public:
     Assembler()
         : inPathname("unspecified") {
@@ -329,17 +333,13 @@ public:
             // Clear output.
             bin.clear();
             binLine.clear();
+            instAddrs.clear();
 
             // Process each line.
             for (lineNumber = 0; lineNumber < lines.size(); lineNumber++) {
                 parseLine();
             }
         }
-
-        emit(0);// XXX remove.
-        emit(0);
-        emit(0);
-        emit(0);
     }
 
     // Dump the assembly/binary listing.
@@ -400,11 +400,13 @@ public:
             << "  " << source << "\n";
 
         // Print disassembled code, for comparison.
-        char buf[128];
-        disasm_inst(buf, sizeof(buf), rv32, pc, instruction);
-        std::cout
-            << std::string(5, ' ')
-            << buf << "\n";
+        if (instAddrs.find(pc) != instAddrs.end()) {
+            char buf[128];
+            disasm_inst(buf, sizeof(buf), rv32, pc, instruction);
+            std::cout
+                << std::string(5, ' ')
+                << buf << "\n";
+        }
     }
 
     // Save the binary file.
@@ -475,132 +477,12 @@ private:
 
         // See if it's an operator.
         if (!opOrLabel.empty()) {
-            // Parse parameters.
-            auto opItr = operators.find(opOrLabel);
-            if (opItr == operators.end()) {
-                s = previousToken;
-                std::ostringstream ss;
-                ss << "Unknown operator \"" << opOrLabel << "\"";
-                error(ss.str());
-            }
-            const Operator &op = opItr->second;
-
-            switch (op.format) {
-                case FORMAT_R: {
-                    int rd = readRegister(op.dIsFloat, "destination");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int rs1 = readRegister(op.s1IsFloat, "source");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int rs2 = readRegister(op.s2IsFloat, "source");
-                    emitR(op, rd, rs1, rs2);
-                    break;
-                }
-
-                case FORMAT_R2: {
-                    int rd = readRegister(op.dIsFloat, "destination");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int rs1 = readRegister(op.s1IsFloat, "source");
-                    emitR(op, rd, rs1, op.r2);
-                    break;
-                }
-
-                case FORMAT_I: {
-                    int rd = readRegister(op.dIsFloat, "destination");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int rs1 = readRegister(op.s1IsFloat, "source");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int32_t imm = readImmediate(op.bits);
-                    emitI(op, rd, rs1, imm);
-                    break;
-                }
-
-                case FORMAT_IL: {
-                    int rd = readRegister(op.dIsFloat, "destination");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int32_t imm = readImmediateOrLabel(op, false);
-                    if (!foundChar('(')) {
-                        error("Expected open parenthesis");
-                    }
-                    int rs1 = readRegister(op.s1IsFloat, "source");
-                    if (!foundChar(')')) {
-                        error("Expected close parenthesis");
-                    }
-                    emitI(op, rd, rs1, imm);
-                    break;
-                }
-
-                case FORMAT_IZ: {
-                    // No parameters.
-                    emitR(op, 0, 0, op.r2);
-                    break;
-                }
-
-                case FORMAT_S: {
-                    int rs2 = readRegister(op.s2IsFloat, "source");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int32_t imm = readImmediateOrLabel(op, false);
-                    if (!foundChar('(')) {
-                        error("Expected open parenthesis");
-                    }
-                    int rs1 = readRegister(op.s1IsFloat, "source");
-                    if (!foundChar(')')) {
-                        error("Expected close parenthesis");
-                    }
-                    emitS(op, rs2, imm, rs1);
-                    break;
-                }
-
-                case FORMAT_SB: {
-                    int rs1 = readRegister(op.s1IsFloat, "source");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int rs2 = readRegister(op.s2IsFloat, "source");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int32_t imm = readImmediateOrLabel(op, true);
-                    emitSB(op, rs1, rs2, imm);
-                    break;
-                }
-
-                case FORMAT_U: {
-                    int rd = readRegister(op.dIsFloat, "destination");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int32_t imm = readImmediate(op.bits);
-                    emitU(op, rd, imm);
-                    break;
-                }
-
-                case FORMAT_UJ: {
-                    int rd = readRegister(op.dIsFloat, "destination");
-                    if (!foundChar(',')) {
-                        error("Expected comma");
-                    }
-                    int32_t imm = readImmediateOrLabel(op, true);
-                    emitUJ(op, rd, imm);
-                    break;
-                }
-
-                default: {
-                    assert(false);
-                }
+            // See if it's a directive.
+            if (opOrLabel == ".word") {
+                int32_t imm = readImmediate(-1);
+                emit(imm);
+            } else {
+                parseOperator(opOrLabel);
             }
         }
 
@@ -646,7 +528,7 @@ private:
         previousToken = s;
 
         while (isalnum(*s) || *s == '_' || *s == '.') {
-            if ((isdigit(*s) || *s == '.') && s == previousToken) {
+            if (isdigit(*s) && s == previousToken) {
                 // Can't start with digit or dot; this isn't an identifier.
                 return "";
             }
@@ -660,8 +542,8 @@ private:
     }
 
     // Read a signed integer immediate value. The immediate must fit in the specified
-    // number of bits. Skips subsequent whitespace. The immediate can be in
-    // decimal or hex (with a 0x prefix).
+    // number of bits (or -1 for no limit). Skips subsequent whitespace. The immediate
+    // can be in decimal or hex (with a 0x prefix).
     int32_t readImmediate(int bits) {
         bool found = false;
         int32_t imm = 0;
@@ -710,15 +592,17 @@ private:
         }
 
         // Make sure we fit.
-        int32_t limit = 1 << (bits - 1);
-        if (negative ? -imm > limit : imm >= limit) {
-            // Back up over immediate.
-            s = previousToken;
-            std::ostringstream ss;
-            ss << "Immediate " << imm << " (0x"
-                << std::hex << imm << std::dec << ") does not fit in "
-                << bits << (bits == 1 ? " bit" : " bits");
-            error(ss.str());
+        if (bits != -1) {
+            int32_t limit = 1 << (bits - 1);
+            if (negative ? -imm > limit : imm >= limit) {
+                // Back up over immediate.
+                s = previousToken;
+                std::ostringstream ss;
+                ss << "Immediate " << imm << " (0x"
+                    << std::hex << imm << std::dec << ") does not fit in "
+                    << bits << (bits == 1 ? " bit" : " bits");
+                error(ss.str());
+            }
         }
 
         skipWhitespace();
@@ -769,6 +653,140 @@ private:
         }
 
         return imm;
+    }
+
+    // Parse an operator and its parameters.
+    void parseOperator(const std::string &opName) {
+        // Parse parameters.
+        auto opItr = operators.find(opName);
+        if (opItr == operators.end()) {
+            s = previousToken;
+            std::ostringstream ss;
+            ss << "Unknown operator \"" << opName << "\"";
+            error(ss.str());
+        }
+        const Operator &op = opItr->second;
+
+        // Keep track of the fact that we put an instruction here.
+        instAddrs.insert(pc());
+
+        switch (op.format) {
+            case FORMAT_R: {
+                int rd = readRegister(op.dIsFloat, "destination");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int rs1 = readRegister(op.s1IsFloat, "source");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int rs2 = readRegister(op.s2IsFloat, "source");
+                emitR(op, rd, rs1, rs2);
+                break;
+            }
+
+            case FORMAT_R2: {
+                int rd = readRegister(op.dIsFloat, "destination");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int rs1 = readRegister(op.s1IsFloat, "source");
+                emitR(op, rd, rs1, op.r2);
+                break;
+            }
+
+            case FORMAT_I: {
+                int rd = readRegister(op.dIsFloat, "destination");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int rs1 = readRegister(op.s1IsFloat, "source");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int32_t imm = readImmediate(op.bits);
+                emitI(op, rd, rs1, imm);
+                break;
+            }
+
+            case FORMAT_IL: {
+                int rd = readRegister(op.dIsFloat, "destination");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int32_t imm = readImmediateOrLabel(op, false);
+                if (!foundChar('(')) {
+                    error("Expected open parenthesis");
+                }
+                int rs1 = readRegister(op.s1IsFloat, "source");
+                if (!foundChar(')')) {
+                    error("Expected close parenthesis");
+                }
+                emitI(op, rd, rs1, imm);
+                break;
+            }
+
+            case FORMAT_IZ: {
+                // No parameters.
+                emitR(op, 0, 0, op.r2);
+                break;
+            }
+
+            case FORMAT_S: {
+                int rs2 = readRegister(op.s2IsFloat, "source");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int32_t imm = readImmediateOrLabel(op, false);
+                if (!foundChar('(')) {
+                    error("Expected open parenthesis");
+                }
+                int rs1 = readRegister(op.s1IsFloat, "source");
+                if (!foundChar(')')) {
+                    error("Expected close parenthesis");
+                }
+                emitS(op, rs2, imm, rs1);
+                break;
+            }
+
+            case FORMAT_SB: {
+                int rs1 = readRegister(op.s1IsFloat, "source");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int rs2 = readRegister(op.s2IsFloat, "source");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int32_t imm = readImmediateOrLabel(op, true);
+                emitSB(op, rs1, rs2, imm);
+                break;
+            }
+
+            case FORMAT_U: {
+                int rd = readRegister(op.dIsFloat, "destination");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int32_t imm = readImmediate(op.bits);
+                emitU(op, rd, imm);
+                break;
+            }
+
+            case FORMAT_UJ: {
+                int rd = readRegister(op.dIsFloat, "destination");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int32_t imm = readImmediateOrLabel(op, true);
+                emitUJ(op, rd, imm);
+                break;
+            }
+
+            default: {
+                assert(false);
+            }
+        }
     }
 
     // Error function.
