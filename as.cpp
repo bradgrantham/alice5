@@ -14,6 +14,7 @@
 extern "C" {
 #include "riscv-disas.h"
 }
+#include "gpuemu.h"
 
 // Return the pathname without the extension ("file.x" becomes "file").
 // If the pathname does not have an extension, it is returned unchanged.
@@ -416,6 +417,19 @@ public:
             std::cerr << "Can't open file \"" << outPathname << "\".\n";
             exit(EXIT_FAILURE);
         }
+
+        // Output header.
+        RunHeader header;
+        header.initialPC = 0;
+        header.gl_FragCoordAddress = getLabelAddress("gl_FragCoord");
+        header.colorAddress = getLabelAddress("color");
+        header.iTimeAddress = getLabelAddress("iTime");
+        header.iMouseAddress = getLabelAddress("iMouse");
+        header.iResolutionAddress = getLabelAddress("iResolution");
+
+        outFile.write(reinterpret_cast<char *>(&header), sizeof(header));
+
+        // Write binary.
         for (uint32_t instruction : bin) {
             // Force little endian.
             outFile
@@ -428,6 +442,16 @@ public:
     }
 
 private:
+    // Return the address of a label, or 0xFFFFFFFF if not found.
+    uint32_t getLabelAddress(const std::string &label) const {
+        auto itr = labels.find(label);
+        if (itr == labels.end()) {
+            return 0xFFFFFFFF;
+        } else {
+            return itr->second;
+        }
+    }
+
     // Add known registers with prefix from "first" to "last" inclusive, starting
     // at physical register "start".
     void addRegisters(const std::string &prefix, int first, int last, int start) {
