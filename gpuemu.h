@@ -66,7 +66,7 @@ GPUCore::Status GPUCore::step(T& memory)
 
     uint32_t rd = getBits(insn, 11, 7);
     uint32_t funct3 = getBits(insn, 14, 12);
-    uint32_t funct7 = getBits(insn, 31, 25);
+    // uint32_t funct7 = getBits(insn, 31, 25);
     uint32_t rs1 = getBits(insn, 19, 15);
     uint32_t rs2 = getBits(insn, 24, 20);
     uint32_t immI = extendSign(getBits(insn, 31, 20), 12);
@@ -221,3 +221,15 @@ GPUCore::Status GPUCore::step(T& memory)
     return status;
 }
 
+struct RunHeader
+{
+    uint32_t magic = 0x30354c41; // 'AL50', version 0 of Alice 5 header
+    uint32_t initialPC;
+    uint32_t initialSP;
+    uint32_t gl_FragCoordAddress;
+    uint32_t colorAddress;
+    uint32_t iTimeAddress;
+    uint32_t iMouseAddress;
+    uint32_t iResolution;
+    /* bytes to follow are loaded at 0 */
+};
