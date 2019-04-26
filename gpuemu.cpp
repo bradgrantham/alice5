@@ -54,6 +54,7 @@ struct Memory
     uint32_t read32(uint32_t addr)
     {
         if(verbose) printf("read 32 from %08X\n", addr);
+        assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
         return *reinterpret_cast<uint32_t*>(memorybytes.data() + addr);
     }
@@ -72,6 +73,7 @@ struct Memory
     void write32(uint32_t addr, uint32_t v)
     {
         if(verbose) printf("write 32 bits of %08X to %08X\n", v, addr);
+        assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
         *reinterpret_cast<uint32_t*>(memorybytes.data() + addr) = v;
     }
@@ -232,8 +234,12 @@ int main(int argc, char **argv)
     float fh = imageHeight;
     float zero = 0.0;
     float when = 1.5;
-    set(m, hdr.iResolutionAddress, v4float{fw, fh, zero, zero});
-    set(m, hdr.iResolutionAddress +  0, when);
+    if (hdr.iResolutionAddress == 0xFFFFFFFF) {
+        std::cerr << "Warning: No memory location for iResolution.\n";
+    } else {
+        set(m, hdr.iResolutionAddress, v4float{fw, fh, zero, zero});
+        set(m, hdr.iResolutionAddress +  0, when);
+    }
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
 
     for(int j = 0; j < imageHeight; j++)

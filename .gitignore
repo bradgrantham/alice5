@@ -36,6 +36,7 @@
 *.ppm
 /shade
 /as
+/gpuemu
 *.dSYM
 *.gif
 foo.s
