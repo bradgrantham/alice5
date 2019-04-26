@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <cmath>
 
 struct GPUCore
 {
@@ -126,6 +127,14 @@ GPUCore::Status GPUCore::step(T& memory)
 
         // fadd.s    rd rs1 rs2      31..27=0x00 rm       26..25=0 6..2=0x14 1..0=3
         // fmul.s    rd rs1 rs2      31..27=0x02 rm       26..25=0 6..2=0x14 1..0=3
+        // fsub.s    rd rs1 rs2      31..27=0x01 rm       26..25=0 6..2=0x14 1..0=3
+        // fdiv.s    rd rs1 rs2      31..27=0x03 rm       26..25=0 6..2=0x14 1..0=3
+        // fsgnj.s   rd rs1 rs2      31..27=0x04 14..12=0 26..25=0 6..2=0x14 1..0=3
+        // fsgnjn.s  rd rs1 rs2      31..27=0x04 14..12=1 26..25=0 6..2=0x14 1..0=3
+        // fsgnjx.s  rd rs1 rs2      31..27=0x04 14..12=2 26..25=0 6..2=0x14 1..0=3
+        // fmin.s    rd rs1 rs2      31..27=0x05 14..12=0 26..25=0 6..2=0x14 1..0=3
+        // fmax.s    rd rs1 rs2      31..27=0x05 14..12=1 26..25=0 6..2=0x14 1..0=3
+        // fsqrt.s   rd rs1 24..20=0 31..27=0x0B rm       26..25=0 6..2=0x14 1..0=3
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x14, 3)
         {
             if(dump) std::cout << "fadd etc\n";
@@ -134,7 +143,11 @@ GPUCore::Status GPUCore::step(T& memory)
             }
             switch(ffunct) {
                 case 0x00: /* fadd */ f[rd] = f[rs1] + f[rs2]; break;
+                case 0x01: /* fsub */ f[rd] = f[rs1] - f[rs2]; break;
                 case 0x02: /* fmul */ f[rd] = f[rs1] * f[rs2]; break;
+                case 0x03: /* fdiv */ f[rd] = f[rs1] / f[rs2]; break;
+                case 0x05: /* fmin or fmax */ f[rd] = (funct3 == 0) ? fminf(f[rs1], f[rs2]) : fmaxf(f[rs1], f[rs2]); break;
+                case 0x0B: /* fsqrt */ f[rd] = sqrtf(f[rs1]); break;
                 default: unimpl(); break;
             }
             pc += 4;
@@ -143,9 +156,6 @@ GPUCore::Status GPUCore::step(T& memory)
 
         // fmv.x.s
         // fmv.s.x
-        // fsgnj.s
-        // fsgnjn.s
-        // fsgnjx.s
         // fcvt.w.s
         // fcvt.wu.s
         // fcvt.s.w
@@ -156,10 +166,6 @@ GPUCore::Status GPUCore::step(T& memory)
         // fmin.s
         // fmax.s
         // fclass.s
-        // fsub.s
-        // fdiv.s
-        // fsqrt.s
-
 
         case makeOpcode(0, 0x1C, 3): { // ebreak
             if(dump) std::cout << "ebreak\n";
