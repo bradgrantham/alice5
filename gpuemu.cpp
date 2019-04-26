@@ -1,6 +1,8 @@
 #include <vector>
+#include <array>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <iomanip>
 #include <cassert>
 #include <cstdlib>
@@ -32,62 +34,45 @@ void dumpGPUCore(const GPUCore& core)
 struct Memory
 {
     std::vector<uint8_t> memorybytes;
-    Memory(const std::vector<uint8_t>& memorybytes_) :
-        memorybytes(memorybytes_)
+    bool verbose;
+    Memory(const std::vector<uint8_t>& memorybytes_, bool verbose_ = false) :
+        memorybytes(memorybytes_),
+        verbose(verbose_)
     {}
     uint8_t read8(uint32_t addr)
     {
-        printf("read 8 from %08X\n", addr);
-        if(!(addr < memorybytes.size())) {
-            throw std::runtime_error("read outside memory at " + std::to_string(addr));
-        }
+        if(verbose) printf("read 8 from %08X\n", addr);
+        assert(addr < memorybytes.size());
         return memorybytes[addr];
     }
     uint16_t read16(uint32_t addr)
     {
-        printf("read 16 from %08X\n", addr);
-        if(!(addr + 1 < memorybytes.size())) {
-            throw std::runtime_error("read outside memory at " + std::to_string(addr));
-        }
+        if(verbose) printf("read 16 from %08X\n", addr);
+        assert(addr + 1 < memorybytes.size());
         return *reinterpret_cast<uint16_t*>(memorybytes.data() + addr);
     }
     uint32_t read32(uint32_t addr)
     {
-        printf("read 32 from %08X\n", addr);
-        if(!(addr + 3 < memorybytes.size())) {
-            throw std::runtime_error("read outside memory at " + std::to_string(addr));
-        }
-        return *reinterpret_cast<uint32_t*>(memorybytes.data() + addr);
-    }
-    uint32_t read32quiet(uint32_t addr)
-    {
-        if(!(addr + 3 < memorybytes.size())) {
-            throw std::runtime_error("read outside memory at " + std::to_string(addr));
-        }
+        if(verbose) printf("read 32 from %08X\n", addr);
+        assert(addr + 3 < memorybytes.size());
         return *reinterpret_cast<uint32_t*>(memorybytes.data() + addr);
     }
     void write8(uint32_t addr, uint32_t v)
     {
-        printf("write 8 bits of %08X to %08X\n", v, addr);
-        if(!(addr < memorybytes.size())) {
-            throw std::runtime_error("read outside memory at " + std::to_string(addr));
-        }
+        if(verbose) printf("write 8 bits of %08X to %08X\n", v, addr);
+        assert(addr < memorybytes.size());
         memorybytes[addr] = static_cast<uint8_t>(v);
     }
     void write16(uint32_t addr, uint32_t v)
     {
-        printf("write 16 bits of %08X to %08X\n", v, addr);
-        if(!(addr + 1 < memorybytes.size())) {
-            throw std::runtime_error("read outside memory at " + std::to_string(addr));
-        }
+        if(verbose) printf("write 16 bits of %08X to %08X\n", v, addr);
+        assert(addr + 1 < memorybytes.size());
         *reinterpret_cast<uint16_t*>(memorybytes.data() + addr) = static_cast<uint16_t>(v);
     }
     void write32(uint32_t addr, uint32_t v)
     {
-        printf("write %08X to %08X\n", v, addr);
-        if(!(addr + 3 < memorybytes.size())) {
-            throw std::runtime_error("read outside memory at " + std::to_string(addr));
-        }
+        if(verbose) printf("write 32 bits of %08X to %08X\n", v, addr);
+        assert(addr + 3 < memorybytes.size());
         *reinterpret_cast<uint32_t*>(memorybytes.data() + addr) = v;
     }
 };
@@ -122,24 +107,122 @@ uint32_t iMouseAddress = 2064; // ivec4
 uint32_t iResolutionAddress = 2048; // vec2 
 uint32_t iTimeAddress = 2056; // float 
 
-// XXX bin may be loaded anywhere, so must be -fPIC
+template <class MEMORY, class TYPE>
+void set(MEMORY& memory, uint32_t address, const TYPE& value)
+{
+    static_assert(sizeof(TYPE) == sizeof(uint32_t));
+    memory.write32(address, *reinterpret_cast<const uint32_t*>(&value));
+}
+
+template <class MEMORY, class TYPE, unsigned long N>
+void set(MEMORY& memory, uint32_t address, const std::array<TYPE, N>& value)
+{
+    static_assert(sizeof(TYPE) == sizeof(uint32_t));
+    for(int i = 0; i < N; i++)
+        memory.write32(address + i * sizeof(uint32_t), *reinterpret_cast<const uint32_t*>(&value[i]));
+}
+
+typedef std::array<float,1> v1float;
+typedef std::array<uint32_t,1> v1uint;
+typedef std::array<int32_t,1> v1int;
+typedef std::array<float,2> v2float;
+typedef std::array<uint32_t,2> v2uint;
+typedef std::array<int32_t,2> v2int;
+typedef std::array<float,3> v3float;
+typedef std::array<uint32_t,3> v3uint;
+typedef std::array<int32_t,3> v3int;
+typedef std::array<float,4> v4float;
+typedef std::array<uint32_t,4> v4uint;
+typedef std::array<int32_t,4> v4int;
+
+// https://stackoverflow.com/a/34571089/211234
+static const char *BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+std::string base64Encode(const std::string &in) {
+    std::string out;
+    int val = 0;
+    int valb = -6;
+
+    for (uint8_t c : in) {
+        val = (val << 8) + c;
+        valb += 8;
+        while (valb >= 0) {
+            out.push_back(BASE64_ALPHABET[(val >> valb) & 0x3F]);
+            valb -= 6;
+        }
+    }
+    if (valb > -6) {
+        out.push_back(BASE64_ALPHABET[((val << 8) >> (valb + 8)) & 0x3F]);
+    }
+    while (out.size() % 4 != 0) {
+        out.push_back('=');
+    }
+
+    return out;
+}
+
+void usage(const char* progname)
+{
+    printf("usage: %s [options] shader.blob\n", progname);
+    printf("options:\n");
+    printf("\t-v        Print memory options\n");
+    printf("\t-S        show the disassembly of the SPIR-V code\n");
+    printf("\t--term    draw output image on terminal (in addition to file)\n");
+}
+
+
 int main(int argc, char **argv)
 {
-    if(argc < 2) {
-        std::cerr << "usage: " << argv[0] << " bin\n";
+    bool verboseMemory = false;
+    bool disassemble = false;
+    bool imageToTerminal = false;
+
+    char *progname = argv[0];
+    argv++; argc--;
+
+    while(argc > 0 && argv[0][0] == '-') {
+        if(strcmp(argv[0], "-v") == 0) {
+
+            verboseMemory = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "--term") == 0) {
+
+            imageToTerminal = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "-S") == 0) {
+
+            disassemble = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "-h") == 0) {
+
+            usage(progname);
+            exit(EXIT_SUCCESS);
+
+        } else {
+
+            usage(progname);
+            exit(EXIT_FAILURE);
+
+        }
+    }
+
+    if(argc < 1) {
+        usage(progname);
         exit(EXIT_FAILURE);
     }
 
-    std::vector<uint8_t> bytes = readFileContents(argv[1]);
+    std::vector<uint8_t> blob = readFileContents(argv[0]);
+    assert(blob.size() > sizeof(RunHeader));
+    RunHeader hdr = *reinterpret_cast<RunHeader*>(blob.data());
 
-    bytes.resize(0x20000);
+    std::vector<uint8_t> bytes(blob.begin() + sizeof(RunHeader), blob.end());
+
+    bytes.resize(bytes.size() + 0x10000);
+    Memory m(bytes, false);
+
     GPUCore core;
-    Memory m(bytes);
-
-    core.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
-    core.x[2] = 0x20000; // Set SP to end of memory 
-    core.pc = 0x10000;
-
     GPUCore::Status status;
 
     int imageWidth = 320;
@@ -149,52 +232,71 @@ int main(int argc, char **argv)
     float fh = imageHeight;
     float zero = 0.0;
     float when = 1.5;
-    m.write32(iResolutionAddress +  0, *reinterpret_cast<uint32_t*>(&fw));
-    m.write32(iResolutionAddress +  4, *reinterpret_cast<uint32_t*>(&fh));
-    m.write32(iResolutionAddress +  8, *reinterpret_cast<uint32_t*>(&zero));
-    m.write32(iResolutionAddress + 12, *reinterpret_cast<uint32_t*>(&zero));
-    m.write32(iTimeAddress +  0, *reinterpret_cast<uint32_t*>(&when));
-    m.write32(iMouseAddress +  0, 0);
-    m.write32(iMouseAddress +  4, 0);
-    m.write32(iMouseAddress +  8, 0);
-    m.write32(iMouseAddress + 12, 0);
+    set(m, hdr.iResolutionAddress, v4float{fw, fh, zero, zero});
+    set(m, hdr.iResolutionAddress +  0, when);
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
+
     for(int j = 0; j < imageHeight; j++)
         for(int i = 0; i < imageWidth; i++) {
+
             float x = i, y = j, z = 0, w = 0;
-            m.write32(gl_FragCoordAddress +  0, *reinterpret_cast<uint32_t*>(&x));
-            m.write32(gl_FragCoordAddress +  0, *reinterpret_cast<uint32_t*>(&y));
-            m.write32(gl_FragCoordAddress +  0, *reinterpret_cast<uint32_t*>(&z));
-            m.write32(gl_FragCoordAddress +  0, *reinterpret_cast<uint32_t*>(&w));
+            set(m, hdr.gl_FragCoordAddress, v4float{x, y, z, w});
+            set(m, hdr.colorAddress, v4float{1, 1, 1, 1});
+
+            core.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
+            core.x[2] = bytes.size(); // Set SP to end of memory 
+            core.pc = hdr.initialPC;
+
+            if(disassemble) {
+                std::cout << "pixel " << x << ", " << y << '\n';
+            }
             try {
                 do {
-                    print_inst(core.pc, m.read32(core.pc));
+                    if(disassemble) {
+                        print_inst(core.pc, m.read32(core.pc));
+                    }
+                    m.verbose = verboseMemory;
                     status = core.step(m);
+                    m.verbose = false;
                 } while(core.pc != 0xffffffff && status == GPUCore::RUNNING);
             } catch(const std::exception& e) {
                 std::cerr << e.what() << '\n';
                 dumpGPUCore(core);
                 exit(EXIT_FAILURE);
             }
+
             if(status != GPUCore::BREAK) {
                 std::cerr << "unexpected core step result " << status << '\n';
                 dumpGPUCore(core);
                 exit(EXIT_FAILURE);
             }
-            uint32_t ir = m.read32(colorAddress +  0);
-            uint32_t ig = m.read32(colorAddress +  4);
-            uint32_t ib = m.read32(colorAddress +  8);
-            uint32_t ia = m.read32(colorAddress + 12);
+
+            uint32_t ir = m.read32(hdr.colorAddress +  0);
+            uint32_t ig = m.read32(hdr.colorAddress +  4);
+            uint32_t ib = m.read32(hdr.colorAddress +  8);
+            // uint32_t ia = m.read32(hdr.colorAddress + 12);
             float r = *reinterpret_cast<float*>(&ir);
             float g = *reinterpret_cast<float*>(&ig);
             float b = *reinterpret_cast<float*>(&ib);
-            float a = *reinterpret_cast<float*>(&ia);
+            // float a = *reinterpret_cast<float*>(&ia);
             img[3 * (j * imageWidth + i) + 0] = static_cast<unsigned char>(r * 255.99);
             img[3 * (j * imageWidth + i) + 1] = static_cast<unsigned char>(g * 255.99);
             img[3 * (j * imageWidth + i) + 2] = static_cast<unsigned char>(b * 255.99);
         }
+
     FILE *fp = fopen("emulated.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", imageWidth, imageHeight);
     fwrite(img, 1, imageWidth * imageHeight * 3, fp);
     fclose(fp);
+
+    if (imageToTerminal) {
+        // https://www.iterm2.com/documentation-images.html
+        std::ostringstream ss;
+        ss << "P6 " << imageWidth << " " << imageHeight << " 255\n";
+        ss.write(reinterpret_cast<char *>(img), 3*imageWidth*imageHeight);
+        std::cout << "\033]1337;File=width="
+            << imageWidth << "px;height="
+            << imageHeight << "px;inline=1:"
+            << base64Encode(ss.str()) << "\007\n";
+    }
 }
