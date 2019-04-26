@@ -27,6 +27,10 @@ void dumpGPUCore(const GPUCore& core)
         std::cout << "x" << std::setw(2) << i << ":" << std::hex << std::setw(8) << core.x[i] << std::dec;
         std::cout << (((i + 1) % 4 == 0) ? "\n" : " ");
     }
+    for(int i = 0; i < 32; i++) {
+        std::cout << "ft" << std::setfill('0') << std::setw(2) << i << ":" << std::setw(8) << std::setfill(' ') << core.f[i];
+        std::cout << (((i + 1) % 4 == 0) ? "\n" : " ");
+    }
     std::cout << "pc :" << std::hex << std::setw(8) << core.pc << '\n' << std::dec;
     std::cout << std::setfill(' ');
 }
