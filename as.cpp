@@ -479,7 +479,7 @@ private:
         if (!opOrLabel.empty()) {
             // See if it's a directive.
             if (opOrLabel == ".word") {
-                int32_t imm = readImmediate(-1);
+                int32_t imm = readImmediate(32);
                 emit(imm);
             } else {
                 parseOperator(opOrLabel);
@@ -542,7 +542,7 @@ private:
     }
 
     // Read a signed integer immediate value. The immediate must fit in the specified
-    // number of bits (or -1 for no limit). Skips subsequent whitespace. The immediate
+    // number of bits. Skips subsequent whitespace. The immediate
     // can be in decimal or hex (with a 0x prefix).
     int32_t readImmediate(int bits) {
         bool found = false;
@@ -592,7 +592,7 @@ private:
         }
 
         // Make sure we fit.
-        if (bits != -1) {
+        if (bits != 32) {
             int32_t limit = 1 << (bits - 1);
             if (negative ? -imm > limit : imm >= limit) {
                 // Back up over immediate.
