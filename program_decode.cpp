@@ -198,7 +198,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
         case SpvOpTypeVoid: {
             // XXX result id
             uint32_t id = nextu();
-            pgm->types[id] = TypeVoid {};
+            pgm->types[id] = std::make_shared<TypeVoid>();
             pgm->typeSizes[id] = 0;
             if(pgm->verbose) {
                 std::cout << "TypeVoid " << id << "\n";
@@ -221,7 +221,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
         case SpvOpTypeBool: {
             // XXX result id
             uint32_t id = nextu();
-            pgm->types[id] = TypeBool {};
+            pgm->types[id] = std::make_shared<TypeBool>();
             pgm->typeSizes[id] = sizeof(bool);
             if(pgm->verbose) {
                 std::cout << "TypeBool " << id << "\n";
@@ -234,7 +234,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             uint32_t width = nextu();
             assert(width <= 32); // XXX deal with larger later
-            pgm->types[id] = TypeFloat {width};
+            pgm->types[id] = std::make_shared<TypeFloat>(width);
             pgm->typeSizes[id] = ((width + 31) / 32) * 4;
             if(pgm->verbose) {
                 std::cout << "TypeFloat " << id << " " << width << "\n";
@@ -248,7 +248,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t width = nextu();
             uint32_t signedness = nextu();
             assert(width <= 32); // XXX deal with larger later
-            pgm->types[id] = TypeInt {width, signedness};
+            pgm->types[id] = std::make_shared<TypeInt>(width, signedness);
             pgm->typeSizes[id] = ((width + 31) / 32) * 4;
             if(pgm->verbose) {
                 std::cout << "TypeInt " << id << " width " << width << " signedness " << signedness << "\n";
@@ -261,7 +261,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             uint32_t returnType = nextu();
             std::vector<uint32_t> params = restv();
-            pgm->types[id] = TypeFunction {returnType, params};
+            pgm->types[id] = std::make_shared<TypeFunction>(returnType, params);
             pgm->typeSizes[id] = 4; // XXX ?!?!?
             if(pgm->verbose) {
                 std::cout << "TypeFunction " << id << " returning " << returnType;
@@ -280,7 +280,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             uint32_t type = nextu();
             uint32_t count = nextu();
-            pgm->types[id] = TypeVector {type, count};
+            pgm->types[id] = std::make_shared<TypeVector>(pgm->types[type], type, count);
             pgm->typeSizes[id] = pgm->typeSizes[type] * count;
             if(pgm->verbose) {
                 std::cout << "TypeVector " << id << " of " << type << " count " << count << "\n";
@@ -295,7 +295,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t lengthId = nextu();
             const Register& length = pgm->constants.at(lengthId);
             uint32_t count = *reinterpret_cast<uint32_t*>(length.data);
-            pgm->types[id] = TypeArray {type, count};
+            pgm->types[id] = std::make_shared<TypeArray>(pgm->types[type], type, count);
             pgm->typeSizes[id] = pgm->typeSizes[type] * count;
             if(pgm->verbose) {
                 std::cout << "TypeArray " << id << " of " << type << " count " << count << " (from register " << lengthId << ")\n";
@@ -308,7 +308,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             uint32_t columnType = nextu();
             uint32_t columnCount = nextu();
-            pgm->types[id] = TypeMatrix {columnType, columnCount};
+            pgm->types[id] = std::make_shared<TypeMatrix>(pgm->types[columnType], columnType, columnCount);
             pgm->typeSizes[id] = pgm->typeSizes[columnType] * columnCount;
             if(pgm->verbose) {
                 std::cout << "TypeMatrix " << id << " of " << columnType << " count " << columnCount << "\n";
@@ -321,7 +321,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             uint32_t storageClass = nextu();
             uint32_t type = nextu();
-            pgm->types[id] = TypePointer {type, storageClass};
+            pgm->types[id] = std::make_shared<TypePointer>(pgm->types[type], type, storageClass);
             pgm->typeSizes[id] = sizeof(uint32_t);
             if(pgm->verbose) {
                 std::cout << "TypePointer " << id << " class " << storageClass << " type " << type << "\n";
@@ -332,18 +332,20 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
         case SpvOpTypeStruct: {
             // XXX result id
             uint32_t id = nextu();
-            std::vector<uint32_t> memberTypes = restv();
-            pgm->types[id] = TypeStruct {memberTypes};
+            std::vector<uint32_t> memberTypeIds = restv();
+            std::vector<std::shared_ptr<Type>> memberTypes;
             size_t size = 0;
-            for(auto& t: memberTypes) {
+            for(auto& t: memberTypeIds) {
+                memberTypes.push_back(pgm->types[t]);
                 size += pgm->typeSizes[t];
             }
+            pgm->types[id] = std::make_shared<TypeStruct>(memberTypes, memberTypeIds);
             pgm->typeSizes[id] = size;
             if(pgm->verbose) {
                 std::cout << "TypeStruct " << id;
-                if(memberTypes.size() > 0) {
+                if(memberTypeIds.size() > 0) {
                     std::cout << " members"; 
-                    for(auto& i: memberTypes)
+                    for(auto& i: memberTypeIds)
                         std::cout << " " << i;
                 }
                 std::cout << "\n";
@@ -357,7 +359,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             uint32_t storageClass = nextu();
             uint32_t initializer = nextu(NO_INITIALIZER);
-            uint32_t pointedType = std::get<TypePointer>(pgm->types[type]).type;
+            uint32_t pointedType = pgm->type<TypePointer>(type)->type;
             pgm->variables[id] = {pointedType, storageClass, initializer, 0xFFFFFFFF};
             if(pgm->verbose) {
                 std::cout << "Variable " << id << " type " << type << " to type " << pointedType << " storageClass " << storageClass;
@@ -448,7 +450,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             // XXX result id
             uint32_t id = nextu();
             uint32_t imageType = nextu();
-            pgm->types[id] = TypeSampledImage { imageType };
+            pgm->types[id] = std::make_shared<TypeSampledImage>(imageType);
             pgm->typeSizes[id] = sizeof(uint32_t); // binding
             if(pgm->verbose) {
                 std::cout << "TypeSampledImage " << id
@@ -469,7 +471,8 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t sampled = nextu();
             uint32_t imageFormat = nextu();
             uint32_t accessQualifier = nextu(NO_ACCESS_QUALIFIER);
-            pgm->types[id] = TypeImage { sampledType, dim, depth, arrayed, ms, sampled, imageFormat, accessQualifier };
+            pgm->types[id] = std::make_shared<TypeImage>(sampledType, dim, depth, arrayed,
+                    ms, sampled, imageFormat, accessQualifier);
             pgm->typeSizes[id] = sizeof(uint32_t); // XXX ???
             if(pgm->verbose) {
                 std::cout << "TypeImage " << id

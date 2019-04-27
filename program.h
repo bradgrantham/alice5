@@ -6,7 +6,6 @@
 #include <set>
 #include <memory>
 #include <vector>
-#include <variant>
 
 #include <StandAlone/ResourceLimits.h>
 #include <glslang/MachineIndependent/localintermediate.h>
@@ -72,12 +71,6 @@ struct MemoryRegion
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-template <class T>
-T& objectAt(unsigned char* data)
-{
-    return *reinterpret_cast<T*>(data);
-}
-
 // The static state of the program.
 struct Program 
 {
@@ -112,7 +105,7 @@ struct Program
 
     std::vector<Source> sources;
     std::vector<std::string> processes;
-    std::map<uint32_t, Type> types;
+    std::map<uint32_t, std::shared_ptr<Type>> types;
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
@@ -139,6 +132,13 @@ struct Program
     size_t memorySize;
 
     std::map<uint32_t, MemoryRegion> memoryRegions;
+
+    // Returns the type as the specific subtype. Does not check to see
+    // whether the object is of the specific subtype.
+    template <class T>
+    const T *type(uint32_t typeId) const {
+        return dynamic_cast<const T *>(types.at(typeId).get());
+    }
 
     Register& allocConstantObject(uint32_t id, uint32_t type)
     {
@@ -175,9 +175,11 @@ struct Program
     // returned and the offset by column type is returned.
     // For structs, the type of field "i" (0-indexed) is returned
     // and the offset is looked up in offset decorations.
-    std::tuple<uint32_t, size_t> getConstituentInfo(uint32_t t, int i) const
+    ConstituentInfo getConstituentInfo(uint32_t t, int i) const
     {
-        const Type& type = types.at(t);
+        const Type *type = types.at(t).get();
+        return type->getConstituentInfo(i);
+        /*
         if(std::holds_alternative<TypeVector>(type)) {
             uint32_t elementType = std::get<TypeVector>(type).type;
             return std::make_tuple(elementType, typeSizes.at(elementType) * i);
@@ -195,91 +197,27 @@ struct Program
             assert(false && "getConstituentType of invalid type?!");
         }
         return std::make_tuple(0, 0); // not reached
+        */
     }
 
     // If the type ID refers to a TypeVector, returns it. Otherwise returns null.
     const TypeVector *getTypeAsVector(int typeId) const {
-        const Type &type = types.at(typeId);
-
-        return std::holds_alternative<TypeVector>(type)
-            ? &std::get<TypeVector>(type)
-            : nullptr;
+        const Type *type = types.at(typeId).get();
+        return type->op() == SpvOpTypeVector ? dynamic_cast<const TypeVector *>(type) : nullptr;
     }
 
     // Returns true if a type is a float, false if it's an integer or pointer,
     // otherwise asserts.
     bool isTypeFloat(uint32_t typeId) const {
-        Type type = types.at(typeId);
-        if (std::holds_alternative<TypeInt>(type)
-                || std::holds_alternative<TypePointer>(type)) {
-
+        const Type *type = types.at(typeId).get();
+        if (type->op() == SpvOpTypeInt || type->op() == SpvOpTypePointer) {
             return false;
-        } else if (std::holds_alternative<TypeFloat>(type)) {
+        } else if (type->op() == SpvOpTypeVector) {
             return true;
         } else {
             std::cerr << "Error: Type " << typeId << " is neither int nor float.\n";
             assert(false);
         }
-    }
-
-    void dumpTypeAt(const Type& type, unsigned char *ptr) const
-    {
-        std::visit(overloaded {
-            [&](const TypeVoid& type) { std::cout << "{}"; },
-            [&](const TypeBool& type) { std::cout << objectAt<bool>(ptr); },
-            [&](const TypeFloat& type) { std::cout << objectAt<float>(ptr); },
-            [&](const TypeInt& type) {
-                if(type.signedness) {
-                    std::cout << objectAt<int32_t>(ptr);
-                } else {
-                    std::cout << objectAt<uint32_t>(ptr);
-                }
-            },
-            [&](const TypePointer& type) { std::cout << "(ptr)" << objectAt<uint32_t>(ptr); },
-            [&](const TypeFunction& type) { std::cout << "function"; },
-            [&](const TypeImage& type) { std::cout << "image"; },
-            [&](const TypeSampledImage& type) { std::cout << "sampledimage"; },
-            [&](const TypeVector& type) {
-                std::cout << "<";
-                for(int i = 0; i < type.count; i++) {
-                    dumpTypeAt(types.at(type.type), ptr);
-                    ptr += typeSizes.at(type.type);
-                    if(i < type.count - 1)
-                        std::cout << ", ";
-                }
-                std::cout << ">";
-            },
-            [&](const TypeArray& type) {
-                std::cout << "[";
-                for(int i = 0; i < type.count; i++) {
-                    dumpTypeAt(types.at(type.type), ptr);
-                    ptr += typeSizes.at(type.type);
-                    if(i < type.count - 1)
-                        std::cout << ", ";
-                }
-                std::cout << "]";
-            },
-            [&](const TypeMatrix& type) {
-                std::cout << "<";
-                for(int i = 0; i < type.columnCount; i++) {
-                    dumpTypeAt(types.at(type.columnType), ptr);
-                    ptr += typeSizes.at(type.columnType);
-                    if(i < type.columnCount - 1)
-                        std::cout << ", ";
-                }
-                std::cout << ">";
-            },
-            [&](const TypeStruct& type) {
-                std::cout << "{";
-                for(int i = 0; i < type.memberTypes.size(); i++) {
-                    dumpTypeAt(types.at(type.memberTypes[i]), ptr);
-                    ptr += typeSizes.at(type.memberTypes[i]);
-                    if(i < type.memberTypes.size() - 1)
-                        std::cout << ", ";
-                }
-                std::cout << "}";
-            },
-        }, type);
     }
 
     static spv_result_t handleHeader(void* user_data, spv_endianness_t endian,
@@ -291,37 +229,45 @@ struct Program
 
     void storeNamedVariableInfo(const std::string& name, uint32_t typeId, uint32_t address)
     {
-        std::visit([this, name, typeId, address](auto&& type) {
+        const Type *type = types[typeId].get();
 
-            using T = std::decay_t<decltype(type)>;
+        switch (type->op()) {
+            case SpvOpTypeStruct: {
+                const TypeStruct *typeStruct = dynamic_cast<const TypeStruct *>(type);
 
-            if constexpr (std::is_same_v<T, TypeStruct>) {
-
-                for(int i = 0; i < type.memberTypes.size(); i++) {
-                    uint32_t membertype = type.memberTypes[i];
+                for(int i = 0; i < typeStruct->memberTypes.size(); i++) {
+                    uint32_t membertype = typeStruct->memberTypeIds[i];
                     std::string fullname = ((name == "") ? "" : (name + ".")) + memberNames[typeId][i];
                     storeNamedVariableInfo(fullname, membertype, address + memberDecorations[typeId][i][SpvDecorationOffset][0]);
                 }
+                break;
+            }
 
-            } else if constexpr (std::is_same_v<T, TypeArray>) {
+            case SpvOpTypeArray: {
+                const TypeArray *typeArray = dynamic_cast<const TypeArray *>(type);
 
-                for(int i = 0; i < type.count; i++) {
-                    uint32_t membertype = type.type;
+                for(int i = 0; i < typeArray->count; i++) {
+                    uint32_t membertype = typeArray->type;
                     std::string fullname = name + "[" + std::to_string(i) + "]";
                     storeNamedVariableInfo(fullname, membertype, address + i * typeSizes.at(membertype));
                 }
-
-            } else if constexpr (std::is_same_v<T, TypeVector> || std::is_same_v<T, TypeFloat> || std::is_same_v<T, TypeInt> || std::is_same_v<T, TypeSampledImage> || std::is_same_v<T, TypeBool> || std::is_same_v<T, TypeMatrix>) {
-
-                namedVariables[name] = {address, typeSizes.at(typeId)};
-
-            } else {
-
-                std::cout << "Unhandled type for finding uniform variable offset and size\n";
-
+                break;
             }
-        }, types[typeId]);
 
+            case SpvOpTypeVector:
+            case SpvOpTypeFloat:
+            case SpvOpTypeInt:
+            case SpvOpTypeSampledImage:
+            case SpvOpTypeBool:
+            case SpvOpTypeMatrix: {
+                namedVariables[name] = {address, typeSizes.at(typeId)};
+                break;
+            }
+
+            default:
+                std::cout << "Unhandled type for finding uniform variable offset and size\n";
+                break;
+        }
     }
 
     // Post-parsing work.
