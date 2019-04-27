@@ -1,6 +1,7 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
+#include <ostream>
 #include <cstdint>
 #include "basic_types.h"
 

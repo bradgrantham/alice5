@@ -4,7 +4,6 @@
 #include <set>
 #include <cstdio>
 #include <fstream>
-#include <variant>
 #include <chrono>
 #include <thread>
 #include <algorithm>
@@ -178,30 +177,40 @@ struct Compiler
 
     // Emit constant value for the specified constant ID.
     void emitConstant(uint32_t id, uint32_t typeId, unsigned char *data) {
-        Type type = pgm->types.at(typeId);
+        const Type *type = pgm->types.at(typeId).get();
 
-        if (std::holds_alternative<TypeInt>(type)) {
-            uint32_t value = *reinterpret_cast<uint32_t *>(data);
-            std::ostringstream ss;
-            ss << ".word " << value;
-            emit(ss.str(), "");
-        } else if (std::holds_alternative<TypeFloat>(type)) {
-            uint32_t intValue = *reinterpret_cast<uint32_t *>(data);
-            float floatValue = *reinterpret_cast<float *>(data);
-            std::ostringstream ss1;
-            ss1 << ".word 0x" << std::hex << intValue;
-            std::ostringstream ss2;
-            ss2 << "Float " << floatValue;
-            emit(ss1.str(), ss2.str());
-        } else if (std::holds_alternative<TypeVector>(type)) {
-            const TypeVector *typeVector = pgm->getTypeAsVector(typeId);
-            for (int i = 0; i < typeVector->count; i++) {
-                auto [subtype, offset] = pgm->getConstituentInfo(typeId, i);
-                emitConstant(id, subtype, data + offset);
+        switch (type->op()) {
+            case SpvOpTypeInt: {
+                uint32_t value = *reinterpret_cast<uint32_t *>(data);
+                std::ostringstream ss;
+                ss << ".word " << value;
+                emit(ss.str(), "");
+                break;
             }
-        } else {
-            std::cerr << "Error: Unhandled type for constant " << id << ".\n";
-            exit(EXIT_FAILURE);
+
+            case SpvOpTypeFloat: {
+                uint32_t intValue = *reinterpret_cast<uint32_t *>(data);
+                float floatValue = *reinterpret_cast<float *>(data);
+                std::ostringstream ss1;
+                ss1 << ".word 0x" << std::hex << intValue;
+                std::ostringstream ss2;
+                ss2 << "Float " << floatValue;
+                emit(ss1.str(), ss2.str());
+                break;
+            }
+
+            case SpvOpTypeVector: {
+                const TypeVector *typeVector = pgm->getTypeAsVector(typeId);
+                for (int i = 0; i < typeVector->count; i++) {
+                    auto [subtype, offset] = pgm->getConstituentInfo(typeId, i);
+                    emitConstant(id, subtype, data + offset);
+                }
+                break;
+            }
+
+            default:
+                std::cerr << "Error: Unhandled type for constant " << id << ".\n";
+                exit(EXIT_FAILURE);
         }
     }
 
@@ -211,8 +220,8 @@ struct Compiler
     bool asIntegerConstant(uint32_t id, uint32_t &value) const {
         auto r = pgm->constants.find(id);
         if (r != pgm->constants.end()) {
-            Type type = pgm->types.at(r->second.type);
-            if (std::holds_alternative<TypeInt>(type)) {
+            const Type *type = pgm->types.at(r->second.type).get();
+            if (type->op() == SpvOpTypeInt) {
                 value = *reinterpret_cast<uint32_t *>(r->second.data);
                 return true;
             }
@@ -455,7 +464,7 @@ struct Compiler
         } else {
             auto constant = pgm->constants.find(id);
             if (constant != pgm->constants.end() &&
-                    std::holds_alternative<TypeFloat>(pgm->types.at(constant->second.type))) {
+                    pgm->types.at(constant->second.type)->op() == SpvOpTypeFloat) {
 
                 const float *f = reinterpret_cast<float *>(constant->second.data);
                 ss << *f;

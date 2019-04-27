@@ -4,9 +4,10 @@
 #include <iostream>
 #include <map>
 #include <array>
-#include <variant>
 #include <vector>
 #include <set>
+
+#include "spirv.h"
 
 typedef std::array<float,1> v1float;
 typedef std::array<uint32_t,1> v1uint;
@@ -116,98 +117,272 @@ struct MemberName
     std::string name;
 };
 
-// Represents a "void" type.
-struct TypeVoid
+// Component of an aggregate type.
+struct ConstituentInfo {
+    // Type of the sub-element.
+    uint32_t subtype;
+
+    // Offset in bytes of the sub-element.
+    size_t offset;
+};
+
+// Template to case generate data to a specific type.
+template <class T>
+T& objectAt(unsigned char* data)
 {
-    // XXX Not sure why we need this. Not allowed to have an empty struct?
-    int foo;
+    return *reinterpret_cast<T*>(data);
+}
+
+// Base class for types.
+struct Type {
+    Type(uint32_t size) : size(size) {}
+    virtual ~Type() {
+        // Nothing.
+    }
+
+    // Number of bytes.
+    uint32_t size;
+
+    virtual uint32_t op() const = 0;
+    virtual ConstituentInfo getConstituentInfo(int i) const {
+        // Most types don't have this.
+        std::cerr << "No constituent info for op " << op() << "\n";
+        assert(false);
+    }
+    virtual void dump(unsigned char *data) const = 0;
+};
+
+// Represents a "void" type.
+struct TypeVoid : public Type
+{
+    TypeVoid() : Type(0) {}
+    virtual uint32_t op() const { return SpvOpTypeVoid; }
+    virtual void dump(unsigned char *data) const {
+        std::cout << "{}";
+    }
 };
 
 // Represents an "bool" type.
-struct TypeBool
+struct TypeBool : public Type
 {
-    // No fields. It's a freakin' bool.
+    TypeBool() : Type(sizeof(bool)) {}
+    virtual uint32_t op() const { return SpvOpTypeBool; }
+    virtual void dump(unsigned char *data) const {
+        std::cout << objectAt<bool>(data);
+    }
 };
 
 // Represents an "int" type.
-struct TypeInt
+struct TypeInt : public Type
 {
     // Number of bits in the int.
     uint32_t width;
 
     // Whether signed.
     uint32_t signedness;
+
+    TypeInt(uint32_t width, uint32_t signedness)
+        : Type(sizeof(uint32_t)), width(width), signedness(signedness) {}
+    virtual uint32_t op() const { return SpvOpTypeInt; }
+    virtual void dump(unsigned char *data) const {
+        if(signedness) {
+            std::cout << objectAt<int32_t>(data);
+        } else {
+            std::cout << objectAt<uint32_t>(data);
+        }
+    }
 };
 
 // Represents a "float" type.
-struct TypeFloat
+struct TypeFloat : public Type
 {
     // Number of bits in the float.
     uint32_t width;
+
+    TypeFloat(uint32_t width)
+        : Type(sizeof(float)), width(width) {}
+    virtual uint32_t op() const { return SpvOpTypeFloat; }
+    virtual void dump(unsigned char *data) const {
+        std::cout << objectAt<float>(data);
+    }
 };
 
 // Represents a vector type.
-struct TypeVector
+struct TypeVector : public Type
 {
+    // Type of each element.
+    std::shared_ptr<Type> subtype;
+
     // Type of the element. This is a key in the "types" map.
     uint32_t type;
 
     // Number of elements.
     uint32_t count;
+
+    TypeVector(std::shared_ptr<Type> subtype, uint32_t type, uint32_t count)
+        : Type(subtype->size*count), subtype(subtype), type(type), count(count) {}
+    virtual uint32_t op() const { return SpvOpTypeVector; }
+    virtual ConstituentInfo getConstituentInfo(int i) const {
+        return { type, i*subtype->size };
+    }
+    virtual void dump(unsigned char *data) const {
+        std::cout << "<";
+        for(int i = 0; i < count; i++) {
+            subtype->dump(data);
+            data += subtype->size;
+            if(i < count - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << ">";
+    }
 };
 
 // Represents a vector type.
-struct TypeArray
+struct TypeArray : public Type
 {
+    // Type of each element.
+    std::shared_ptr<Type> subtype;
+
     // Type of the element. This is a key in the "types" map.
     uint32_t type;
 
     // Number of elements.
     uint32_t count;
+
+    TypeArray(std::shared_ptr<Type> subtype, uint32_t type, uint32_t count)
+        : Type(subtype->size*count), type(type), count(count) {}
+    virtual uint32_t op() const { return SpvOpTypeArray; }
+    virtual ConstituentInfo getConstituentInfo(int i) const {
+        return { type, i*subtype->size };
+    }
+    virtual void dump(unsigned char *data) const {
+        std::cout << "[";
+        for(int i = 0; i < count; i++) {
+            subtype->dump(data);
+            data += subtype->size;
+            if(i < count - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << "]";
+    }
 };
 
 // Represents a matrix type. Each matrix is a sequence of column vectors.
 // Matrix data is stored starting at the upper-left, going down the first
 // column, then the next column, etc.
-struct TypeMatrix
+struct TypeMatrix : public Type
 {
+    // Type of each column.
+    std::shared_ptr<Type> subtype;
+
     // Type of the column vector. This is a key in the "types" map.
     uint32_t columnType;
 
     // Number of columns.
     uint32_t columnCount;
+
+    TypeMatrix(std::shared_ptr<Type> subtype, uint32_t columnType, uint32_t columnCount)
+        : Type(subtype->size*columnCount), subtype(subtype),
+        columnType(columnType), columnCount(columnCount) {}
+    virtual uint32_t op() const { return SpvOpTypeMatrix; }
+    virtual ConstituentInfo getConstituentInfo(int i) const {
+        return { columnType, subtype->size*i };
+    }
+    virtual void dump(unsigned char *data) const {
+        std::cout << "<";
+        for(int i = 0; i < columnCount; i++) {
+            subtype->dump(data);
+            data += subtype->size;
+            if(i < columnCount - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << ">";
+    }
 };
 
 // Represents a function type.
-struct TypeFunction
+struct TypeFunction : public Type
 {
     // Type of the return value. This is a key in the "types" map.
     uint32_t returnType;
 
     // Type of each parameter, in order from left to right. These are keys in the "types" map.
     std::vector<uint32_t> parameterTypes;
+
+    TypeFunction(uint32_t returnType, const std::vector<uint32_t> &parameterTypes)
+        : Type(4 /* XXX */), returnType(returnType), parameterTypes(parameterTypes) {}
+    virtual uint32_t op() const { return SpvOpTypeFunction; }
+    virtual void dump(unsigned char *data) const {
+        std::cout << "function";
+    }
 };
 
 // Represents a struct type.
-struct TypeStruct
+struct TypeStruct : public Type
 {
+    // Type of each element, in order.
+    std::vector<std::shared_ptr<Type>> memberTypes;
+
     // Type of each element, in order. These are keys in the "types" map.
-    std::vector<uint32_t> memberTypes;
+    std::vector<uint32_t> memberTypeIds;
+
+    TypeStruct(const std::vector<std::shared_ptr<Type>> &memberTypes,
+            const std::vector<uint32_t> &memberTypeIds)
+        : Type(computeSize(memberTypes)), memberTypes(memberTypes), memberTypeIds(memberTypeIds) {}
+    virtual uint32_t op() const { return SpvOpTypeStruct; }
+    virtual ConstituentInfo getConstituentInfo(int i) const {
+        size_t offset = 0;
+        for(int j = 0; j < i; j++) {
+            offset += memberTypes[j]->size;
+        }
+        return { memberTypeIds[i], offset };
+    }
+    virtual void dump(unsigned char *data) const {
+        std::cout << "{";
+        for(int i = 0; i < memberTypes.size(); i++) {
+            memberTypes[i]->dump(data);
+            data += memberTypes[i]->size;
+            if(i < memberTypes.size() - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << "}";
+    }
+    static size_t computeSize(const std::vector<std::shared_ptr<Type>> &memberTypes) {
+        size_t size = 0;
+        for(auto &t: memberTypes) {
+            size += t->size;
+        }
+        return size;
+    }
 };
 
 // Represents a pointer type.
-struct TypePointer
+struct TypePointer : public Type
 {
+    // Type pointer is pointing to.
+    std::shared_ptr<Type> subtype;
+
     // Type of the data being pointed to. This is a key in the "types" map.
     uint32_t type;
 
     // Storage class of the data. One of the values of SpvStorageClass (input,
     // output, uniform, function, etc.).
     uint32_t storageClass;
+
+    TypePointer(std::shared_ptr<Type> subtype, uint32_t type, uint32_t storageClass)
+        : Type(sizeof(uint32_t)), subtype(subtype), type(type), storageClass(storageClass) {}
+    virtual uint32_t op() const { return SpvOpTypePointer; }
+    virtual void dump(unsigned char *data) const {
+        std::cout << "(ptr)" << objectAt<uint32_t>(data);
+    }
 };
 
 // Represents an image type.
-struct TypeImage
+struct TypeImage : public Type
 {
     // XXX document these.
     uint32_t sampledType;
@@ -218,17 +393,36 @@ struct TypeImage
     uint32_t sampled;
     uint32_t imageFormat;
     uint32_t accessQualifier;
+
+    TypeImage(uint32_t sampledType, uint32_t dim, uint32_t depth, uint32_t arrayed, uint32_t ms, uint32_t sampled, uint32_t imageFormat, uint32_t accessQualifier)
+        : Type(sizeof(uint32_t) /* XXX */),
+        sampledType(sampledType),
+        dim(dim),
+        depth(depth),
+        arrayed(arrayed),
+        ms(ms),
+        sampled(sampled),
+        imageFormat(imageFormat),
+        accessQualifier(accessQualifier) {}
+    virtual uint32_t op() const { return SpvOpTypeImage; }
+    virtual void dump(unsigned char *data) const {
+        std::cout << "image";
+    }
 };
 
 // XXX Dunno.
-struct TypeSampledImage
+struct TypeSampledImage : public Type
 {
     // Type of the image. This is a key in the "types" map. XXX yes?
     uint32_t imageType;
-};
 
-// Union of all known types.
-typedef std::variant<TypeVoid, TypeBool, TypeFloat, TypePointer, TypeFunction, TypeVector, TypeMatrix, TypeInt, TypeStruct, TypeImage, TypeSampledImage, TypeArray> Type;
+    TypeSampledImage(uint32_t imageType)
+        : Type(sizeof(uint32_t)), imageType(imageType) {}
+    virtual uint32_t op() const { return SpvOpTypeSampledImage; }
+    virtual void dump(unsigned char *data) const {
+        std::cout << "sampledimage";
+    }
+};
 
 // A function parameter. This is on the receiving side, to set aside an SSA slot
 // for the value received from the caller.
