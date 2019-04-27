@@ -413,4 +413,14 @@ struct Block {
     }
 };
 
+struct CommandLineParameters
+{
+    int outputWidth;
+    int outputHeight;
+    bool beVerbose;
+    bool throwOnUnimplemented;
+};
+
+std::string readFileContents(std::string shaderFileName);
+
 #endif // BASIC_TYPES_H

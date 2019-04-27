@@ -16,13 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef USE_CPP17_FILESYSTEM
-// filesystem still not available in XCode 2019/04/04
-#include <filesystem>
-#else
-#include <libgen.h>
-#endif
-
 #include <StandAlone/ResourceLimits.h>
 #include <glslang/MachineIndependent/localintermediate.h>
 #include <glslang/Public/ShaderLang.h>
@@ -34,20 +27,17 @@
 #include "spirv.h"
 #include "GLSL.std.450.h"
 
-#include "json.hpp"
-
 #include "basic_types.h"
 #include "risc-v.h"
 #include "image.h"
 #include "interpreter.h"
 #include "program.h"
 #include "interpreter_tmpl.h"
+#include "shadertoy.h"
 #include "timer.h"
 
 #define DEFAULT_WIDTH (640/2)
 #define DEFAULT_HEIGHT (360/2)
-
-using json = nlohmann::json;
 
 // Enable this to check if our virtual RAM is being initialized properly.
 #define CHECK_MEMORY_ACCESS
@@ -876,63 +866,14 @@ void usage(const char* progname)
     printf("\t--term    draw output image on terminal (in addition to file)\n");
 }
 
-struct ShaderToyImage
-{
-    int channelNumber;
-    int id;
-    SampledImage sampledImage;
-};
-
-struct ShaderSource
-{
-    std::string code;
-    std::string filename;
-    ShaderSource() {}
-    ShaderSource(const std::string& code_, const std::string& filename_) :
-        code(code_),
-        filename(filename_)
-    {}
-};
-
-struct CommandLineParameters
-{
-    int outputWidth;
-    int outputHeight;
-    bool beVerbose;
-    bool throwOnUnimplemented;
-};
-
 const std::string shaderPreambleFilename = "preamble.frag";
 const std::string shaderEpilogueFilename = "epilogue.frag";
-
-struct RenderPass
-{
-    std::string name;
-    std::vector<ShaderToyImage> inputs; // in channel order
-    std::vector<ShaderToyImage> outputs;
-    std::vector<ShaderSource> sources;
-    Program pgm;
-    void Render(void) {
-        // set input images, uniforms, output images, call run()
-    }
-    RenderPass(const std::string& name_, std::vector<ShaderToyImage> inputs_, std::vector<ShaderToyImage> outputs_, const std::vector<ShaderSource>& sources_, const CommandLineParameters& params) :
-        name(name_),
-        inputs(inputs_),
-        outputs(outputs_),
-        sources(sources_),
-        pgm(params.throwOnUnimplemented, params.beVerbose)
-    {
-    }
-};
-
-typedef std::shared_ptr<RenderPass> RenderPassPtr;
-
 
 // Number of rows still left to shade (for progress report).
 static std::atomic_int rowsLeft;
 
 // Render rows starting at "startRow" every "skip".
-void render(RenderPass* pass, int startRow, int skip, int frameNumber, float when)
+void render(ShaderToyRenderPass* pass, int startRow, int skip, int frameNumber, float when)
 {
     Interpreter interpreter(&pass->pgm);
     ImagePtr output = pass->outputs[0].sampledImage.image;
@@ -1000,224 +941,10 @@ void showProgress(int totalRows, std::chrono::time_point<std::chrono::steady_clo
     std::cout << "                                                             \r";
 }
 
-std::string getFilepathAdjacentToPath(const std::string& filename, std::string adjacent)
-{
-    std::string result;
-
-#ifdef USE_CPP17_FILESYSTEM
-
-    // filesystem still not available in XCode 2019/04/04
-    std::filesystem::path adjacent_path(adjacent);
-    std::filesystem::path adjacent_dirname = adjacent_path.parent_path();
-    std::filesystem::path code_path(filename);
-
-    if(code_path.is_relative()) {
-        std::filesystem::path full_path(adjacent_dirname + code_path);
-        result = full_path;
-    }
-
-#else
-
-    if(filename[0] != '/') {
-        // Assume relative path, get directory from JSON filename
-        char *adjacent_copy = strdup(adjacent.c_str());;
-        result = std::string(dirname(adjacent_copy)) + "/" + filename;
-        free(adjacent_copy);
-    }
-
-#endif
-
-    return result;
-}
-
 void earwigMessageConsumer(spv_message_level_t level, const char *source,
         const spv_position_t& position, const char *message)
 {
     std::cout << source << ": " << message << "\n";
-}
-
-void sortInDependencyOrder(
-    const std::vector<RenderPassPtr>& passes,
-    const std::map<int, RenderPassPtr>& channelIdsToPasses,
-    const std::map<std::string, RenderPassPtr>& namesToPasses,
-    std::vector<RenderPassPtr>& passesOrdered)
-{
-    std::set<RenderPassPtr> passesToVisit(passes.begin(), passes.end());
-
-    std::function<void(RenderPassPtr)> visit;
-
-    visit = [&visit, &passesToVisit, &channelIdsToPasses, &passesOrdered](RenderPassPtr pass) {
-        if(passesToVisit.count(pass) > 0) {
-            passesToVisit.erase(pass);
-            for(ShaderToyImage& input: pass->inputs) {
-                if(channelIdsToPasses.find(input.id) != channelIdsToPasses.end()) {
-                    visit(channelIdsToPasses.at(input.id));
-                }
-            }
-            passesOrdered.push_back(pass);
-        }
-    };
-
-    visit(namesToPasses.at("Image"));
-}
-
-void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<RenderPassPtr>& renderPassesOrdered, const CommandLineParameters& params)
-{
-    json j = json::parse(readFileContents(filename));
-
-    std::vector<RenderPassPtr> renderPasses;
-
-    ShaderSource common_code;
-
-    // Go through the render passes and load code in from files as necessary
-    auto& renderPassesInJSON = j["Shader"]["renderpass"];
-
-    for (auto& pass: renderPassesInJSON) {
-
-        // If special key "codefile" is present, use that file as
-        // the shader code instead of the value of key "code".
-
-        if(pass.find("codefile") != pass.end()) {
-            std::string code_filename = pass["codefile"];
-
-            code_filename = getFilepathAdjacentToPath(code_filename, filename);
-
-            pass["full_code_filename"] = code_filename;
-            pass["code"] = readFileContents(code_filename);
-        }
-
-	// If this is the "common" pass, it includes text which is
-	// preprended to all other passes.
-
-        if(pass["type"] == "common") {
-            common_code.code = pass["code"];
-            if(pass.find("codefile") != pass.end()) {
-                common_code.filename = pass["codefile"];
-            } else {
-                common_code.filename = pass["name"].get<std::string>() + " JSON inline";
-            }
-        } 
-    }
-
-    std::map<int, RenderPassPtr> channelIdsToPasses;
-    std::map<std::string, RenderPassPtr> namesToPasses;
-
-    for (auto& pass: renderPassesInJSON) {
-        std::vector<ShaderSource> sources;
-
-        if(pass["type"] == "common") {
-            /* Don't make a renderpass for "common", it's just common preamble code for all passes */
-            continue;
-        }
-        if((pass["type"] != "buffer") && (pass["type"] != "image")) {
-            throw std::runtime_error("pass type \"" + pass["type"].get<std::string>() + "\" is not supported");
-        }
-
-        ShaderSource asset_preamble;
-        ShaderSource shader;
-
-        std::vector<ShaderToyImage> inputs;
-
-        for(auto& input: pass["inputs"]) {
-            int channelNumber = input["channel"].get<int>();
-            int channelId = input["id"].get<int>();
-
-            const std::string& src = input["src"].get<std::string>();
-
-            bool isABuffer = (src.find("/media/previz/buffer") != std::string::npos);
-
-            if(isABuffer) {
-
-                /* will hook up to output from source pass */
-                if(false) printf("pass \"%s\", channel number %d and id %d\n", pass["name"].get<std::string>().c_str(), channelNumber, channelId);
-                Sampler sampler; /*  = makeSamplerFromJSON(input); */
-                inputs.push_back({channelNumber, channelId, {nullptr, sampler}});
-                asset_preamble.code += "layout (binding = " + std::to_string(channelNumber + 1) + ") uniform sampler2D iChannel" + std::to_string(channelNumber) + ";\n";
-
-            } else if(input.find("locally_saved") == input.end()) {
-
-                throw std::runtime_error("downloading assets is not supported; didn't find \"locally_saved\" key for an asset");
-
-            } else {
-
-                if(input["ctype"].get<std::string>() != "texture") {
-                    throw std::runtime_error("unsupported input type " + input["ctype"].get<std::string>());
-                }
-
-                std::string asset_filename = getFilepathAdjacentToPath(input["locally_saved"].get<std::string>(), filename);
-
-                bool flipInY = ((input.find("vflip") != input.end()) && (input["vflip"].get<std::string>() == std::string("true")));
-
-                ImagePtr image = loadImage(asset_filename, flipInY);
-                if(!image) {
-                    std::cerr << "image load failed\n";
-                    exit(EXIT_FAILURE);
-                }
-
-                Sampler sampler; /*  = makeSamplerFromJSON(input); */
-                inputs.push_back({channelNumber, channelId, {image, sampler}});
-                asset_preamble.code += "layout (binding = " + std::to_string(channelNumber + 1) + ") uniform sampler2D iChannel" + std::to_string(channelNumber) + ";\n";
-            }
-        }
-
-        if(asset_preamble.code != "") {
-            asset_preamble.filename = "BuiltIn Asset Preamble";
-            sources.push_back(asset_preamble);
-        }
-
-        if(common_code.code != "") {
-            sources.push_back(common_code);
-        }
-
-        if(pass.find("full_code_filename") != pass.end()) {
-            // If we find "full_code_filename", that's the
-            // fully-qualified absolute on-disk path we loaded.  Set
-            // that for debugging.
-            shader.filename = pass["full_code_filename"];
-        } else if(pass.find("codefile") != pass.end()) {
-            // If we find only "codefile", that's the on-disk path
-            // the JSON specified.  Set that for debugging.
-            shader.filename = pass["codefile"];
-        } else {
-            // If we find neither "codefile" nor "full_code_filename",
-            // then the shader came out of the renderpass "code", so
-            // at least use the pass name to aid debugging.
-            shader.filename = std::string("JSON inline shader from pass ") + pass["name"].get<std::string>();
-        }
-
-        shader.code = pass["code"];
-        sources.push_back(shader);
-
-        int channelId = pass["outputs"][0]["id"].get<int>();
-        Image::Format format = (pass["name"].get<std::string>() == "Image") ? Image::FORMAT_R8G8B8_UNORM : Image::FORMAT_R32G32B32A32_SFLOAT;
-        ImagePtr image(new Image(format, Image::DIM_2D, params.outputWidth, params.outputHeight));
-        ShaderToyImage output {0, channelId, { image, Sampler {}}};
-        RenderPassPtr rpass(new RenderPass(
-            pass["name"],
-            {inputs},
-            {output},
-            sources,
-            params));
-
-        channelIdsToPasses[channelId] = rpass;
-        namesToPasses[pass["name"]] = rpass;
-        renderPasses.push_back(rpass);
-    }
-
-    // Hook up outputs to inputs
-    for(auto& pass: renderPasses) {
-        for(int i = 0; i < pass->inputs.size(); i++) {
-            ShaderToyImage& input = pass->inputs[i];
-            if(!input.sampledImage.image) {
-                int channelId = input.id;
-                ShaderToyImage& source = channelIdsToPasses.at(channelId)->outputs[0];
-                pass->inputs[i].sampledImage = source.sampledImage;
-            }
-        }
-    }
-    
-    // and sort in dependency order
-    sortInDependencyOrder(renderPasses, channelIdsToPasses, namesToPasses, renderPassesOrdered);
 }
 
 bool createSPIRVFromSources(const std::vector<ShaderSource>& sources, bool debug, bool optimize, std::vector<uint32_t>& spirv)
@@ -1479,7 +1206,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    std::vector<RenderPassPtr> renderPasses;
+    std::vector<ShaderToyRenderPassPtr> renderPasses;
 
     std::string filename = argv[0];
     std::string shader_code;
@@ -1492,7 +1219,7 @@ int main(int argc, char **argv)
         ShaderToyImage output {0, 0, {image, Sampler {}}};
 
         std::vector<ShaderSource> sources = { {"", ""}, {shader_code, filename}};
-        RenderPassPtr pass(new RenderPass("Image", {}, {output}, sources, params));
+        ShaderToyRenderPassPtr pass(new ShaderToyRenderPass("Image", {}, {output}, sources, params));
 
         renderPasses.push_back(pass);
 
