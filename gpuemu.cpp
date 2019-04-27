@@ -62,7 +62,7 @@ struct Memory
         assert(addr + 3 < memorybytes.size());
         return *reinterpret_cast<uint32_t*>(memorybytes.data() + addr);
     }
-    uint32_t readf(uint32_t addr)
+    float readf(uint32_t addr)
     {
         if(verbose) printf("read float from %08X\n", addr);
         assert(addr < memorybytes.size());
@@ -303,9 +303,9 @@ int main(int argc, char **argv)
             float g = *reinterpret_cast<float*>(&ig);
             float b = *reinterpret_cast<float*>(&ib);
             // float a = *reinterpret_cast<float*>(&ia);
-            img[3 * (j * imageWidth + i) + 0] = static_cast<unsigned char>(r * 255.99);
-            img[3 * (j * imageWidth + i) + 1] = static_cast<unsigned char>(g * 255.99);
-            img[3 * (j * imageWidth + i) + 2] = static_cast<unsigned char>(b * 255.99);
+            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 0] = static_cast<unsigned char>(r * 255.99);
+            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 1] = static_cast<unsigned char>(g * 255.99);
+            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 2] = static_cast<unsigned char>(b * 255.99);
         }
 
     FILE *fp = fopen("emulated.ppm", "wb");
