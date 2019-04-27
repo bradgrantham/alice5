@@ -62,6 +62,9 @@ struct UninitializedMemoryReadException : std::runtime_error
 
 using json = nlohmann::json;
 
+// List of shared instruction pointers.
+using InstructionList = std::vector<std::shared_ptr<Instruction>>;
+
 std::map<uint32_t, std::string> OpcodeToString = {
 #include "opcode_to_string.h"
 };
@@ -158,7 +161,7 @@ struct Program
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
     std::map<uint32_t, Function> functions;
-    std::vector<std::shared_ptr<Instruction>> instructions;
+    InstructionList instructions;
     // Map from label ID to block object.
     std::map<uint32_t, std::unique_ptr<Block>> blocks;
     // Map from virtual register ID to its type. Only used for results of instructions.
@@ -939,6 +942,9 @@ struct Program
 
     // Post-parsing work.
     void postParse() {
+        // Convert vector instructions to scalar instructions.
+        expandVectors(instructions, instructions);
+
         // Find the main function.
         mainFunction = nullptr;
         for(auto& e: entryPoints) {
@@ -1308,6 +1314,147 @@ struct Program
             }
             assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
         }
+    }
+
+    // Transform vector instructions to scalar instructions. inList and outList
+    // may be the same list.
+    void expandVectors(const InstructionList &inList, InstructionList &outList) {
+        InstructionList newList;
+
+        uint32_t nextReg = 1000; // XXX make sure this doesn't conflict with actual registers.
+        using RegIndex = std::pair<uint32_t,int>;
+        std::map<RegIndex,uint32_t> vec2scalar;
+
+        // Return the scalar for the vector register's index.
+        auto scalarize = [this, &nextReg, &vec2scalar](uint32_t vreg, int i, uint32_t subtype) -> uint32_t {
+            auto regIndex = RegIndex{vreg, i};
+            auto itr = vec2scalar.find(regIndex);
+            uint32_t scalarReg;
+            if (itr == vec2scalar.end()) {
+                scalarReg = nextReg++;
+                vec2scalar[regIndex] = scalarReg;
+                this->resultTypes[scalarReg] = subtype;
+            } else {
+                scalarReg = itr->second;
+            }
+
+            return scalarReg;
+        };
+
+        /* XXX delete
+        // Expand variables.
+        std::map<uint32_t, Variable> newVariables;
+        for (auto &[id, var] : variables) {
+            const TypeVector *typeVector = getTypeAsVector(var.type);
+            if (typeVector != nullptr) {
+                assert(var.initializer == NO_INITIALIZER);
+                for (int i = 0; i < typeVector->count; i++) {
+                    auto [subtype, offset] = getConstituentInfo(var.type, i);
+                    uint32_t scalarReg = scalarize(id, i, subtype);
+                    newVariables[scalarReg] = {
+                        subtype, var.storageClass, NO_INITIALIZER, 0xFFFFFFFF
+                    };
+                    auto itr = names.find(id);
+                    if (itr != names.end()) {
+                        names[scalarReg] = itr->second;
+                    }
+                }
+            }
+        }
+        for (auto &[id, var] : newVariables) {
+            variables[id] = var;
+        }
+        */
+
+        for (uint32_t pc = 0; pc < inList.size(); pc++) {
+            bool replaced = false;
+            const std::shared_ptr<Instruction> &instructionPtr = inList[pc];
+            Instruction *instruction = instructionPtr.get();
+
+            switch (instruction->opcode()) {
+                case SpvOpLoad: {
+                    InsnLoad *insn = dynamic_cast<InsnLoad *>(instruction);
+                    const TypeVector *typeVector = getTypeAsVector(
+                            resultTypes.at(insn->resultId));
+                    if (typeVector != nullptr) {
+                        for (int i = 0; i < typeVector->count; i++) {
+                            auto [subtype, offset] = getConstituentInfo(insn->type, i);
+                            newList.push_back(std::make_shared<RiscVLoad>(insn->lineInfo,
+                                        subtype,
+                                        scalarize(insn->resultId, i, subtype),
+                                        insn->pointerId,
+                                        insn->memoryAccess,
+                                        i*typeSizes.at(subtype)));
+                        }
+                    } else {
+                        newList.push_back(std::make_shared<RiscVLoad>(insn->lineInfo,
+                                    insn->type,
+                                    insn->resultId,
+                                    insn->pointerId,
+                                    insn->memoryAccess,
+                                    0));
+                    }
+                    replaced = true;
+                    break;
+                }
+
+                case SpvOpStore: {
+                    InsnStore *insn = dynamic_cast<InsnStore *>(instruction);
+                    const TypeVector *typeVector = getTypeAsVector(
+                            resultTypes.at(insn->objectId));
+                    if (typeVector != nullptr) {
+                        for (int i = 0; i < typeVector->count; i++) {
+                            auto [subtype, offset] = getConstituentInfo(
+                                    resultTypes.at(insn->objectId), i);
+                            newList.push_back(std::make_shared<RiscVStore>(insn->lineInfo,
+                                        insn->pointerId,
+                                        scalarize(insn->objectId, i, subtype),
+                                        insn->memoryAccess,
+                                        i*typeSizes.at(subtype)));
+                        }
+                    } else {
+                        newList.push_back(std::make_shared<RiscVStore>(insn->lineInfo,
+                                    insn->pointerId,
+                                    insn->objectId,
+                                    insn->memoryAccess,
+                                    0));
+                    }
+                    replaced = true;
+                    break;
+                }
+
+                case SpvOpFMul: {
+                    InsnFMul *insn = dynamic_cast<InsnFMul *>(instruction);
+                    const TypeVector *typeVector = getTypeAsVector(
+                            resultTypes.at(insn->resultId));
+                    if (typeVector != nullptr) {
+                        for (int i = 0; i < typeVector->count; i++) {
+                            auto [subtype, offset] = getConstituentInfo(insn->type, i);
+                            newList.push_back(std::make_shared<InsnFMul>(insn->lineInfo,
+                                        subtype,
+                                        scalarize(insn->resultId, i, subtype),
+                                        scalarize(insn->operand1Id, i, subtype),
+                                        scalarize(insn->operand2Id, i, subtype)));
+                        }
+                        replaced = true;
+                    }
+                    break;
+                }
+
+                default: {
+                    std::cerr << "Warning: Unhandled opcode "
+                        << OpcodeToString.at(instruction->opcode())
+                        << " when expanding vectors.\n";
+                    break;
+                }
+            }
+
+            if (!replaced) {
+                newList.push_back(instructionPtr);
+            }
+        }
+
+        std::swap(newList, outList);
     }
 
     // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
@@ -3567,7 +3714,7 @@ struct Compiler
     const Program *pgm;
     std::map<uint32_t, CompilerRegister> registers;
     uint32_t localLabelCounter;
-    std::vector<std::shared_ptr<Instruction>> instructions;
+    InstructionList instructions;
 
     Compiler(const Program *pgm)
         : pgm(pgm), localLabelCounter(1)
@@ -3578,7 +3725,7 @@ struct Compiler
     void compile()
     {
         // Transform SPIR-V instructions to RISC-V instructions.
-        transformInstructions();
+        transformInstructions(pgm->instructions, instructions);
 
         // Perform physical register assignment.
         assignRegisters();
@@ -3709,13 +3856,14 @@ struct Compiler
 
     // Transform SPIR-V instructions to RISC-V instructions. Creates a new
     // "instructions" array that's local to the compiler and is closer to
-    // machine instructions, but still using SSA.
-    void transformInstructions() {
-        instructions.clear();
+    // machine instructions, but still using SSA. inList and outList
+    // may be the same list.
+    void transformInstructions(const InstructionList &inList, InstructionList &outList) {
+        InstructionList newList;
 
-        for (uint32_t pc = 0; pc < pgm->instructions.size(); pc++) {
+        for (uint32_t pc = 0; pc < inList.size(); pc++) {
             bool replaced = false;
-            const std::shared_ptr<Instruction> &instructionPtr = pgm->instructions[pc];
+            const std::shared_ptr<Instruction> &instructionPtr = inList[pc];
             Instruction *instruction = instructionPtr.get();
             if (instruction->opcode() == SpvOpIAdd) {
                 InsnIAdd *insnIAdd = dynamic_cast<InsnIAdd *>(instruction);
@@ -3723,21 +3871,23 @@ struct Compiler
                 uint32_t imm;
                 if (asIntegerConstant(insnIAdd->operand1Id, imm)) {
                     // XXX Verify that immediate fits in 12 bits.
-                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
+                    newList.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
                                 insnIAdd->type, insnIAdd->resultId, insnIAdd->operand2Id, imm));
                     replaced = true;
                 } else if (asIntegerConstant(insnIAdd->operand2Id, imm)) {
                     // XXX Verify that immediate fits in 12 bits.
-                    instructions.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
+                    newList.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
                                 insnIAdd->type, insnIAdd->resultId, insnIAdd->operand1Id, imm));
                     replaced = true;
                 }
             }
 
             if (!replaced) {
-                instructions.push_back(instructionPtr);
+                newList.push_back(instructionPtr);
             }
         }
+
+        std::swap(newList, outList);
     }
 
     void assignRegisters() {
@@ -3768,6 +3918,7 @@ struct Compiler
             std::set<uint32_t> constIntRegs = PHY_INT_REGS;
             std::set<uint32_t> constFloatRegs = PHY_FLOAT_REGS;
             for (auto regId : instructions.at(block->begin)->livein) {
+                std::cerr << regId << "\n";
                 assert(registers.find(regId) == registers.end());
                 auto &c = pgm->constants.at(regId);
                 auto r = CompilerRegister {c.type, 1}; // XXX get real count.
@@ -3806,10 +3957,10 @@ struct Compiler
         for (auto regId : instructions.at(block->begin)->livein) {
             auto r = registers.find(regId);
             if (r == registers.end()) {
-                std::cerr << "Warning: Virtual register "
+                std::cerr << "Warning: Initial virtual register "
                     << regId << " not found in block " << block->labelId << ".\n";
             } else if (r->second.phy.empty()) {
-                std::cerr << "Warning: Expected physical register for "
+                std::cerr << "Warning: Expected initial physical register for "
                     << regId << " in block " << block->labelId << ".\n";
             } else {
                 for (auto phy : r->second.phy) {
@@ -4056,6 +4207,42 @@ void RiscVAddi::emit(Compiler *compiler)
     compiler->emitBinaryImmOp("addi", resultId, rs1, imm);
 }
 
+void RiscVLoad::emit(Compiler *compiler)
+{
+    std::ostringstream ss1;
+    if (compiler->isRegFloat(resultId)) {
+        ss1 << "flw ";
+    } else {
+        ss1 << "lw ";
+    }
+    ss1 << compiler->reg(resultId) << ", " << compiler->reg(pointerId);
+    if (offset != 0) {
+        ss1 << "+" << offset;
+    }
+    ss1 << "(x0)";
+    std::ostringstream ss2;
+    ss2 << "r" << resultId << " = (r" << pointerId << ")";
+    compiler->emit(ss1.str(), ss2.str());
+}
+
+void RiscVStore::emit(Compiler *compiler)
+{
+    std::ostringstream ss1;
+    if (compiler->isRegFloat(objectId)) {
+        ss1 << "fsw ";
+    } else {
+        ss1 << "sw ";
+    }
+    ss1 << compiler->reg(objectId) << ", " << compiler->reg(pointerId);
+    if (offset != 0) {
+        ss1 << "+" << offset;
+    }
+    ss1 << "(x0)";
+    std::ostringstream ss2;
+    ss2 << "(r" << pointerId << ") = r" << objectId;
+    compiler->emit(ss1.str(), ss2.str());
+}
+
 // -----------------------------------------------------------------------------------
 
 Instruction::Instruction(const LineInfo& lineInfo_, uint32_t resId)
@@ -4112,58 +4299,14 @@ void InsnFunctionParameter::emit(Compiler *compiler)
 
 void InsnLoad::emit(Compiler *compiler)
 {
-    auto r = compiler->registers.find(resultId);
-    int count = r == compiler->registers.end() ? 1 : r->second.count;
-    for (int i = 0; i < count; i++) {
-        std::ostringstream ss1;
-        if (compiler->isRegFloat(resultId)) {
-            ss1 << "flw ";
-        } else {
-            ss1 << "lw ";
-        }
-        ss1 << compiler->reg(resultId, i) << ", ";
-        if (count != 1) {
-            ss1 << "(";
-        }
-        ss1 << compiler->reg(pointerId);
-        if (count != 1) {
-            ss1 << (i*4) << ")";
-        }
-        ss1 << "(x0)";
-        std::ostringstream ss2;
-        if (i == 0) {
-            ss2 << "r" << resultId << " = (r" << pointerId << ")";
-        }
-        compiler->emit(ss1.str(), ss2.str());
-    }
+    // We expand these to RiscVLoad.
+    assert(false);
 }
 
 void InsnStore::emit(Compiler *compiler)
 {
-    auto r = compiler->registers.find(objectId);
-    int count = r == compiler->registers.end() ? 1 : r->second.count;
-    for (int i = 0; i < count; i++) {
-        std::ostringstream ss1;
-        if (compiler->isRegFloat(objectId)) {
-            ss1 << "fsw ";
-        } else {
-            ss1 << "sw ";
-        }
-        ss1 << compiler->reg(objectId, i) << ", ";
-        if (count != 1) {
-            ss1 << "(";
-        }
-        ss1 << compiler->reg(pointerId);
-        if (count != 1) {
-            ss1 << (i*4) << ")";
-        }
-        ss1 << "(x0)";
-        std::ostringstream ss2;
-        if (i == 0) {
-            ss2 << "(r" << pointerId << ") = r" << objectId;
-        }
-        compiler->emit(ss1.str(), ss2.str());
-    }
+    // We expand these to RiscVStore.
+    assert(false);
 }
 
 void InsnBranch::emit(Compiler *compiler)

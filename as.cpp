@@ -285,6 +285,7 @@ public:
 
         // Registers.
         addRegisters("x", 0, 31, 0);
+        registers["zero"] = 0;
         registers["ra"] = 1;
         registers["sp"] = 2;
         registers["gp"] = 3;
@@ -739,6 +740,11 @@ private:
                     error("Expected comma");
                 }
                 int32_t imm = readImmediateOrLabel(op, false);
+                if (foundChar('+')) {
+                    // Integer offset.
+                    int32_t offset = readImmediate(32);
+                    imm += offset;
+                }
                 if (!foundChar('(')) {
                     error("Expected open parenthesis");
                 }
@@ -762,6 +768,11 @@ private:
                     error("Expected comma");
                 }
                 int32_t imm = readImmediateOrLabel(op, false);
+                if (foundChar('+')) {
+                    // Integer offset.
+                    int32_t offset = readImmediate(32);
+                    imm += offset;
+                }
                 if (!foundChar('(')) {
                     error("Expected open parenthesis");
                 }
