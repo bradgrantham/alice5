@@ -303,9 +303,9 @@ int main(int argc, char **argv)
             float g = *reinterpret_cast<float*>(&ig);
             float b = *reinterpret_cast<float*>(&ib);
             // float a = *reinterpret_cast<float*>(&ia);
-            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 0] = static_cast<unsigned char>(r * 255.99);
-            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 1] = static_cast<unsigned char>(g * 255.99);
-            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 2] = static_cast<unsigned char>(b * 255.99);
+            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 0] = std::clamp(int(r * 255.99), 0, 255);
+            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 1] = std::clamp(int(g * 255.99), 0, 255);
+            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 2] = std::clamp(int(b * 255.99), 0, 255);
         }
 
     FILE *fp = fopen("emulated.ppm", "wb");
