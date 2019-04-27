@@ -188,7 +188,7 @@ struct Sampler
     Sampler() :
         uAddressMode(REPEAT),
         vAddressMode(REPEAT),
-        filterMode(NEAREST),
+        filterMode(LINEAR),
         mipMapMode(MIPMAP_NEAREST),
         isSRGB(false)
         {}
