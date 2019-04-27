@@ -17,12 +17,21 @@ LDLIBS          :=      $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLA
 
 DIS_OBJ 	:=	riscv-disas.o
 
+SHADE_SRCS      =      shade.cpp program.cpp
+SHADE_OBJS      =      $(SHADE_SRCS:.cpp=.o)
+
+DEPS            = $(SHADE_OBJS:.o=.d)
+-include $(DEPS)
+
 # $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLANG_SOURCE_DIR)/build/glslang/OSDependent/Unix/libOSDependent.a
 
 default: shade
 
-shade: shade.cpp GLSL.std.450.h GLSLstd450_opcode_to_string.h basic_types.h interpreter.h opcode_decl.h opcode_decode.h opcode_impl.h opcode_struct_decl.h opcode_structs.h opcode_to_string.h spirv.h json.hpp image.h
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) shade.cpp -o $@ $(LDLIBS)
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS)  $< -c -o $@ -MMD
+
+shade: $(SHADE_OBJS) 
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHADE_OBJS) -o $@ $(LDLIBS)
 
 as: as.cpp $(DIS_OBJ)
 	$(CXX) --std=c++17 -Wall as.cpp $(DIS_OBJ) -o $@

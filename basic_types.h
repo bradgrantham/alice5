@@ -1,6 +1,8 @@
 #ifndef BASIC_TYPES_H
 #define BASIC_TYPES_H
 
+#include <iostream>
+
 typedef std::array<float,1> v1float;
 typedef std::array<uint32_t,1> v1uint;
 typedef std::array<int32_t,1> v1int;
