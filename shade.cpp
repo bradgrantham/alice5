@@ -1333,7 +1333,20 @@ struct Program
             if (itr == vec2scalar.end()) {
                 scalarReg = nextReg++;
                 vec2scalar[regIndex] = scalarReg;
-                this->resultTypes[scalarReg] = subtype;
+
+                // See if this was a constant vector.
+                auto itr = constants.find(vreg);
+                if (itr != constants.end()) {
+                    // Extract new constant for this component.
+                    Register &r = allocConstantObject(scalarReg, subtype);
+                    auto [subtype2, offset] = getConstituentInfo(itr->second.type, i);
+                    uint32_t size = typeSizes[subtype];
+                    assert(subtype == subtype2);
+                    std::copy(itr->second.data + offset, itr->second.data + offset + size, r.data);
+                } else {
+                    // Not a constant, must be a variable.
+                    this->resultTypes[scalarReg] = subtype;
+                }
             } else {
                 scalarReg = itr->second;
             }
@@ -3800,24 +3813,36 @@ struct Compiler
                 name = nameItr->second;
             }
             emitLabel(name);
-            Type type = pgm->types.at(reg.type);
-            if (std::holds_alternative<TypeInt>(type)) {
-                uint32_t value = *reinterpret_cast<uint32_t *>(reg.data);
-                std::ostringstream ss;
-                ss << ".word " << value;
-                emit(ss.str(), "");
-            } else if (std::holds_alternative<TypeFloat>(type)) {
-                uint32_t intValue = *reinterpret_cast<uint32_t *>(reg.data);
-                float floatValue = *reinterpret_cast<float *>(reg.data);
-                std::ostringstream ss1;
-                ss1 << ".word 0x" << std::hex << intValue;
-                std::ostringstream ss2;
-                ss2 << "Float " << floatValue;
-                emit(ss1.str(), ss2.str());
-            } else {
-                std::cerr << "Error: Unhandled type for constant " << id << ".\n";
-                exit(EXIT_FAILURE);
+            emitConstant(id, reg.type, reg.data);
+        }
+    }
+
+    // Emit constant value for the specified constant ID.
+    void emitConstant(uint32_t id, uint32_t typeId, unsigned char *data) {
+        Type type = pgm->types.at(typeId);
+
+        if (std::holds_alternative<TypeInt>(type)) {
+            uint32_t value = *reinterpret_cast<uint32_t *>(data);
+            std::ostringstream ss;
+            ss << ".word " << value;
+            emit(ss.str(), "");
+        } else if (std::holds_alternative<TypeFloat>(type)) {
+            uint32_t intValue = *reinterpret_cast<uint32_t *>(data);
+            float floatValue = *reinterpret_cast<float *>(data);
+            std::ostringstream ss1;
+            ss1 << ".word 0x" << std::hex << intValue;
+            std::ostringstream ss2;
+            ss2 << "Float " << floatValue;
+            emit(ss1.str(), ss2.str());
+        } else if (std::holds_alternative<TypeVector>(type)) {
+            const TypeVector *typeVector = pgm->getTypeAsVector(typeId);
+            for (int i = 0; i < typeVector->count; i++) {
+                auto [subtype, offset] = pgm->getConstituentInfo(typeId, i);
+                emitConstant(id, subtype, data + offset);
             }
+        } else {
+            std::cerr << "Error: Unhandled type for constant " << id << ".\n";
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -5154,7 +5179,7 @@ int main(int argc, char **argv)
             // Generate the rows on multiple threads.
             for (int t = 0; t < threadCount; t++) {
                 thread.push_back(new std::thread(render, pass.get(), t, threadCount, frameNumber, frameNumber / 60.0));
-                // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                // std::this_thread::sleep_for(std::chrono::milliseconds(100)); XXX delete
             }
 
             // Progress information.
