@@ -424,9 +424,10 @@ public:
         header.initialPC = 0;
         header.gl_FragCoordAddress = getLabelAddress("gl_FragCoord");
         header.colorAddress = getLabelAddress("color");
-        header.iTimeAddress = getLabelAddress("iTime");
-        header.iMouseAddress = getLabelAddress("iMouse");
-        header.iResolutionAddress = getLabelAddress("iResolution");
+        // XXX This makes assumptions about the layout of the params struct:
+        header.iTimeAddress = getLabelAddress(".anonymous", 8);
+        header.iMouseAddress = getLabelAddress(".anonymous", 12);
+        header.iResolutionAddress = getLabelAddress(".anonymous", 0);
 
         outFile.write(reinterpret_cast<char *>(&header), sizeof(header));
 
@@ -443,13 +444,13 @@ public:
     }
 
 private:
-    // Return the address of a label, or 0xFFFFFFFF if not found.
-    uint32_t getLabelAddress(const std::string &label) const {
+    // Return the address of a label in bytes, or 0xFFFFFFFF if not found.
+    uint32_t getLabelAddress(const std::string &label, uint32_t offset = 0) const {
         auto itr = labels.find(label);
         if (itr == labels.end()) {
             return 0xFFFFFFFF;
         } else {
-            return itr->second;
+            return itr->second + offset;
         }
     }
 
