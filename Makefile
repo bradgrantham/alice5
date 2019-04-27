@@ -17,7 +17,7 @@ LDLIBS          :=      $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLA
 
 DIS_OBJ 	:=	riscv-disas.o
 
-SHADE_SRCS      =      shade.cpp program.cpp
+SHADE_SRCS      =      shade.cpp program.cpp interpreter.cpp
 SHADE_OBJS      =      $(SHADE_SRCS:.cpp=.o)
 
 DEPS            = $(SHADE_OBJS:.o=.d)

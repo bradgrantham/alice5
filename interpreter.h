@@ -6,6 +6,8 @@
 
 struct Program;
 
+const size_t MEMORY_CHECK_OKAY = 0xFFFFFFFF;
+
 // Dynamic state of the program (registers, call stack, ...).
 struct Interpreter
 {
