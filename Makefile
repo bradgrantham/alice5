@@ -56,6 +56,8 @@ clean:
 	if [ -f simple.spv ]; then rm simple.spv; fi
 	if [ -f shade ]; then rm shade; fi
 	if [ -f $(DIS_OBJ) ]; then rm $(DIS_OBJ); fi
+	for i in $(SHADE_OBJS); do if [ -f "$$i" ]; then rm "$$i"; fi; done
+	for i in $(DEPS); do if [ -f "$$i" ]; then rm "$$i"; fi; done
 
 .PHONY: dis
 dis: simple.spv
