@@ -329,6 +329,7 @@ struct InsnFDiv : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepFDiv(*this); }
     virtual uint32_t opcode() const { return SpvOpFDiv; }
     virtual std::string name() const { return "OpFDiv"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFMod instruction (code 141).

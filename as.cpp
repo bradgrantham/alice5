@@ -729,7 +729,12 @@ private:
                 if (!foundChar(',')) {
                     error("Expected comma");
                 }
-                int32_t imm = readImmediate(op.bits);
+                int32_t imm = readImmediateOrLabel(op, false);
+                if (foundChar('+')) {
+                    // Integer offset.
+                    int32_t offset = readImmediate(32);
+                    imm += offset;
+                }
                 emitI(op, rd, rs1, imm);
                 break;
             }

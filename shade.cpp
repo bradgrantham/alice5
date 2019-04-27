@@ -169,6 +169,11 @@ struct Program
     std::map<uint32_t, Register> constants;
     std::map<std::string, VariableInfo> namedVariables;
 
+    // For expanding vectors to scalars:
+    uint32_t nextReg = 1000; // XXX make sure this doesn't conflict with actual registers.
+    using RegIndex = std::pair<uint32_t,int>;
+    std::map<RegIndex,uint32_t> vec2scalar;
+
     SampledImage sampledImages[16];
 
     Function* currentFunction;
@@ -267,17 +272,19 @@ struct Program
             : nullptr;
     }
 
+    // Returns true if a type is a float, false if it's an integer or pointer,
+    // otherwise asserts.
     bool isTypeFloat(uint32_t typeId) const {
-        // Returns true if a type is a float, false if it's an integer,
-        // otherwise asserts.
         Type type = types.at(typeId);
-        if (std::holds_alternative<TypeInt>(type)) {
+        if (std::holds_alternative<TypeInt>(type)
+                || std::holds_alternative<TypePointer>(type)) {
+
             return false;
         } else if (std::holds_alternative<TypeFloat>(type)) {
             return true;
         } else {
             std::cerr << "Error: Type " << typeId << " is neither int nor float.\n";
-            exit(EXIT_FAILURE);
+            assert(false);
         }
     }
 
@@ -1316,43 +1323,44 @@ struct Program
         }
     }
 
+    // Return the scalar for the vector register's index.
+    uint32_t scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg = 0) {
+        auto regIndex = RegIndex{vreg, i};
+        auto itr = vec2scalar.find(regIndex);
+        if (itr == vec2scalar.end()) {
+            if (scalarReg == 0) {
+                scalarReg = nextReg++;
+            }
+            vec2scalar[regIndex] = scalarReg;
+
+            // See if this was a constant vector.
+            auto itr = constants.find(vreg);
+            if (itr != constants.end()) {
+                // Extract new constant for this component.
+                Register &r = allocConstantObject(scalarReg, subtype);
+                auto [subtype2, offset] = getConstituentInfo(itr->second.type, i);
+                uint32_t size = typeSizes[subtype];
+                assert(subtype == subtype2);
+                std::copy(itr->second.data + offset, itr->second.data + offset + size, r.data);
+            } else {
+                // Not a constant, must be a variable.
+                this->resultTypes[scalarReg] = subtype;
+            }
+        } else {
+            if (scalarReg != 0) {
+                assert(scalarReg == itr->second);
+            } else {
+                scalarReg = itr->second;
+            }
+        }
+
+        return scalarReg;
+    }
+
     // Transform vector instructions to scalar instructions. inList and outList
     // may be the same list.
     void expandVectors(const InstructionList &inList, InstructionList &outList) {
         InstructionList newList;
-
-        uint32_t nextReg = 1000; // XXX make sure this doesn't conflict with actual registers.
-        using RegIndex = std::pair<uint32_t,int>;
-        std::map<RegIndex,uint32_t> vec2scalar;
-
-        // Return the scalar for the vector register's index.
-        auto scalarize = [this, &nextReg, &vec2scalar](uint32_t vreg, int i, uint32_t subtype) -> uint32_t {
-            auto regIndex = RegIndex{vreg, i};
-            auto itr = vec2scalar.find(regIndex);
-            uint32_t scalarReg;
-            if (itr == vec2scalar.end()) {
-                scalarReg = nextReg++;
-                vec2scalar[regIndex] = scalarReg;
-
-                // See if this was a constant vector.
-                auto itr = constants.find(vreg);
-                if (itr != constants.end()) {
-                    // Extract new constant for this component.
-                    Register &r = allocConstantObject(scalarReg, subtype);
-                    auto [subtype2, offset] = getConstituentInfo(itr->second.type, i);
-                    uint32_t size = typeSizes[subtype];
-                    assert(subtype == subtype2);
-                    std::copy(itr->second.data + offset, itr->second.data + offset + size, r.data);
-                } else {
-                    // Not a constant, must be a variable.
-                    this->resultTypes[scalarReg] = subtype;
-                }
-            } else {
-                scalarReg = itr->second;
-            }
-
-            return scalarReg;
-        };
 
         /* XXX delete
         // Expand variables.
@@ -1436,23 +1444,27 @@ struct Program
                     break;
                 }
 
-                case SpvOpFMul: {
-                    InsnFMul *insn = dynamic_cast<InsnFMul *>(instruction);
-                    const TypeVector *typeVector = getTypeAsVector(
-                            resultTypes.at(insn->resultId));
-                    if (typeVector != nullptr) {
-                        for (int i = 0; i < typeVector->count; i++) {
-                            auto [subtype, offset] = getConstituentInfo(insn->type, i);
-                            newList.push_back(std::make_shared<InsnFMul>(insn->lineInfo,
-                                        subtype,
-                                        scalarize(insn->resultId, i, subtype),
-                                        scalarize(insn->operand1Id, i, subtype),
-                                        scalarize(insn->operand2Id, i, subtype)));
-                        }
-                        replaced = true;
+                case SpvOpCompositeConstruct: {
+                    InsnCompositeConstruct *insn =
+                        dynamic_cast<InsnCompositeConstruct *>(instruction);
+                    const TypeVector *typeVector = getTypeAsVector(insn->type);
+                    assert(typeVector != nullptr);
+                    for (int i = 0; i < typeVector->count; i++) {
+                        auto [subtype, offset] = getConstituentInfo(insn->type, i);
+                        // Re-use existing SSA register.
+                        scalarize(insn->resultId, i, subtype, insn->constituentsId[i]);
                     }
+                    replaced = true;
                     break;
                 }
+
+                case SpvOpFMul:
+                     expandVectorsBinOp<InsnFMul>(instruction, newList, replaced);
+                     break;
+
+                case SpvOpFDiv:
+                     expandVectorsBinOp<InsnFDiv>(instruction, newList, replaced);
+                     break;
 
                 default: {
                     std::cerr << "Warning: Unhandled opcode "
@@ -1468,6 +1480,24 @@ struct Program
         }
 
         std::swap(newList, outList);
+    }
+
+    // Expand a binary operator, such as FMul, from vector to scalar if necessary.
+    template <class T>
+    void expandVectorsBinOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
+        T *insn = dynamic_cast<T *>(instruction);
+        const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->resultId));
+        if (typeVector != nullptr) {
+            for (int i = 0; i < typeVector->count; i++) {
+                auto [subtype, offset] = getConstituentInfo(insn->type, i);
+                newList.push_back(std::make_shared<T>(insn->lineInfo,
+                            subtype,
+                            scalarize(insn->resultId, i, subtype),
+                            scalarize(insn->operand1Id, i, subtype),
+                            scalarize(insn->operand2Id, i, subtype)));
+            }
+            replaced = true;
+        }
     }
 
     // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
@@ -4073,13 +4103,21 @@ struct Compiler
         return false;
     }
 
+    // Returns the SSA ID as a compiler register, or null if it's not stored
+    // in a compiler register.
+    const CompilerRegister *asRegister(uint32_t id) const {
+        auto r = registers.find(id);
+
+        return r == registers.end() ? nullptr : &r->second;
+    }
+
     // String for a virtual register ("r12" or more).
     std::string reg(uint32_t id, int index = 0) const {
         std::ostringstream ss;
 
-        auto r = registers.find(id);
-        if (r != registers.end() && index < r->second.phy.size()) {
-            uint32_t phy = r->second.phy[index];
+        auto r = asRegister(id);
+        if (r != nullptr) {
+            uint32_t phy = r->phy[index];
             if (phy < 32) {
                 ss << "x" << phy;
             } else {
@@ -4158,7 +4196,13 @@ struct Compiler
 
     void emitLabel(const std::string &label)
     {
-        std::cout << label << ":\n";
+        std::cout << notEmptyLabel(label) << ":\n";
+    }
+
+    // Return the label passed in, unless it's an empty string, in which case
+    // it returns an appropriate non-empty string.
+    std::string notEmptyLabel(const std::string &label) const {
+        return label.empty() ? ".anonymous" : label;
     }
 
     void emit(const std::string &op, const std::string &comment)
@@ -4240,11 +4284,19 @@ void RiscVLoad::emit(Compiler *compiler)
     } else {
         ss1 << "lw ";
     }
-    ss1 << compiler->reg(resultId) << ", " << compiler->reg(pointerId);
-    if (offset != 0) {
-        ss1 << "+" << offset;
+    ss1 << compiler->reg(resultId) << ", ";
+    auto r = compiler->asRegister(pointerId);
+    if (r == nullptr) {
+        // It's a variable reference.
+        ss1 << compiler->reg(pointerId);
+        if (offset != 0) {
+            ss1 << "+" << offset;
+        }
+        ss1 << "(x0)";
+    } else {
+        // It's a register reference.
+        ss1 << offset << "(" << compiler->reg(pointerId) << ")";
     }
-    ss1 << "(x0)";
     std::ostringstream ss2;
     ss2 << "r" << resultId << " = (r" << pointerId << ")";
     compiler->emit(ss1.str(), ss2.str());
@@ -4293,15 +4345,20 @@ void InsnFMul::emit(Compiler *compiler)
     compiler->emitBinaryOp("fmul.s", resultId, operand1Id, operand2Id);
 }
 
+void InsnFDiv::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("fdiv.s", resultId, operand1Id, operand2Id);
+}
+
 void InsnIAdd::emit(Compiler *compiler)
 {
-    uint32_t int_value;
-    if (compiler->asIntegerConstant(operand1Id, int_value)) {
+    uint32_t intValue;
+    if (compiler->asIntegerConstant(operand1Id, intValue)) {
         // XXX Verify that immediate fits in 12 bits.
-        compiler->emitBinaryImmOp("addi", resultId, operand2Id, int_value);
-    } else if (compiler->asIntegerConstant(operand2Id, int_value)) {
+        compiler->emitBinaryImmOp("addi", resultId, operand2Id, intValue);
+    } else if (compiler->asIntegerConstant(operand2Id, intValue)) {
         // XXX Verify that immediate fits in 12 bits.
-        compiler->emitBinaryImmOp("addi", resultId, operand1Id, int_value);
+        compiler->emitBinaryImmOp("addi", resultId, operand1Id, intValue);
     } else {
         compiler->emitBinaryOp("add", resultId, operand1Id, operand2Id);
     }
@@ -4396,23 +4453,32 @@ void InsnAccessChain::emit(Compiler *compiler)
 {
     uint32_t offset = 0;
 
-    /*
-    Pointer& basePointer = compiler->pgm->pointers.at(baseId);
-    uint32_t type = basePointer.type;
-    for (auto& id: indexesId) {
-        if (constant) {
-            int i = get_constant_value();
-            auto [type, constituentOffset] = pgm->getConstituentInfo(type, i);
-            offset += constituentOffset;
+    const Variable &variable = compiler->pgm->variables.at(baseId);
+    uint32_t type = variable.type;
+    for (auto &id : indexesId) {
+        uint32_t intValue;
+        if (compiler->asIntegerConstant(id, intValue)) {
+            auto [subtype, subOffset] = compiler->pgm->getConstituentInfo(type, intValue);
+            type = subtype;
+            offset += subOffset;
         } else {
-            std::cerr << "Don't yet handle register offsets in AccessChain.\n";
+            std::cerr << "Error: Don't yet handle non-constant offsets in AccessChain ("
+                << id << ").\n";
+            exit(EXIT_FAILURE);
         }
     }
-    */
 
-    std::cerr << "InsnAccessChain::emit() not implemented\n";
-    compiler->emitUnaryOp("mov", resultId, baseId);
-    compiler->emitBinaryImmOp("addi", resultId, resultId, offset);
+    auto name = compiler->pgm->names.find(baseId);
+    if (name == compiler->pgm->names.end()) {
+        std::cerr << "Error: Don't yet handle pointer reference in AccessChain ("
+            << baseId << ").\n";
+        exit(EXIT_FAILURE);
+    }
+
+    std::ostringstream ss;
+    ss << "addi " << compiler->reg(resultId) << ", x0, "
+        << compiler->notEmptyLabel(name->second) << "+" << offset;
+    compiler->emit(ss.str(), "");
 }
 
 // -----------------------------------------------------------------------------------
