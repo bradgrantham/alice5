@@ -169,6 +169,8 @@ private:
 
 typedef std::shared_ptr<Image> ImagePtr;
 
+ImagePtr loadImage(std::string filename, bool flipInY);
+
 struct Sampler
 {
     enum AddressMode {
