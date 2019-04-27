@@ -22,7 +22,8 @@ SHADE_OBJS      =      $(SHADE_SRCS:.cpp=.o)
 
 DEPS            = $(SHADE_OBJS:.o=.d)
 
-default: shade
+.PHONY: all
+all: shade as gpuemu
 
 -include $(DEPS)
 
