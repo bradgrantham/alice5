@@ -21,11 +21,12 @@ SHADE_SRCS      =      shade.cpp program.cpp
 SHADE_OBJS      =      $(SHADE_SRCS:.cpp=.o)
 
 DEPS            = $(SHADE_OBJS:.o=.d)
+
+default: shade
+
 -include $(DEPS)
 
 # $(GLSLANG_SOURCE_DIR)/build/glslang/libglslang.a $(GLSLANG_SOURCE_DIR)/build/glslang/OSDependent/Unix/libOSDependent.a
-
-default: shade
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS)  $< -c -o $@ -MMD
