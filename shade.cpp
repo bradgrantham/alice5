@@ -3491,6 +3491,19 @@ void Interpreter::stepPhi(const InsnPhi& insn)
     }
 }
 
+float applyAddressMode(float f, Sampler::AddressMode mode)
+{
+    if(mode == Sampler::CLAMP_TO_EDGE)
+        return std::clamp(f, 0.0f, 1.0f);
+    if(mode == Sampler::REPEAT) {
+        float wrapped = (f >= 0) ? fmodf(f, 1.0f) : (1 + fmodf(f, 1.0f));
+        if(wrapped == 1.0f)
+            wrapped = 0.0f;
+        return wrapped;
+    }
+    return f;
+}
+
 // XXX implicit LOD level and thus texel interpolants
 void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& insn)
 {
@@ -3514,28 +3527,41 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
             int imageIndex = fromRegister<int>(insn.sampledImageId);
             const SampledImage& si = pgm->sampledImages[imageIndex];
+            const ImagePtr image = si.image;
 
             unsigned int s, t;
 
-            if(si.sampler.uAddressMode == Sampler::CLAMP_TO_EDGE) {
-                s = std::clamp(static_cast<unsigned int>(u * si.image->width), 0u, si.image->width - 1);
+            u = applyAddressMode(u, si.sampler.uAddressMode);
+            v = applyAddressMode(v, si.sampler.vAddressMode);
+
+            if(si.sampler.filterMode == Sampler::NEAREST /* && si.sampler.mipMapMode == Sampler::MIPMAP_NEAREST */) {
+
+                s = static_cast<unsigned int>(u * image->width);
+                t = static_cast<unsigned int>(v * image->height);
+                image->get(s, image->height - 1 - t, rgba);
+
+            } else if(si.sampler.filterMode == Sampler::LINEAR /* && si.sampler.mipMapMode == Sampler::MIPMAP_NEAREST */) {
+
+                s = static_cast<unsigned int>(u * image->width);
+                t = static_cast<unsigned int>(v * image->height);
+                float alpha = u * image->width - s;
+                float beta = v * image->height - t;
+                unsigned int s0 = (s + 0) % image->width;
+                unsigned int s1 = (s + 1) % image->width;
+                unsigned int t0 = (t + 0) % image->height;
+                unsigned int t1 = (t + 1) % image->height;
+                v4float s0t0, s1t0, s0t1, s1t1;
+                image->get(s0, image->height - 1 - t0, s0t0);
+                image->get(s1, image->height - 1 - t0, s1t0);
+                image->get(s0, image->height - 1 - t1, s0t1);
+                image->get(s1, image->height - 1 - t1, s1t1);
+                for(int i = 0; i < 4; i++)
+                    rgba[i] =
+                        (s0t0[i] * (1 - alpha) + s1t0[i] * alpha) * (1 - beta) +
+                        (s0t1[i] * (1 - alpha) + s1t1[i] * alpha) * beta;
             } else {
-                float wrapped = (u >= 0) ? fmodf(u, 1.0f) : (1 + fmodf(u, 1.0f));
-                if(wrapped == 1.0f) /* fmodf of a negative number could return 0, after which "wrapped" would be 1 */
-                    wrapped = 0.0f;
-                s = static_cast<unsigned int>(wrapped * si.image->width);
             }
 
-            if(si.sampler.vAddressMode == Sampler::CLAMP_TO_EDGE) {
-                t = std::clamp(static_cast<unsigned int>(v * si.image->height), 0u, si.image->height - 1);
-            } else {
-                float wrapped = (v >= 0) ? fmodf(v, 1.0f) : (1 + fmodf(v, 1.0f));
-                if(wrapped == 1.0f) /* fmodf of a negative number could return 0, after which "wrapped" would be 1 */
-                    wrapped = 0.0f;
-                t = static_cast<unsigned int>(wrapped * si.image->height);
-            }
-
-            si.image->get(s, si.image->height - 1 - t, rgba);
 
         } else {
 
@@ -4801,7 +4827,8 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
 
                 /* will hook up to output from source pass */
                 if(false) printf("pass \"%s\", channel number %d and id %d\n", pass["name"].get<std::string>().c_str(), channelNumber, channelId);
-                inputs.push_back({channelNumber, channelId, {nullptr, {}}});
+                Sampler sampler; /*  = makeSamplerFromJSON(input); */
+                inputs.push_back({channelNumber, channelId, {nullptr, sampler}});
                 asset_preamble.code += "layout (binding = " + std::to_string(channelNumber + 1) + ") uniform sampler2D iChannel" + std::to_string(channelNumber) + ";\n";
 
             } else if(input.find("locally_saved") == input.end()) {
@@ -4843,7 +4870,8 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Ren
 
                 stbi_image_free(textureData);
 
-                inputs.push_back({channelNumber, channelId, {image, {}}});
+                Sampler sampler; /*  = makeSamplerFromJSON(input); */
+                inputs.push_back({channelNumber, channelId, {image, sampler}});
                 asset_preamble.code += "layout (binding = " + std::to_string(channelNumber + 1) + ") uniform sampler2D iChannel" + std::to_string(channelNumber) + ";\n";
             }
         }
