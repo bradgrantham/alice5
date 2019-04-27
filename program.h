@@ -35,6 +35,9 @@ const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
 const uint32_t EXECUTION_ENDED = 0xFFFFFFFF;
 const uint32_t NO_RETURN_REGISTER = 0xFFFFFFFF;
 
+extern std::map<uint32_t, std::string> OpcodeToString;
+extern std::map<uint32_t, std::string> GLSLstd450OpcodeToString;
+
 struct VariableInfo
 {
     uint32_t address;       // The address of this variable within memory
