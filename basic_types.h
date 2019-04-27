@@ -2,6 +2,11 @@
 #define BASIC_TYPES_H
 
 #include <iostream>
+#include <map>
+#include <array>
+#include <variant>
+#include <vector>
+#include <set>
 
 typedef std::array<float,1> v1float;
 typedef std::array<uint32_t,1> v1uint;
