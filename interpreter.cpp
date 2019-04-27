@@ -895,7 +895,7 @@ void Interpreter::stepFunctionCall(const InsnFunctionCall& insn)
 
 void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
 {
-    const Type *type = pgm->types.at(insn.type).get();
+    const Type *type = pgm->types.at(registers[insn.p0Id].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
@@ -917,7 +917,7 @@ void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
 
 void Interpreter::stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
 {
-    const Type *type = pgm->types.at(insn.type).get();
+    const Type *type = pgm->types.at(registers[insn.xId].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
@@ -996,7 +996,7 @@ void Interpreter::stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
 
 void Interpreter::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
 {
-    const Type *type = pgm->types.at(insn.type).get();
+    const Type *type = pgm->types.at(registers[insn.xId].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
@@ -1263,7 +1263,7 @@ static float fmix(float x, float y, float a)
 
 void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
 {
-    const Type *type = pgm->types.at(insn.type).get();
+    const Type *type = pgm->types.at(registers[insn.xId].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
@@ -1285,7 +1285,7 @@ void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
 
 void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
 {
-    const Type *type = pgm->types.at(insn.type).get();
+    const Type *type = pgm->types.at(registers[insn.xId].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
@@ -1307,7 +1307,7 @@ void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
 
 void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
 {
-    const Type *type = pgm->types.at(insn.type).get();
+    const Type *type = pgm->types.at(registers[insn.xId].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
@@ -1329,7 +1329,7 @@ void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
 
 void Interpreter::stepGLSLstd450Step(const InsnGLSLstd450Step& insn)
 {
-    const Type *type = pgm->types.at(insn.type).get();
+    const Type *type = pgm->types.at(registers[insn.xId].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
@@ -1364,7 +1364,7 @@ void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 
 void Interpreter::stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn)
 {
-    const Type *type = pgm->types.at(insn.type).get();
+    const Type *type = pgm->types.at(registers[insn.iId].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
