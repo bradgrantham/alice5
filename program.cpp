@@ -708,6 +708,34 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 break;
             }
 
+            case 0x10000 | GLSLstd450Normalize: {
+                InsnGLSLstd450Normalize *insn =
+                    dynamic_cast<InsnGLSLstd450Normalize *>(instruction);
+
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->xId));
+
+                std::vector<uint32_t> resultIds;
+                std::vector<uint32_t> operandIds;
+                if (typeVector) {
+                    // Operand is vector.
+                    for (int i = 0; i < typeVector->count; i++) {
+                        resultIds.push_back(scalarize(insn->resultId, i, typeVector->type));
+                        operandIds.push_back(scalarize(insn->xId, i, typeVector->type));
+                    }
+                } else {
+                    // Operand is scalar.
+                    resultIds.push_back(insn->resultId);
+                    operandIds.push_back(insn->xId);
+                }
+                newList.push_back(std::make_shared<RiscVNormalize>(insn->lineInfo,
+                            insn->type,
+                            resultIds,
+                            operandIds));
+
+                replaced = true;
+                break;
+            }
+
             case 0x10000 | GLSLstd450Cross: {
                 InsnGLSLstd450Cross *insn =
                     dynamic_cast<InsnGLSLstd450Cross *>(instruction);

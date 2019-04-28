@@ -10,6 +10,7 @@ enum {
     RiscVOpCross,
     RiscVOpMove,
     RiscVOpLength,
+    RiscVOpNormalize,
 };
 
 // "addi" instruction.
@@ -138,5 +139,24 @@ struct RiscVLength : public Instruction {
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpLength; }
     virtual std::string name() const { return "length"; }
+    virtual void emit(Compiler *compiler);
+};
+
+// Normalize instruction.
+struct RiscVNormalize : public Instruction {
+    RiscVNormalize(LineInfo& lineInfo, uint32_t type, const std::vector<uint32_t> resultIds, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), resultIds(resultIds), operandIds(operandIds) {
+        for (auto resultId : resultIds) {
+            addResult(resultId);
+        }
+        for (auto operandId : operandIds) {
+            addParameter(operandId);
+        }
+    }
+    uint32_t type; // result type
+    std::vector<uint32_t> resultIds; // results from register
+    std::vector<uint32_t> operandIds; // operands from register
+    virtual void step(Interpreter *interpreter) { assert(false); }
+    virtual uint32_t opcode() const { return RiscVOpNormalize; }
+    virtual std::string name() const { return "normalize"; }
     virtual void emit(Compiler *compiler);
 };

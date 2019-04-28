@@ -789,6 +789,17 @@ void RiscVLength::emit(Compiler *compiler)
     compiler->emitCall(functionName.str(), resultIds, operandIds);
 }
 
+void RiscVNormalize::emit(Compiler *compiler)
+{
+    size_t n = operandIds.size();
+    assert(n <= 4);
+
+    std::ostringstream functionName;
+    functionName << ".normalize" << n;
+
+    compiler->emitCall(functionName.str(), resultIds, operandIds);
+}
+
 // -----------------------------------------------------------------------------------
 
 Instruction::Instruction(const LineInfo& lineInfo)
