@@ -56,6 +56,10 @@
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
 
+.fract:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
 .cross:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0

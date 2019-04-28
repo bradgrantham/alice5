@@ -42,7 +42,8 @@ struct GPUCore
         SUBST_TAN,
         SUBST_ATAN2,
         SUBST_REFRACT,
-        SUBST_DISTANCE
+        SUBST_DISTANCE,
+        SUBST_FRACT,
     };
     std::map<uint32_t, SubstituteFunction> substFunctions;
 
@@ -77,7 +78,8 @@ struct GPUCore
             { ".tan", SUBST_TAN },
             { ".atan2", SUBST_ATAN2 },
             { ".refract", SUBST_REFRACT },
-            { ".distance", SUBST_DISTANCE }
+            { ".distance", SUBST_DISTANCE },
+            { ".fract", SUBST_FRACT },
         };
         for(auto& [name, subst]: substitutions) {
             if(librarySymbols.find(name) != librarySymbols.end()) {
@@ -205,9 +207,6 @@ GPUCore::Status GPUCore::step(T& memory)
         // fmul.s    rd rs1 rs2      31..27=0x02 rm       26..25=0 6..2=0x14 1..0=3
         // fsub.s    rd rs1 rs2      31..27=0x01 rm       26..25=0 6..2=0x14 1..0=3
         // fdiv.s    rd rs1 rs2      31..27=0x03 rm       26..25=0 6..2=0x14 1..0=3
-        // fsgnj.s   rd rs1 rs2      31..27=0x04 14..12=0 26..25=0 6..2=0x14 1..0=3
-        // fsgnjn.s  rd rs1 rs2      31..27=0x04 14..12=1 26..25=0 6..2=0x14 1..0=3
-        // fsgnjx.s  rd rs1 rs2      31..27=0x04 14..12=2 26..25=0 6..2=0x14 1..0=3
         // fmin.s    rd rs1 rs2      31..27=0x05 14..12=0 26..25=0 6..2=0x14 1..0=3
         // fmax.s    rd rs1 rs2      31..27=0x05 14..12=1 26..25=0 6..2=0x14 1..0=3
         // fsqrt.s   rd rs1 24..20=0 31..27=0x0B rm       26..25=0 6..2=0x14 1..0=3
@@ -260,14 +259,32 @@ GPUCore::Status GPUCore::step(T& memory)
                     }
                     break;
                 }
-                // fcvt.s.w  rd rs1 24..20=0 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
-                // fcvt.s.wu rd rs1 24..20=1 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
+                // fsgnj.s   rd rs1 rs2      31..27=0x04 14..12=0 26..25=0 6..2=0x14 1..0=3
+                // fsgnjn.s  rd rs1 rs2      31..27=0x04 14..12=1 26..25=0 6..2=0x14 1..0=3
+                // fsgnjx.s  rd rs1 rs2      31..27=0x04 14..12=2 26..25=0 6..2=0x14 1..0=3
+                case 0x04: {
+                    uint32_t& fs1 = *reinterpret_cast<uint32_t*>(&f[rs1]);
+                    uint32_t& fs2 = *reinterpret_cast<uint32_t*>(&f[rs2]);
+                    uint32_t& fd = *reinterpret_cast<uint32_t*>(&f[rd]);
+                    if(funct3 == 0) {
+                        fd = (fs1 & 0x7FFFFFFF) | (fs2 & 0x80000000);
+                    } else if(funct3 == 1) {
+                        fd = (fs1 & 0x7FFFFFFF) | ((fs2 & 0x80000000) ^ 0x80000000);
+                    } else if(funct3 == 2) {
+                        fd = (fs1 & 0x7FFFFFFF) | ((fs2 & 0x80000000) ^ (fs1 & 0x80000000));
+                    } else {
+                        unimpl();
+                    }
+                    break;
+                }
                 default: unimpl(); break;
             }
             pc += 4;
             break;
         }
 
+        // fcvt.s.w  rd rs1 24..20=0 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
+        // fcvt.s.wu rd rs1 24..20=1 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
         // fmv.x.s
         // fmv.s.x
         // fclass.s
@@ -447,14 +464,6 @@ GPUCore::Status GPUCore::step(T& memory)
                                 pushf(atan2f(y, x));
                                 break;
                             }
-                            case SUBST_FACEFORWARD: {
-                                unimpl_subst();
-                                break;
-                            }
-                            case SUBST_LENGTH: {
-                                unimpl_subst();
-                                break;
-                            }
                             case SUBST_CROSS: {
                                 float x[3], y[3];
                                 x[0] = popf();
@@ -466,18 +475,6 @@ GPUCore::Status GPUCore::step(T& memory)
                                 pushf(y[2]);
                                 pushf(y[1]);
                                 pushf(y[0]);
-                                break;
-                            }
-                            case SUBST_REFRACT: {
-                                unimpl_subst();
-                                break;
-                            }
-                            case SUBST_DISTANCE: {
-                                unimpl_subst();
-                                break;
-                            }
-                            case SUBST_REFLECT: {
-                                unimpl_subst();
                                 break;
                             }
                             case SUBST_NORMALIZE1: {
@@ -513,6 +510,30 @@ GPUCore::Status GPUCore::step(T& memory)
                                 pushf(y * d);
                                 pushf(z * d);
                                 pushf(w * d);
+                                break;
+                            }
+                            case SUBST_FRACT: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_REFRACT: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_DISTANCE: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_REFLECT: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_FACEFORWARD: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_LENGTH: {
+                                unimpl_subst();
                                 break;
                             }
                         }
