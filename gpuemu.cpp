@@ -97,19 +97,48 @@ struct Memory
     }
 };
 
-std::vector<uint8_t> readFileContents(std::string shaderFileName)
+bool ReadBinary(std::ifstream& binaryFile, RunHeader1& header, SymbolTable& symbols, std::vector<uint8_t>& bytes)
 {
-    std::ifstream shaderFile(shaderFileName.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
-    if(!shaderFile.good()) {
-        throw std::runtime_error("couldn't open file " + shaderFileName + " for reading");
+    binaryFile.read(reinterpret_cast<char*>(&header), sizeof(header));
+    if(!binaryFile) {
+        std::cerr << "failed to read header, only " << binaryFile.gcount() << " bytes read\n";
+        return false;
     }
-    std::ifstream::pos_type size = shaderFile.tellg();
-    shaderFile.seekg(0, std::ios::beg);
 
-    std::vector<uint8_t> text(size);
-    shaderFile.read(reinterpret_cast<char*>(text.data()), size);
+    if(header.magic != RunHeader1MagicExpected) {
+        std::cerr << "magic read did not match magic expected for RunHeader1\n";
+        return false;
+    }
 
-    return text;
+    for(int i = 0; i < header.symbolCount; i++) {
+        uint32_t addressAndLength[2];
+
+        binaryFile.read(reinterpret_cast<char*>(addressAndLength), sizeof(addressAndLength));
+        if(!binaryFile) {
+            std::cerr << "failed to read address and length for symbol " << i << " only " << binaryFile.gcount() << " bytes read\n";
+            return false;
+        }
+
+        std::string symbol;
+        symbol.resize(addressAndLength[1] - 1);
+
+        binaryFile.read(symbol.data(), addressAndLength[1]);
+        if(!binaryFile) {
+            std::cerr << "failed to symbol string for symbol " << i << " only " << binaryFile.gcount() << " bytes read\n";
+            return false;
+        }
+
+        symbols[symbol] = addressAndLength[0];
+    }
+
+    std::ifstream::pos_type bytesStart = binaryFile.tellg();
+    binaryFile.seekg(0, std::ios::end);
+    std::ifstream::pos_type bytesEnd = binaryFile.tellg();
+    binaryFile.seekg(bytesStart, std::ios::beg);
+    bytes.resize(bytesEnd - bytesStart);
+    binaryFile.read(reinterpret_cast<char*>(bytes.data()), bytesEnd - bytesStart);
+
+    return true;
 }
 
 template <class T>
@@ -120,12 +149,6 @@ void disassemble(uint32_t pc, T& memory)
     std::cout << " " << std::hex << std::setw(8) << std::setfill('0') << memory.read32quiet(pc);
     std::cout << std::setw(0) << std::dec << std::setfill(' ') << '\n';
 }
-
-uint32_t colorAddress = 6144; // vec4 
-uint32_t gl_FragCoordAddress = 1024; // vec4 
-uint32_t iMouseAddress = 2064; // ivec4 
-uint32_t iResolutionAddress = 2048; // vec2 
-uint32_t iTimeAddress = 2056; // float 
 
 template <class MEMORY, class TYPE>
 void set(MEMORY& memory, uint32_t address, const TYPE& value)
@@ -195,6 +218,7 @@ int main(int argc, char **argv)
     bool verboseMemory = false;
     bool disassemble = false;
     bool imageToTerminal = false;
+    bool printSymbols = false;
 
     char *progname = argv[0];
     argv++; argc--;
@@ -215,6 +239,11 @@ int main(int argc, char **argv)
             disassemble = true;
             argv++; argc--;
 
+        } else if(strcmp(argv[0], "-d") == 0) {
+
+            printSymbols = true;
+            argv++; argc--;
+
         } else if(strcmp(argv[0], "-h") == 0) {
 
             usage(progname);
@@ -233,11 +262,28 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    std::vector<uint8_t> blob = readFileContents(argv[0]);
-    assert(blob.size() > sizeof(RunHeader));
-    RunHeader hdr = *reinterpret_cast<RunHeader*>(blob.data());
+    RunHeader1 header;
+    SymbolTable symbols;
+    std::vector<uint8_t> bytes;
 
-    std::vector<uint8_t> bytes(blob.begin() + sizeof(RunHeader), blob.end());
+    std::ifstream binaryFile(argv[0], std::ios::in | std::ios::binary);
+    if(!binaryFile.good()) {
+        throw std::runtime_error(std::string("couldn't open file ") + argv[0] + " for reading");
+    }
+
+    if(!ReadBinary(binaryFile, header, symbols, bytes)) {
+        exit(EXIT_FAILURE);
+    }
+
+    if(printSymbols) {
+        for(auto& [symbol, address]: symbols) {
+            std::cout << "symbol \"" << symbol << "\" is at " << address << "\n";
+        }
+    }
+
+    std::cout << header.initialPC << '\n';
+
+    binaryFile.close();
 
     bytes.resize(bytes.size() + 0x10000);
     Memory m(bytes, false);
@@ -252,27 +298,35 @@ int main(int argc, char **argv)
     float fh = imageHeight;
     float zero = 0.0;
     float when = 1.5;
-    if (hdr.iResolutionAddress == 0xFFFFFFFF) {
-        std::cerr << "Warning: No memory location for iResolution.\n";
-    } else {
-        set(m, hdr.iResolutionAddress, v4float{fw, fh, zero, zero});
-        set(m, hdr.iResolutionAddress +  0, when);
+    for(auto& s: { "gl_FragCoord", "color"}) {
+        if (symbols.find(s) == symbols.end()) {
+            std::cerr << "No memory location for required variable" << s << ".\n";
+        }
+    }
+    for(auto& s: { "iResolution", "iTime", "iMouse"}) {
+        if (symbols.find(s) == symbols.end()) {
+            std::cerr << "Warning: No memory location for required variable" << s << ".\n";
+        }
+    }
+
+    if (symbols.find("iResolution") != symbols.end()) {
+        set(m, symbols["iResolution"], v4float{fw, fh, zero, zero});
+        set(m, symbols["iResolution"] +  0, when);
     }
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
 
     for(int j = 0; j < imageHeight; j++)
         for(int i = 0; i < imageWidth; i++) {
 
-            float x = i, y = j, z = 0, w = 0;
-            set(m, hdr.gl_FragCoordAddress, v4float{x, y, z, w});
-            set(m, hdr.colorAddress, v4float{1, 1, 1, 1});
+            set(m, symbols["gl_FragCoord"], v4float{(float)i, (float)j, 0, 0});
+            set(m, symbols["color"], v4float{1, 1, 1, 1});
 
             core.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
             core.x[2] = bytes.size(); // Set SP to end of memory 
-            core.pc = hdr.initialPC;
+            core.pc = header.initialPC;
 
             if(disassemble) {
-                std::cout << "pixel " << x << ", " << y << '\n';
+                std::cout << "pixel " << i << ", " << j << '\n';
             }
             try {
                 do {
@@ -295,10 +349,10 @@ int main(int argc, char **argv)
                 exit(EXIT_FAILURE);
             }
 
-            uint32_t ir = m.read32(hdr.colorAddress +  0);
-            uint32_t ig = m.read32(hdr.colorAddress +  4);
-            uint32_t ib = m.read32(hdr.colorAddress +  8);
-            // uint32_t ia = m.read32(hdr.colorAddress + 12);
+            uint32_t ir = m.read32(symbols["color"] +  0);
+            uint32_t ig = m.read32(symbols["color"] +  4);
+            uint32_t ib = m.read32(symbols["color"] +  8);
+            // uint32_t ia = m.read32(symbols["color"] + 12);
             float r = *reinterpret_cast<float*>(&ir);
             float g = *reinterpret_cast<float*>(&ig);
             float b = *reinterpret_cast<float*>(&ib);

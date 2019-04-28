@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
+#include <map>
+#include <string>
 
 struct GPUCore
 {
@@ -327,3 +329,19 @@ struct RunHeader
     uint32_t iResolutionAddress;        // address of vec2 iResolution uniform
     // Bytes to follow are loaded at 0
 };
+
+const uint32_t RunHeader1MagicExpected = 0x31354c41;
+struct RunHeader1
+{
+    // Little-endian
+    uint32_t magic = RunHeader1MagicExpected;        // 'AL51', version 1 of Alice 5 header
+    uint32_t initialPC;                 // Initial value PC is set to
+    uint32_t symbolCount;
+    // symbolCount symbols follow that are of the following layout:
+    //       uint32_t address
+    //       uint32_t stringLength
+    //       stringLength bytes for symbol name including NUL
+    // Program and data bytes follow.  Bytes are loaded at 0
+};
+
+typedef std::map<std::string, uint32_t> SymbolTable;
