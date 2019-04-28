@@ -39,7 +39,7 @@ as: as.cpp $(DIS_OBJ)
 	$(CXX) --std=c++17 -Wall as.cpp $(DIS_OBJ) -o $@
 
 gpuemu: gpuemu.cpp $(DIS_OBJ) gpuemu.h
-	$(CXX) --std=c++17 -Wall gpuemu.cpp $(DIS_OBJ) -o $@
+	$(CXX) $(CXXFLAGS) --std=c++17 -Wall gpuemu.cpp $(DIS_OBJ) -o $@
 
 simple.spv: simple.frag
 	cat preamble.frag simple.frag epilogue.frag | $(GLSLANG_BINARY_DIR)/glslangValidator -H -V100 -d -o simple.spv --stdin -S frag
