@@ -47,6 +47,8 @@ struct GPUCore
         SUBST_REFRACT,
         SUBST_DISTANCE,
         SUBST_FRACT,
+        SUBST_FLOOR,
+        SUBST_STEP,
     };
     std::map<uint32_t, SubstituteFunction> substFunctions;
 
@@ -86,6 +88,8 @@ struct GPUCore
             { ".refract", SUBST_REFRACT },
             { ".distance", SUBST_DISTANCE },
             { ".fract", SUBST_FRACT },
+            { ".floor", SUBST_FLOOR },
+            { ".step", SUBST_STEP },
         };
         for(auto& [name, subst]: substitutions) {
             if(librarySymbols.find(name) != librarySymbols.end()) {
@@ -516,6 +520,18 @@ GPUCore::Status GPUCore::step(T& memory)
                                 pushf(y * d);
                                 pushf(z * d);
                                 pushf(w * d);
+                                break;
+                            }
+                            case SUBST_FLOOR: {
+                                float f = popf();
+                                pushf(floorf(f));
+                                break;
+                            }
+                            case SUBST_STEP: {
+                                float edge = popf();
+                                float x = popf();
+                                float y = (x < edge) ? 0.0f : 1.0f;
+                                pushf(y);
                                 break;
                             }
                             case SUBST_FRACT: {
