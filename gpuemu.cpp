@@ -301,6 +301,7 @@ int main(int argc, char **argv)
     for(auto& s: { "gl_FragCoord", "color"}) {
         if (symbols.find(s) == symbols.end()) {
             std::cerr << "No memory location for required variable" << s << ".\n";
+            exit(EXIT_FAILURE);
         }
     }
     for(auto& s: { "iResolution", "iTime", "iMouse"}) {
