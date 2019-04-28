@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
 
+if [ "$1" == "--compile" ]
+then
+    compile=true
+    shift
+else
+    compile=false
+fi
+
 echo 
 for i in creation define lk wavy wetrock flirt
 do
-    echo $i
-    ./shade --term -f 90 90 shaders/$i.frag
-    mv image0090.ppm $i.ppm
-    echo
+    echo "============================================== $i"
+    if [ $compile = true ]; then
+        ./shade -c -s -O shaders/$i.frag > x.s
+        ./as x.s
+        ./gpuemu --term x.o
+    else
+        ./shade --term -f 90 90 shaders/$i.frag
+        mv image0090.ppm $i.ppm
+    fi
 done
 
