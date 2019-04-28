@@ -141,6 +141,24 @@ struct Operator {
 
 // ----------------------------------------------------------------------
 
+struct SourceLine {
+    std::string code;
+    std::string pathname;
+    size_t lineNumber;
+};
+
+// ----------------------------------------------------------------------
+
+// Binary for instruction, source file, source line.
+struct Instruction {
+    uint32_t opcode;
+
+    // Index into "lines" array (not original source file).
+    uint32_t lineNumber;
+};
+
+// ----------------------------------------------------------------------
+
 // Main assembler class.
 class Assembler {
 private:
@@ -150,16 +168,13 @@ private:
     // Map from register name to register number.
     std::map<std::string,int> registers;
 
-    std::string inPathname;
-    bool verbose;
-
     // Which pass we're doing (0 or 1).
     int pass;
 
     // Lines of source code.
-    std::vector<std::string> lines;
+    std::vector<SourceLine> lines;
 
-    // Line number in the input file (0-based).
+    // Line number in the "lines" array.
     uint32_t lineNumber;
 
     // Pointer we walk through the file.
@@ -169,10 +184,7 @@ private:
     const char *previousToken;
 
     // Output binary.
-    std::vector<uint32_t> bin;
-
-    // Parallel array to "bin" indicating which source line emitted the instruction.
-    std::vector<size_t> binLine;
+    std::vector<Instruction> bin;
 
     // Map from label name to address in bytes.
     std::map<std::string,uint32_t> labels;
@@ -181,9 +193,7 @@ private:
     std::set<uint32_t> instAddrs;
 
 public:
-    Assembler()
-        : inPathname("unspecified") {
-
+    Assembler() {
         // Build our maps.
 
         // Basic arithmetic.
@@ -299,27 +309,20 @@ public:
         addRegisters("f", 0, 31, 32);
     }
 
-    void setVerbose(bool verbose) {
-        this->verbose = verbose;
-    }
-
     // Load the assembly file.
     void load(const std::string &inPathname) {
-        this->inPathname = inPathname;
-
         // Read the whole assembly file at once.
         std::string in = readFileContents(inPathname);
 
         // Convert to lines.
-        lines.clear();
         const char *s = in.c_str();
         while (true) {
             auto endOfLine = strchr(s, '\n');
             if (endOfLine == nullptr) {
-                lines.push_back(s);
+                lines.push_back(SourceLine{s, inPathname, lines.size()});
                 break;
             }
-            lines.push_back(std::string(s, endOfLine - s));
+            lines.push_back(SourceLine{std::string(s, endOfLine - s), inPathname, lines.size()});
             s = endOfLine + 1;
         }
     }
@@ -334,7 +337,6 @@ public:
         for (pass = 0; pass < 2; pass++) {
             // Clear output.
             bin.clear();
-            binLine.clear();
             instAddrs.clear();
 
             // Process each line.
@@ -361,7 +363,7 @@ public:
             while (true) {
                 // See what source line corresponds to the next instruction to display.
                 displaySourceLine = binIndex < bin.size()
-                    ? binLine[binIndex]
+                    ? bin[binIndex].lineNumber
                     : lines.size();
 
                 // See if previous source line generated multiple instructions.
@@ -376,13 +378,13 @@ public:
 
             if (displaySourceLine == sourceLine) {
                 // Found matching source line.
-                dumpInstructionListing(binIndex, lines[sourceLine]);
+                dumpInstructionListing(binIndex, lines[sourceLine].code);
                 binIndex++;
             } else {
                 // Source line with no instruction. Must be comment, label, blank line, etc.
                 std::cout
                     << std::string(15, ' ')
-                    << lines[sourceLine] << "\n";
+                    << lines[sourceLine].code << "\n";
             }
         }
 
@@ -392,7 +394,7 @@ public:
     // Dump one instruction with optional source code.
     void dumpInstructionListing(size_t binIndex, const std::string &source) {
         uint32_t pc = binIndex*4;
-        uint32_t instruction = bin[binIndex];
+        uint32_t instruction = bin[binIndex].opcode;
 
         // Print out original code.
         std::cout
@@ -432,13 +434,13 @@ public:
         }
 
         // Write binary.
-        for (uint32_t instruction : bin) {
+        for (Instruction instruction : bin) {
             // Force little endian.
             outFile
-                << uint8_t((instruction >> 0) & 0xFF)
-                << uint8_t((instruction >> 8) & 0xFF)
-                << uint8_t((instruction >> 16) & 0xFF)
-                << uint8_t((instruction >> 24) & 0xFF);
+                << uint8_t((instruction.opcode >> 0) & 0xFF)
+                << uint8_t((instruction.opcode >> 8) & 0xFF)
+                << uint8_t((instruction.opcode >> 16) & 0xFF)
+                << uint8_t((instruction.opcode >> 24) & 0xFF);
         }
         outFile.close();
     }
@@ -466,7 +468,7 @@ private:
 
     // Reads one line of input.
     void parseLine() {
-        s = currentLine().c_str();
+        s = currentLine().code.c_str();
         previousToken = nullptr;
 
         // Skip initial whitespace.
@@ -832,17 +834,19 @@ private:
 
     // Error function.
     [[noreturn]] void error(const std::string &message) {
-        int col = s - currentLine().c_str();
+        const SourceLine &sourceLine = currentLine();
 
-        std::cerr << inPathname << ":" << (lineNumber + 1) << ":"
+        int col = s - sourceLine.code.c_str();
+
+        std::cerr << sourceLine.pathname << ":" << (sourceLine.lineNumber+ 1) << ":"
             << (col + 1) << ": " << message << "\n";
-        std::cerr << currentLine() << "\n";
+        std::cerr << currentLine().code << "\n";
         std::cerr << std::string(col, ' ') << "^\n";
         exit(EXIT_FAILURE);
     }
 
     // Return a reference to the current line.
-    const std::string &currentLine() {
+    const SourceLine &currentLine() {
         return lines[lineNumber];
     }
 
@@ -954,8 +958,7 @@ private:
 
     // Emit an instruction for this source line.
     void emit(uint32_t instruction) {
-        bin.push_back(instruction);
-        binLine.push_back(lineNumber);
+        bin.push_back(Instruction{instruction, lineNumber});
     }
 };
 
@@ -1006,7 +1009,6 @@ int main(int argc, char *argv[]) {
     }
 
     Assembler assembler;
-    assembler.setVerbose(verbose);
     assembler.load(inPathname);
     assembler.assemble();
     assembler.save(outPathname);
