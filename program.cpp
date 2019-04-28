@@ -598,6 +598,36 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 break;
             }
 
+            case SpvOpVectorShuffle: {
+                InsnVectorShuffle *insn = dynamic_cast<InsnVectorShuffle *>(instruction);
+
+                const TypeVector *typeVector = getTypeAsVector(insn->type);
+                assert(typeVector != nullptr);
+
+                const TypeVector *typeVector1 = getTypeAsVector(resultTypes.at(insn->vector1Id));
+                assert(typeVector1 != nullptr);
+                size_t n1 = typeVector1->count;
+
+                for (int i = 0; i < insn->componentsId.size(); i++) {
+                    uint32_t component = insn->componentsId[i];
+                    uint32_t vectorId;
+
+                    if (component < n1) {
+                        vectorId = insn->vector1Id;
+                    } else {
+                        vectorId = insn->vector2Id;
+                        component -= n1;
+                    }
+
+                    // Use same register for both.
+                    uint32_t newId = scalarize(vectorId, component, typeVector->type);
+                    scalarize(insn->resultId, i, typeVector->type, newId);
+                }
+
+                replaced = true;
+                break;
+            }
+
             case SpvOpFAdd:
                  expandVectorsBinOp<InsnFAdd>(instruction, newList, replaced);
                  break;
