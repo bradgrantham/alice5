@@ -31,7 +31,10 @@ struct GPUCore
         SUBST_EXP,
         SUBST_INVERSESQRT,
         SUBST_ASIN,
-        SUBST_LENGTH,
+        SUBST_LENGTH1,
+        SUBST_LENGTH2,
+        SUBST_LENGTH3,
+        SUBST_LENGTH4,
         SUBST_CROSS,
         SUBST_LOG,
         SUBST_FACEFORWARD,
@@ -67,7 +70,10 @@ struct GPUCore
             { ".exp", SUBST_EXP },
             { ".inversesqrt", SUBST_INVERSESQRT },
             { ".asin", SUBST_ASIN },
-            { ".length", SUBST_LENGTH },
+            { ".length1", SUBST_LENGTH1 },
+            { ".length2", SUBST_LENGTH2 },
+            { ".length3", SUBST_LENGTH3 },
+            { ".length4", SUBST_LENGTH4 },
             { ".cross", SUBST_CROSS },
             { ".log", SUBST_LOG },
             { ".faceforward", SUBST_FACEFORWARD },
@@ -532,8 +538,33 @@ GPUCore::Status GPUCore::step(T& memory)
                                 unimpl_subst();
                                 break;
                             }
-                            case SUBST_LENGTH: {
-                                unimpl_subst();
+                            case SUBST_LENGTH1: {
+                                float x = popf();
+                                pushf(fabsf(x));
+                                break;
+                            }
+                            case SUBST_LENGTH2: {
+                                float x = popf();
+                                float y = popf();
+                                float d = sqrtf(x * x + y * y);
+                                pushf(d);
+                                break;
+                            }
+                            case SUBST_LENGTH3: {
+                                float x = popf();
+                                float y = popf();
+                                float z = popf();
+                                float d = sqrtf(x * x + y * y + z * z);
+                                pushf(d);
+                                break;
+                            }
+                            case SUBST_LENGTH4: {
+                                float x = popf();
+                                float y = popf();
+                                float z = popf();
+                                float w = popf();
+                                float d = sqrtf(x * x + y * y + z * z + w * w);
+                                pushf(d);
                                 break;
                             }
                         }
