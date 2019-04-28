@@ -449,6 +449,34 @@ struct InsnDot : public Instruction {
     virtual std::string name() const { return "OpDot"; }
 };
 
+// OpAny instruction (code 154).
+struct InsnAny : public Instruction {
+    InsnAny(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId) : Instruction(lineInfo), type(type), resultId(resultId), vectorId(vectorId) {
+        addResult(resultId);
+        addParameter(vectorId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vectorId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepAny(*this); }
+    virtual uint32_t opcode() const { return SpvOpAny; }
+    virtual std::string name() const { return "OpAny"; }
+};
+
+// OpAll instruction (code 155).
+struct InsnAll : public Instruction {
+    InsnAll(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId) : Instruction(lineInfo), type(type), resultId(resultId), vectorId(vectorId) {
+        addResult(resultId);
+        addParameter(vectorId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    uint32_t vectorId; // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepAll(*this); }
+    virtual uint32_t opcode() const { return SpvOpAll; }
+    virtual std::string name() const { return "OpAll"; }
+};
+
 // OpLogicalOr instruction (code 166).
 struct InsnLogicalOr : public Instruction {
     InsnLogicalOr(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {

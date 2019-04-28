@@ -602,6 +602,44 @@ case SpvOpDot: {
     break;
 }
 
+case SpvOpAny: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t vectorId = nextu();
+    pgm->instructions.push_back(std::make_shared<InsnAny>(pgm->currentLine, type, resultId, vectorId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "Any";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " vectorId ";
+        std::cout << vectorId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case SpvOpAll: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t vectorId = nextu();
+    pgm->instructions.push_back(std::make_shared<InsnAll>(pgm->currentLine, type, resultId, vectorId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "All";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " vectorId ";
+        std::cout << vectorId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpLogicalOr: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();

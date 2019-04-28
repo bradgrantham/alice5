@@ -31,6 +31,8 @@ struct InsnVectorTimesMatrix;
 struct InsnMatrixTimesVector;
 struct InsnMatrixTimesMatrix;
 struct InsnDot;
+struct InsnAny;
+struct InsnAll;
 struct InsnLogicalOr;
 struct InsnLogicalAnd;
 struct InsnLogicalNot;

@@ -573,16 +573,6 @@ void Interpreter::stepSMulExtended(const InsnSMulExtended& insn)
     std::cerr << "stepSMulExtended() not implemented\n";
 }
 
-void Interpreter::stepAny(const InsnAny& insn)
-{
-    std::cerr << "stepAny() not implemented\n";
-}
-
-void Interpreter::stepAll(const InsnAll& insn)
-{
-    std::cerr << "stepAll() not implemented\n";
-}
-
 void Interpreter::stepIsNan(const InsnIsNan& insn)
 {
     std::cerr << "stepIsNan() not implemented\n";

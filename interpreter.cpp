@@ -627,6 +627,42 @@ void Interpreter::stepLogicalAnd(const InsnLogicalAnd& insn)
     }
 }
 
+void Interpreter::stepAll(const InsnAll& insn)
+{
+    const Type *type = pgm->types.at(registers[insn.vectorId].type).get();
+    const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
+
+    const bool* operand = &fromRegister<bool>(insn.vectorId);
+
+    bool result = true;
+    for(int i = 0; i < typeVector->count; i++) {
+        result = result && operand[i];
+        if (!result) {
+            break;
+        }
+    }
+
+    toRegister<bool>(insn.resultId) = result;
+}
+
+void Interpreter::stepAny(const InsnAny& insn)
+{
+    const Type *type = pgm->types.at(registers[insn.vectorId].type).get();
+    const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
+
+    const bool* operand = &fromRegister<bool>(insn.vectorId);
+
+    bool result = false;
+    for(int i = 0; i < typeVector->count; i++) {
+        result = result || operand[i];
+        if (result) {
+            break;
+        }
+    }
+
+    toRegister<bool>(insn.resultId) = result;
+}
+
 void Interpreter::stepLogicalOr(const InsnLogicalOr& insn)
 {
     const Type *type = pgm->types.at(insn.type).get();

@@ -31,6 +31,8 @@ void stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn);
 void stepMatrixTimesVector(const InsnMatrixTimesVector& insn);
 void stepMatrixTimesMatrix(const InsnMatrixTimesMatrix& insn);
 void stepDot(const InsnDot& insn);
+void stepAny(const InsnAny& insn);
+void stepAll(const InsnAll& insn);
 void stepLogicalOr(const InsnLogicalOr& insn);
 void stepLogicalAnd(const InsnLogicalAnd& insn);
 void stepLogicalNot(const InsnLogicalNot& insn);
