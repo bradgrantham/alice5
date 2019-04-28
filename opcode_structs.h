@@ -712,7 +712,7 @@ struct InsnGLSLstd450FAbs : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FAbs(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FAbs; }
     virtual std::string name() const { return "GLSLstd450FAbs"; }
 };
 
@@ -725,7 +725,7 @@ struct InsnGLSLstd450FSign : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FSign(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FSign; }
     virtual std::string name() const { return "GLSLstd450FSign"; }
 };
 
@@ -738,7 +738,7 @@ struct InsnGLSLstd450Floor : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Floor(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Floor; }
     virtual std::string name() const { return "GLSLstd450Floor"; }
 };
 
@@ -751,7 +751,7 @@ struct InsnGLSLstd450Fract : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Fract(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Fract; }
     virtual std::string name() const { return "GLSLstd450Fract"; }
 };
 
@@ -764,7 +764,7 @@ struct InsnGLSLstd450Radians : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t degreesId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Radians(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Radians; }
     virtual std::string name() const { return "GLSLstd450Radians"; }
 };
 
@@ -777,7 +777,7 @@ struct InsnGLSLstd450Sin : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Sin(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Sin; }
     virtual std::string name() const { return "GLSLstd450Sin"; }
 };
 
@@ -790,7 +790,7 @@ struct InsnGLSLstd450Cos : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Cos(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Cos; }
     virtual std::string name() const { return "GLSLstd450Cos"; }
 };
 
@@ -803,7 +803,7 @@ struct InsnGLSLstd450Atan : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t y_over_xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Atan(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Atan; }
     virtual std::string name() const { return "GLSLstd450Atan"; }
 };
 
@@ -818,7 +818,7 @@ struct InsnGLSLstd450Atan2 : public Instruction {
     uint32_t yId; // operand from register
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Atan2(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Atan2; }
     virtual std::string name() const { return "GLSLstd450Atan2"; }
 };
 
@@ -833,7 +833,7 @@ struct InsnGLSLstd450Pow : public Instruction {
     uint32_t xId; // operand from register
     uint32_t yId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Pow(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Pow; }
     virtual std::string name() const { return "GLSLstd450Pow"; }
 };
 
@@ -846,7 +846,7 @@ struct InsnGLSLstd450Exp : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Exp; }
     virtual std::string name() const { return "GLSLstd450Exp"; }
 };
 
@@ -859,7 +859,7 @@ struct InsnGLSLstd450Exp2 : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp2(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Exp2; }
     virtual std::string name() const { return "GLSLstd450Exp2"; }
 };
 
@@ -872,7 +872,7 @@ struct InsnGLSLstd450Sqrt : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Sqrt(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Sqrt; }
     virtual std::string name() const { return "GLSLstd450Sqrt"; }
 };
 
@@ -887,7 +887,7 @@ struct InsnGLSLstd450FMin : public Instruction {
     uint32_t xId; // operand from register
     uint32_t yId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMin(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FMin; }
     virtual std::string name() const { return "GLSLstd450FMin"; }
 };
 
@@ -902,7 +902,7 @@ struct InsnGLSLstd450FMax : public Instruction {
     uint32_t xId; // operand from register
     uint32_t yId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMax(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FMax; }
     virtual std::string name() const { return "GLSLstd450FMax"; }
 };
 
@@ -919,7 +919,7 @@ struct InsnGLSLstd450FClamp : public Instruction {
     uint32_t minValId; // operand from register
     uint32_t maxValId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FClamp(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FClamp; }
     virtual std::string name() const { return "GLSLstd450FClamp"; }
 };
 
@@ -936,7 +936,7 @@ struct InsnGLSLstd450FMix : public Instruction {
     uint32_t yId; // operand from register
     uint32_t aId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMix(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FMix; }
     virtual std::string name() const { return "GLSLstd450FMix"; }
 };
 
@@ -951,7 +951,7 @@ struct InsnGLSLstd450Step : public Instruction {
     uint32_t edgeId; // operand from register
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Step(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Step; }
     virtual std::string name() const { return "GLSLstd450Step"; }
 };
 
@@ -968,7 +968,7 @@ struct InsnGLSLstd450SmoothStep : public Instruction {
     uint32_t edge1Id; // operand from register
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450SmoothStep(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450SmoothStep; }
     virtual std::string name() const { return "GLSLstd450SmoothStep"; }
 };
 
@@ -981,7 +981,7 @@ struct InsnGLSLstd450Length : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Length(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Length; }
     virtual std::string name() const { return "GLSLstd450Length"; }
 };
 
@@ -996,7 +996,7 @@ struct InsnGLSLstd450Distance : public Instruction {
     uint32_t p0Id; // operand from register
     uint32_t p1Id; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Distance(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Distance; }
     virtual std::string name() const { return "GLSLstd450Distance"; }
 };
 
@@ -1011,7 +1011,7 @@ struct InsnGLSLstd450Cross : public Instruction {
     uint32_t xId; // operand from register
     uint32_t yId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Cross(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Cross; }
     virtual std::string name() const { return "GLSLstd450Cross"; }
 };
 
@@ -1024,7 +1024,7 @@ struct InsnGLSLstd450Normalize : public Instruction {
     uint32_t resultId; // SSA register for result value
     uint32_t xId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Normalize(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Normalize; }
     virtual std::string name() const { return "GLSLstd450Normalize"; }
 };
 
@@ -1039,7 +1039,7 @@ struct InsnGLSLstd450Reflect : public Instruction {
     uint32_t iId; // operand from register
     uint32_t nId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Reflect(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Reflect; }
     virtual std::string name() const { return "GLSLstd450Reflect"; }
 };
 
@@ -1056,7 +1056,7 @@ struct InsnGLSLstd450Refract : public Instruction {
     uint32_t nId; // operand from register
     uint32_t etaId; // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Refract(*this); }
-    virtual uint32_t opcode() const { return 0; }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Refract; }
     virtual std::string name() const { return "GLSLstd450Refract"; }
 };
 

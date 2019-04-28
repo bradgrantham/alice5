@@ -8,10 +8,6 @@ std::map<uint32_t, std::string> OpcodeToString = {
 #include "opcode_to_string.h"
 };
 
-std::map<uint32_t, std::string> GLSLstd450OpcodeToString = {
-#include "GLSLstd450_opcode_to_string.h"
-};
-
 Program::Program(bool throwOnUnimplemented_, bool verbose_) :
     throwOnUnimplemented(throwOnUnimplemented_),
     hasUnimplemented(false),

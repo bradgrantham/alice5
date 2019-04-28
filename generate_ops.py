@@ -111,13 +111,11 @@ def cleanUpName(name):
     else:
         return CamelCase_to_camelCase(name[1:-1].replace(" ", "").replace("~", ""))
 
-# Returns two sets, the instructions implemented in the interpreter and the
-# ones that emit assembly.
-def get_already_implemented_instructions(source_pathname):
+# Returns the set of instructions implemented in the interpreter.
+def get_interpreted_instructions(source_pathname):
     lines = open(source_pathname).readlines()
 
-    already_implemented = set()
-    emitting = set()
+    interpreter_instructions = set()
 
     for line in lines:
         m = IMPL_RE.match(line.strip())
@@ -127,14 +125,23 @@ def get_already_implemented_instructions(source_pathname):
             name2 = m.group(2)
             assert(name1 == name2)
 
-            already_implemented.add(name1)
+            interpreter_instructions.add(name1)
 
+    return interpreter_instructions
+
+# Returns the set of instructions in the compiler.
+def get_compiled_instructions(source_pathname):
+    lines = open(source_pathname).readlines()
+
+    compiled_instructions = set()
+
+    for line in lines:
         m = EMIT_RE.match(line.strip())
         if m:
             name = m.group(1)
-            emitting.add(name)
+            compiled_instructions.add(name)
 
-    return already_implemented, emitting
+    return compiled_instructions
 
 def main():
     # Input file.
@@ -148,14 +155,12 @@ def main():
     operand_kind_map = dict((kind["kind"], kind) for kind in grammar["operand_kinds"])
 
     # Find what instructions have already been implemented.
-    already_implemented, emitting = get_already_implemented_instructions("shade.cpp")
+    interpreter_instructions = get_interpreted_instructions("interpreter.cpp")
+    compiled_instructions = get_compiled_instructions("shade.cpp")
 
     # Output files.
     opcode_to_string_f = open("opcode_to_string.h", "w")
     opcode_to_string_f.write(HEADER % ("OPCODE_TO_STRING_H", "OPCODE_TO_STRING_H"))
-
-    GLSLstd450_opcode_to_string_f = open("GLSLstd450_opcode_to_string.h", "w")
-    GLSLstd450_opcode_to_string_f.write(HEADER % ("GLSLSTD450_OPCODE_TO_STRING_H", "GLSLSTD450_OPCODE_TO_STRING_H"))
 
     opcode_structs_f = open("opcode_structs.h", "w")
     opcode_structs_f.write(HEADER % ("OPCODE_STRUCTS_H", "OPCODE_STRUCTS_H"))
@@ -201,7 +206,7 @@ def main():
         # Opcode to string file.
         opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, short_opname))
 
-        if short_opname in already_implemented:
+        if short_opname in interpreter_instructions:
             # Struct file.
             opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
             opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
@@ -237,7 +242,7 @@ def main():
             opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % short_opname)
             opcode_structs_f.write("    virtual uint32_t opcode() const { return Spv%s; }\n" % opname)
             opcode_structs_f.write("    virtual std::string name() const { return \"%s\"; }\n" % opname)
-            if short_opname in emitting:
+            if short_opname in compiled_instructions:
                 opcode_structs_f.write("    virtual void emit(Compiler *compiler);\n")
             is_branch = opname in ["OpBranch", "OpBranchConditional", "OpSwitch",
                     "OpReturn", "OpReturnValue"]
@@ -280,7 +285,7 @@ def main():
             opcode_decl_f.write("void step%s(const %s& insn);\n" % (short_opname, struct_opname))
 
         # Generate a stub if it's not already implemented in the C++ file.
-        if short_opname not in already_implemented:
+        if short_opname not in interpreter_instructions:
             opcode_impl_f.write("void Interpreter::step%s(const %s& insn)\n{\n    std::cerr << \"step%s() not implemented\\n\";\n}\n\n"
                     % (short_opname, struct_opname, short_opname))
 
@@ -318,9 +323,9 @@ def main():
             sys.exit(1)
 
         # Opcode to string file.
-        GLSLstd450_opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, opname))
+        opcode_to_string_f.write("    {0x10000 | %d, \"%s\"},\n" % (opcode, opname))
 
-        if opname in already_implemented:
+        if opname in interpreter_instructions:
             # Struct file.
             opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
             opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
@@ -348,9 +353,9 @@ def main():
                     " (optional)" if operand.quantifier == "?" else ""))
             opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % opname)
             # Not sure about these opcodes. I think they're even in a different namespace.
-            opcode_structs_f.write("    virtual uint32_t opcode() const { return 0; }\n")
+            opcode_structs_f.write("    virtual uint32_t opcode() const { return 0x10000 | %s; }\n" % opname)
             opcode_structs_f.write("    virtual std::string name() const { return \"%s\"; }\n" % opname)
-            if opname in emitting:
+            if opname in compiled_instructions:
                 opcode_structs_f.write("    virtual void emit(Compiler *compiler);\n")
             opcode_structs_f.write("};\n\n")
 
@@ -385,15 +390,15 @@ def main():
             opcode_decl_f.write("void step%s(const %s& insn);\n" % (opname, struct_opname))
 
         # Generate a stub if it's not already implemented in the C++ file.
-        if opname not in already_implemented:
+        if opname not in interpreter_instructions:
             opcode_impl_f.write("void Interpreter::step%s(const %s& insn)\n{\n    std::cerr << \"step%s() not implemented\\n\";\n}\n\n"
                     % (opname, struct_opname, opname))
 
     opcode_decode_f.write("            default: {\n")
     opcode_decode_f.write("                if(pgm->throwOnUnimplemented) {\n")
-    opcode_decode_f.write("                    throw std::runtime_error(\"unimplemented GLSLstd450 opcode \" + GLSLstd450OpcodeToString[opcode] + \" (\" + std::to_string(opcode) + \")\");\n")
+    opcode_decode_f.write("                    throw std::runtime_error(\"unimplemented GLSLstd450 opcode \" + OpcodeToString[opcode] + \" (\" + std::to_string(opcode) + \")\");\n")
     opcode_decode_f.write("                } else {\n")
-    opcode_decode_f.write("                    std::cout << \"unimplemented GLSLstd450 opcode \" << GLSLstd450OpcodeToString[opcode] << \" (\" << opcode << \")\\n\";\n")
+    opcode_decode_f.write("                    std::cout << \"unimplemented GLSLstd450 opcode \" << OpcodeToString[opcode] << \" (\" << opcode << \")\\n\";\n")
     opcode_decode_f.write("                    pgm->hasUnimplemented = true;\n")
     opcode_decode_f.write("                }\n")
     opcode_decode_f.write("                break;\n")
@@ -406,7 +411,6 @@ def main():
     opcode_decode_f.write("}\n")
 
     opcode_to_string_f.write(FOOTER % "OPCODE_TO_STRING_H")
-    GLSLstd450_opcode_to_string_f.write(FOOTER % "GLSLSTD450_OPCODE_TO_STRING_H")
     opcode_structs_f.write(FOOTER % "OPCODE_STRUCTS_H")
     opcode_struct_decl_f.write(FOOTER % "OPCODE_STRUCT_DECL_H")
     opcode_impl_f.write(FOOTER % "OPCODE_IMPL_H")
@@ -414,7 +418,6 @@ def main():
     opcode_decode_f.write(FOOTER % "OPCODE_DECODE_H")
 
     opcode_to_string_f.close()
-    GLSLstd450_opcode_to_string_f.close()
     opcode_structs_f.close()
     opcode_struct_decl_f.close()
     opcode_impl_f.close()
