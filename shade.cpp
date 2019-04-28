@@ -479,7 +479,9 @@ struct Compiler
 
         ss << op << " not implemented";
 
-        emit("nop", ss.str());
+        emit("#error#", ss.str());
+
+        std::cerr << "Warning: " << ss.str() << ".\n";
     }
 
     void emitUnaryOp(const std::string &opName, int result, int op)
@@ -803,6 +805,11 @@ void InsnFAdd::emit(Compiler *compiler)
     compiler->emitBinaryOp("fadd.s", resultId, operand1Id, operand2Id);
 }
 
+void InsnFSub::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("fsub.s", resultId, operand1Id, operand2Id);
+}
+
 void InsnFMul::emit(Compiler *compiler)
 {
     compiler->emitBinaryOp("fmul.s", resultId, operand1Id, operand2Id);
@@ -949,6 +956,11 @@ void InsnGLSLstd450Sin::emit(Compiler *compiler)
     compiler->emitUniCall(".sin", resultId, xId);
 }
 
+void InsnGLSLstd450Cos::emit(Compiler *compiler)
+{
+    compiler->emitUniCall(".cos", resultId, xId);
+}
+
 void InsnGLSLstd450Atan2::emit(Compiler *compiler)
 {
     compiler->emitBinCall(".atan2", resultId, yId, xId);
@@ -957,7 +969,7 @@ void InsnGLSLstd450Atan2::emit(Compiler *compiler)
 void InsnGLSLstd450FAbs::emit(Compiler *compiler)
 {
     std::ostringstream ss1;
-    ss1 << "fsgnx.s "
+    ss1 << "fsgnjx.s "
         << compiler->reg(resultId) << ", "
         << compiler->reg(xId) << ", "
         << compiler->reg(xId);

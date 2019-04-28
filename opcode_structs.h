@@ -300,6 +300,7 @@ struct InsnFSub : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepFSub(*this); }
     virtual uint32_t opcode() const { return SpvOpFSub; }
     virtual std::string name() const { return "OpFSub"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFMul instruction (code 133).
@@ -842,6 +843,7 @@ struct InsnGLSLstd450Cos : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Cos(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Cos; }
     virtual std::string name() const { return "GLSLstd450Cos"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Atan instruction (code 18).
