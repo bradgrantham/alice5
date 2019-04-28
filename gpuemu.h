@@ -19,6 +19,27 @@ struct GPUCore
 
     enum SubstituteFunction {
         SUBST_SIN,
+        SUBST_ATAN,
+        SUBST_REFLECT,
+        SUBST_POW,
+        SUBST_NORMALIZE,
+        SUBST_COS,
+        SUBST_LOG2,
+        SUBST_EXP,
+        SUBST_INVERSESQRT,
+        SUBST_ASIN,
+        SUBST_LENGTH,
+        SUBST_CROSS,
+        SUBST_LOG,
+        SUBST_FACEFORWARD,
+        SUBST_ACOS,
+        SUBST_RADIANS,
+        SUBST_DEGREES,
+        SUBST_EXP2,
+        SUBST_TAN,
+        SUBST_ATAN2,
+        SUBST_REFRACT,
+        SUBST_DISTANCE
     };
     std::map<uint32_t, SubstituteFunction> substFunctions;
 
@@ -28,8 +49,34 @@ struct GPUCore
         std::fill(f, f + 32, 0.0f);
         pc = 0;
 
-        if(librarySymbols.find(".sin") != librarySymbols.end()) {
-            substFunctions[librarySymbols.at(".sin")] = SUBST_SIN;
+        std::vector<std::pair<std::string, SubstituteFunction> > substitutions = {
+            { ".sin", SUBST_SIN },
+            { ".atan", SUBST_ATAN },
+            { ".reflect", SUBST_REFLECT },
+            { ".pow", SUBST_POW },
+            { ".normalize", SUBST_NORMALIZE },
+            { ".cos", SUBST_COS },
+            { ".log2", SUBST_LOG2 },
+            { ".exp", SUBST_EXP },
+            { ".inversesqrt", SUBST_INVERSESQRT },
+            { ".asin", SUBST_ASIN },
+            { ".length", SUBST_LENGTH },
+            { ".cross", SUBST_CROSS },
+            { ".log", SUBST_LOG },
+            { ".faceforward", SUBST_FACEFORWARD },
+            { ".acos", SUBST_ACOS },
+            { ".radians", SUBST_RADIANS },
+            { ".degrees", SUBST_DEGREES },
+            { ".exp2", SUBST_EXP2 },
+            { ".tan", SUBST_TAN },
+            { ".atan2", SUBST_ATAN2 },
+            { ".refract", SUBST_REFRACT },
+            { ".distance", SUBST_DISTANCE }
+        };
+        for(auto& [name, subst]: substitutions) {
+            if(librarySymbols.find(name) != librarySymbols.end()) {
+                substFunctions[librarySymbols.at(name)] = subst;
+            }
         }
     }
 
@@ -115,6 +162,9 @@ GPUCore::Status GPUCore::step(T& memory)
         (getBits(insn, 20, 20) << 11) | 
         (getBits(insn, 30, 21) << 1),
         21);
+
+    std::function<float(void)> popf = [&]() { float v = memory.readf(x[2]); x[2] += 4; return v; };
+    std::function<void(float)> pushf = [&](float f) { x[2] -= 4; memory.writef(x[2], f); };
 
     std::function<void(void)> unimpl = [&]() {
         std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
@@ -323,12 +373,96 @@ GPUCore::Status GPUCore::step(T& memory)
                     if(substFunctions.find(pc) != substFunctions.end()) {
                         switch(substFunctions[pc]) {
                             case SUBST_SIN: {
-                                float v = memory.readf(x[2]);
-                                memory.writef(x[2], sinf(v));
-                                pc += 4;
+                                float v = popf();
+                                pushf(sinf(v));
+                                break;
+                            }
+                            case SUBST_ATAN: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_REFLECT: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_POW: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_NORMALIZE: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_COS: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_LOG2: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_EXP: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_INVERSESQRT: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_ASIN: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_LENGTH: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_CROSS: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_LOG: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_FACEFORWARD: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_ACOS: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_RADIANS: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_DEGREES: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_EXP2: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_TAN: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_ATAN2: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_REFRACT: {
+                                // pop ops, operate, push results
+                                break;
+                            }
+                            case SUBST_DISTANCE: {
+                                // pop ops, operate, push results
                                 break;
                             }
                         }
+                        pc += 4;
                         return RUNNING;
                     }
                 }
