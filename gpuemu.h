@@ -116,18 +116,6 @@ GPUCore::Status GPUCore::step(T& memory)
         (getBits(insn, 30, 21) << 1),
         21);
 
-    if(substFunctions.find(pc) != substFunctions.end()) {
-        switch(substFunctions[pc]) {
-            case SUBST_SIN: {
-                float v = memory.readf(x[2]);
-                memory.writef(x[2], sinf(v));
-                pc += 4;
-                break;
-            }
-        }
-        return RUNNING;
-    }
-
     std::function<void(void)> unimpl = [&]() {
         std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
         std::cerr << " with 14..12=" << std::dec << std::setfill('0') << std::setw(1) << ((insn & 0x7000) >> 12);
@@ -330,7 +318,22 @@ GPUCore::Status GPUCore::step(T& memory)
                     case 7: x[rd] = x[rs1] & immI; break;
                     default: unimpl(); break;
                 }
+            } else {
+                if((funct3 == 0) && (rs1 == 0) && (immI == 0)) {
+                    if(substFunctions.find(pc) != substFunctions.end()) {
+                        switch(substFunctions[pc]) {
+                            case SUBST_SIN: {
+                                float v = memory.readf(x[2]);
+                                memory.writef(x[2], sinf(v));
+                                pc += 4;
+                                break;
+                            }
+                        }
+                        return RUNNING;
+                    }
+                }
             }
+
             pc += 4;
             break;
         }
