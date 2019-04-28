@@ -163,6 +163,9 @@ struct Compiler
             emitLabel(name);
             emitConstant(id, reg.type, reg.data);
         }
+
+        // Emit library.
+        std::cout << readFileContents("library.s");
     }
 
     // Emit constant value for the specified constant ID.
