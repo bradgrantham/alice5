@@ -564,6 +564,7 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
             case SpvOpCompositeExtract: {
                 InsnCompositeExtract *insn = dynamic_cast<InsnCompositeExtract *>(instruction);
 
+                // Only handle the simple case.
                 assert(isTypeFloat(insn->type));
                 assert(insn->indexesId.size() == 1);
                 uint32_t index = insn->indexesId[0];
@@ -574,6 +575,32 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 // to "oldId".
                 newList.push_back(std::make_shared<RiscVMove>(insn->lineInfo,
                             insn->type, insn->resultId, oldId));
+
+                replaced = true;
+                break;
+            }
+
+            case SpvOpCompositeInsert: { // XXX not tested.
+                InsnCompositeInsert *insn = dynamic_cast<InsnCompositeInsert *>(instruction);
+
+                // Only handle the simple case.
+                const TypeVector *typeVector = getTypeAsVector(insn->type);
+                assert(typeVector != nullptr);
+                assert(insn->indexesId.size() == 1);
+                uint32_t index = insn->indexesId[0];
+
+                for (int i = 0; i < typeVector->count; i++) {
+                    uint32_t newId;
+
+                    if (i == index) {
+                        // Use new value.
+                        newId = insn->objectId;
+                    } else {
+                        // Use old value.
+                        newId = scalarize(insn->compositeId, i, typeVector->type);
+                    }
+                    scalarize(insn->resultId, i, typeVector->type, newId);
+                }
 
                 replaced = true;
                 break;

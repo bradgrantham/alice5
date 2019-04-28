@@ -57,29 +57,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // fragColor = vec4(uv, 0.0, 1.0);
     */
 
-    //fragColor.x = foo(10.0);
-    // fragColor.x = 0.4;
-    // fragColor.y = 0.5;
-    // fragColor.z = 0.6;
-    // outtest = 0.0;
-    // outtest = 1.0 + outtest;
-    // fragColor = vec4(outtest, outtest, outtest, 1.0);
-    // vec3 q = vec3(0.4, 0.5, 0.6);
-    // fragColor = vec4(cross(q, q*2.0), 1.0);
-    // fragColor = vec4(1.0, 2.0, 3.0, 4.0);
-    // outtest = cross(intest, intest);
+    outtest = intest;
+    outtest.y = 5.0;
 
-    // outtestf = 1.2;
-    outtest = normalize(intest);
-
-    // vec3 x = vec3(1.0, 2.0, 3.0);
-    // vec3 y = vec3(4.0, 5.0, 6.0);
-    // vec3 z = x + y;
-
-    // swizzle test
-    if(false) {
-        vec4 p;
-        p.xy = vec2(2.0, 3.0);
-        p.zw = vec2(5.0, 7.0);
-    }
+    vec2 d;
+    d.x = 1.0;
+    d.y = 2.0;
 }

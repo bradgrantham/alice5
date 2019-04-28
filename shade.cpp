@@ -1241,7 +1241,8 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
 
     if (optimize) {
         if(disassemble) {
-            spv::Disassemble(std::cout, spirv);
+            // Not useful.
+            /// spv::Disassemble(std::cout, spirv);
         }
 
         optimizeSPIRV(targetEnv, spirv);
