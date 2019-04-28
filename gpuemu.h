@@ -28,7 +28,7 @@ struct GPUCore
         std::fill(f, f + 32, 0.0f);
         pc = 0;
 
-        if(librarySymbols.find(".sin") == librarySymbols.end()) {
+        if(librarySymbols.find(".sin") != librarySymbols.end()) {
             substFunctions[librarySymbols.at(".sin")] = SUBST_SIN;
         }
     }
