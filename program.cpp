@@ -579,6 +579,25 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 break;
             }
 
+            case SpvOpVectorTimesScalar: {
+                InsnVectorTimesScalar *insn = dynamic_cast<InsnVectorTimesScalar *>(instruction);
+
+                const TypeVector *typeVector = getTypeAsVector(insn->type);
+                assert(typeVector != nullptr);
+
+                // Break into individual floating point multiplies.
+                for (int i = 0; i < typeVector->count; i++) {
+                    newList.push_back(std::make_shared<InsnFMul>(insn->lineInfo,
+                                typeVector->type,
+                                scalarize(insn->resultId, i, typeVector->type),
+                                scalarize(insn->vectorId, i, typeVector->type),
+                                insn->scalarId));
+                }
+
+                replaced = true;
+                break;
+            }
+
             case SpvOpFAdd:
                  expandVectorsBinOp<InsnFAdd>(instruction, newList, replaced);
                  break;
