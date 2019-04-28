@@ -281,8 +281,6 @@ int main(int argc, char **argv)
         }
     }
 
-    std::cout << header.initialPC << '\n';
-
     binaryFile.close();
 
     bytes.resize(bytes.size() + 0x10000);
@@ -300,13 +298,13 @@ int main(int argc, char **argv)
     float when = 1.5;
     for(auto& s: { "gl_FragCoord", "color"}) {
         if (symbols.find(s) == symbols.end()) {
-            std::cerr << "No memory location for required variable" << s << ".\n";
+            std::cerr << "No memory location for required variable " << s << ".\n";
             exit(EXIT_FAILURE);
         }
     }
     for(auto& s: { "iResolution", "iTime", "iMouse"}) {
         if (symbols.find(s) == symbols.end()) {
-            std::cerr << "Warning: No memory location for required variable" << s << ".\n";
+            std::cerr << "Warning: No memory location for variable " << s << ".\n";
         }
     }
 
