@@ -970,7 +970,10 @@ void showProgress(int totalRows, std::chrono::time_point<std::chrono::steady_clo
         std::cout << "\r";
         std::cout.flush();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        // Wait one second while polling.
+        for (int i = 0; i < 100 && rowsLeft > 0; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
     }
 
     // Clear the line.
@@ -1337,11 +1340,11 @@ int main(int argc, char **argv)
                 std::thread* td = thread.back();
                 thread.pop_back();
                 td->join();
-        }
+            }
 
-        double elapsedSeconds = timer.elapsed();
+            double elapsedSeconds = timer.elapsed();
             std::cerr << "Shading pass " << pass->name << " took " << elapsedSeconds << " seconds ("
-            << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
+                << long(image->width*image->height/elapsedSeconds) << " pixels per second)\n";
         }
 
         if(false) {
