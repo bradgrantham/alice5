@@ -596,10 +596,25 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                  // Else add squares of elements, take sqrt, divide each element by that.
                  break;
             }
-
-            case 0x10000 | GLSLstd450Cross:
-                 break;
                  */
+
+            case 0x10000 | GLSLstd450Cross: {
+                InsnGLSLstd450Cross *insn =
+                    dynamic_cast<InsnGLSLstd450Cross *>(instruction);
+                auto [subtype, offset] = getConstituentInfo(insn->type, 0);
+                newList.push_back(std::make_shared<RiscVCross>(insn->lineInfo,
+                            scalarize(insn->resultId, 0, subtype),
+                            scalarize(insn->resultId, 1, subtype),
+                            scalarize(insn->resultId, 2, subtype),
+                            scalarize(insn->xId, 0, subtype),
+                            scalarize(insn->xId, 1, subtype),
+                            scalarize(insn->xId, 2, subtype),
+                            scalarize(insn->yId, 0, subtype),
+                            scalarize(insn->yId, 1, subtype),
+                            scalarize(insn->yId, 2, subtype)));
+                replaced = true;
+                break;
+            }
 
             case SpvOpAccessChain: {
                 // Nothing to do for these.

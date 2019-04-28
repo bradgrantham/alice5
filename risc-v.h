@@ -7,6 +7,7 @@ enum {
     RiscVOpAddi = 16384, // XXX not sure what's a safe number to start with.
     RiscVOpLoad,
     RiscVOpStore,
+    RiscVOpCross,
 };
 
 // "addi" instruction.
@@ -55,5 +56,53 @@ struct RiscVStore : public Instruction {
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpStore; }
     virtual std::string name() const { return "store"; }
+    virtual void emit(Compiler *compiler);
+};
+
+// Cross product instruction.
+struct RiscVCross : public Instruction {
+    RiscVCross(const LineInfo& lineInfo,
+            uint32_t resultId0,
+            uint32_t resultId1,
+            uint32_t resultId2,
+            uint32_t xId0,
+            uint32_t xId1,
+            uint32_t xId2,
+            uint32_t yId0,
+            uint32_t yId1,
+            uint32_t yId2)
+        : Instruction(lineInfo),
+        resultId0(resultId0),
+        resultId1(resultId1),
+        resultId2(resultId2),
+        xId0(xId0),
+        xId1(xId1),
+        xId2(xId2),
+        yId0(yId0),
+        yId1(yId1),
+        yId2(yId2)
+    {
+        addResult(resultId0);
+        addResult(resultId1);
+        addResult(resultId2);
+        addParameter(xId0);
+        addParameter(xId1);
+        addParameter(xId2);
+        addParameter(yId0);
+        addParameter(yId1);
+        addParameter(yId2);
+    }
+    uint32_t resultId0;
+    uint32_t resultId1;
+    uint32_t resultId2;
+    uint32_t xId0;
+    uint32_t xId1;
+    uint32_t xId2;
+    uint32_t yId0;
+    uint32_t yId1;
+    uint32_t yId2;
+    virtual void step(Interpreter *interpreter) { assert(false); }
+    virtual uint32_t opcode() const { return RiscVOpCross; }
+    virtual std::string name() const { return "cross"; }
     virtual void emit(Compiler *compiler);
 };

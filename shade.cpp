@@ -650,6 +650,29 @@ void RiscVStore::emit(Compiler *compiler)
     compiler->emit(ss1.str(), ss2.str());
 }
 
+void RiscVCross::emit(Compiler *compiler)
+{
+    compiler->emit("addi sp, sp, -28", "Make room on stack");
+    compiler->emit("sw ra, 4(sp)", "Save return address");
+
+    for (int i = 0; i < argIdList.size(); i++) {
+        std::ostringstream ss;
+        ss << "fsw " << compiler->reg(argIdList[i]) << ", " << (i*4) << "(sp)";
+        compiler->emit(ss.str(), "Push parameter");
+    }
+
+    compiler->emit("jal ra, .sin", "Call routine");
+
+    for (int i = 0; i < resIdList.size(); i++) {
+        std::ostringstream ss;
+        ss << "flw " << compiler->reg(resIdList[i]) << ", " << (i*4) << "(sp)";
+        compiler->emit(ss.str(), "Pop result");
+    }
+
+    compiler->emit("lw ra, 4(sp)", "Restore return address");
+    compiler->emit("addi sp, sp, 28", "Restore stack");
+}
+
 // -----------------------------------------------------------------------------------
 
 Instruction::Instruction(const LineInfo& lineInfo)

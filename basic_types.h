@@ -529,8 +529,11 @@ struct Instruction {
     // Which block this instruction is in.
     uint32_t blockId;
 
-    // Registers affected by instruction.
+    // Set of registers affected by instruction.
     std::set<uint32_t> resIdSet;
+
+    // List of registers affected by instruction.
+    std::vector<uint32_t> resIdList;
 
     // Set of registers that are inputs to the instruction.
     std::set<uint32_t> argIdSet;
@@ -577,6 +580,7 @@ protected:
     // Add a result to the instruction.
     void addResult(uint32_t id) {
         resIdSet.insert(id);
+        resIdList.push_back(id);
     }
 
     // Add an input parameter to the instruction.
