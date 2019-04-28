@@ -16,7 +16,19 @@
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
 
-.normalize
+.normalize1
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.normalize2
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.normalize3
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.normalize4
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
 
