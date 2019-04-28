@@ -871,6 +871,7 @@ void usage(const char* progname)
     printf("\t-n        Compile and load shader, but do not shade an image\n");
     printf("\t-S        show the disassembly of the SPIR-V code\n");
     printf("\t-c        compile to our own ISA\n");
+    printf("\t-s        convert vector operations to scalar operations\n");
     printf("\t--json    input file is a ShaderToy JSON file\n");
     printf("\t--term    draw output image on terminal (in addition to file)\n");
 }
@@ -1024,7 +1025,7 @@ void optimizeSPIRV(spv_target_env targetEnv, std::vector<uint32_t>& spirv)
     std::cerr << "Optimizing took " << timer.elapsed() << " seconds.\n";
 }
 
-bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool optimize, bool disassemble, Program& program)
+bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool optimize, bool disassemble, bool scalarize, Program& program)
 {
     std::vector<uint32_t> spirv;
 
@@ -1062,7 +1063,7 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
 
     {
         Timer timer;
-        program.postParse();
+        program.postParse(scalarize);
         std::cerr << "Post-parse took " << timer.elapsed() << " seconds.\n";
     }
 
@@ -1103,6 +1104,7 @@ int main(int argc, char **argv)
     bool inputIsJSON = false;
     bool imageToTerminal = false;
     bool compile = false;
+    bool scalarize = false;
     int threadCount = std::thread::hardware_concurrency();
     int frameStart = 0, frameEnd = 0;
     CommandLineParameters params;
@@ -1192,6 +1194,11 @@ int main(int argc, char **argv)
             compile = true;
             argv++; argc--;
 
+        } else if(strcmp(argv[0], "-s") == 0) {
+
+            scalarize = true;
+            argv++; argc--;
+
         } else if(strcmp(argv[0], "-h") == 0) {
 
             usage(progname);
@@ -1255,7 +1262,7 @@ int main(int argc, char **argv)
         }
         sources.push_back(epilogue);
 
-        bool success = createProgram(sources, debug, optimize, disassemble, pass->pgm);
+        bool success = createProgram(sources, debug, optimize, disassemble, scalarize, pass->pgm);
         if(!success) {
             exit(EXIT_FAILURE);
         }

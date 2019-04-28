@@ -75,9 +75,11 @@ uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t sca
 }
 
 // Post-parsing work.
-void Program::postParse() {
-    // Convert vector instructions to scalar instructions.
-    /// expandVectors(instructions, instructions);
+void Program::postParse(bool scalarize) {
+    if (scalarize) {
+        // Convert vector instructions to scalar instructions.
+        expandVectors(instructions, instructions);
+    }
 
     // Find the main function.
     mainFunction = nullptr;

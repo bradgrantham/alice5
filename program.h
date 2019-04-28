@@ -270,7 +270,7 @@ struct Program
     }
 
     // Post-parsing work.
-    void postParse();
+    void postParse(bool scalarize);
 
     // Return the scalar for the vector register's index.
     uint32_t scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg = 0);
