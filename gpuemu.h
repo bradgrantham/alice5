@@ -392,8 +392,8 @@ GPUCore::Status GPUCore::step(T& memory)
                                 break;
                             }
                             case SUBST_POW: {
-                                float y = popf();
                                 float x = popf();
+                                float y = popf();
                                 pushf(powf(x, y));
                                 break;
                             }
@@ -442,8 +442,8 @@ GPUCore::Status GPUCore::step(T& memory)
                                 break;
                             }
                             case SUBST_ATAN2: {
-                                float x = popf();
                                 float y = popf();
+                                float x = popf();
                                 pushf(atan2f(y, x));
                                 break;
                             }
@@ -456,7 +456,16 @@ GPUCore::Status GPUCore::step(T& memory)
                                 break;
                             }
                             case SUBST_CROSS: {
-                                unimpl_subst();
+                                float x[3], y[3];
+                                x[0] = popf();
+                                x[1] = popf();
+                                x[2] = popf();
+                                y[0] = x[1] * y[2] - y[1] * x[2];
+                                y[1] = x[2] * y[0] - y[2] * x[0];
+                                y[2] = x[0] * y[1] - y[0] * x[1];
+                                pushf(y[2]);
+                                pushf(y[1]);
+                                pushf(y[0]);
                                 break;
                             }
                             case SUBST_REFRACT: {
@@ -477,17 +486,17 @@ GPUCore::Status GPUCore::step(T& memory)
                                 break;
                             }
                             case SUBST_NORMALIZE2: {
-                                float y = popf();
                                 float x = popf();
+                                float y = popf();
                                 float d = 1.0f / sqrtf(x * x + y * y);
                                 pushf(x * d);
                                 pushf(y * d);
                                 break;
                             }
                             case SUBST_NORMALIZE3: {
-                                float z = popf();
-                                float y = popf();
                                 float x = popf();
+                                float y = popf();
+                                float z = popf();
                                 float d = 1.0f / sqrtf(x * x + y * y + z * z);
                                 pushf(x * d);
                                 pushf(y * d);
@@ -495,10 +504,10 @@ GPUCore::Status GPUCore::step(T& memory)
                                 break;
                             }
                             case SUBST_NORMALIZE4: {
-                                float w = popf();
-                                float z = popf();
-                                float y = popf();
                                 float x = popf();
+                                float y = popf();
+                                float z = popf();
+                                float w = popf();
                                 float d = 1.0f / sqrtf(x * x + y * y + z * z + w * w);
                                 pushf(x * d);
                                 pushf(y * d);
