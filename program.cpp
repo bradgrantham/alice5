@@ -45,7 +45,8 @@ uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t sca
     auto regIndex = RegIndex{vreg, i};
     auto itr = vec2scalar.find(regIndex);
     if (itr == vec2scalar.end()) {
-        if (scalarReg == 0) {
+        bool scalarRegWasSpecified = scalarReg > 0;
+        if (!scalarRegWasSpecified) {
             scalarReg = nextReg++;
         }
         vec2scalar[regIndex] = scalarReg;
@@ -61,7 +62,9 @@ uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t sca
             std::copy(itr->second.data + offset, itr->second.data + offset + size, r.data);
         } else {
             // Not a constant, must be a variable.
-            this->resultTypes[scalarReg] = subtype;
+            if (!scalarRegWasSpecified) {
+                this->resultTypes[scalarReg] = subtype;
+            }
         }
     } else {
         if (scalarReg != 0) {

@@ -303,7 +303,7 @@ struct Compiler
             for (auto regId : instructions.at(block->begin)->livein) {
                 if (registers.find(regId) != registers.end()) {
                     std::cerr << "Error: Constant "
-                        << regId << " not found at head of function.\n";
+                        << regId << " already assigned a register at head of function.\n";
                     exit(EXIT_FAILURE);
                 }
                 auto &c = pgm->constants.at(regId);
