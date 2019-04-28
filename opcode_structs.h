@@ -785,6 +785,7 @@ struct InsnGLSLstd450Floor : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Floor(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Floor; }
     virtual std::string name() const { return "GLSLstd450Floor"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Fract instruction (code 10).
@@ -1017,6 +1018,7 @@ struct InsnGLSLstd450Step : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Step(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Step; }
     virtual std::string name() const { return "GLSLstd450Step"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450SmoothStep instruction (code 49).

@@ -672,8 +672,16 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 expandVectorsUniOp<InsnGLSLstd450Fract>(instruction, newList, replaced);
                 break;
 
+            case 0x10000 | GLSLstd450Floor:
+                expandVectorsUniOp<InsnGLSLstd450Floor>(instruction, newList, replaced);
+                break;
+
             case 0x10000 | GLSLstd450FClamp:
                  expandVectorsTerOp<InsnGLSLstd450FClamp>(instruction, newList, replaced);
+                 break;
+
+            case 0x10000 | GLSLstd450Step:
+                 expandVectorsBinOp<InsnGLSLstd450Step>(instruction, newList, replaced);
                  break;
 
             case 0x10000 | GLSLstd450Length: {

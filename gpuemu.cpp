@@ -295,7 +295,7 @@ int main(int argc, char **argv)
     float fw = imageWidth;
     float fh = imageHeight;
     float zero = 0.0;
-    float when = 0.0;
+    float when = 1.5;
     for(auto& s: { "gl_FragCoord", "color"}) {
         if (symbols.find(s) == symbols.end()) {
             std::cerr << "No memory location for required variable " << s << ".\n";

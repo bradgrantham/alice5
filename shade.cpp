@@ -870,7 +870,7 @@ void InsnBranch::emit(Compiler *compiler)
     compiler->emitPhiCopy(this, targetLabelId);
 
     std::ostringstream ss;
-    ss << "j label" << targetLabelId;
+    ss << "jal x0, label" << targetLabelId;
     compiler->emit(ss.str(), "");
 }
 
@@ -986,6 +986,16 @@ void InsnGLSLstd450FAbs::emit(Compiler *compiler)
 void InsnGLSLstd450Fract::emit(Compiler *compiler)
 {
     compiler->emitUniCall(".fract", resultId, xId);
+}
+
+void InsnGLSLstd450Floor::emit(Compiler *compiler)
+{
+    compiler->emitUniCall(".floor", resultId, xId);
+}
+
+void InsnGLSLstd450Step::emit(Compiler *compiler)
+{
+    compiler->emitBinCall(".step", resultId, edgeId, xId);
 }
 
 // -----------------------------------------------------------------------------------

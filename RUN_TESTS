@@ -8,8 +8,15 @@ else
     compile=false
 fi
 
+if [ "$1" == "" ]
+then
+    shaders="creation define lk wavy wetrock flirt"
+else
+    shaders="$1"
+fi
+
 echo 
-for i in creation define lk wavy wetrock flirt
+for i in $shaders
 do
     echo "============================================== $i"
     if [ $compile = true ]; then
