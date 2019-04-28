@@ -52,7 +52,19 @@
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
 
-.length:
+.length1:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.length2:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.length3:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.length4:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
 
