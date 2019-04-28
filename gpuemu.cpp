@@ -288,7 +288,7 @@ int main(int argc, char **argv)
     bytes.resize(bytes.size() + 0x10000);
     Memory m(bytes, false);
 
-    GPUCore core;
+    GPUCore core(symbols);
     GPUCore::Status status;
 
     int imageWidth = 320;

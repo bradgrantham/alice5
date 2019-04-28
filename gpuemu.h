@@ -4,6 +4,8 @@
 #include <map>
 #include <string>
 
+typedef std::map<std::string, uint32_t> SymbolTable;
+
 struct GPUCore
 {
     // Loosely modeled on RISC-V RVI, RVA, RVM, RVF
@@ -11,13 +13,24 @@ struct GPUCore
     uint32_t x[32]; // but 0 not accessed because it's readonly 0
     uint32_t pc;
     float f[32]; // but 0 not accessed because it's readonly 0
+
     // XXX CSRs
     // XXX FCSRs
 
-    GPUCore()
+    enum SubstituteFunction {
+        SUBST_SIN,
+    };
+    std::map<uint32_t, SubstituteFunction> substFunctions;
+
+    GPUCore(const SymbolTable& librarySymbols)
     {
         std::fill(x, x + 32, 0);
+        std::fill(f, f + 32, 0.0f);
         pc = 0;
+
+        if(librarySymbols.find(".sin") == librarySymbols.end()) {
+            substFunctions[librarySymbols.at(".sin")] = SUBST_SIN;
+        }
     }
 
     enum Status {RUNNING, BREAK, UNIMPLEMENTED_OPCODE};
@@ -102,6 +115,18 @@ GPUCore::Status GPUCore::step(T& memory)
         (getBits(insn, 20, 20) << 11) | 
         (getBits(insn, 30, 21) << 1),
         21);
+
+    if(substFunctions.find(pc) != substFunctions.end()) {
+        switch(substFunctions[pc]) {
+            case SUBST_SIN: {
+                float v = memory.readf(x[2]);
+                memory.writef(x[2], sinf(v));
+                pc += 4;
+                break;
+            }
+        }
+        return RUNNING;
+    }
 
     std::function<void(void)> unimpl = [&]() {
         std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
@@ -343,5 +368,3 @@ struct RunHeader1
     //       stringLength bytes for symbol name including NUL
     // Program and data bytes follow.  Bytes are loaded at 0
 };
-
-typedef std::map<std::string, uint32_t> SymbolTable;
