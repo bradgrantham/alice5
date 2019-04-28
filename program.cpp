@@ -598,6 +598,11 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                  break;
                  */
 
+            case SpvOpAccessChain: {
+                // Nothing to do for these.
+                break;
+            }
+
             default: {
                 std::cerr << "Warning: Unhandled opcode "
                     << OpcodeToString.at(instruction->opcode())

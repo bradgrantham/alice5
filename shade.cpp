@@ -301,8 +301,11 @@ struct Compiler
             std::set<uint32_t> constIntRegs = PHY_INT_REGS;
             std::set<uint32_t> constFloatRegs = PHY_FLOAT_REGS;
             for (auto regId : instructions.at(block->begin)->livein) {
-                std::cerr << regId << "\n";
-                assert(registers.find(regId) == registers.end());
+                if (registers.find(regId) != registers.end()) {
+                    std::cerr << "Error: Constant "
+                        << regId << " not found at head of function.\n";
+                    exit(EXIT_FAILURE);
+                }
                 auto &c = pgm->constants.at(regId);
                 auto r = CompilerRegister {c.type, 1}; // XXX get real count.
                 uint32_t phy;

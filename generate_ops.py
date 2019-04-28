@@ -313,7 +313,7 @@ def main():
                 for operand_index, json_operand in enumerate(instruction.get("operands", []))]
 
         # Name of result register.
-        resultIds = [operand.cpp_name for operand in operands if operand.is_result]
+        resultIds = [operand.cpp_name for operand in operands + extinst_operands if operand.is_result]
         if not resultIds:
             resultId = "NO_REGISTER"
         elif len(resultIds) == 1:
