@@ -411,7 +411,7 @@ void Program::postParse(bool scalarize) {
             if (instruction->resIdSet.empty()) {
                 std::cout << "        ";
             } else {
-                for (uint32_t resId : instruction->resIdSet) {
+                for (uint32_t resId : instruction->resIdList) {
                     std::cout << std::setw(5) << resId;
                 }
                 std::cout << " <-";
@@ -419,7 +419,7 @@ void Program::postParse(bool scalarize) {
 
             std::cout << std::setw(0) << " " << instruction->name();
 
-            for (auto argId : instruction->argIdSet) {
+            for (auto argId : instruction->argIdList) {
                 std::cout << " " << argId;
             }
 
@@ -517,8 +517,12 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
 
             case SpvOpStore: {
                 InsnStore *insn = dynamic_cast<InsnStore *>(instruction);
-                const TypeVector *typeVector = getTypeAsVector(
-                        resultTypes.at(insn->objectId));
+                const TypeVector *typeVector = nullptr;
+                // XXX handle case of objectId being a constant.
+                auto itr = resultTypes.find(insn->objectId);
+                if (itr != resultTypes.end()) {
+                    typeVector = getTypeAsVector(itr->second);
+                }
                 if (typeVector != nullptr) {
                     for (int i = 0; i < typeVector->count; i++) {
                         auto [subtype, offset] = getConstituentInfo(
@@ -550,6 +554,24 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                     // Re-use existing SSA register.
                     scalarize(insn->resultId, i, subtype, insn->constituentsId[i]);
                 }
+                replaced = true;
+                break;
+            }
+
+            case SpvOpCompositeExtract: {
+                InsnCompositeExtract *insn = dynamic_cast<InsnCompositeExtract *>(instruction);
+
+                assert(isTypeFloat(insn->type));
+                assert(insn->indexesId.size() == 1);
+                uint32_t index = insn->indexesId[0];
+
+                uint32_t oldId = scalarize(insn->compositeId, index, insn->type);
+
+                // XXX We could avoid this move by renaming the result register throughout
+                // to "oldId".
+                newList.push_back(std::make_shared<RiscVMove>(insn->lineInfo,
+                            insn->type, insn->resultId, oldId));
+
                 replaced = true;
                 break;
             }
@@ -616,6 +638,7 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 break;
             }
 
+            case SpvOpReturn:
             case SpvOpAccessChain: {
                 // Nothing to do for these.
                 break;

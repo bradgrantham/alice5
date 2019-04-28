@@ -1,5 +1,7 @@
 
-layout (location = 1) out float outtest;
+layout (location = 1) in vec3 intest;
+layout (location = 2) out vec3 outtest;
+layout (location = 3) out float outtestf;
 
 /*
 float foo(float n) {
@@ -61,8 +63,11 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // outtest = 0.0;
     // outtest = 1.0 + outtest;
     // fragColor = vec4(outtest, outtest, outtest, 1.0);
-    vec3 q = vec3(0.4, 0.5, 0.6);
-    fragColor = vec4(cross(q, q*2.0), 1.0);
+    // vec3 q = vec3(0.4, 0.5, 0.6);
+    // fragColor = vec4(cross(q, q*2.0), 1.0);
+    // fragColor = vec4(1.0, 2.0, 3.0, 4.0);
+    // outtest = cross(intest, intest);
+    outtestf = (gl_FragCoord + gl_FragCoord).x;
 
     // vec3 x = vec3(1.0, 2.0, 3.0);
     // vec3 y = vec3(4.0, 5.0, 6.0);

@@ -653,15 +653,15 @@ void RiscVStore::emit(Compiler *compiler)
 void RiscVCross::emit(Compiler *compiler)
 {
     compiler->emit("addi sp, sp, -28", "Make room on stack");
-    compiler->emit("sw ra, 4(sp)", "Save return address");
+    compiler->emit("sw ra, 24(sp)", "Save return address");
 
-    for (int i = 0; i < argIdList.size(); i++) {
+    for (int i = argIdList.size() - 1; i >= 0; i--) {
         std::ostringstream ss;
         ss << "fsw " << compiler->reg(argIdList[i]) << ", " << (i*4) << "(sp)";
         compiler->emit(ss.str(), "Push parameter");
     }
 
-    compiler->emit("jal ra, .sin", "Call routine");
+    compiler->emit("jal ra, .cross", "Call routine");
 
     for (int i = 0; i < resIdList.size(); i++) {
         std::ostringstream ss;
@@ -669,8 +669,31 @@ void RiscVCross::emit(Compiler *compiler)
         compiler->emit(ss.str(), "Pop result");
     }
 
-    compiler->emit("lw ra, 4(sp)", "Restore return address");
-    compiler->emit("addi sp, sp, 28", "Restore stack");
+    compiler->emit("lw ra, 12(sp)", "Restore return address");
+    compiler->emit("addi sp, sp, 16", "Restore stack");
+}
+
+void RiscVMove::emit(Compiler *compiler)
+{
+    const CompilerRegister *r1 = compiler->asRegister(resultId);
+    const CompilerRegister *r2 = compiler->asRegister(rs);
+    assert(r1 != nullptr);
+    assert(r2 != nullptr);
+
+    std::ostringstream ss1;
+    if (r1->phy != r2->phy) {
+        if (compiler->isRegFloat(resultId)) {
+            ss1 << "fsgnj.s ";
+        } else {
+            ss1 << "and ";
+        }
+        ss1 << compiler->reg(resultId) << ", "
+            << compiler->reg(rs) << ", "
+            << compiler->reg(rs);
+    }
+    std::ostringstream ss2;
+    ss2 << "r" << resultId << " = r" << rs;
+    compiler->emit(ss1.str(), ss2.str());
 }
 
 // -----------------------------------------------------------------------------------
