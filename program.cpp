@@ -676,12 +676,29 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                  expandVectorsTerOp<InsnGLSLstd450FClamp>(instruction, newList, replaced);
                  break;
 
-                 /*
             case 0x10000 | GLSLstd450Length: {
                 InsnGLSLstd450Length *insn = dynamic_cast<InsnGLSLstd450Length *>(instruction);
+
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->xId));
+
+                std::vector<uint32_t> operandIds;
+                if (typeVector) {
+                    // Operand is vector.
+                    for (int i = 0; i < typeVector->count; i++) {
+                        operandIds.push_back(scalarize(insn->xId, i, typeVector->type));
+                    }
+                } else {
+                    // Operand is scalar.
+                    operandIds.push_back(insn->xId);
+                }
+                newList.push_back(std::make_shared<RiscVLength>(insn->lineInfo,
+                            insn->type,
+                            insn->resultId,
+                            operandIds));
+
+                replaced = true;
                 break;
             }
-            */
 
             case 0x10000 | GLSLstd450Cross: {
                 InsnGLSLstd450Cross *insn =

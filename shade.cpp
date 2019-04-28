@@ -543,18 +543,18 @@ struct Compiler
         // Push parameters.
         {
             std::ostringstream ss;
-            ss << "addi sp, sp, -" << (operandIds.size() + 4);
+            ss << "addi sp, sp, -" << 4*(operandIds.size() + 1);
             emit(ss.str(), "Make room on stack");
         }
         {
             std::ostringstream ss;
-            ss << "sw ra, " << operandIds.size() << "(sp)";
+            ss << "sw ra, " << 4*operandIds.size() << "(sp)";
             emit(ss.str(), "Save return address");
         }
 
         for (int i = operandIds.size() - 1; i >= 0; i--) {
             std::ostringstream ss;
-            ss << "fsw " << reg(operandIds[i]) << ", " << (i*4) << "(sp)";
+            ss << "fsw " << reg(operandIds[i]) << ", " << i*4 << "(sp)";
             emit(ss.str(), "Push parameter");
         }
 
@@ -568,18 +568,18 @@ struct Compiler
         // Pop parameters.
         for (int i = 0; i < resultIds.size(); i++) {
             std::ostringstream ss;
-            ss << "flw " << reg(resultIds[i]) << ", " << (i*4) << "(sp)";
+            ss << "flw " << reg(resultIds[i]) << ", " << i*4 << "(sp)";
             emit(ss.str(), "Pop result");
         }
 
         {
             std::ostringstream ss;
-            ss << "lw ra, " << resultIds.size() << "(sp)";
+            ss << "lw ra, " << 4*resultIds.size() << "(sp)";
             emit(ss.str(), "Restore return address");
         }
         {
             std::ostringstream ss;
-            ss << "addi sp, sp, " << (resultIds.size() + 4);
+            ss << "addi sp, sp, " << 4*(resultIds.size() + 1);
             emit(ss.str(), "Restore stack");
         }
     }
@@ -768,6 +768,20 @@ void RiscVMove::emit(Compiler *compiler)
     std::ostringstream ss2;
     ss2 << "r" << resultId << " = r" << rs;
     compiler->emit(ss1.str(), ss2.str());
+}
+
+void RiscVLength::emit(Compiler *compiler)
+{
+    size_t n = operandIds.size();
+    assert(n <= 4);
+
+    std::vector<uint32_t> resultIds;
+    resultIds.push_back(resultId);
+
+    std::ostringstream functionName;
+    functionName << ".length" << n;
+
+    compiler->emitCall(functionName.str(), resultIds, operandIds);
 }
 
 // -----------------------------------------------------------------------------------

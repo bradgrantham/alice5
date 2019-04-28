@@ -9,6 +9,7 @@ enum {
     RiscVOpStore,
     RiscVOpCross,
     RiscVOpMove,
+    RiscVOpLength,
 };
 
 // "addi" instruction.
@@ -120,5 +121,22 @@ struct RiscVMove : public Instruction {
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpMove; }
     virtual std::string name() const { return "move"; }
+    virtual void emit(Compiler *compiler);
+};
+
+// Length instruction.
+struct RiscVLength : public Instruction {
+    RiscVLength(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), resultId(resultId), operandIds(operandIds) {
+        addResult(resultId);
+        for (auto operandId : operandIds) {
+            addParameter(operandId);
+        }
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    std::vector<uint32_t> operandIds; // operands from register
+    virtual void step(Interpreter *interpreter) { assert(false); }
+    virtual uint32_t opcode() const { return RiscVOpLength; }
+    virtual std::string name() const { return "length"; }
     virtual void emit(Compiler *compiler);
 };
