@@ -660,17 +660,28 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                  expandVectorsUniOp<InsnGLSLstd450Cos>(instruction, newList, replaced);
                  break;
 
+            case 0x10000 | GLSLstd450Atan2:
+                expandVectorsBinOp<InsnGLSLstd450Atan2>(instruction, newList, replaced);
+                break;
+
+            case 0x10000 | GLSLstd450FAbs:
+                expandVectorsUniOp<InsnGLSLstd450FAbs>(instruction, newList, replaced);
+                break;
+
+            case 0x10000 | GLSLstd450Fract:
+                expandVectorsUniOp<InsnGLSLstd450Fract>(instruction, newList, replaced);
+                break;
+
             case 0x10000 | GLSLstd450FClamp:
                  expandVectorsTerOp<InsnGLSLstd450FClamp>(instruction, newList, replaced);
                  break;
 
                  /*
-            case 0x10000 | GLSLstd450Normalize: {
-                 // If parameter is a float, compute absolute value.
-                 // Else add squares of elements, take sqrt, divide each element by that.
-                 break;
+            case 0x10000 | GLSLstd450Length: {
+                InsnGLSLstd450Length *insn = dynamic_cast<InsnGLSLstd450Length *>(instruction);
+                break;
             }
-                 */
+            */
 
             case 0x10000 | GLSLstd450Cross: {
                 InsnGLSLstd450Cross *insn =

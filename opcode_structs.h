@@ -755,6 +755,7 @@ struct InsnGLSLstd450FAbs : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FAbs(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FAbs; }
     virtual std::string name() const { return "GLSLstd450FAbs"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450FSign instruction (code 6).
@@ -797,6 +798,7 @@ struct InsnGLSLstd450Fract : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Fract(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Fract; }
     virtual std::string name() const { return "GLSLstd450Fract"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Radians instruction (code 11).
@@ -870,6 +872,7 @@ struct InsnGLSLstd450Atan2 : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Atan2(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Atan2; }
     virtual std::string name() const { return "GLSLstd450Atan2"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Pow instruction (code 26).

@@ -535,6 +535,80 @@ struct Compiler
         return label.empty() ? ".anonymous" : label;
     }
 
+    // Emit a call to a floating-point routine.
+    void emitCall(const std::string &functionName,
+            const std::vector<uint32_t> resultIds,
+            const std::vector<uint32_t> operandIds) {
+
+        // Push parameters.
+        {
+            std::ostringstream ss;
+            ss << "addi sp, sp, -" << (operandIds.size() + 4);
+            emit(ss.str(), "Make room on stack");
+        }
+        {
+            std::ostringstream ss;
+            ss << "sw ra, " << operandIds.size() << "(sp)";
+            emit(ss.str(), "Save return address");
+        }
+
+        for (int i = operandIds.size() - 1; i >= 0; i--) {
+            std::ostringstream ss;
+            ss << "fsw " << reg(operandIds[i]) << ", " << (i*4) << "(sp)";
+            emit(ss.str(), "Push parameter");
+        }
+
+        // Call routines.
+        {
+            std::ostringstream ss;
+            ss << "jal ra, " << functionName;
+            emit(ss.str(), "Call routine");
+        }
+
+        // Pop parameters.
+        for (int i = 0; i < resultIds.size(); i++) {
+            std::ostringstream ss;
+            ss << "flw " << reg(resultIds[i]) << ", " << (i*4) << "(sp)";
+            emit(ss.str(), "Pop result");
+        }
+
+        {
+            std::ostringstream ss;
+            ss << "lw ra, " << resultIds.size() << "(sp)";
+            emit(ss.str(), "Restore return address");
+        }
+        {
+            std::ostringstream ss;
+            ss << "addi sp, sp, " << (resultIds.size() + 4);
+            emit(ss.str(), "Restore stack");
+        }
+    }
+
+    // Emit a call to a single-parameter floating-point routine.
+    void emitUniCall(const std::string &functionName, uint32_t resultId, uint32_t operandId) {
+        std::vector<uint32_t> operandIds;
+        std::vector<uint32_t> resultIds;
+
+        operandIds.push_back(operandId);
+        resultIds.push_back(resultId);
+
+        emitCall(functionName, resultIds, operandIds);
+    }
+
+    // Emit a call to a two-parameter floating-point routine.
+    void emitBinCall(const std::string &functionName, uint32_t resultId,
+            uint32_t operand1Id, uint32_t operand2Id) {
+
+        std::vector<uint32_t> operandIds;
+        std::vector<uint32_t> resultIds;
+
+        operandIds.push_back(operand1Id);
+        operandIds.push_back(operand2Id);
+        resultIds.push_back(resultId);
+
+        emitCall(functionName, resultIds, operandIds);
+    }
+
     void emit(const std::string &op, const std::string &comment)
     {
         std::ios oldState(nullptr);
@@ -858,25 +932,31 @@ void InsnAccessChain::emit(Compiler *compiler)
 
 void InsnGLSLstd450Sin::emit(Compiler *compiler)
 {
-    compiler->emit("addi sp, sp, -8", "Make room on stack");
-    compiler->emit("sw ra, 4(sp)", "Save return address");
+    compiler->emitUniCall(".sin", resultId, xId);
+}
 
-    {
-        std::ostringstream ss;
-        ss << "fsw " << compiler->reg(xId) << ", 0(sp)";
-        compiler->emit(ss.str(), "Push parameter");
-    }
+void InsnGLSLstd450Atan2::emit(Compiler *compiler)
+{
+    compiler->emitBinCall(".atan2", resultId, yId, xId);
+}
 
-    compiler->emit("jal ra, .sin", "Call routine");
+void InsnGLSLstd450FAbs::emit(Compiler *compiler)
+{
+    std::ostringstream ss1;
+    ss1 << "fsgnx.s "
+        << compiler->reg(resultId) << ", "
+        << compiler->reg(xId) << ", "
+        << compiler->reg(xId);
 
-    {
-        std::ostringstream ss;
-        ss << "flw " << compiler->reg(resultId) << ", 0(sp)";
-        compiler->emit(ss.str(), "Pop result");
-    }
+    std::ostringstream ss2;
+    ss2 << resultId << " = fabs(" << xId << ")";
 
-    compiler->emit("lw ra, 4(sp)", "Restore return address");
-    compiler->emit("addi sp, sp, 8", "Restore stack");
+    compiler->emit(ss1.str(), ss2.str());
+}
+
+void InsnGLSLstd450Fract::emit(Compiler *compiler)
+{
+    compiler->emitUniCall(".fract", resultId, xId);
 }
 
 // -----------------------------------------------------------------------------------

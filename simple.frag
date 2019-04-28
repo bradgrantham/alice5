@@ -70,7 +70,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // outtest = cross(intest, intest);
 
     // outtestf = 1.2;
-    outtest = intest.zxy;
+    outtest = atan(intest, intest);
+    outtest = abs(intest);
+    outtest = sin(intest);
+    outtest = fract(intest);
 
     // vec3 x = vec3(1.0, 2.0, 3.0);
     // vec3 y = vec3(4.0, 5.0, 6.0);
