@@ -314,6 +314,25 @@ struct Program
         }
     }
 
+    // Expand a ternary operator, such as FClamp, from vector to scalar if necessary.
+    template <class T>
+    void expandVectorsTerOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
+        T *insn = dynamic_cast<T *>(instruction);
+        const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->resultId));
+        if (typeVector != nullptr) {
+            for (int i = 0; i < typeVector->count; i++) {
+                auto [subtype, offset] = getConstituentInfo(insn->type, i);
+                newList.push_back(std::make_shared<T>(insn->lineInfo,
+                            subtype,
+                            scalarize(insn->resultId, i, subtype),
+                            scalarize(insn->argIdList[0], i, subtype),
+                            scalarize(insn->argIdList[1], i, subtype),
+                            scalarize(insn->argIdList[2], i, subtype)));
+            }
+            replaced = true;
+        }
+    }
+
     // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
     std::string cleanUpFunctionName(int nameId) const {
         std::string name = names.at(nameId);

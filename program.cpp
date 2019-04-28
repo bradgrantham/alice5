@@ -575,13 +575,28 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                  expandVectorsUniOp<InsnFNegate>(instruction, newList, replaced);
                  break;
 
-            case GLSLstd450Sin:
+            case 0x10000 | GLSLstd450Sin:
                  expandVectorsUniOp<InsnGLSLstd450Sin>(instruction, newList, replaced);
                  break;
 
-            case GLSLstd450Cos:
+            case 0x10000 | GLSLstd450Cos:
                  expandVectorsUniOp<InsnGLSLstd450Cos>(instruction, newList, replaced);
                  break;
+
+            case 0x10000 | GLSLstd450FClamp:
+                 expandVectorsTerOp<InsnGLSLstd450FClamp>(instruction, newList, replaced);
+                 break;
+
+                 /*
+            case 0x10000 | GLSLstd450Normalize: {
+                 // If parameter is a float, compute absolute value.
+                 // Else add squares of elements, take sqrt, divide each element by that.
+                 break;
+            }
+
+            case 0x10000 | GLSLstd450Cross:
+                 break;
+                 */
 
             default: {
                 std::cerr << "Warning: Unhandled opcode "
