@@ -223,15 +223,15 @@ def main():
                 if opname == "OpPhi" and operand.cpp_name == "operandId":
                     # Special case the phi operands.
                     opcode_structs_f.write("        for (int i = 0; i < %s.size(); i += 2) {\n" % operand.cpp_name)
-                    opcode_structs_f.write("            argIds.insert(%s[i]);\n" % operand.cpp_name)
+                    opcode_structs_f.write("            addParameter(%s[i]);\n" % operand.cpp_name)
                     opcode_structs_f.write("        }\n")
                 elif operand.is_argument:
                     if operand.quantifier == "*":
                         opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
-                        opcode_structs_f.write("            argIds.insert(_argId);\n")
+                        opcode_structs_f.write("            addParameter(_argId);\n")
                         opcode_structs_f.write("        }\n")
                     else:
-                        opcode_structs_f.write("        argIds.insert(%s);\n" % operand.cpp_name)
+                        opcode_structs_f.write("        addParameter(%s);\n" % operand.cpp_name)
                 if operand.is_label:
                     opcode_structs_f.write("        targetLabelIds.insert(%s);\n" % operand.cpp_name)
             opcode_structs_f.write("    }\n")
@@ -342,10 +342,10 @@ def main():
                 if operand.is_argument:
                     if operand.quantifier == "*":
                         opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
-                        opcode_structs_f.write("            argIds.insert(_argId);\n")
+                        opcode_structs_f.write("            addParameter(_argId);\n")
                         opcode_structs_f.write("        }\n")
                     else:
-                        opcode_structs_f.write("        argIds.insert(%s);\n" % operand.cpp_name)
+                        opcode_structs_f.write("        addParameter(%s);\n" % operand.cpp_name)
             opcode_structs_f.write("    }\n")
             for operand in extinst_operands + operands:
                 opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,

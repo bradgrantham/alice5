@@ -356,7 +356,7 @@ struct Compiler
             Instruction *instruction = instructions.at(pc).get();
 
             // Free up now-unused physical registers.
-            for (auto argId : instruction->argIds) {
+            for (auto argId : instruction->argIdSet) {
                 // If this virtual register doesn't survive past this line, then we
                 // can use its physical register again.
                 if (instruction->liveout.find(argId) == instruction->liveout.end()) {

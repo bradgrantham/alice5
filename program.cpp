@@ -227,7 +227,7 @@ void Program::postParse(bool scalarize) {
         if (instruction->resId != NO_REGISTER) {
             instruction->livein.erase(instruction->resId);
         }
-        for (uint32_t argId : instruction->argIds) {
+        for (uint32_t argId : instruction->argIdSet) {
             // Don't consider constants or variables, they're never in registers.
             if (/*constants.find(argId) == constants.end() &&*/
                     variables.find(argId) == variables.end()) {
@@ -416,7 +416,7 @@ void Program::postParse(bool scalarize) {
 
             std::cout << std::setw(0) << " " << instruction->name();
 
-            for (auto argId : instruction->argIds) {
+            for (auto argId : instruction->argIdSet) {
                 std::cout << " " << argId;
             }
 
@@ -551,12 +551,36 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 break;
             }
 
+            case SpvOpFAdd:
+                 expandVectorsBinOp<InsnFAdd>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpFSub:
+                 expandVectorsBinOp<InsnFSub>(instruction, newList, replaced);
+                 break;
+
             case SpvOpFMul:
                  expandVectorsBinOp<InsnFMul>(instruction, newList, replaced);
                  break;
 
             case SpvOpFDiv:
                  expandVectorsBinOp<InsnFDiv>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpFMod:
+                 expandVectorsBinOp<InsnFMod>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpFNegate:
+                 expandVectorsUniOp<InsnFNegate>(instruction, newList, replaced);
+                 break;
+
+            case GLSLstd450Sin:
+                 expandVectorsUniOp<InsnGLSLstd450Sin>(instruction, newList, replaced);
+                 break;
+
+            case GLSLstd450Cos:
+                 expandVectorsUniOp<InsnGLSLstd450Cos>(instruction, newList, replaced);
                  break;
 
             default: {

@@ -533,7 +533,10 @@ struct Instruction {
     uint32_t resId;
 
     // Set of registers that are inputs to the instruction.
-    std::set<uint32_t> argIds;
+    std::set<uint32_t> argIdSet;
+
+    // List of registers that are inputs to the instruction.
+    std::vector<uint32_t> argIdList;
 
     // Label IDs we might branch to.
     std::set<uint32_t> targetLabelIds;
@@ -569,6 +572,13 @@ struct Instruction {
     // Whether this is a termination instruction (branch instruction, OpKill,
     // OpUnreachable).
     virtual bool isTermination() const { return false; }
+
+protected:
+    // Add an input parameter to the instruction.
+    void addParameter(uint32_t id) {
+        argIdSet.insert(id);
+        argIdList.push_back(id);
+    }
 };
 
 // A block is a sequence of instructions that has one entry point

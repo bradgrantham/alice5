@@ -279,6 +279,23 @@ struct Program
     // may be the same list.
     void expandVectors(const InstructionList &inList, InstructionList &outList);
 
+    // Expand a unary operator, such as FNegate, from vector to scalar if necessary.
+    template <class T>
+    void expandVectorsUniOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
+        T *insn = dynamic_cast<T *>(instruction);
+        const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->resultId));
+        if (typeVector != nullptr) {
+            for (int i = 0; i < typeVector->count; i++) {
+                auto [subtype, offset] = getConstituentInfo(insn->type, i);
+                newList.push_back(std::make_shared<T>(insn->lineInfo,
+                            subtype,
+                            scalarize(insn->resultId, i, subtype),
+                            scalarize(insn->argIdList[0], i, subtype)));
+            }
+            replaced = true;
+        }
+    }
+
     // Expand a binary operator, such as FMul, from vector to scalar if necessary.
     template <class T>
     void expandVectorsBinOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
@@ -290,8 +307,8 @@ struct Program
                 newList.push_back(std::make_shared<T>(insn->lineInfo,
                             subtype,
                             scalarize(insn->resultId, i, subtype),
-                            scalarize(insn->operand1Id, i, subtype),
-                            scalarize(insn->operand2Id, i, subtype)));
+                            scalarize(insn->argIdList[0], i, subtype),
+                            scalarize(insn->argIdList[1], i, subtype)));
             }
             replaced = true;
         }
