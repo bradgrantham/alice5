@@ -12,11 +12,15 @@ extern "C" {
 #include "riscv-disas.h"
 }
 
-void print_inst(uint64_t pc, uint32_t inst)
+typedef std::map<uint32_t, std::string> AddressToSymbolMap;
+
+void print_inst(uint64_t pc, uint32_t inst, const AddressToSymbolMap& addressesToSymbols)
 {
     char buf[80] = { 0 };
+    if(addressesToSymbols.find(pc) != addressesToSymbols.end())
+        printf("%s:\n", addressesToSymbols.at(pc).c_str());
     disasm_inst(buf, sizeof(buf), rv64, pc, inst);
-    printf("%016" PRIx64 ":  %s\n", pc, buf);
+    printf("        %08" PRIx64 ":  %s\n", pc, buf);
 }
 
     
@@ -139,15 +143,6 @@ bool ReadBinary(std::ifstream& binaryFile, RunHeader1& header, SymbolTable& symb
     binaryFile.read(reinterpret_cast<char*>(bytes.data()), bytesEnd - bytesStart);
 
     return true;
-}
-
-template <class T>
-void disassemble(uint32_t pc, T& memory)
-{
-    std::cout << "pc :";
-    std::cout << std::hex << std::setw(8) << std::setfill('0') << pc;
-    std::cout << " " << std::hex << std::setw(8) << std::setfill('0') << memory.read32quiet(pc);
-    std::cout << std::setw(0) << std::dec << std::setfill(' ') << '\n';
 }
 
 template <class MEMORY, class TYPE>
@@ -283,6 +278,10 @@ int main(int argc, char **argv)
 
     binaryFile.close();
 
+    AddressToSymbolMap addressesToSymbols;
+    for(auto& [symbol, address]: symbols)
+        addressesToSymbols[address] = symbol;
+
     bytes.resize(bytes.size() + 0x10000);
     Memory m(bytes, false);
 
@@ -325,12 +324,12 @@ int main(int argc, char **argv)
             core.pc = header.initialPC;
 
             if(disassemble) {
-                std::cout << "pixel " << i << ", " << j << '\n';
+                std::cout << "; pixel " << i << ", " << j << '\n';
             }
             try {
                 do {
                     if(disassemble) {
-                        print_inst(core.pc, m.read32(core.pc));
+                        print_inst(core.pc, m.read32(core.pc), addressesToSymbols);
                     }
                     m.verbose = verboseMemory;
                     status = core.step(m);
