@@ -373,8 +373,7 @@ struct Compiler
             }
 
             // Assign result registers to physical registers.
-            uint32_t resId = instruction->resId;
-            if (resId != NO_REGISTER) {
+            for (uint32_t resId : instruction->resIdSet) {
                 auto r = registers.find(resId);
                 if (r == registers.end()) {
                     std::cout << "Error: Virtual register "
@@ -404,7 +403,7 @@ struct Compiler
                     }
                     if (!found) {
                         std::cout << "Error: No physical register available for "
-                            << instruction->resId << "[" << i << "] on line " << pc << ".\n";
+                            << resId << "[" << i << "] on line " << pc << ".\n";
                         exit(EXIT_FAILURE);
                     }
                 }
@@ -653,10 +652,9 @@ void RiscVStore::emit(Compiler *compiler)
 
 // -----------------------------------------------------------------------------------
 
-Instruction::Instruction(const LineInfo& lineInfo_, uint32_t resId)
-    : lineInfo(lineInfo_),
-      blockId(NO_BLOCK_ID),
-      resId(resId)
+Instruction::Instruction(const LineInfo& lineInfo)
+    : lineInfo(lineInfo),
+      blockId(NO_BLOCK_ID)
 {
     // Nothing.
 }

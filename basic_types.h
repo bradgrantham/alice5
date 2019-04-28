@@ -520,7 +520,7 @@ struct Interpreter;
 struct Compiler;
 
 struct Instruction {
-    Instruction(const LineInfo& lineInfo_, uint32_t resId);
+    Instruction(const LineInfo& lineInfo);
     virtual ~Instruction() {};
 
     // Source line information
@@ -529,8 +529,8 @@ struct Instruction {
     // Which block this instruction is in.
     uint32_t blockId;
 
-    // Register affected by instruction, or NO_REGISTER if no register is affected.
-    uint32_t resId;
+    // Registers affected by instruction.
+    std::set<uint32_t> resIdSet;
 
     // Set of registers that are inputs to the instruction.
     std::set<uint32_t> argIdSet;
@@ -574,6 +574,11 @@ struct Instruction {
     virtual bool isTermination() const { return false; }
 
 protected:
+    // Add a result to the instruction.
+    void addResult(uint32_t id) {
+        resIdSet.insert(id);
+    }
+
     // Add an input parameter to the instruction.
     void addParameter(uint32_t id) {
         argIdSet.insert(id);

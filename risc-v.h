@@ -11,7 +11,8 @@ enum {
 
 // "addi" instruction.
 struct RiscVAddi : public Instruction {
-    RiscVAddi(LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t rs1, uint32_t imm) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), rs1(rs1), imm(imm) {
+    RiscVAddi(LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t rs1, uint32_t imm) : Instruction(lineInfo), type(type), resultId(resultId), rs1(rs1), imm(imm) {
+        addResult(resultId);
         addParameter(rs1);
     }
     uint32_t type; // result type
@@ -26,7 +27,8 @@ struct RiscVAddi : public Instruction {
 
 // Load instruction (int or float).
 struct RiscVLoad : public Instruction {
-    RiscVLoad(const LineInfo& lineInfo_, uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo_, resultId), type(type), resultId(resultId), pointerId(pointerId), memoryAccess(memoryAccess), offset(offset) {
+    RiscVLoad(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo), type(type), resultId(resultId), pointerId(pointerId), memoryAccess(memoryAccess), offset(offset) {
+        addResult(resultId);
         addParameter(pointerId);
     }
     uint32_t type; // result type
@@ -42,7 +44,7 @@ struct RiscVLoad : public Instruction {
 
 // Store instruction (int or float).
 struct RiscVStore : public Instruction {
-    RiscVStore(const LineInfo& lineInfo_, uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo_, NO_REGISTER), pointerId(pointerId), objectId(objectId), memoryAccess(memoryAccess), offset(offset) {
+    RiscVStore(const LineInfo& lineInfo, uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo), pointerId(pointerId), objectId(objectId), memoryAccess(memoryAccess), offset(offset) {
         addParameter(pointerId);
         addParameter(objectId);
     }

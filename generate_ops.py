@@ -193,15 +193,8 @@ def main():
         operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
                 for operand_index, json_operand in enumerate(instruction.get("operands", []))]
 
-        # Name of result register.
+        # Name of result registers.
         resultIds = [operand.cpp_name for operand in operands if operand.is_result]
-        if not resultIds:
-            resultId = "NO_REGISTER"
-        elif len(resultIds) == 1:
-            resultId = resultIds[0]
-        else:
-            sys.stderr.write("Multiple results for %s: %s\n" % (opname, resultIds))
-            sys.exit(1)
 
         # Opcode to string file.
         opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, short_opname))
@@ -210,8 +203,8 @@ def main():
             # Struct file.
             opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
             opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
-            params = ["const LineInfo& lineInfo_"]
-            inits = ["Instruction(lineInfo_, %s)" % resultId]
+            params = ["const LineInfo& lineInfo"]
+            inits = ["Instruction(lineInfo)"]
             for operand in operands:
                 params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
                 inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
@@ -219,6 +212,8 @@ def main():
                     (struct_opname,
                         ", ".join(params),
                         ", ".join(inits)))
+            for resultId in resultIds:
+                opcode_structs_f.write("        addResult(%s);\n" % resultId)
             for operand in operands:
                 if opname == "OpPhi" and operand.cpp_name == "operandId":
                     # Special case the phi operands.
@@ -314,13 +309,6 @@ def main():
 
         # Name of result register.
         resultIds = [operand.cpp_name for operand in operands + extinst_operands if operand.is_result]
-        if not resultIds:
-            resultId = "NO_REGISTER"
-        elif len(resultIds) == 1:
-            resultId = resultIds[0]
-        else:
-            sys.stderr.write("Multiple results for %s: %s\n" % (opname, resultIds))
-            sys.exit(1)
 
         # Opcode to string file.
         opcode_to_string_f.write("    {0x10000 | %d, \"%s\"},\n" % (opcode, opname))
@@ -329,8 +317,8 @@ def main():
             # Struct file.
             opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
             opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
-            params = ["const LineInfo& lineInfo_"]
-            inits = ["Instruction(lineInfo_, %s)" % resultId]
+            params = ["const LineInfo& lineInfo"]
+            inits = ["Instruction(lineInfo)"]
             for operand in extinst_operands + operands:
                 params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
                 inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
@@ -338,6 +326,8 @@ def main():
                     (struct_opname,
                         ", ".join(params),
                         ", ".join(inits)))
+            for resultId in resultIds:
+                opcode_structs_f.write("        addResult(%s);\n" % resultId)
             for operand in operands:
                 if operand.is_argument:
                     if operand.quantifier == "*":

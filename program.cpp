@@ -224,8 +224,8 @@ void Program::postParse(bool scalarize) {
         }
 
         instruction->livein = instruction->liveout;
-        if (instruction->resId != NO_REGISTER) {
-            instruction->livein.erase(instruction->resId);
+        for (uint32_t resId : instruction->resIdSet) {
+            instruction->livein.erase(resId);
         }
         for (uint32_t argId : instruction->argIdSet) {
             // Don't consider constants or variables, they're never in registers.
@@ -408,10 +408,13 @@ void Program::postParse(bool scalarize) {
             } else {
                 std::cout << std::setw(5) << instruction->blockId;
             }
-            if (instruction->resId == NO_REGISTER) {
+            if (instruction->resIdSet.empty()) {
                 std::cout << "        ";
             } else {
-                std::cout << std::setw(5) << instruction->resId << " <-";
+                for (uint32_t resId : instruction->resIdSet) {
+                    std::cout << std::setw(5) << resId;
+                }
+                std::cout << " <-";
             }
 
             std::cout << std::setw(0) << " " << instruction->name();
