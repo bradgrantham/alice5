@@ -173,6 +173,11 @@ GPUCore::Status GPUCore::step(T& memory)
         status = UNIMPLEMENTED_OPCODE;
     };
 
+    std::function<void(void)> unimpl_subst = [&]() {
+        std::cerr << "unimplemented substitution " << substFunctions[pc] << "\n";
+        status = UNIMPLEMENTED_OPCODE;
+    };
+
     switch(insn & 0x707F) {
         // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
         case makeOpcode(2, 0x01, 3): {
@@ -373,92 +378,95 @@ GPUCore::Status GPUCore::step(T& memory)
                     if(substFunctions.find(pc) != substFunctions.end()) {
                         switch(substFunctions[pc]) {
                             case SUBST_SIN: {
-                                float v = popf();
-                                pushf(sinf(v));
+                                pushf(sinf(popf()));
                                 break;
                             }
                             case SUBST_ATAN: {
-                                // pop ops, operate, push results
-                                break;
-                            }
-                            case SUBST_REFLECT: {
-                                // pop ops, operate, push results
+                                pushf(atanf(popf()));
                                 break;
                             }
                             case SUBST_POW: {
-                                // pop ops, operate, push results
-                                break;
-                            }
-                            case SUBST_NORMALIZE: {
-                                // pop ops, operate, push results
+                                float y = popf();
+                                float x = popf();
+                                pushf(powf(x, y));
                                 break;
                             }
                             case SUBST_COS: {
-                                // pop ops, operate, push results
+                                pushf(cosf(popf()));
                                 break;
                             }
                             case SUBST_LOG2: {
-                                // pop ops, operate, push results
+                                pushf(log2f(popf()));
                                 break;
                             }
                             case SUBST_EXP: {
-                                // pop ops, operate, push results
+                                pushf(expf(popf()));
                                 break;
                             }
                             case SUBST_INVERSESQRT: {
-                                // pop ops, operate, push results
+                                pushf(1.0 / sqrtf(popf()));
                                 break;
                             }
                             case SUBST_ASIN: {
-                                // pop ops, operate, push results
-                                break;
-                            }
-                            case SUBST_LENGTH: {
-                                // pop ops, operate, push results
-                                break;
-                            }
-                            case SUBST_CROSS: {
-                                // pop ops, operate, push results
+                                pushf(asinf(popf()));
                                 break;
                             }
                             case SUBST_LOG: {
-                                // pop ops, operate, push results
-                                break;
-                            }
-                            case SUBST_FACEFORWARD: {
-                                // pop ops, operate, push results
+                                pushf(logf(popf()));
                                 break;
                             }
                             case SUBST_ACOS: {
-                                // pop ops, operate, push results
+                                pushf(acosf(popf()));
                                 break;
                             }
                             case SUBST_RADIANS: {
-                                // pop ops, operate, push results
+                                pushf(popf() / 180.0 * M_PI);
                                 break;
                             }
                             case SUBST_DEGREES: {
-                                // pop ops, operate, push results
+                                pushf(popf() * 180.0 / M_PI);
                                 break;
                             }
                             case SUBST_EXP2: {
-                                // pop ops, operate, push results
+                                pushf(exp2f(popf()));
                                 break;
                             }
                             case SUBST_TAN: {
-                                // pop ops, operate, push results
+                                pushf(tanf(popf()));
                                 break;
                             }
                             case SUBST_ATAN2: {
-                                // pop ops, operate, push results
+                                float x = popf();
+                                float y = popf();
+                                pushf(atan2f(y, x));
+                                break;
+                            }
+                            case SUBST_FACEFORWARD: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_LENGTH: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_CROSS: {
+                                unimpl_subst();
                                 break;
                             }
                             case SUBST_REFRACT: {
-                                // pop ops, operate, push results
+                                unimpl_subst();
                                 break;
                             }
                             case SUBST_DISTANCE: {
-                                // pop ops, operate, push results
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_REFLECT: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_NORMALIZE: {
+                                unimpl_subst();
                                 break;
                             }
                         }
