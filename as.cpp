@@ -420,16 +420,16 @@ public:
         }
 
         // Output header.
-        RunHeader header;
+        RunHeader1 header;
         header.initialPC = 0;
-        header.gl_FragCoordAddress = getLabelAddress("gl_FragCoord");
-        header.colorAddress = getLabelAddress("color");
-        // XXX This makes assumptions about the layout of the params struct:
-        header.iTimeAddress = getLabelAddress(".anonymous", 8);
-        header.iMouseAddress = getLabelAddress(".anonymous", 12);
-        header.iResolutionAddress = getLabelAddress(".anonymous", 0);
-
+        header.symbolCount = labels.size();
         outFile.write(reinterpret_cast<char *>(&header), sizeof(header));
+        for (auto& [symbol, address] : labels) {
+            outFile.write(reinterpret_cast<char *>(&address), sizeof(address));
+            uint32_t strsize = symbol.size() + 1;
+            outFile.write(reinterpret_cast<char *>(&strsize), sizeof(strsize));
+            outFile.write(reinterpret_cast<const char *>(symbol.data()), strsize);
+        }
 
         // Write binary.
         for (uint32_t instruction : bin) {
