@@ -519,7 +519,8 @@ GPUCore::Status GPUCore::step(T& memory)
                                 break;
                             }
                             case SUBST_FRACT: {
-                                unimpl_subst();
+                                float f = popf();
+                                pushf(f - floorf(f));
                                 break;
                             }
                             case SUBST_REFRACT: {
