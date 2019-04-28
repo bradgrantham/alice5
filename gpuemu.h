@@ -22,7 +22,10 @@ struct GPUCore
         SUBST_ATAN,
         SUBST_REFLECT,
         SUBST_POW,
-        SUBST_NORMALIZE,
+        SUBST_NORMALIZE1,
+        SUBST_NORMALIZE2,
+        SUBST_NORMALIZE3,
+        SUBST_NORMALIZE4,
         SUBST_COS,
         SUBST_LOG2,
         SUBST_EXP,
@@ -54,7 +57,10 @@ struct GPUCore
             { ".atan", SUBST_ATAN },
             { ".reflect", SUBST_REFLECT },
             { ".pow", SUBST_POW },
-            { ".normalize", SUBST_NORMALIZE },
+            { ".normalize1", SUBST_NORMALIZE1 },
+            { ".normalize2", SUBST_NORMALIZE2 },
+            { ".normalize3", SUBST_NORMALIZE3 },
+            { ".normalize4", SUBST_NORMALIZE4 },
             { ".cos", SUBST_COS },
             { ".log2", SUBST_LOG2 },
             { ".exp", SUBST_EXP },
@@ -465,8 +471,39 @@ GPUCore::Status GPUCore::step(T& memory)
                                 unimpl_subst();
                                 break;
                             }
-                            case SUBST_NORMALIZE: {
-                                unimpl_subst();
+                            case SUBST_NORMALIZE1: {
+                                float x = popf();
+                                pushf(x < 0.0 ? -1.0f : 1.0f);
+                                break;
+                            }
+                            case SUBST_NORMALIZE2: {
+                                float y = popf();
+                                float x = popf();
+                                float d = 1.0f / sqrtf(x * x + y * y);
+                                pushf(x * d);
+                                pushf(y * d);
+                                break;
+                            }
+                            case SUBST_NORMALIZE3: {
+                                float z = popf();
+                                float y = popf();
+                                float x = popf();
+                                float d = 1.0f / sqrtf(x * x + y * y + z * z);
+                                pushf(x * d);
+                                pushf(y * d);
+                                pushf(z * d);
+                                break;
+                            }
+                            case SUBST_NORMALIZE4: {
+                                float w = popf();
+                                float z = popf();
+                                float y = popf();
+                                float x = popf();
+                                float d = 1.0f / sqrtf(x * x + y * y + z * z + w * w);
+                                pushf(x * d);
+                                pushf(y * d);
+                                pushf(z * d);
+                                pushf(w * d);
                                 break;
                             }
                         }
