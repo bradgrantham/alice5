@@ -779,6 +779,7 @@ struct InsnGLSLstd450Sin : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Sin(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Sin; }
     virtual std::string name() const { return "GLSLstd450Sin"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Cos instruction (code 14).

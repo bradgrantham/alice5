@@ -211,7 +211,7 @@ struct Program
         const Type *type = types.at(typeId).get();
         if (type->op() == SpvOpTypeInt || type->op() == SpvOpTypePointer) {
             return false;
-        } else if (type->op() == SpvOpTypeVector) {
+        } else if (type->op() == SpvOpTypeFloat) {
             return true;
         } else {
             std::cerr << "Error: Type " << typeId << " is neither int nor float.\n";

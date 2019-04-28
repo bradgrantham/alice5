@@ -281,9 +281,9 @@ struct Compiler
             registers[id] = CompilerRegister {type, count};
         }
 
-        // 32 registers; x0 is always zero; x1 is ra.
+        // 32 registers; x0 is always zero; x1 is ra; x2 is sp.
         std::set<uint32_t> PHY_INT_REGS;
-        for (int i = 2; i < 32; i++) {
+        for (int i = 3; i < 32; i++) {
             PHY_INT_REGS.insert(i);
         }
 
@@ -810,6 +810,29 @@ void InsnAccessChain::emit(Compiler *compiler)
     ss << "addi " << compiler->reg(resultId) << ", x0, "
         << compiler->notEmptyLabel(name->second) << "+" << offset;
     compiler->emit(ss.str(), "");
+}
+
+void InsnGLSLstd450Sin::emit(Compiler *compiler)
+{
+    compiler->emit("addi sp, sp, -8", "Make room on stack");
+    compiler->emit("sw ra, 4(sp)", "Save return address");
+
+    {
+        std::ostringstream ss;
+        ss << "fsw " << compiler->reg(xId) << ", 0(sp)";
+        compiler->emit(ss.str(), "Push parameter");
+    }
+
+    compiler->emit("jal ra, .sin", "Call routine");
+
+    {
+        std::ostringstream ss;
+        ss << "flw " << compiler->reg(resultId) << ", 0(sp)";
+        compiler->emit(ss.str(), "Pop result");
+    }
+
+    compiler->emit("lw ra, 4(sp)", "Restore return address");
+    compiler->emit("addi sp, sp, 8", "Restore stack");
 }
 
 // -----------------------------------------------------------------------------------
