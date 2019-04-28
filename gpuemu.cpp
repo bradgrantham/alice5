@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdlib>
 #include "gpuemu.h"
+#include "timer.h"
 
 extern "C" {
 #include "riscv-disas.h"
@@ -313,11 +314,15 @@ int main(int argc, char **argv)
     }
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
 
+    uint32_t gl_FragCoordAddress = symbols["gl_FragCoord"];
+    uint32_t colorAddress = symbols["color"];
+
+    Timer frameElapsed;
     for(int j = 0; j < imageHeight; j++)
         for(int i = 0; i < imageWidth; i++) {
 
-            set(m, symbols["gl_FragCoord"], v4float{(float)i, (float)j, 0, 0});
-            set(m, symbols["color"], v4float{1, 1, 1, 1});
+            set(m, gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
+            set(m, colorAddress, v4float{1, 1, 1, 1});
 
             core.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
             core.x[2] = bytes.size(); // Set SP to end of memory 
@@ -359,6 +364,7 @@ int main(int argc, char **argv)
             img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 1] = std::clamp(int(g * 255.99), 0, 255);
             img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 2] = std::clamp(int(b * 255.99), 0, 255);
         }
+    std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";
 
     FILE *fp = fopen("emulated.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", imageWidth, imageHeight);
