@@ -318,6 +318,7 @@ int main(int argc, char **argv)
     uint32_t colorAddress = symbols["color"];
 
     Timer frameElapsed;
+    uint64_t dispatchedCount = 0;
     for(int j = 0; j < imageHeight; j++)
         for(int i = 0; i < imageWidth; i++) {
 
@@ -338,6 +339,7 @@ int main(int argc, char **argv)
                     }
                     m.verbose = verboseMemory;
                     status = core.step(m);
+                    dispatchedCount ++;
                     m.verbose = false;
                 } while(core.pc != 0xffffffff && status == GPUCore::RUNNING);
             } catch(const std::exception& e) {
@@ -365,6 +367,8 @@ int main(int argc, char **argv)
             img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 2] = std::clamp(int(b * 255.99), 0, 255);
         }
     std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";
+    std::cout << dispatchedCount << " instructions executed.\n";
+    std::cout << (50000000.0f / dispatchedCount) << " fps estimated at 50 MHz.\n";
 
     FILE *fp = fopen("emulated.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", imageWidth, imageHeight);
