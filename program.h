@@ -148,6 +148,24 @@ struct Program
 
     Program(bool throwOnUnimplemented_, bool verbose_);
 
+    // Get the type ID of the entity. Returns 0 if not found.
+    uint32_t typeIdOf(uint32_t id) const {
+        // Look for operation results.
+        auto itr1 = resultTypes.find(id);
+        if (itr1 != resultTypes.end()) {
+            return itr1->second;
+        }
+
+        // Look for constants.
+        auto itr2 = constants.find(id);
+        if (itr2 != constants.end()) {
+            return itr2->second.type;
+        }
+
+        // Not found. Should probably look in variables, etc.
+        return 0;
+    }
+
     size_t allocate(SpvStorageClass clss, uint32_t type)
     {
         MemoryRegion& reg = memoryRegions[clss];
@@ -302,13 +320,18 @@ struct Program
         T *insn = dynamic_cast<T *>(instruction);
         const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->resultId));
         if (typeVector != nullptr) {
+            const TypeVector *typeVector0 = getTypeAsVector(typeIdOf(insn->argIdList[0]));
+            const TypeVector *typeVector1 = getTypeAsVector(typeIdOf(insn->argIdList[1]));
+            uint32_t arg0Subtype = typeVector0->type;
+            uint32_t arg1Subtype = typeVector1->type;
+
             for (int i = 0; i < typeVector->count; i++) {
                 auto [subtype, offset] = getConstituentInfo(insn->type, i);
                 newList.push_back(std::make_shared<T>(insn->lineInfo,
                             subtype,
                             scalarize(insn->resultId, i, subtype),
-                            scalarize(insn->argIdList[0], i, subtype),
-                            scalarize(insn->argIdList[1], i, subtype)));
+                            scalarize(insn->argIdList[0], i, arg0Subtype),
+                            scalarize(insn->argIdList[1], i, arg1Subtype)));
             }
             replaced = true;
         }

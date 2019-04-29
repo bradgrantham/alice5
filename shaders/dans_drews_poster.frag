@@ -110,9 +110,18 @@ vec2 rotate(in vec2 p, in vec2 origin, in float rad)
     float s = sin(rad);
     float c = cos(rad);
     
+    // We don't support matrices in the compiler.
+    /*
     mat2 m = mat2(c, -s, s, c);
 
     return m * (p - origin) + origin;
+    */
+
+    vec2 v1 = vec2(c, s);
+    vec2 v2 = vec2(-s, c);
+    vec2 v = p - origin;
+    vec2 r = vec2(dot(v1, v), dot(v2, v));
+    return r + origin;
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )

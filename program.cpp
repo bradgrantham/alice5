@@ -655,6 +655,14 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 break;
             }
 
+            case SpvOpFOrdEqual:
+                 expandVectorsBinOp<InsnFOrdEqual>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpFOrdGreaterThan:
+                 expandVectorsBinOp<InsnFOrdGreaterThan>(instruction, newList, replaced);
+                 break;
+
             case SpvOpFAdd:
                  expandVectorsBinOp<InsnFAdd>(instruction, newList, replaced);
                  break;
@@ -707,8 +715,28 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                  expandVectorsTerOp<InsnGLSLstd450FClamp>(instruction, newList, replaced);
                  break;
 
+            case 0x10000 | GLSLstd450FMix:
+                 expandVectorsTerOp<InsnGLSLstd450FMix>(instruction, newList, replaced);
+                 break;
+
+            case 0x10000 | GLSLstd450FMin:
+                 expandVectorsBinOp<InsnGLSLstd450FMin>(instruction, newList, replaced);
+                 break;
+
+            case 0x10000 | GLSLstd450FMax:
+                 expandVectorsBinOp<InsnGLSLstd450FMax>(instruction, newList, replaced);
+                 break;
+
             case 0x10000 | GLSLstd450Step:
                  expandVectorsBinOp<InsnGLSLstd450Step>(instruction, newList, replaced);
+                 break;
+
+            case 0x10000 | GLSLstd450Pow:
+                 expandVectorsBinOp<InsnGLSLstd450Pow>(instruction, newList, replaced);
+                 break;
+
+            case 0x10000 | GLSLstd450Exp:
+                 expandVectorsUniOp<InsnGLSLstd450Exp>(instruction, newList, replaced);
                  break;
 
             case 0x10000 | GLSLstd450Length: {
@@ -782,6 +810,8 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
             }
 
             case SpvOpReturn:
+            case SpvOpBranch:
+            case SpvOpBranchConditional:
             case SpvOpAccessChain: {
                 // Nothing to do for these.
                 break;
