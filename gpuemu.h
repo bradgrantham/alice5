@@ -49,6 +49,10 @@ struct GPUCore
         SUBST_FRACT,
         SUBST_FLOOR,
         SUBST_STEP,
+        SUBST_DOT1,
+        SUBST_DOT2,
+        SUBST_DOT3,
+        SUBST_DOT4,
     };
     std::map<uint32_t, SubstituteFunction> substFunctions;
 
@@ -90,6 +94,10 @@ struct GPUCore
             { ".fract", SUBST_FRACT },
             { ".floor", SUBST_FLOOR },
             { ".step", SUBST_STEP },
+            { ".dot1", SUBST_DOT1 },
+            { ".dot2", SUBST_DOT2 },
+            { ".dot3", SUBST_DOT3 },
+            { ".dot4", SUBST_DOT4 },
         };
         for(auto& [name, subst]: substitutions) {
             if(librarySymbols.find(name) != librarySymbols.end()) {
@@ -526,6 +534,42 @@ GPUCore::Status GPUCore::step(T& memory)
                                 float f = popf();
                                 pushf(floorf(f));
                                 break;
+                            }
+                            case SUBST_DOT1: {
+                                float x1 = popf();
+                                float x2 = popf();
+                                float v = x1 * x2;
+                                pushf(v);
+                            }
+                            case SUBST_DOT2: {
+                                float x1 = popf();
+                                float y1 = popf();
+                                float x2 = popf();
+                                float y2 = popf();
+                                float v = x1 * x2 + y1 * y2;
+                                pushf(v);
+                            }
+                            case SUBST_DOT3: {
+                                float x1 = popf();
+                                float y1 = popf();
+                                float z1 = popf();
+                                float x2 = popf();
+                                float y2 = popf();
+                                float z2 = popf();
+                                float v = x1 * x2 + y1 * y2 + z1 * z2;
+                                pushf(v);
+                            }
+                            case SUBST_DOT4: {
+                                float x1 = popf();
+                                float y1 = popf();
+                                float z1 = popf();
+                                float w1 = popf();
+                                float x2 = popf();
+                                float y2 = popf();
+                                float z2 = popf();
+                                float w2 = popf();
+                                float v = x1 * x2 + y1 * y2 + z1 * z2 + w1 * w2;
+                                pushf(v);
                             }
                             case SUBST_STEP: {
                                 float edge = popf();

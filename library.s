@@ -124,3 +124,19 @@
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
 
+.dot1:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.dot2:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.dot3:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.dot4:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
