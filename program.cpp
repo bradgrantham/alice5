@@ -63,6 +63,7 @@ uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t sca
         } else {
             // Not a constant, must be a variable.
             if (!scalarRegWasSpecified) {
+                assert(this->resultTypes.find(scalarReg) == this->resultTypes.end());
                 this->resultTypes[scalarReg] = subtype;
             }
         }
@@ -687,6 +688,34 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                  expandVectorsUniOp<InsnFNegate>(instruction, newList, replaced);
                  break;
 
+            case SpvOpDot: {
+                InsnDot *insn = dynamic_cast<InsnDot *>(instruction);
+
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->vector1Id));
+
+                std::vector<uint32_t> vector1Ids;
+                std::vector<uint32_t> vector2Ids;
+                if (typeVector != nullptr) {
+                    // Operand is vector.
+                    for (int i = 0; i < typeVector->count; i++) {
+                        vector1Ids.push_back(scalarize(insn->vector1Id, i, typeVector->type));
+                        vector2Ids.push_back(scalarize(insn->vector2Id, i, typeVector->type));
+                    }
+                } else {
+                    // Operand is scalar.
+                    vector1Ids.push_back(insn->vector1Id);
+                    vector2Ids.push_back(insn->vector2Id);
+                }
+                newList.push_back(std::make_shared<RiscVDot>(insn->lineInfo,
+                            insn->type,
+                            insn->resultId,
+                            vector1Ids,
+                            vector2Ids));
+
+                replaced = true;
+                break;
+            }
+
             case 0x10000 | GLSLstd450Sin:
                  expandVectorsUniOp<InsnGLSLstd450Sin>(instruction, newList, replaced);
                  break;
@@ -745,7 +774,7 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->xId));
 
                 std::vector<uint32_t> operandIds;
-                if (typeVector) {
+                if (typeVector != nullptr) {
                     // Operand is vector.
                     for (int i = 0; i < typeVector->count; i++) {
                         operandIds.push_back(scalarize(insn->xId, i, typeVector->type));
@@ -771,7 +800,7 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
 
                 std::vector<uint32_t> resultIds;
                 std::vector<uint32_t> operandIds;
-                if (typeVector) {
+                if (typeVector != nullptr) {
                     // Operand is vector.
                     for (int i = 0; i < typeVector->count; i++) {
                         resultIds.push_back(scalarize(insn->resultId, i, typeVector->type));

@@ -11,6 +11,7 @@ enum {
     RiscVOpMove,
     RiscVOpLength,
     RiscVOpNormalize,
+    RiscVOpDot,
 };
 
 // "addi" instruction.
@@ -158,5 +159,26 @@ struct RiscVNormalize : public Instruction {
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpNormalize; }
     virtual std::string name() const { return "normalize"; }
+    virtual void emit(Compiler *compiler);
+};
+
+// Dot instruction.
+struct RiscVDot : public Instruction {
+    RiscVDot(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &vector1Ids, const std::vector<uint32_t> &vector2Ids) : Instruction(lineInfo), type(type), resultId(resultId), vector1Ids(vector1Ids), vector2Ids(vector2Ids) {
+        addResult(resultId);
+        for (auto id : vector1Ids) {
+            addParameter(id);
+        }
+        for (auto id : vector2Ids) {
+            addParameter(id);
+        }
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    std::vector<uint32_t> vector1Ids; // operands from register
+    std::vector<uint32_t> vector2Ids; // operands from register
+    virtual void step(Interpreter *interpreter) { assert(false); }
+    virtual uint32_t opcode() const { return RiscVOpDot; }
+    virtual std::string name() const { return "dot"; }
     virtual void emit(Compiler *compiler);
 };

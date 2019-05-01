@@ -117,7 +117,7 @@ struct Program
     std::map<std::string, VariableInfo> namedVariables;
 
     // For expanding vectors to scalars:
-    uint32_t nextReg = 1000; // XXX make sure this doesn't conflict with actual registers.
+    uint32_t nextReg = 10000; // XXX make sure this doesn't conflict with actual registers.
     using RegIndex = std::pair<uint32_t,int>;
     std::map<RegIndex,uint32_t> vec2scalar;
 
