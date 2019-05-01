@@ -53,6 +53,14 @@ struct GPUCore
         SUBST_DOT2,
         SUBST_DOT3,
         SUBST_DOT4,
+        SUBST_ANY1,
+        SUBST_ANY2,
+        SUBST_ANY3,
+        SUBST_ANY4,
+        SUBST_ALL1,
+        SUBST_ALL2,
+        SUBST_ALL3,
+        SUBST_ALL4,
     };
     std::map<uint32_t, SubstituteFunction> substFunctions;
 
@@ -98,6 +106,14 @@ struct GPUCore
             { ".dot2", SUBST_DOT2 },
             { ".dot3", SUBST_DOT3 },
             { ".dot4", SUBST_DOT4 },
+            { ".any1", SUBST_ANY1 },
+            { ".any2", SUBST_ANY2 },
+            { ".any3", SUBST_ANY3 },
+            { ".any4", SUBST_ANY4 },
+            { ".all1", SUBST_ALL1 },
+            { ".all2", SUBST_ALL2 },
+            { ".all3", SUBST_ALL3 },
+            { ".all4", SUBST_ALL4 },
         };
         for(auto& [name, subst]: substitutions) {
             if(librarySymbols.find(name) != librarySymbols.end()) {
@@ -191,6 +207,8 @@ GPUCore::Status GPUCore::step(T& memory)
 
     std::function<float(void)> popf = [&]() { float v = memory.readf(x[2]); x[2] += 4; return v; };
     std::function<void(float)> pushf = [&](float f) { x[2] -= 4; memory.writef(x[2], f); };
+    std::function<uint32_t(void)> pop32 = [&]() { uint32_t v = memory.read32(x[2]); x[2] += 4; return v; };
+    std::function<void(uint32_t)> push32 = [&](uint32_t f) { x[2] -= 4; memory.write32(x[2], f); };
 
     std::function<void(void)> unimpl = [&]() {
         std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
@@ -570,6 +588,50 @@ GPUCore::Status GPUCore::step(T& memory)
                                 float w2 = popf();
                                 float v = x1 * x2 + y1 * y2 + z1 * z2 + w1 * w2;
                                 pushf(v);
+                            }
+                            case SUBST_ALL1: {
+                                uint32_t x = pop32();
+                                push32(x);
+                            }
+                            case SUBST_ALL2: {
+                                uint32_t x = pop32();
+                                uint32_t y = pop32();
+                                push32(x && y);
+                            }
+                            case SUBST_ALL3: {
+                                uint32_t x = pop32();
+                                uint32_t y = pop32();
+                                uint32_t z = pop32();
+                                push32(x && y && z);
+                            }
+                            case SUBST_ALL4: {
+                                uint32_t x = pop32();
+                                uint32_t y = pop32();
+                                uint32_t z = pop32();
+                                uint32_t w = pop32();
+                                push32(x && y && z && w);
+                            }
+                            case SUBST_ANY1: {
+                                uint32_t x = pop32();
+                                push32(x);
+                            }
+                            case SUBST_ANY2: {
+                                uint32_t x = pop32();
+                                uint32_t y = pop32();
+                                push32(x || y);
+                            }
+                            case SUBST_ANY3: {
+                                uint32_t x = pop32();
+                                uint32_t y = pop32();
+                                uint32_t z = pop32();
+                                push32(x || y || z);
+                            }
+                            case SUBST_ANY4: {
+                                uint32_t x = pop32();
+                                uint32_t y = pop32();
+                                uint32_t z = pop32();
+                                uint32_t w = pop32();
+                                push32(x || y || z || w);
                             }
                             case SUBST_STEP: {
                                 float edge = popf();
