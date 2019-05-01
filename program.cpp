@@ -754,6 +754,28 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 break;
             }
 
+            case SpvOpPhi: {
+                InsnPhi *insn = dynamic_cast<InsnPhi *>(instruction);
+                const TypeVector *typeVector = getTypeAsVector(
+                        resultTypes.at(insn->resultId));
+                if (typeVector != nullptr) {
+                    // Operands are <data, label> pairs.
+                    for (int i = 0; i < typeVector->count; i++) {
+                        std::vector<uint32_t> operandIds;
+                        for (int j = 0; j < insn->operandId.size(); j += 2) {
+                            operandIds.push_back(scalarize(insn->operandId[j], i, typeVector->type));
+                            operandIds.push_back(insn->operandId[j + 1]);
+                        }
+                        newList.push_back(std::make_shared<InsnPhi>(insn->lineInfo,
+                                    insn->type,
+                                    scalarize(insn->resultId, i, typeVector->type),
+                                    operandIds));
+                    }
+                    replaced = true;
+                }
+                break;
+            }
+
             case 0x10000 | GLSLstd450Sin:
                  expandVectorsUniOp<InsnGLSLstd450Sin>(instruction, newList, replaced);
                  break;
