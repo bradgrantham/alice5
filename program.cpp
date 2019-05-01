@@ -716,6 +716,44 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
                 break;
             }
 
+            case SpvOpAll: {
+                InsnAll *insn = dynamic_cast<InsnAll *>(instruction);
+
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->vectorId));
+                assert(typeVector != nullptr);
+
+                std::vector<uint32_t> operandIds;
+                for (int i = 0; i < typeVector->count; i++) {
+                    operandIds.push_back(scalarize(insn->vectorId, i, typeVector->type));
+                }
+                newList.push_back(std::make_shared<RiscVAll>(insn->lineInfo,
+                            insn->type,
+                            insn->resultId,
+                            operandIds));
+
+                replaced = true;
+                break;
+            }
+
+            case SpvOpAny: {
+                InsnAny *insn = dynamic_cast<InsnAny *>(instruction);
+
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->vectorId));
+                assert(typeVector != nullptr);
+
+                std::vector<uint32_t> operandIds;
+                for (int i = 0; i < typeVector->count; i++) {
+                    operandIds.push_back(scalarize(insn->vectorId, i, typeVector->type));
+                }
+                newList.push_back(std::make_shared<RiscVAny>(insn->lineInfo,
+                            insn->type,
+                            insn->resultId,
+                            operandIds));
+
+                replaced = true;
+                break;
+            }
+
             case 0x10000 | GLSLstd450Sin:
                  expandVectorsUniOp<InsnGLSLstd450Sin>(instruction, newList, replaced);
                  break;

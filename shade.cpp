@@ -822,6 +822,34 @@ void RiscVDot::emit(Compiler *compiler)
     compiler->emitCall(functionName.str(), resultIds, operandIds);
 }
 
+void RiscVAll::emit(Compiler *compiler)
+{
+    size_t n = operandIds.size();
+    assert(n <= 4);
+
+    std::vector<uint32_t> resultIds;
+    resultIds.push_back(resultId);
+
+    std::ostringstream functionName;
+    functionName << ".all" << n;
+
+    compiler->emitCall(functionName.str(), resultIds, operandIds);
+}
+
+void RiscVAny::emit(Compiler *compiler)
+{
+    size_t n = operandIds.size();
+    assert(n <= 4);
+
+    std::vector<uint32_t> resultIds;
+    resultIds.push_back(resultId);
+
+    std::ostringstream functionName;
+    functionName << ".any" << n;
+
+    compiler->emitCall(functionName.str(), resultIds, operandIds);
+}
+
 // -----------------------------------------------------------------------------------
 
 Instruction::Instruction(const LineInfo& lineInfo)

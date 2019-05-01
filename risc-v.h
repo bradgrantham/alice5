@@ -12,6 +12,8 @@ enum {
     RiscVOpLength,
     RiscVOpNormalize,
     RiscVOpDot,
+    RiscVOpAll,
+    RiscVOpAny,
 };
 
 // "addi" instruction.
@@ -180,5 +182,39 @@ struct RiscVDot : public Instruction {
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpDot; }
     virtual std::string name() const { return "dot"; }
+    virtual void emit(Compiler *compiler);
+};
+
+// All instruction.
+struct RiscVAll : public Instruction {
+    RiscVAll(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), resultId(resultId), operandIds(operandIds) {
+        addResult(resultId);
+        for (auto operandId : operandIds) {
+            addParameter(operandId);
+        }
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    std::vector<uint32_t> operandIds; // operands from register
+    virtual void step(Interpreter *interpreter) { assert(false); }
+    virtual uint32_t opcode() const { return RiscVOpAll; }
+    virtual std::string name() const { return "all"; }
+    virtual void emit(Compiler *compiler);
+};
+
+// Any instruction.
+struct RiscVAny : public Instruction {
+    RiscVAny(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), resultId(resultId), operandIds(operandIds) {
+        addResult(resultId);
+        for (auto operandId : operandIds) {
+            addParameter(operandId);
+        }
+    }
+    uint32_t type; // result type
+    uint32_t resultId; // SSA register for result value
+    std::vector<uint32_t> operandIds; // operands from register
+    virtual void step(Interpreter *interpreter) { assert(false); }
+    virtual uint32_t opcode() const { return RiscVOpAny; }
+    virtual std::string name() const { return "any"; }
     virtual void emit(Compiler *compiler);
 };
