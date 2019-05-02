@@ -252,8 +252,6 @@ GPUCore::Status GPUCore::step(T& memory)
 
         // fcvt.w.s  rd rs1 24..20=0 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
         // fcvt.wu.s rd rs1 24..20=1 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
-        // fcvt.s.w  rd rs1 24..20=0 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
-        // fcvt.s.wu rd rs1 24..20=1 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
 
         // XXX ignoring the rounding-mode bits
         // XXX haven't implemented anything but "S" (single) size
@@ -295,6 +293,48 @@ GPUCore::Status GPUCore::step(T& memory)
                     }
                     break;
                 }
+
+                // 00000110:  f0000253          fmv.s.x       ft4,zero
+                // unimplemented instruction f0000253 with 14..12=0 and 6..2=0x14
+                // fmv.w.x   rd rs1 24..20=0 31..27=0x1E 14..12=0 26..25=0 6..2=0x14 1..0=3
+                case 0x1E: {
+                    if(funct3 == 0) {
+                        if(fmt == 0) {
+                            f[rd] = *reinterpret_cast<float*>(&x[rs1]);
+                        } else {
+                            unimpl();
+                        }
+                    } else {
+                        unimpl();
+                    }
+                    break;
+                }
+
+                // unimplemented instruction d007f053 with 14..12=7 and 6..2=0x14
+                // fcvt.s.w  rd rs1 24..20=0 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
+                // fcvt.s.wu rd rs1 24..20=1 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
+                case 0x1A: {
+                    if(rs2 == 0) {
+                        if(fmt == 0) {
+                            f[rd] = *reinterpret_cast<int32_t*>(&x[rs1]);
+                        } else {
+                            printf("fmt = %d\n", fmt);
+                            unimpl();
+                        }
+                    } else if(rs2 == 1) {
+                        if(fmt == 0) {
+                            f[rd] = x[rs1];
+                        } else {
+                            printf("fmt = %d\n", fmt);
+                            unimpl();
+                        }
+                    } else {
+                        printf("rs2 = %d\n", rs2);
+                        unimpl();
+                    }
+                    break;
+                }
+
                 // fsgnj.s   rd rs1 rs2      31..27=0x04 14..12=0 26..25=0 6..2=0x14 1..0=3
                 // fsgnjn.s  rd rs1 rs2      31..27=0x04 14..12=1 26..25=0 6..2=0x14 1..0=3
                 // fsgnjx.s  rd rs1 rs2      31..27=0x04 14..12=2 26..25=0 6..2=0x14 1..0=3
@@ -319,10 +359,10 @@ GPUCore::Status GPUCore::step(T& memory)
             break;
         }
 
+        // fmv.x.w   rd rs1 24..20=0 31..27=0x1C 14..12=0 26..25=0 6..2=0x14 1..0=3
         // fcvt.s.w  rd rs1 24..20=0 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
         // fcvt.s.wu rd rs1 24..20=1 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
         // fmv.x.s
-        // fmv.s.x
         // fclass.s
 
         case makeOpcode(0, 0x1C, 3): { // ebreak
