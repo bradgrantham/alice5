@@ -216,34 +216,68 @@ void Program::postParse(bool scalarize) {
         uint32_t pc = *itr;
         pc_worklist.erase(*itr);
 
+        // Keep track of old livein/liveout for comparison.
         Instruction *instruction = instructions[pc].get();
-        std::set<uint32_t> oldLivein = instruction->livein;
+        std::map<uint32_t,std::set<uint32_t>> oldLivein = instruction->livein;
         std::set<uint32_t> oldLiveout = instruction->liveout;
 
+        // Compute liveout as union of next instructions' liveins.
         instruction->liveout.clear();
         for (uint32_t succPc : instruction->succ) {
             Instruction *succInstruction = instructions[succPc].get();
-            instruction->liveout.insert(succInstruction->livein.begin(),
-                    succInstruction->livein.end());
-        }
 
-        instruction->livein = instruction->liveout;
-        for (uint32_t resId : instruction->resIdSet) {
-            instruction->livein.erase(resId);
-        }
-        for (uint32_t argId : instruction->argIdSet) {
-            // Don't consider constants or variables, they're never in registers.
-            if (/*constants.find(argId) == constants.end() &&*/
-                    variables.find(argId) == variables.end()) {
+            // Add livein from any branch (0).
+            instruction->liveout.insert(
+                    succInstruction->livein[0].begin(),
+                    succInstruction->livein[0].end());
 
-                instruction->livein.insert(argId);
+            // Add livein specifically from this branch.
+            auto itr = succInstruction->livein.find(instruction->blockId);
+            if (itr != succInstruction->livein.end()) {
+                instruction->liveout.insert(itr->second.begin(), itr->second.end());
             }
         }
 
+        // Livein is liveout minus what we generate ...
+        instruction->livein[0] = instruction->liveout;
+        for (uint32_t resId : instruction->resIdSet) {
+            instruction->livein[0].erase(resId);
+        }
+        // ... plus what we need.
+        if (instruction->opcode() == SpvOpPhi) {
+            // Special handling of Phi instruction, because we must specify
+            // which branch our livein is from. Otherwise all branches will
+            // think they need all inputs, which is incorrect.
+            InsnPhi *phi = dynamic_cast<InsnPhi *>(instruction);
+            for (int i = 0; i < phi->operandId.size(); i += 2) {
+                uint32_t data = phi->operandId[i];
+                uint32_t label = phi->operandId[i + 1];
+                instruction->livein[label].insert(data);
+            }
+        } else {
+            // Non-phi instruction, all parameters are livein.
+            for (uint32_t argId : instruction->argIdSet) {
+                // Don't consider /*constants or*/ variables, they're never in registers.
+                if (/*constants.find(argId) == constants.end() &&*/
+                        variables.find(argId) == variables.end()) {
+
+                    instruction->livein[0].insert(argId);
+                }
+            }
+        }
+
+        // If we changed, then our predecessors need to update since they
+        // depend on us.
         if (oldLivein != instruction->livein || oldLiveout != instruction->liveout) {
             // Our predecessors depend on us.
             for (uint32_t predPc : instruction->pred) {
                 pc_worklist.insert(predPc);
+            }
+
+            // Compute union of livein.
+            instruction->liveinAll.clear();
+            for (auto &[label,liveinSet] : instruction->livein) {
+                instruction->liveinAll.insert(liveinSet.begin(), liveinSet.end());
             }
         }
     }
@@ -440,8 +474,12 @@ void Program::postParse(bool scalarize) {
                 std::cout << " " << line;
             }
             std::cout << ", live";
-            for (auto regId : instruction->livein) {
-                std::cout << " " << regId;
+            for (auto &[label,liveinSet] : instruction->livein) {
+                std::cout << " " << label << "(";
+                for (auto regId : liveinSet) {
+                    std::cout << " " << regId;
+                }
+                std::cout << ")";
             }
 
             std::cout << ")\n";

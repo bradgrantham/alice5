@@ -104,7 +104,7 @@ struct Compiler
                     emitLabel(name);
 
                     // Emit instructions to fill constants.
-                    for (auto regId : pgm->instructions.at(function.second.start)->livein) {
+                    for (auto regId : pgm->instructions.at(function.second.start)->liveinAll) {
                         auto r = registers.find(regId);
                         assert(r != registers.end());
                         assert(r->second.phy.size() == 1);
@@ -303,7 +303,7 @@ struct Compiler
             // Assign registers for constants.
             std::set<uint32_t> constIntRegs = PHY_INT_REGS;
             std::set<uint32_t> constFloatRegs = PHY_FLOAT_REGS;
-            for (auto regId : instructions.at(block->begin)->livein) {
+            for (auto regId : instructions.at(block->begin)->liveinAll) {
                 if (registers.find(regId) != registers.end()) {
                     std::cerr << "Error: Constant "
                         << regId << " already assigned a register at head of function.\n";
@@ -343,7 +343,7 @@ struct Compiler
 
         // Registers that are live going into this block have already been
         // assigned.
-        for (auto regId : instructions.at(block->begin)->livein) {
+        for (auto regId : instructions.at(block->begin)->liveinAll) {
             auto r = registers.find(regId);
             if (r == registers.end()) {
                 std::cerr << "Warning: Initial virtual register "
