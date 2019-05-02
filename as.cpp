@@ -507,7 +507,7 @@ private:
         if (!opOrLabel.empty()) {
             // See if it's a directive.
             if (opOrLabel == ".word") {
-                int32_t imm = readImmediate(32);
+                int32_t imm = readExpression(32);
                 emit(imm);
             } else {
                 parseOperator(opOrLabel);
@@ -569,12 +569,11 @@ private:
         return id;
     }
 
-    // Read a signed integer immediate value. The immediate must fit in the specified
-    // number of bits. Skips subsequent whitespace. The immediate
+    // Read a signed integer immediate value. Skips subsequent whitespace. The immediate
     // can be in decimal or hex (with a 0x prefix).
-    int32_t readImmediate(int bits) {
+    int64_t readImmediate() {
         bool found = false;
-        int32_t imm = 0;
+        int64_t value = 0;
         previousToken = s;
 
         bool negative = *s == '-';
@@ -588,15 +587,15 @@ private:
             while (true) {
                 char c = tolower(*s);
 
-                uint32_t value;
+                uint32_t digit;
                 if (isdigit(c)) {
-                    value = c - '0';
+                    digit = c - '0';
                 } else if (c >= 'a' && c <= 'f') {
-                    value = c - 'a' + 10;
+                    digit = c - 'a' + 10;
                 } else {
                     break;
                 }
-                imm = imm*16 + value;
+                value = value*16 + digit;
                 found = true;
 
                 s++;
@@ -604,7 +603,7 @@ private:
         } else {
             // Decimal.
             while (isdigit(*s)) {
-                imm = imm*10 + (*s - '0');
+                value = value*10 + (*s - '0');
                 found = true;
                 s++;
             }
@@ -616,43 +615,105 @@ private:
         }
 
         if (negative) {
-            imm = -imm;
-        }
-
-        // Make sure we fit.
-        if (bits != 32) {
-            int32_t limit = 1 << (bits - 1);
-            if (negative ? -imm > limit : imm >= limit) {
-                // Back up over immediate.
-                s = previousToken;
-                std::ostringstream ss;
-                ss << "Immediate " << imm << " (0x"
-                    << std::hex << imm << std::dec << ") does not fit in "
-                    << bits << (bits == 1 ? " bit" : " bits");
-                error(ss.str());
-            }
+            value = -value;
         }
 
         skipWhitespace();
 
-        return imm;
+        return value;
     }
 
-    // Read a signed immediate or a label. If label, returns
-    // as a PC-relative immediate (if pcRelative is true) or
-    // an absolute value (if pcRelative is false).
-    int32_t readImmediateOrLabel(const Operator &op, bool pcRelative) {
-        int32_t imm;
+    // Read an expression. Ensure that the result fits in "bits" bits.
+    //
+    // An expression can be:
+    //
+    // - A signed immediate decimal or hex number.
+    // - A reference to a label.
+    // - The function %hi(expr) or %lo(expr). These returns the top 20 or
+    // lower 12 bits of the expression in the parentheses. If bit 11 is set,
+    // then the %hi() value is incremented by one to account for the fact that
+    // the %lo() value will later be sign-extended and added to the %hi() value.
+    // - The sum of two expressions.
+    int32_t readExpression(int bits) {
+        const char *expressionStart = s;
 
-        // See if we're branching to a label or an immediate.
+        int64_t value = readSum();
+
+        // Make sure we fit.
+        if (bits != 32) {
+            int32_t limit = 1 << (bits - 1);
+            if (value < 0 ? -value > limit : value >= limit) {
+                // Back up over expression.
+                const char *here = s;
+                s = expressionStart;
+                std::ostringstream ss;
+                ss << "Value " << value << " (0x"
+                    << std::hex << value << std::dec << ") does not fit in "
+                    << bits << (bits == 1 ? " bit" : " bits");
+                warning(ss.str());
+                s = here;
+            }
+        }
+
+        return value;
+    }
+
+    // Read an expression, not checking resulting size.
+    int64_t readSum() {
+        int64_t value = 0;
+
+        while (true) {
+            value += readAtom();
+            if (!foundChar('+')) {
+                break;
+            }
+        }
+
+        return value;
+    }
+
+    int64_t readAtom() {
+        if (foundChar('%')) {
+            const char *functionStart = s;
+            std::string func = readIdentifier();
+
+            if (!foundChar('(')) {
+                error("Expected open parenthesis");
+            }
+
+            int64_t value = readSum();
+
+            if (!foundChar(')')) {
+                error("Expected close parenthesis");
+            }
+
+            if (func == "lo") {
+                // Lower 12 bits.
+                return value & 0x00000FFF;
+            } else if (func == "hi") {
+                // Upper 20 bits.
+                if ((value & 0x00000800) != 0) {
+                    // Since the low value will be sign-extended and added,
+                    // we have to add 1 to this.
+                    value += 0x00001000;
+                }
+                return value >> 12;
+            } else {
+                s = functionStart;
+                std::ostringstream ss;
+                ss << "Unknown assembler function \"" << func << "\"";
+                error(ss.str());
+            }
+        }
+
+        // Try identifier.
         std::string label = readIdentifier();
-        if (label.empty()) {
-            imm = readImmediate(op.bits);
-        } else {
-            uint32_t target;
+        if (!label.empty()) {
+            int64_t target;
 
             // Look up label.
             if (labels.find(label) == labels.end()) {
+                // Unknown label.
                 if (pass == 0) {
                     // Use anything, it doesn't matter.
                     target = pc();
@@ -663,24 +724,15 @@ private:
                     error(ss.str());
                 }
             } else {
+                // Found label.
                 target = labels.at(label);
             }
 
-            if (pcRelative) {
-                // Jump labels are PC-relative.
-                imm = target - pc();
-            } else {
-                imm = target;
-            }
-            // XXX check that it can fit in op.bits.
-        }
-        if ((imm & 0x1) != 0) {
-            // XXX I think this is only true of jump targets.
-            s = previousToken;
-            error("Immediate must be even");
+            return target;
         }
 
-        return imm;
+        // Assume immediate.
+        return readImmediate();
     }
 
     // Parse an operator and its parameters.
@@ -732,12 +784,7 @@ private:
                 if (!foundChar(',')) {
                     error("Expected comma");
                 }
-                int32_t imm = readImmediateOrLabel(op, false);
-                if (foundChar('+')) {
-                    // Integer offset.
-                    int32_t offset = readImmediate(32);
-                    imm += offset;
-                }
+                int32_t imm = readExpression(op.bits);
                 emitI(op, rd, rs1, imm);
                 break;
             }
@@ -747,12 +794,7 @@ private:
                 if (!foundChar(',')) {
                     error("Expected comma");
                 }
-                int32_t imm = readImmediateOrLabel(op, false);
-                if (foundChar('+')) {
-                    // Integer offset.
-                    int32_t offset = readImmediate(32);
-                    imm += offset;
-                }
+                int32_t imm = readExpression(op.bits);
                 if (!foundChar('(')) {
                     error("Expected open parenthesis");
                 }
@@ -775,12 +817,7 @@ private:
                 if (!foundChar(',')) {
                     error("Expected comma");
                 }
-                int32_t imm = readImmediateOrLabel(op, false);
-                if (foundChar('+')) {
-                    // Integer offset.
-                    int32_t offset = readImmediate(32);
-                    imm += offset;
-                }
+                int32_t imm = readExpression(op.bits);
                 if (!foundChar('(')) {
                     error("Expected open parenthesis");
                 }
@@ -801,7 +838,9 @@ private:
                 if (!foundChar(',')) {
                     error("Expected comma");
                 }
-                int32_t imm = readImmediateOrLabel(op, true);
+                int32_t imm = readExpression(op.bits);
+                // Jump labels are PC-relative.
+                imm -= pc();
                 emitSB(op, rs1, rs2, imm);
                 break;
             }
@@ -811,7 +850,7 @@ private:
                 if (!foundChar(',')) {
                     error("Expected comma");
                 }
-                int32_t imm = readImmediate(op.bits);
+                int32_t imm = readExpression(op.bits);
                 emitU(op, rd, imm);
                 break;
             }
@@ -821,7 +860,9 @@ private:
                 if (!foundChar(',')) {
                     error("Expected comma");
                 }
-                int32_t imm = readImmediateOrLabel(op, true);
+                int32_t imm = readExpression(op.bits);
+                // Jump labels are PC-relative.
+                imm -= pc();
                 emitUJ(op, rd, imm);
                 break;
             }
@@ -832,8 +873,8 @@ private:
         }
     }
 
-    // Error function.
-    [[noreturn]] void error(const std::string &message) {
+    // Message function.
+    void showMessage(const std::string &message) {
         const SourceLine &sourceLine = currentLine();
 
         int col = s - sourceLine.code.c_str();
@@ -842,6 +883,16 @@ private:
             << (col + 1) << ": " << message << "\n";
         std::cerr << currentLine().code << "\n";
         std::cerr << std::string(col, ' ') << "^\n";
+    }
+
+    // Warning function.
+    void warning(const std::string &message) {
+        showMessage(std::string("warning: ") + message);
+    }
+
+    // Error function.
+    [[noreturn]] void error(const std::string &message) {
+        showMessage(std::string("error: ") + message);
         exit(EXIT_FAILURE);
     }
 
