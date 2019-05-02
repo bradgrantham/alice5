@@ -223,11 +223,14 @@ struct Program
         return type->op() == SpvOpTypeVector ? dynamic_cast<const TypeVector *>(type) : nullptr;
     }
 
-    // Returns true if a type is a float, false if it's an integer or pointer,
+    // Returns true if a type is a float, false if it's an integer, pointer, or bool,
     // otherwise asserts.
     bool isTypeFloat(uint32_t typeId) const {
         const Type *type = types.at(typeId).get();
-        if (type->op() == SpvOpTypeInt || type->op() == SpvOpTypePointer) {
+        if (type->op() == SpvOpTypeInt
+                || type->op() == SpvOpTypePointer
+                || type->op() == SpvOpTypeBool) {
+
             return false;
         } else if (type->op() == SpvOpTypeFloat) {
             return true;
