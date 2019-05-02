@@ -293,9 +293,8 @@ struct Program
     // Return the scalar for the vector register's index.
     uint32_t scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg = 0);
 
-    // Transform vector instructions to scalar instructions. inList and outList
-    // may be the same list.
-    void expandVectors(const InstructionList &inList, InstructionList &outList);
+    // Transform vector instructions to scalar instructions.
+    void expandVectors();
 
     // Expand a unary operator, such as FNegate, from vector to scalar if necessary.
     template <class T>

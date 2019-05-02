@@ -82,7 +82,7 @@ uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t sca
 void Program::postParse(bool scalarize) {
     if (scalarize) {
         // Convert vector instructions to scalar instructions.
-        expandVectors(instructions, instructions);
+        expandVectors();
     }
 
     // Find the main function.
@@ -306,6 +306,10 @@ void Program::postParse(bool scalarize) {
             worklist.insert(worklist.end(), block->succ.begin(), block->succ.end());
         }
     }
+    // Unreached blocks don't actually have any doms.
+    for (auto id : unreached) {
+        blocks[id]->dom.clear();
+    }
     std::cerr << "Dominance tree took " << timer.elapsed() << " seconds.\n";
 
     // Compute immediate dom for each block.
@@ -447,6 +451,7 @@ void Program::postParse(bool scalarize) {
         std::cout << "-----------------------\n";
     }
 
+    // Check that all blocks were assigned properly.
     for (auto& [labelId, block] : blocks) {
         // It's okay to have no idom as long as you're the first block in the function.
         if ((block->idom == NO_BLOCK_ID) != block->pred.empty()) {
@@ -459,7 +464,9 @@ void Program::postParse(bool scalarize) {
     }
 }
 
-void Program::expandVectors(const InstructionList &inList, InstructionList &outList) {
+void Program::expandVectors() {
+    // Map from instruction index before and after, for remapping other data structures.
+    std::vector<uint32_t> lineMap;
     InstructionList newList;
 
     /* XXX delete
@@ -487,10 +494,13 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
     }
     */
 
-    for (uint32_t pc = 0; pc < inList.size(); pc++) {
+    for (uint32_t pc = 0; pc < instructions.size(); pc++) {
         bool replaced = false;
-        const std::shared_ptr<Instruction> &instructionPtr = inList[pc];
+        const std::shared_ptr<Instruction> &instructionPtr = instructions[pc];
         Instruction *instruction = instructionPtr.get();
+
+        // Keep track of where this instructions ends up.
+        lineMap.push_back(newList.size());
 
         switch (instruction->opcode()) {
             case SpvOpLoad: {
@@ -919,6 +929,11 @@ void Program::expandVectors(const InstructionList &inList, InstructionList &outL
         }
     }
 
-    std::swap(newList, outList);
+    // Remap other data structures.
+    for (auto &itr : labels) {
+        itr.second = lineMap[itr.second];
+    }
+
+    std::swap(newList, instructions);
 }
 
