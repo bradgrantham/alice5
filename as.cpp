@@ -289,8 +289,7 @@ public:
         operators["fdiv.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0001100}.setAllFloat();
         operators["fsqrt.s"]   = Operator{FORMAT_R2, 0b1010011, 0b010, 0b0101100}.setAllFloat()
             .setR2(0b00000);
-        operators["fmadd.s"]   = Operator{FORMAT_R4, 0b1000011, 0b010, 0b0000000}.setAllFloat();
-        // fmadd.s   rd rs1 rs2 rs3 rm 26..25=0 6..2=0x10 1..0=3
+        operators["fmadd.s"]   = Operator{FORMAT_R4, 0b1000011, 0b000, 0b0000000}.setAllFloat();
 
         // Environment.
         operators["ebreak"]    = Operator{FORMAT_IZ, 0b1110011, 0b000, 0b0000000}.
