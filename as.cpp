@@ -308,7 +308,12 @@ public:
         addRegisters("a", 0, 7, 10);
         addRegisters("s", 2, 11, 18);
         addRegisters("t", 3, 6, 28);
-        addRegisters("f", 0, 31, 32);
+        addRegisters("f", 0, 31, 32 + 0);
+        addRegisters("ft", 0, 7, 32 + 0);
+        addRegisters("fs", 0, 1, 32 + 8);
+        addRegisters("fa", 0, 7, 32 + 10);
+        addRegisters("fs", 2, 11, 32 + 18);
+        addRegisters("ft", 8, 11, 32 + 28);
     }
 
     // Load the assembly file.
