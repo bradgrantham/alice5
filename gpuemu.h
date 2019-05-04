@@ -12,7 +12,7 @@ struct GPUCore
 
     uint32_t x[32]; // but 0 not accessed because it's readonly 0
     uint32_t pc;
-    float f[32]; // but 0 not accessed because it's readonly 0
+    float f[32];
 
     // XXX CSRs
     // XXX FCSRs
@@ -187,6 +187,7 @@ GPUCore::Status GPUCore::step(T& memory)
     uint32_t ffunct = getBits(insn, 31, 27);
     uint32_t rs1 = getBits(insn, 19, 15);
     uint32_t rs2 = getBits(insn, 24, 20);
+    uint32_t rs3 = getBits(insn, 31, 27);
     uint32_t immI = extendSign(getBits(insn, 31, 20), 12);
     uint32_t shamt = getBits(insn, 34, 20);
     uint32_t immS = extendSign(
@@ -235,6 +236,26 @@ GPUCore::Status GPUCore::step(T& memory)
         case makeOpcode(2, 0x09, 3): {
             if(dump) std::cout << "fsw\n";
             memory.writef(x[rs1] + immS, f[rs2]);
+            pc += 4;
+            break;
+        }
+
+        CASE_MAKE_OPCODE_ALL_FUNCT3(0x10, 3)
+        {
+            if(dump) std::cout << "fmadd\n";
+            if(fmt == 0x0) { // rm
+                // our assembler always outputs rm = 0
+                if(funct3 == 0x0) { // size
+                    // .s
+                    f[rd] = f[rs1] * f[rs2] + f[rs3];
+                } else {
+                    printf("funct3 %d\n", funct3);
+                    unimpl();
+                }
+            } else {
+                printf("fmt %d\n", fmt);
+                unimpl();
+            }
             pc += 4;
             break;
         }
