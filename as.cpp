@@ -50,6 +50,7 @@ std::string readFileContents(const std::string &pathname) {
 enum Format {
     FORMAT_R,
     FORMAT_R2,  // Two-operand (one source).
+    FORMAT_R4,  // Three-operand (one source).
     FORMAT_I,
     FORMAT_IL,  // For loads: same binary as FORMAT_I but different assembly.
     FORMAT_IZ,  // For system instructions. No parameters, they're all zero.
@@ -288,6 +289,8 @@ public:
         operators["fdiv.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0001100}.setAllFloat();
         operators["fsqrt.s"]   = Operator{FORMAT_R2, 0b1010011, 0b010, 0b0101100}.setAllFloat()
             .setR2(0b00000);
+        operators["fmadd.s"]   = Operator{FORMAT_R4, 0b1000011, 0b010, 0b0000000}.setAllFloat();
+        // fmadd.s   rd rs1 rs2 rs3 rm 26..25=0 6..2=0x10 1..0=3
 
         // Environment.
         operators["ebreak"]    = Operator{FORMAT_IZ, 0b1110011, 0b000, 0b0000000}.
@@ -765,6 +768,24 @@ private:
                 break;
             }
 
+            case FORMAT_R4: {
+                int rd = readRegister(op.dIsFloat, "destination");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int rs1 = readRegister(op.s1IsFloat, "source");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int rs2 = readRegister(op.s2IsFloat, "source");
+                if (!foundChar(',')) {
+                    error("Expected comma");
+                }
+                int rs3 = readRegister(true, "source");
+                emitR4(op, rd, rs1, rs2, rs3);
+                break;
+            }
+
             case FORMAT_R2: {
                 int rd = readRegister(op.dIsFloat, "destination");
                 if (!foundChar(',')) {
@@ -946,6 +967,16 @@ private:
         }
 
         return reg;
+    }
+
+    // Emit a FORMAT_R4 instruction.
+    void emitR4(const Operator &op, int rd, int rs1, int rs2, int rs3) {
+        emit(op.opcode
+                | rd << 7
+                | op.funct3 << 12
+                | rs1 << 15
+                | rs2 << 20
+                | rs3 << 27);
     }
 
     // Emit a FORMAT_R instruction.
