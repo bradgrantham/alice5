@@ -5,10 +5,10 @@
         sw      a3, -4(sp)      ; save registers
         sw      a4, -8(sp)
         sw      a5, -12(sp)
-        fsw     f0, -16(sp)
-        fsw     f4, -20(sp)
-        fsw     f5, -24(sp)
-        flw     f0, 0(sp)       ; load first parameter ("x")
+        fsw     fa0, -16(sp)
+        fsw     fa4, -20(sp)
+        fsw     fa5, -24(sp)
+        flw     fa0, 0(sp)       ; load first parameter ("x")
 	lui	a5,%hi(.LC0)
 	flw	fa5,%lo(.LC0)(a5)
 	fmv.s.x	fa4,zero
@@ -16,16 +16,16 @@
 	fmul.s	fa5,fa0,fa5
 	flt.s	a4,fa0,fa4
 	flw	fa4,%lo(.LC1)(a5)
-	fcvt.w.s a5,fa5,rtz
+	fcvt.w.s a5,fa5
 	sub	a5,a5,a4
 	fcvt.s.w	fa0,a5
 	fsub.s	fa0,fa5,fa0
 	fmul.s	fa0,fa0,fa4
-	fge.s	a5,fa0,fa4
-	beqz	a5,.L4
+	flt.s	a5,fa4,fa0
+	beq	a5,x0,.L4
 	fsub.s	fa0,fa0,fa4
 .L4:
-	fcvt.wu.s a5,fa0,rtz
+	fcvt.wu.s a5,fa0
 	lui	a3,%hi(sinTable_f32)
 	addi	a3,a3,%lo(sinTable_f32)
 	andi	a5,a5,511
@@ -43,13 +43,13 @@
 	fmul.s	fa0,fa0,fa4
 	flw	fa4,0(a5)
 	fmadd.s	fa0,fa5,fa4,fa0
-        fsw     f0, 0(sp)       ; store return value
+        fsw     fa0, 0(sp)       ; store return value
         lw      a3, -4(sp)      ; restore registers
         lw      a4, -8(sp)
         lw      a5, -12(sp)
-        flw     f0, -16(sp)
-        flw     f4, -20(sp)
-        flw     f5, -24(sp)
+        flw     fa0, -16(sp)
+        flw     fa4, -20(sp)
+        flw     fa5, -24(sp)
         jalr x0, ra, 0                
 
 sinTable_f32:
