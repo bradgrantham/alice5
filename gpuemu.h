@@ -20,7 +20,10 @@ struct GPUCore
     enum SubstituteFunction {
         SUBST_SIN,
         SUBST_ATAN,
-        SUBST_REFLECT,
+        SUBST_REFLECT1,
+        SUBST_REFLECT2,
+        SUBST_REFLECT3,
+        SUBST_REFLECT4,
         SUBST_POW,
         SUBST_NORMALIZE1,
         SUBST_NORMALIZE2,
@@ -37,15 +40,24 @@ struct GPUCore
         SUBST_LENGTH4,
         SUBST_CROSS,
         SUBST_LOG,
-        SUBST_FACEFORWARD,
+        SUBST_FACEFORWARD1,
+        SUBST_FACEFORWARD2,
+        SUBST_FACEFORWARD3,
+        SUBST_FACEFORWARD4,
         SUBST_ACOS,
         SUBST_RADIANS,
         SUBST_DEGREES,
         SUBST_EXP2,
         SUBST_TAN,
         SUBST_ATAN2,
-        SUBST_REFRACT,
-        SUBST_DISTANCE,
+        SUBST_REFRACT1,
+        SUBST_REFRACT2,
+        SUBST_REFRACT3,
+        SUBST_REFRACT4,
+        SUBST_DISTANCE1,
+        SUBST_DISTANCE2,
+        SUBST_DISTANCE3,
+        SUBST_DISTANCE4,
         SUBST_FRACT,
         SUBST_FLOOR,
         SUBST_STEP,
@@ -73,7 +85,10 @@ struct GPUCore
         std::vector<std::pair<std::string, SubstituteFunction> > substitutions = {
             { ".sin", SUBST_SIN },
             { ".atan", SUBST_ATAN },
-            { ".reflect", SUBST_REFLECT },
+            { ".reflect1", SUBST_REFLECT1 },
+            { ".reflect2", SUBST_REFLECT2 },
+            { ".reflect3", SUBST_REFLECT3 },
+            { ".reflect4", SUBST_REFLECT4 },
             { ".pow", SUBST_POW },
             { ".normalize1", SUBST_NORMALIZE1 },
             { ".normalize2", SUBST_NORMALIZE2 },
@@ -90,15 +105,24 @@ struct GPUCore
             { ".length4", SUBST_LENGTH4 },
             { ".cross", SUBST_CROSS },
             { ".log", SUBST_LOG },
-            { ".faceforward", SUBST_FACEFORWARD },
+            { ".faceforward1", SUBST_FACEFORWARD1 },
+            { ".faceforward2", SUBST_FACEFORWARD2 },
+            { ".faceforward3", SUBST_FACEFORWARD3 },
+            { ".faceforward4", SUBST_FACEFORWARD4 },
             { ".acos", SUBST_ACOS },
             { ".radians", SUBST_RADIANS },
             { ".degrees", SUBST_DEGREES },
             { ".exp2", SUBST_EXP2 },
             { ".tan", SUBST_TAN },
             { ".atan2", SUBST_ATAN2 },
-            { ".refract", SUBST_REFRACT },
-            { ".distance", SUBST_DISTANCE },
+            { ".refract1", SUBST_REFRACT1 },
+            { ".refract2", SUBST_REFRACT2 },
+            { ".refract3", SUBST_REFRACT3 },
+            { ".refract4", SUBST_REFRACT4 },
+            { ".distance1", SUBST_DISTANCE1 },
+            { ".distance2", SUBST_DISTANCE2 },
+            { ".distance3", SUBST_DISTANCE3 },
+            { ".distance4", SUBST_DISTANCE4 },
             { ".fract", SUBST_FRACT },
             { ".floor", SUBST_FLOOR },
             { ".step", SUBST_STEP },
@@ -706,19 +730,67 @@ GPUCore::Status GPUCore::step(T& memory)
                                 pushf(f - floorf(f));
                                 break;
                             }
-                            case SUBST_REFRACT: {
+                            case SUBST_REFRACT1: {
                                 unimpl_subst();
                                 break;
                             }
-                            case SUBST_DISTANCE: {
+                            case SUBST_REFRACT2: {
                                 unimpl_subst();
                                 break;
                             }
-                            case SUBST_REFLECT: {
+                            case SUBST_REFRACT3: {
                                 unimpl_subst();
                                 break;
                             }
-                            case SUBST_FACEFORWARD: {
+                            case SUBST_REFRACT4: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_DISTANCE1: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_DISTANCE2: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_DISTANCE3: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_DISTANCE4: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_REFLECT1: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_REFLECT2: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_REFLECT3: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_REFLECT4: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_FACEFORWARD1: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_FACEFORWARD2: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_FACEFORWARD3: {
+                                unimpl_subst();
+                                break;
+                            }
+                            case SUBST_FACEFORWARD4: {
                                 unimpl_subst();
                                 break;
                             }
