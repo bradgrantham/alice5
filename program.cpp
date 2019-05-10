@@ -160,7 +160,7 @@ void Program::postParse(bool scalarize) {
         }
     }
 
-    // Compute successor blocks.
+    // Compute successor and predecessor blocks.
     for (auto& [labelId, block] : blocks) {
         Instruction *instruction = instructions[block->end - 1].get();
         assert(instruction->isTermination());
