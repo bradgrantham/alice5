@@ -27,12 +27,30 @@ struct CompilerRegister {
     }
 };
 
+// Class of all virtual registers that participate (transitively) in
+// the same phi instruction.
+struct PhiClass {
+    // Non-empty set of virtual registers in this class.
+    std::set<uint32_t> registers;
+
+    // Return an arbitrary (but stable) register for this class.
+    uint32_t getId() const {
+        return *registers.begin();
+    }
+};
+
 // Compiles a Program to our ISA.
 struct Compiler {
     const Program *pgm;
     std::map<uint32_t, CompilerRegister> registers;
     uint32_t localLabelCounter;
+
+    // Compiler's own list of instructions, with its modifications.
     InstructionList instructions;
+
+    // Map from each register to the class that it's in. There's only an
+    // entry here if the register participates in a phi instruction.
+    std::map<uint32_t,std::shared_ptr<PhiClass>> phiClassMap;
 
     Compiler(const Program *pgm)
         : pgm(pgm), localLabelCounter(1)
@@ -62,6 +80,13 @@ struct Compiler {
     // machine instructions, but still using SSA. inList and outList
     // may be the same list.
     void transformInstructions(const InstructionList &inList, InstructionList &outList);
+
+    // Get rid of phi instructions.
+    void translateOutOfSsa();
+
+    // Add register to phi class and phi class map, replacing phiClass if
+    // the register is already part of a class.
+    void processPhiRegister(uint32_t regId, std::shared_ptr<PhiClass> &phiClass);
 
     // Assign all physical registers.
     void assignRegisters();

@@ -99,6 +99,40 @@ use temporary registers, they must be done before register assignment. They
 cannot be done at the end when the RISC-V code is being emitted. This pass is
 done in `Compiler::transformInstructions()`.
 
+Before we can assign physical registers, we must get rid of _phi instructions_.
+If SSA truly only assigned each register once, then you couldn't make use of
+any register assigned in a conditional block, since you weren't later guaranteed
+that the block had been executed. To solve this problem, SSA form inserts phi
+instructions immediately after optional blocks like those of if/then statements.
+They are similar to ternary expressions in C:
+
+    if (condition) {
+        a = 5;
+    } else {
+        b = 6;
+    }
+    c = ... ? a : b;
+
+The `...` above can't be expressed in C, but means "if we came from the first
+branch". It's a magical check that knows where program flow just came from,
+and is a way to merge data flow together again after a split in control flow.
+The RISC-V instruction set doesn't have a phi instruction, so we must get rid
+of it. The easiest solution is to remove it altogether by assigning all
+of its arguments and results to the same virtual register:
+
+    if (condition) {
+        c = 5;
+    } else {
+        c = 6;
+    }
+
+It is a violation of SSA rules to assign to `c` in two places in the code, so
+this process is sometimes called "translating out of SSA form". Since the
+result of a phi instruction might be used as an argument to another phi
+instruction, we transitively compute all virtual registers that participate in
+phi instructions together so we can assign them all the same virtual (and
+eventually physical) register. This is done in `Compiler::translateOutOfSsa()`.
+
 The next pass assigns virtual registers to physical registers. We had
 previously computed which virtual registers were live at each instruction. If
 any instruction has more live registers than we have physical registers, then

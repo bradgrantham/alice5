@@ -8,6 +8,9 @@ void Compiler::compile() {
     // Transform SPIR-V instructions to RISC-V instructions.
     transformInstructions(pgm->instructions, instructions);
 
+    // Translate out of SSA by eliminating phi instructions.
+    translateOutOfSsa();
+
     // Perform physical register assignment.
     assignRegisters();
 
@@ -183,6 +186,59 @@ void Compiler::transformInstructions(const InstructionList &inList, InstructionL
     }
 
     std::swap(newList, outList);
+}
+
+void Compiler::translateOutOfSsa() {
+    phiClassMap.clear();
+
+    // Go through all instructions look for phi.
+    for (int pc = 0; pc < instructions.size(); pc++) {
+        Instruction *insn = instructions.at(pc).get();
+        if (insn->opcode() == SpvOpPhi) {
+            std::shared_ptr<PhiClass> phiClass = std::make_shared<PhiClass>();
+            for (uint32_t regId : insn->resIdSet) {
+                processPhiRegister(regId, phiClass);
+            }
+            for (uint32_t regId : insn->argIdSet) {
+                processPhiRegister(regId, phiClass);
+            }
+        }
+    }
+
+    if (pgm->verbose) {
+        std::cout << "----------------------- Phi class info\n";
+        for (auto itr : phiClassMap) {
+            std::cout << itr.first << ":";
+            for (uint32_t regId : itr.second->registers) {
+                std::cout << " " << regId;
+            }
+            std::cout << " (" << itr.second->getId() << ")\n";
+        }
+    }
+
+    // We've created all the phi classes. We must make sure that
+    // no pair of registers in a class is ever live at the same time.
+    // XXX to do!
+}
+
+void Compiler::processPhiRegister(uint32_t regId, std::shared_ptr<PhiClass> &phiClass) {
+    auto itr = phiClassMap.find(regId);
+    if (itr != phiClassMap.end()) {
+        // This register is already in another class. Merge what
+        // we have so far of this class into the other one.
+        std::shared_ptr<PhiClass> otherPhiClass = itr->second;
+        for (uint32_t prevRegId : phiClass->registers) {
+            otherPhiClass->registers.insert(prevRegId);
+            phiClassMap[prevRegId] = otherPhiClass;
+        }
+
+        // Continue adding to other existing class.
+        phiClass = otherPhiClass;
+    }
+
+    // Record this register as part of this class.
+    phiClass->registers.insert(regId);
+    phiClassMap[regId] = phiClass;
 }
 
 void Compiler::assignRegisters() {
