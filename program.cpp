@@ -224,18 +224,23 @@ void Program::postParse(bool scalarize) {
         // Compute liveout as union of next instructions' liveins.
         instruction->liveout.clear();
         for (uint32_t succPc : instruction->succ) {
-            Instruction *succInstruction = instructions[succPc].get();
+            // We must handle all the phi instructions, not just the first.
+            bool isPhi;
+            do {
+                Instruction *succInstruction = instructions[succPc++].get();
+                isPhi = succInstruction->opcode() == SpvOpPhi;
 
-            // Add livein from any branch (0).
-            instruction->liveout.insert(
-                    succInstruction->livein[0].begin(),
-                    succInstruction->livein[0].end());
+                // Add livein from any branch (0).
+                instruction->liveout.insert(
+                        succInstruction->livein[0].begin(),
+                        succInstruction->livein[0].end());
 
-            // Add livein specifically from this branch.
-            auto itr = succInstruction->livein.find(instruction->blockId);
-            if (itr != succInstruction->livein.end()) {
-                instruction->liveout.insert(itr->second.begin(), itr->second.end());
-            }
+                // Add livein specifically from this branch.
+                auto itr = succInstruction->livein.find(instruction->blockId);
+                if (itr != succInstruction->livein.end()) {
+                    instruction->liveout.insert(itr->second.begin(), itr->second.end());
+                }
+            } while (isPhi);
         }
 
         // Livein is liveout minus what we generate ...
@@ -451,10 +456,10 @@ void Program::postParse(bool scalarize) {
                 std::cout << std::setw(5) << instruction->blockId;
             }
             if (instruction->resIdSet.empty()) {
-                std::cout << "        ";
+                std::cout << "         ";
             } else {
                 for (uint32_t resId : instruction->resIdList) {
-                    std::cout << std::setw(5) << resId;
+                    std::cout << std::setw(6) << resId;
                 }
                 std::cout << " <-";
             }

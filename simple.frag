@@ -1,8 +1,9 @@
 
-layout (location = 1) in vec3 intest;
-layout (location = 2) out vec3 outtest;
-layout (location = 3) out float outtestf;
-layout (location = 4) in float intestf;
+layout (location = 1) in vec3 inv1;
+layout (location = 2) in vec3 inv2;
+layout (location = 3) out vec3 outv;
+layout (location = 4) out float outf;
+layout (location = 5) in float inf;
 
 /*
 float foo(float n) {
@@ -57,10 +58,13 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // fragColor = vec4(uv, 0.0, 1.0);
     */
 
-    outtest = intest;
-    outtest.y = 5.0;
+    vec3 x;
 
-    vec2 d;
-    d.x = 1.0;
-    d.y = 2.0;
+    if (inf < 0) {
+        x = inv1;
+    } else {
+        x = inv2;
+    }
+
+    outv = x;
 }

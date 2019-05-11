@@ -437,7 +437,7 @@ std::string Compiler::reg(uint32_t id, int index) const {
 void Compiler::emitNotImplemented(const std::string &op) {
     std::ostringstream ss;
 
-    ss << op << " not implemented";
+    ss << op << " not implemented in compiler";
 
     emit("#error#", ss.str());
 
