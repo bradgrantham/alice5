@@ -680,7 +680,7 @@ void Program::expandVectors() {
                 const TypeVector *typeVector = getTypeAsVector(insn->type);
                 assert(typeVector != nullptr);
 
-                const TypeVector *typeVector1 = getTypeAsVector(resultTypes.at(insn->vector1Id));
+                const TypeVector *typeVector1 = getTypeAsVector(typeIdOf(insn->vector1Id));
                 assert(typeVector1 != nullptr);
                 size_t n1 = typeVector1->count;
 
@@ -708,8 +708,24 @@ void Program::expandVectors() {
                  expandVectorsBinOp<InsnFOrdEqual>(instruction, newList, replaced);
                  break;
 
+            case SpvOpFOrdLessThan:
+                 expandVectorsBinOp<InsnFOrdLessThan>(instruction, newList, replaced);
+                 break;
+
             case SpvOpFOrdGreaterThan:
                  expandVectorsBinOp<InsnFOrdGreaterThan>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpIEqual:
+                 expandVectorsBinOp<InsnIEqual>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpSLessThan:
+                 expandVectorsBinOp<InsnSLessThan>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpIAdd:
+                 expandVectorsBinOp<InsnIAdd>(instruction, newList, replaced);
                  break;
 
             case SpvOpFAdd:
@@ -734,6 +750,18 @@ void Program::expandVectors() {
 
             case SpvOpFNegate:
                  expandVectorsUniOp<InsnFNegate>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpConvertSToF:
+                 expandVectorsUniOp<InsnConvertSToF>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpConvertFToS:
+                 expandVectorsUniOp<InsnConvertFToS>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpLogicalNot:
+                 expandVectorsUniOp<InsnLogicalNot>(instruction, newList, replaced);
                  break;
 
             case SpvOpDot: {
@@ -823,6 +851,10 @@ void Program::expandVectors() {
                 }
                 break;
             }
+
+            case SpvOpSelect:
+                expandVectorsTerOp<InsnSelect>(instruction, newList, replaced);
+                break;
 
             case 0x10000 | GLSLstd450Sin:
                  expandVectorsUniOp<InsnGLSLstd450Sin>(instruction, newList, replaced);
@@ -942,6 +974,34 @@ void Program::expandVectors() {
                             scalarize(insn->yId, 0, subtype),
                             scalarize(insn->yId, 1, subtype),
                             scalarize(insn->yId, 2, subtype)));
+                replaced = true;
+                break;
+            }
+
+            case 0x10000 | GLSLstd450Distance: {
+                InsnGLSLstd450Distance *insn = dynamic_cast<InsnGLSLstd450Distance *>(instruction);
+
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->p0Id));
+
+                std::vector<uint32_t> p0Id;
+                std::vector<uint32_t> p1Id;
+                if (typeVector != nullptr) {
+                    // Operand is vector.
+                    for (int i = 0; i < typeVector->count; i++) {
+                        p0Id.push_back(scalarize(insn->p0Id, i, typeVector->type));
+                        p1Id.push_back(scalarize(insn->p1Id, i, typeVector->type));
+                    }
+                } else {
+                    // Operand is scalar.
+                    p0Id.push_back(insn->p0Id);
+                    p1Id.push_back(insn->p1Id);
+                }
+                newList.push_back(std::make_shared<RiscVDistance>(insn->lineInfo,
+                            insn->type,
+                            insn->resultId,
+                            p0Id,
+                            p1Id));
+
                 replaced = true;
                 break;
             }

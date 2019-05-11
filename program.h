@@ -303,7 +303,7 @@ struct Program
     template <class T>
     void expandVectorsUniOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
         T *insn = dynamic_cast<T *>(instruction);
-        const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->resultId));
+        const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId));
         if (typeVector != nullptr) {
             for (int i = 0; i < typeVector->count; i++) {
                 auto [subtype, offset] = getConstituentInfo(insn->type, i);
@@ -320,7 +320,7 @@ struct Program
     template <class T>
     void expandVectorsBinOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
         T *insn = dynamic_cast<T *>(instruction);
-        const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->resultId));
+        const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId));
         if (typeVector != nullptr) {
             const TypeVector *typeVector0 = getTypeAsVector(typeIdOf(insn->argIdList[0]));
             const TypeVector *typeVector1 = getTypeAsVector(typeIdOf(insn->argIdList[1]));
@@ -343,7 +343,7 @@ struct Program
     template <class T>
     void expandVectorsTerOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
         T *insn = dynamic_cast<T *>(instruction);
-        const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->resultId));
+        const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId));
         if (typeVector != nullptr) {
             for (int i = 0; i < typeVector->count; i++) {
                 auto [subtype, offset] = getConstituentInfo(insn->type, i);

@@ -166,6 +166,28 @@ void RiscVNormalize::emit(Compiler *compiler)
     compiler->emitCall(functionName.str(), resultIds, operandIds);
 }
 
+void RiscVDistance::emit(Compiler *compiler)
+{
+    size_t n = vector1Ids.size();
+    assert(n <= 4);
+
+    std::vector<uint32_t> resultIds;
+    resultIds.push_back(resultId);
+
+    std::vector<uint32_t> operandIds;
+    for (auto id : vector1Ids) {
+        operandIds.push_back(id);
+    }
+    for (auto id : vector2Ids) {
+        operandIds.push_back(id);
+    }
+
+    std::ostringstream functionName;
+    functionName << ".distance" << n;
+
+    compiler->emitCall(functionName.str(), resultIds, operandIds);
+}
+
 void RiscVDot::emit(Compiler *compiler)
 {
     size_t n = vector1Ids.size();
