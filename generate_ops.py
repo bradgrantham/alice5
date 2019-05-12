@@ -143,6 +143,131 @@ def get_compiled_instructions(source_pathname):
 
     return compiled_instructions
 
+# Output all the code for an instruction.
+def generate_instruction(instruction, opname_prefix, opcode_prefix, clip_prefix, opcode_namespace,
+        interpreter_instructions, compiled_instructions, operand_kind_map,
+        opcode_to_string_f, opcode_structs_f, opcode_struct_decl_f, opcode_impl_f,
+        opcode_decl_f, opcode_decode_f):
+
+    opcode = instruction["opcode"]
+    opname = opname_prefix + instruction["opname"]
+    if not opname.startswith(clip_prefix):
+        sys.stderr.write("Instruction name \"%s\" does not start with \"%s\".\n" %
+                (opname, clip_prefix))
+        sys.exit(1)
+
+    short_opname = opname[len(clip_prefix):]
+    struct_opname = "Insn" + short_opname
+
+    if opname_prefix == "GLSLstd450":
+        # Set up 2 operands from OpExtInst that are handled by the extension instruction
+        extinst_operands = [
+                Operand({"kind": "IdResultType"}, operand_kind_map, 0, opname),
+                Operand({"kind": "IdResult"}, operand_kind_map, 1, opname)
+        ]
+    else:
+        extinst_operands = []
+
+    # Process the operands, adding our own custom fields to them.
+    operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
+            for operand_index, json_operand in enumerate(instruction.get("operands", []))]
+
+    # All operands, including the extension ones.
+    all_operands = extinst_operands + operands
+
+    # Convert opcode namespace to hex string.
+    if opcode_namespace == 0:
+        opcode_namespace = ""
+    else:
+        opcode_namespace = "0x%x | " % opcode_namespace
+
+    # Opcode to string file.
+    opcode_to_string_f.write("    {%s%d, \"%s\"},\n" % (opcode_namespace, opcode, short_opname))
+
+    if short_opname in interpreter_instructions:
+        # Struct file.
+        opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
+        opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
+        params = ["const LineInfo& lineInfo"]
+        inits = ["Instruction(lineInfo)"]
+        for operand in all_operands:
+            params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
+            inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
+        opcode_structs_f.write("    %s(%s) : %s {\n" %
+                (struct_opname,
+                    ", ".join(params),
+                    ", ".join(inits)))
+        for operand in all_operands:
+            if operand.is_result:
+                opcode_structs_f.write("        addResult(%s);\n" % operand.cpp_name)
+            elif opname == "OpPhi" and operand.cpp_name == "operandId":
+                # Special case the phi operands.
+                opcode_structs_f.write("        for (int i = 0; i < %s.size(); i += 2) {\n" % operand.cpp_name)
+                opcode_structs_f.write("            addParameter(%s[i]);\n" % operand.cpp_name)
+                opcode_structs_f.write("        }\n")
+            elif operand.is_argument:
+                if operand.quantifier == "*":
+                    opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
+                    opcode_structs_f.write("            addParameter(_argId);\n")
+                    opcode_structs_f.write("        }\n")
+                else:
+                    opcode_structs_f.write("        addParameter(%s);\n" % operand.cpp_name)
+            if operand.is_label:
+                opcode_structs_f.write("        targetLabelIds.insert(%s);\n" % operand.cpp_name)
+        opcode_structs_f.write("    }\n")
+        for operand in all_operands:
+            opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
+                operand.cpp_name, operand.cpp_comment,
+                " (optional)" if operand.quantifier == "?" else ""))
+        opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % short_opname)
+        opcode_structs_f.write("    virtual uint32_t opcode() const { return %s%s%s; }\n" % (opcode_namespace, opcode_prefix, opname))
+        opcode_structs_f.write("    virtual std::string name() const { return \"%s\"; }\n" % opname)
+        if short_opname in compiled_instructions:
+            opcode_structs_f.write("    virtual void emit(Compiler *compiler);\n")
+        is_branch = opname in ["OpBranch", "OpBranchConditional", "OpSwitch",
+                "OpReturn", "OpReturnValue"]
+        if is_branch:
+            opcode_structs_f.write("    virtual bool isBranch() const { return true; }\n")
+        if is_branch or opname in ["OpKill", "OpUnreachable"]:
+            opcode_structs_f.write("    virtual bool isTermination() const { return true; }\n")
+        opcode_structs_f.write("};\n\n")
+
+        # Struct declaration file.
+        opcode_struct_decl_f.write("struct %s;\n" % (struct_opname, ))
+
+        # Decode file.
+        opcode_decode_f.write("case %s%s: {\n" % (opcode_prefix, opname))
+        for operand in operands:
+            opcode_decode_f.write("    %s %s = %s(%s);\n" %
+                    (operand.cpp_type, operand.cpp_name,
+                        operand.decode_function, operand.default_value))
+        opcode_decode_f.write("    pgm->instructions.push_back(std::make_shared<%s>(%s));\n" %
+                (struct_opname, ", ".join(["pgm->currentLine"]+[operand.cpp_name for operand in all_operands])))
+        if 'IdResultType' in [op.kind for op in all_operands] and 'IdResult' in [op.kind for op in all_operands]:
+            opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")
+        opcode_decode_f.write("    if(pgm->verbose) {\n")
+        opcode_decode_f.write("        std::cout << \"%s\";\n" % short_opname)
+        for operand in all_operands:
+            opcode_decode_f.write("        std::cout << \" %s \";\n" % operand.cpp_name)
+            if operand.quantifier == "*":
+                opcode_decode_f.write("        for(int i = 0; i < %s.size(); i++)\n"
+                        % operand.cpp_name)
+                opcode_decode_f.write("            std::cout << %s[i] << \" \";\n" % operand.cpp_name)
+            else:
+                opcode_decode_f.write("        std::cout << %s;\n" % operand.cpp_name)
+        opcode_decode_f.write("        std::cout << \"\\n\";\n")
+        opcode_decode_f.write("    }\n")
+        opcode_decode_f.write("    break;\n")
+        opcode_decode_f.write("}\n\n")
+
+        # Declaration file.
+        opcode_decl_f.write("void step%s(const %s& insn);\n" % (short_opname, struct_opname))
+
+    # Generate a stub if it's not already implemented in the C++ file.
+    if short_opname not in interpreter_instructions:
+        opcode_impl_f.write("void Interpreter::step%s(const %s& insn)\n{\n    std::cerr << \"step%s() not implemented\\n\";\n}\n\n"
+                % (short_opname, struct_opname, short_opname))
+
 def main():
     # Input file.
     json_pathname = sys.argv[1]
@@ -180,106 +305,10 @@ def main():
 
     # Output instructions for core SPIR-V
     for instruction in grammar["instructions"]:
-        opcode = instruction["opcode"]
-        opname = instruction["opname"]
-        if not opname.startswith("Op"):
-            sys.stderr.write("Instruction name \"%s\" does not start with \"Op\".\n" % opname)
-            sys.exit(1)
-
-        short_opname = opname[2:]
-        struct_opname = "Insn" + short_opname
-
-        # Process the operands, adding our own custom fields to them.
-        operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
-                for operand_index, json_operand in enumerate(instruction.get("operands", []))]
-
-        # Opcode to string file.
-        opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, short_opname))
-
-        if short_opname in interpreter_instructions:
-            # Struct file.
-            opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
-            opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
-            params = ["const LineInfo& lineInfo"]
-            inits = ["Instruction(lineInfo)"]
-            for operand in operands:
-                params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
-                inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
-            opcode_structs_f.write("    %s(%s) : %s {\n" %
-                    (struct_opname,
-                        ", ".join(params),
-                        ", ".join(inits)))
-            for operand in operands:
-                if operand.is_result:
-                    opcode_structs_f.write("        addResult(%s);\n" % operand.cpp_name)
-                elif opname == "OpPhi" and operand.cpp_name == "operandId":
-                    # Special case the phi operands.
-                    opcode_structs_f.write("        for (int i = 0; i < %s.size(); i += 2) {\n" % operand.cpp_name)
-                    opcode_structs_f.write("            addParameter(%s[i]);\n" % operand.cpp_name)
-                    opcode_structs_f.write("        }\n")
-                elif operand.is_argument:
-                    if operand.quantifier == "*":
-                        opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
-                        opcode_structs_f.write("            addParameter(_argId);\n")
-                        opcode_structs_f.write("        }\n")
-                    else:
-                        opcode_structs_f.write("        addParameter(%s);\n" % operand.cpp_name)
-                if operand.is_label:
-                    opcode_structs_f.write("        targetLabelIds.insert(%s);\n" % operand.cpp_name)
-            opcode_structs_f.write("    }\n")
-            for operand in operands:
-                opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
-                    operand.cpp_name, operand.cpp_comment,
-                    " (optional)" if operand.quantifier == "?" else ""))
-            opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % short_opname)
-            opcode_structs_f.write("    virtual uint32_t opcode() const { return Spv%s; }\n" % opname)
-            opcode_structs_f.write("    virtual std::string name() const { return \"%s\"; }\n" % opname)
-            if short_opname in compiled_instructions:
-                opcode_structs_f.write("    virtual void emit(Compiler *compiler);\n")
-            is_branch = opname in ["OpBranch", "OpBranchConditional", "OpSwitch",
-                    "OpReturn", "OpReturnValue"]
-            if is_branch:
-                opcode_structs_f.write("    virtual bool isBranch() const { return true; }\n")
-            if is_branch or opname in ["OpKill", "OpUnreachable"]:
-                opcode_structs_f.write("    virtual bool isTermination() const { return true; }\n")
-            opcode_structs_f.write("};\n\n")
-
-            # Struct declaration file.
-            opcode_struct_decl_f.write("struct %s;\n" % (struct_opname, ))
-
-            # Decode file.
-            opcode_decode_f.write("case Spv%s: {\n" % opname)
-            for operand in operands:
-                opcode_decode_f.write("    %s %s = %s(%s);\n" %
-                        (operand.cpp_type, operand.cpp_name,
-                            operand.decode_function, operand.default_value))
-            opcode_decode_f.write("    pgm->instructions.push_back(std::make_shared<%s>(%s));\n" %
-                    (struct_opname, ", ".join(["pgm->currentLine",]+[operand.cpp_name for operand in operands])))
-            if 'IdResultType' in [op.kind for op in operands] and 'IdResult' in [op.kind for op in operands]:
-                opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")
-
-            opcode_decode_f.write("    if(pgm->verbose) {\n")
-            opcode_decode_f.write("        std::cout << \"%s\";\n" % short_opname)
-            for operand in operands:
-                opcode_decode_f.write("        std::cout << \" %s \";\n" % operand.cpp_name)
-                if operand.quantifier == "*":
-                    opcode_decode_f.write("        for(int i = 0; i < %s.size(); i++)\n"
-                            % operand.cpp_name)
-                    opcode_decode_f.write("            std::cout << %s[i] << \" \";\n" % operand.cpp_name)
-                else:
-                    opcode_decode_f.write("        std::cout << %s;\n" % operand.cpp_name)
-            opcode_decode_f.write("        std::cout << \"\\n\";\n")
-            opcode_decode_f.write("    }\n")
-            opcode_decode_f.write("    break;\n")
-            opcode_decode_f.write("}\n\n")
-
-            # Declaration file.
-            opcode_decl_f.write("void step%s(const %s& insn);\n" % (short_opname, struct_opname))
-
-        # Generate a stub if it's not already implemented in the C++ file.
-        if short_opname not in interpreter_instructions:
-            opcode_impl_f.write("void Interpreter::step%s(const %s& insn)\n{\n    std::cerr << \"step%s() not implemented\\n\";\n}\n\n"
-                    % (short_opname, struct_opname, short_opname))
+        generate_instruction(instruction, "", "Spv", "Op", 0,
+                interpreter_instructions, compiled_instructions, operand_kind_map,
+                opcode_to_string_f, opcode_structs_f, opcode_struct_decl_f, opcode_impl_f,
+                opcode_decl_f, opcode_decode_f)
 
     # Emit opcode decode preamble for extinst
     opcode_decode_f.write("case SpvOpExtInst: {\n")
@@ -290,96 +319,11 @@ def main():
     opcode_decode_f.write("    if(ext == pgm->ExtInstGLSL_std_450_id) {\n")
     opcode_decode_f.write("        switch(opcode) {\n")
 
-    type_json_operand = {"kind" : "IdResultType" }
-    resultid_json_operand = { "kind" : "IdResult" }
     for instruction in glsl_std_450_grammar["instructions"]:
-        opcode = instruction["opcode"]
-        opname = "GLSLstd450" + instruction["opname"]
-        struct_opname = "Insn" + opname
-
-        # Set up 2 operands from OpExtInst that are handled by the extension instruction
-        extinst_operands = [
-                Operand(type_json_operand, operand_kind_map, 0, opname),
-                Operand(resultid_json_operand, operand_kind_map, 1, opname)
-        ]
-
-        # Process the operands, adding our own custom fields to them.
-        operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
-                for operand_index, json_operand in enumerate(instruction.get("operands", []))]
-
-        # Opcode to string file.
-        opcode_to_string_f.write("    {0x10000 | %d, \"%s\"},\n" % (opcode, opname))
-
-        if opname in interpreter_instructions:
-            # Struct file.
-            opcode_structs_f.write("// %s instruction (code %d).\n" % (opname, opcode))
-            opcode_structs_f.write("struct %s : public Instruction {\n" % (struct_opname, ))
-            params = ["const LineInfo& lineInfo"]
-            inits = ["Instruction(lineInfo)"]
-            for operand in extinst_operands + operands:
-                params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
-                inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
-            opcode_structs_f.write("    %s(%s) : %s {\n" %
-                    (struct_opname,
-                        ", ".join(params),
-                        ", ".join(inits)))
-            for operand in extinst_operands + operands:
-                if operand.is_result:
-                    opcode_structs_f.write("        addResult(%s);\n" % operand.cpp_name)
-                elif operand.is_argument:
-                    if operand.quantifier == "*":
-                        opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
-                        opcode_structs_f.write("            addParameter(_argId);\n")
-                        opcode_structs_f.write("        }\n")
-                    else:
-                        opcode_structs_f.write("        addParameter(%s);\n" % operand.cpp_name)
-            opcode_structs_f.write("    }\n")
-            for operand in extinst_operands + operands:
-                opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
-                    operand.cpp_name, operand.cpp_comment,
-                    " (optional)" if operand.quantifier == "?" else ""))
-            opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % opname)
-            # Not sure about these opcodes. I think they're even in a different namespace.
-            opcode_structs_f.write("    virtual uint32_t opcode() const { return 0x10000 | %s; }\n" % opname)
-            opcode_structs_f.write("    virtual std::string name() const { return \"%s\"; }\n" % opname)
-            if opname in compiled_instructions:
-                opcode_structs_f.write("    virtual void emit(Compiler *compiler);\n")
-            opcode_structs_f.write("};\n\n")
-
-            # Struct declaration file.
-            opcode_struct_decl_f.write("struct %s;\n" % (struct_opname, ))
-
-            # Decode file.
-            opcode_decode_f.write("case %s: {\n" % opname)
-            for operand in operands:
-                opcode_decode_f.write("    %s %s = %s(%s);\n" %
-                        (operand.cpp_type, operand.cpp_name,
-                            operand.decode_function, operand.default_value))
-            opcode_decode_f.write("    pgm->instructions.push_back(std::make_shared<%s>(%s));\n" %
-                    (struct_opname, ", ".join(["pgm->currentLine",]+[operand.cpp_name for operand in extinst_operands + operands])))
-            opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")
-            opcode_decode_f.write("    if(pgm->verbose) {\n")
-            opcode_decode_f.write("        std::cout << \"%s\";\n" % opname)
-            for operand in extinst_operands + operands:
-                opcode_decode_f.write("        std::cout << \" %s \";\n" % operand.cpp_name)
-                if operand.quantifier == "*":
-                    opcode_decode_f.write("        for(int i = 0; i < %s.size(); i++)\n"
-                            % operand.cpp_name)
-                    opcode_decode_f.write("            std::cout << %s[i] << \" \";\n" % operand.cpp_name)
-                else:
-                    opcode_decode_f.write("        std::cout << %s;\n" % operand.cpp_name)
-            opcode_decode_f.write("        std::cout << \"\\n\";\n")
-            opcode_decode_f.write("    }\n")
-            opcode_decode_f.write("    break;\n")
-            opcode_decode_f.write("}\n\n")
-
-            # Declaration file.
-            opcode_decl_f.write("void step%s(const %s& insn);\n" % (opname, struct_opname))
-
-        # Generate a stub if it's not already implemented in the C++ file.
-        if opname not in interpreter_instructions:
-            opcode_impl_f.write("void Interpreter::step%s(const %s& insn)\n{\n    std::cerr << \"step%s() not implemented\\n\";\n}\n\n"
-                    % (opname, struct_opname, opname))
+        generate_instruction(instruction, "GLSLstd450", "", "", 0x10000,
+                interpreter_instructions, compiled_instructions, operand_kind_map,
+                opcode_to_string_f, opcode_structs_f, opcode_struct_decl_f, opcode_impl_f,
+                opcode_decl_f, opcode_decode_f)
 
     opcode_decode_f.write("            default: {\n")
     opcode_decode_f.write("                if(pgm->throwOnUnimplemented) {\n")
