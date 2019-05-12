@@ -89,12 +89,7 @@ uint32_t Program::scalarize(uint32_t vreg, int i, const TypeVector *typeVector) 
 }
 
 // Post-parsing work.
-void Program::postParse(bool scalarize) {
-    if (scalarize) {
-        // Convert vector instructions to scalar instructions.
-        expandVectors();
-    }
-
+void Program::postParse() {
     // Find the main function.
     mainFunction = nullptr;
     for(auto& e: entryPoints) {
@@ -212,7 +207,9 @@ void Program::postParse(bool scalarize) {
             instructions[block->end - 1]->succ.insert(blocks[succBlockId]->begin);
         }
     }
+}
 
+void Program::prepareForCompile() {
     // Compute livein and liveout registers for each line.
     Timer timer;
     std::set<uint32_t> pc_worklist; // PCs left to work on.
@@ -259,17 +256,9 @@ void Program::postParse(bool scalarize) {
         }
         // ... plus what we need.
         if (instruction->opcode() == SpvOpPhi) {
-            // XXX delete
-            // Special handling of Phi instruction, because we must specify
-            // which branch our livein is from. Otherwise all branches will
-            // think they need all inputs, which is incorrect.
+            // This should have been replaced.
+            std::cerr << "Error: Use the -s flag for programs with OpPhi instructions.\n";
             assert(false);
-            InsnPhi *phi = dynamic_cast<InsnPhi *>(instruction);
-            for (int i = 0; i < phi->operandId.size(); i += 2) {
-                uint32_t data = phi->operandId[i];
-                uint32_t label = phi->operandId[i + 1];
-                instruction->livein[label].insert(data);
-            }
         } else if (instruction->opcode() == RiscVOpPhi) {
             // Special handling of Phi instruction, because we must specify
             // which branch our livein is from. Otherwise all branches will
@@ -579,22 +568,22 @@ void Program::expandVectors() {
             case SpvOpLoad: {
                 InsnLoad *insn = dynamic_cast<InsnLoad *>(instruction);
                 const TypeVector *typeVector = getTypeAsVector(
-                        resultTypes.at(insn->resultId));
+                        resultTypes.at(insn->resultId()));
                 if (typeVector != nullptr) {
                     for (int i = 0; i < typeVector->count; i++) {
                         auto [subtype, offset] = getConstituentInfo(insn->type, i);
                         newList.push_back(std::make_shared<RiscVLoad>(insn->lineInfo,
                                     subtype,
-                                    scalarize(insn->resultId, i, subtype),
-                                    insn->pointerId,
+                                    scalarize(insn->resultId(), i, subtype),
+                                    insn->pointerId(),
                                     insn->memoryAccess,
                                     i*typeSizes.at(subtype)));
                     }
                 } else {
                     newList.push_back(std::make_shared<RiscVLoad>(insn->lineInfo,
                                 insn->type,
-                                insn->resultId,
-                                insn->pointerId,
+                                insn->resultId(),
+                                insn->pointerId(),
                                 insn->memoryAccess,
                                 0));
                 }
@@ -606,24 +595,24 @@ void Program::expandVectors() {
                 InsnStore *insn = dynamic_cast<InsnStore *>(instruction);
                 const TypeVector *typeVector = nullptr;
                 // XXX handle case of objectId being a constant.
-                auto itr = resultTypes.find(insn->objectId);
+                auto itr = resultTypes.find(insn->objectId());
                 if (itr != resultTypes.end()) {
                     typeVector = getTypeAsVector(itr->second);
                 }
                 if (typeVector != nullptr) {
                     for (int i = 0; i < typeVector->count; i++) {
                         auto [subtype, offset] = getConstituentInfo(
-                                resultTypes.at(insn->objectId), i);
+                                resultTypes.at(insn->objectId()), i);
                         newList.push_back(std::make_shared<RiscVStore>(insn->lineInfo,
-                                    insn->pointerId,
-                                    scalarize(insn->objectId, i, subtype),
+                                    insn->pointerId(),
+                                    scalarize(insn->objectId(), i, subtype),
                                     insn->memoryAccess,
                                     i*typeSizes.at(subtype)));
                     }
                 } else {
                     newList.push_back(std::make_shared<RiscVStore>(insn->lineInfo,
-                                insn->pointerId,
-                                insn->objectId,
+                                insn->pointerId(),
+                                insn->objectId(),
                                 insn->memoryAccess,
                                 0));
                 }
@@ -639,7 +628,7 @@ void Program::expandVectors() {
                 for (int i = 0; i < typeVector->count; i++) {
                     auto [subtype, offset] = getConstituentInfo(insn->type, i);
                     // Re-use existing SSA register.
-                    scalarize(insn->resultId, i, subtype, insn->constituentsId[i]);
+                    scalarize(insn->resultId(), i, subtype, insn->constituentsId(i));
                 }
                 replaced = true;
                 break;
@@ -653,12 +642,12 @@ void Program::expandVectors() {
                 assert(insn->indexesId.size() == 1);
                 uint32_t index = insn->indexesId[0];
 
-                uint32_t oldId = scalarize(insn->compositeId, index, insn->type);
+                uint32_t oldId = scalarize(insn->compositeId(), index, insn->type);
 
                 // XXX We could avoid this move by renaming the result register throughout
                 // to "oldId".
                 newList.push_back(std::make_shared<RiscVMove>(insn->lineInfo,
-                            insn->type, insn->resultId, oldId));
+                            insn->type, insn->resultId(), oldId));
 
                 replaced = true;
                 break;
@@ -678,12 +667,12 @@ void Program::expandVectors() {
 
                     if (i == index) {
                         // Use new value.
-                        newId = insn->objectId;
+                        newId = insn->objectId();
                     } else {
                         // Use old value.
-                        newId = scalarize(insn->compositeId, i, typeVector->type);
+                        newId = scalarize(insn->compositeId(), i, typeVector->type);
                     }
-                    scalarize(insn->resultId, i, typeVector->type, newId);
+                    scalarize(insn->resultId(), i, typeVector->type, newId);
                 }
 
                 replaced = true;
@@ -700,9 +689,9 @@ void Program::expandVectors() {
                 for (int i = 0; i < typeVector->count; i++) {
                     newList.push_back(std::make_shared<InsnFMul>(insn->lineInfo,
                                 typeVector->type,
-                                scalarize(insn->resultId, i, typeVector->type),
-                                scalarize(insn->vectorId, i, typeVector->type),
-                                insn->scalarId));
+                                scalarize(insn->resultId(), i, typeVector->type),
+                                scalarize(insn->vectorId(), i, typeVector->type),
+                                insn->scalarId()));
                 }
 
                 replaced = true;
@@ -715,7 +704,7 @@ void Program::expandVectors() {
                 const TypeVector *typeVector = getTypeAsVector(insn->type);
                 assert(typeVector != nullptr);
 
-                const TypeVector *typeVector1 = getTypeAsVector(typeIdOf(insn->vector1Id));
+                const TypeVector *typeVector1 = getTypeAsVector(typeIdOf(insn->vector1Id()));
                 assert(typeVector1 != nullptr);
                 size_t n1 = typeVector1->count;
 
@@ -724,15 +713,15 @@ void Program::expandVectors() {
                     uint32_t vectorId;
 
                     if (component < n1) {
-                        vectorId = insn->vector1Id;
+                        vectorId = insn->vector1Id();
                     } else {
-                        vectorId = insn->vector2Id;
+                        vectorId = insn->vector2Id();
                         component -= n1;
                     }
 
                     // Use same register for both.
                     uint32_t newId = scalarize(vectorId, component, typeVector->type);
-                    scalarize(insn->resultId, i, typeVector->type, newId);
+                    scalarize(insn->resultId(), i, typeVector->type, newId);
                 }
 
                 replaced = true;
@@ -802,24 +791,24 @@ void Program::expandVectors() {
             case SpvOpDot: {
                 InsnDot *insn = dynamic_cast<InsnDot *>(instruction);
 
-                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->vector1Id));
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->vector1Id()));
 
                 std::vector<uint32_t> vector1Ids;
                 std::vector<uint32_t> vector2Ids;
                 if (typeVector != nullptr) {
                     // Operand is vector.
                     for (int i = 0; i < typeVector->count; i++) {
-                        vector1Ids.push_back(scalarize(insn->vector1Id, i, typeVector->type));
-                        vector2Ids.push_back(scalarize(insn->vector2Id, i, typeVector->type));
+                        vector1Ids.push_back(scalarize(insn->vector1Id(), i, typeVector->type));
+                        vector2Ids.push_back(scalarize(insn->vector2Id(), i, typeVector->type));
                     }
                 } else {
                     // Operand is scalar.
-                    vector1Ids.push_back(insn->vector1Id);
-                    vector2Ids.push_back(insn->vector2Id);
+                    vector1Ids.push_back(insn->vector1Id());
+                    vector2Ids.push_back(insn->vector2Id());
                 }
                 newList.push_back(std::make_shared<RiscVDot>(insn->lineInfo,
                             insn->type,
-                            insn->resultId,
+                            insn->resultId(),
                             vector1Ids,
                             vector2Ids));
 
@@ -830,16 +819,16 @@ void Program::expandVectors() {
             case SpvOpAll: {
                 InsnAll *insn = dynamic_cast<InsnAll *>(instruction);
 
-                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->vectorId));
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->vectorId()));
                 assert(typeVector != nullptr);
 
                 std::vector<uint32_t> operandIds;
                 for (int i = 0; i < typeVector->count; i++) {
-                    operandIds.push_back(scalarize(insn->vectorId, i, typeVector->type));
+                    operandIds.push_back(scalarize(insn->vectorId(), i, typeVector->type));
                 }
                 newList.push_back(std::make_shared<RiscVAll>(insn->lineInfo,
                             insn->type,
-                            insn->resultId,
+                            insn->resultId(),
                             operandIds));
 
                 replaced = true;
@@ -849,16 +838,16 @@ void Program::expandVectors() {
             case SpvOpAny: {
                 InsnAny *insn = dynamic_cast<InsnAny *>(instruction);
 
-                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->vectorId));
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->vectorId()));
                 assert(typeVector != nullptr);
 
                 std::vector<uint32_t> operandIds;
                 for (int i = 0; i < typeVector->count; i++) {
-                    operandIds.push_back(scalarize(insn->vectorId, i, typeVector->type));
+                    operandIds.push_back(scalarize(insn->vectorId(), i, typeVector->type));
                 }
                 newList.push_back(std::make_shared<RiscVAny>(insn->lineInfo,
                             insn->type,
-                            insn->resultId,
+                            insn->resultId(),
                             operandIds));
 
                 replaced = true;
@@ -884,18 +873,18 @@ void Program::expandVectors() {
                     }
 
                     // See if we should expand a vector.
-                    const TypeVector *typeVector = getTypeAsVector(typeIdOf(oldPhi->resultId));
+                    const TypeVector *typeVector = getTypeAsVector(typeIdOf(oldPhi->resultId()));
 
                     // Expand vectors in this loop.
                     for (int j = 0; j < vectorCount(typeVector); j++) {
-                        uint32_t regId = scalarize(oldPhi->resultId, j, typeVector);
+                        uint32_t regId = scalarize(oldPhi->resultId(), j, typeVector);
                         newPhi->resultIds.push_back(regId);
                         newPhi->addResult(regId);
 
                         std::vector<uint32_t> operandIds;
-                        for (int i = 0; i < oldPhi->operandId.size()/2; i++) {
-                            uint32_t operandId = oldPhi->operandId[i*2];
-                            uint32_t labelId = oldPhi->operandId[i*2 + 1];
+                        for (int i = 0; i < oldPhi->operandIdCount(); i++) {
+                            uint32_t operandId = oldPhi->operandId(i);
+                            uint32_t labelId = oldPhi->labelId[i];
                             if (first) {
                                 newPhi->labelIds.push_back(labelId);
                             } else {
@@ -978,21 +967,21 @@ void Program::expandVectors() {
             case 0x10000 | GLSLstd450Length: {
                 InsnGLSLstd450Length *insn = dynamic_cast<InsnGLSLstd450Length *>(instruction);
 
-                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->xId));
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->xId()));
 
                 std::vector<uint32_t> operandIds;
                 if (typeVector != nullptr) {
                     // Operand is vector.
                     for (int i = 0; i < typeVector->count; i++) {
-                        operandIds.push_back(scalarize(insn->xId, i, typeVector->type));
+                        operandIds.push_back(scalarize(insn->xId(), i, typeVector->type));
                     }
                 } else {
                     // Operand is scalar.
-                    operandIds.push_back(insn->xId);
+                    operandIds.push_back(insn->xId());
                 }
                 newList.push_back(std::make_shared<RiscVLength>(insn->lineInfo,
                             insn->type,
-                            insn->resultId,
+                            insn->resultId(),
                             operandIds));
 
                 replaced = true;
@@ -1003,20 +992,20 @@ void Program::expandVectors() {
                 InsnGLSLstd450Normalize *insn =
                     dynamic_cast<InsnGLSLstd450Normalize *>(instruction);
 
-                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->xId));
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->xId()));
 
                 std::vector<uint32_t> resultIds;
                 std::vector<uint32_t> operandIds;
                 if (typeVector != nullptr) {
                     // Operand is vector.
                     for (int i = 0; i < typeVector->count; i++) {
-                        resultIds.push_back(scalarize(insn->resultId, i, typeVector->type));
-                        operandIds.push_back(scalarize(insn->xId, i, typeVector->type));
+                        resultIds.push_back(scalarize(insn->resultId(), i, typeVector->type));
+                        operandIds.push_back(scalarize(insn->xId(), i, typeVector->type));
                     }
                 } else {
                     // Operand is scalar.
-                    resultIds.push_back(insn->resultId);
-                    operandIds.push_back(insn->xId);
+                    resultIds.push_back(insn->resultId());
+                    operandIds.push_back(insn->xId());
                 }
                 newList.push_back(std::make_shared<RiscVNormalize>(insn->lineInfo,
                             insn->type,
@@ -1032,15 +1021,15 @@ void Program::expandVectors() {
                     dynamic_cast<InsnGLSLstd450Cross *>(instruction);
                 auto [subtype, offset] = getConstituentInfo(insn->type, 0);
                 newList.push_back(std::make_shared<RiscVCross>(insn->lineInfo,
-                            scalarize(insn->resultId, 0, subtype),
-                            scalarize(insn->resultId, 1, subtype),
-                            scalarize(insn->resultId, 2, subtype),
-                            scalarize(insn->xId, 0, subtype),
-                            scalarize(insn->xId, 1, subtype),
-                            scalarize(insn->xId, 2, subtype),
-                            scalarize(insn->yId, 0, subtype),
-                            scalarize(insn->yId, 1, subtype),
-                            scalarize(insn->yId, 2, subtype)));
+                            scalarize(insn->resultId(), 0, subtype),
+                            scalarize(insn->resultId(), 1, subtype),
+                            scalarize(insn->resultId(), 2, subtype),
+                            scalarize(insn->xId(), 0, subtype),
+                            scalarize(insn->xId(), 1, subtype),
+                            scalarize(insn->xId(), 2, subtype),
+                            scalarize(insn->yId(), 0, subtype),
+                            scalarize(insn->yId(), 1, subtype),
+                            scalarize(insn->yId(), 2, subtype)));
                 replaced = true;
                 break;
             }
@@ -1048,24 +1037,24 @@ void Program::expandVectors() {
             case 0x10000 | GLSLstd450Distance: {
                 InsnGLSLstd450Distance *insn = dynamic_cast<InsnGLSLstd450Distance *>(instruction);
 
-                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->p0Id));
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->p0Id()));
 
                 std::vector<uint32_t> p0Id;
                 std::vector<uint32_t> p1Id;
                 if (typeVector != nullptr) {
                     // Operand is vector.
                     for (int i = 0; i < typeVector->count; i++) {
-                        p0Id.push_back(scalarize(insn->p0Id, i, typeVector->type));
-                        p1Id.push_back(scalarize(insn->p1Id, i, typeVector->type));
+                        p0Id.push_back(scalarize(insn->p0Id(), i, typeVector->type));
+                        p1Id.push_back(scalarize(insn->p1Id(), i, typeVector->type));
                     }
                 } else {
                     // Operand is scalar.
-                    p0Id.push_back(insn->p0Id);
-                    p1Id.push_back(insn->p1Id);
+                    p0Id.push_back(insn->p0Id());
+                    p1Id.push_back(insn->p1Id());
                 }
                 newList.push_back(std::make_shared<RiscVDistance>(insn->lineInfo,
                             insn->type,
-                            insn->resultId,
+                            insn->resultId(),
                             p0Id,
                             p1Id));
 

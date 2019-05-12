@@ -16,11 +16,11 @@ struct InsnNop : public Instruction {
 
 // OpFunctionParameter instruction (code 55).
 struct InsnFunctionParameter : public Instruction {
-    InsnFunctionParameter(const LineInfo& lineInfo, uint32_t type, uint32_t resultId) : Instruction(lineInfo), type(type), resultId(resultId) {
+    InsnFunctionParameter(const LineInfo& lineInfo, uint32_t type, uint32_t resultId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     virtual void step(Interpreter *interpreter) { interpreter->stepFunctionParameter(*this); }
     virtual uint32_t opcode() const { return SpvOpFunctionParameter; }
     virtual std::string name() const { return "OpFunctionParameter"; }
@@ -29,16 +29,17 @@ struct InsnFunctionParameter : public Instruction {
 
 // OpFunctionCall instruction (code 57).
 struct InsnFunctionCall : public Instruction {
-    InsnFunctionCall(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t functionId, std::vector<uint32_t> operandId) : Instruction(lineInfo), type(type), resultId(resultId), functionId(functionId), operandId(operandId) {
+    InsnFunctionCall(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t functionId, std::vector<uint32_t> operandId) : Instruction(lineInfo), type(type), functionId(functionId) {
         addResult(resultId);
         for (auto _argId : operandId) {
             addParameter(_argId);
         }
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     uint32_t functionId; // operand from register
-    std::vector<uint32_t> operandId; // operand from register
+    uint32_t operandId(size_t i) const { return argIdList[0 + i]; } // operand from register
+    size_t operandIdCount() const { return argIdList.size() - 0; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFunctionCall(*this); }
     virtual uint32_t opcode() const { return SpvOpFunctionCall; }
     virtual std::string name() const { return "OpFunctionCall"; }
@@ -47,13 +48,13 @@ struct InsnFunctionCall : public Instruction {
 
 // OpLoad instruction (code 61).
 struct InsnLoad : public Instruction {
-    InsnLoad(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess) : Instruction(lineInfo), type(type), resultId(resultId), pointerId(pointerId), memoryAccess(memoryAccess) {
+    InsnLoad(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess) : Instruction(lineInfo), type(type), memoryAccess(memoryAccess) {
         addResult(resultId);
         addParameter(pointerId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t pointerId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t pointerId() const { return argIdList[0]; } // operand from register
     uint32_t memoryAccess; // MemoryAccess (optional)
     virtual void step(Interpreter *interpreter) { interpreter->stepLoad(*this); }
     virtual uint32_t opcode() const { return SpvOpLoad; }
@@ -63,12 +64,12 @@ struct InsnLoad : public Instruction {
 
 // OpStore instruction (code 62).
 struct InsnStore : public Instruction {
-    InsnStore(const LineInfo& lineInfo, uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess) : Instruction(lineInfo), pointerId(pointerId), objectId(objectId), memoryAccess(memoryAccess) {
+    InsnStore(const LineInfo& lineInfo, uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess) : Instruction(lineInfo), memoryAccess(memoryAccess) {
         addParameter(pointerId);
         addParameter(objectId);
     }
-    uint32_t pointerId; // operand from register
-    uint32_t objectId; // operand from register
+    uint32_t pointerId() const { return argIdList[0]; } // operand from register
+    uint32_t objectId() const { return argIdList[1]; } // operand from register
     uint32_t memoryAccess; // MemoryAccess (optional)
     virtual void step(Interpreter *interpreter) { interpreter->stepStore(*this); }
     virtual uint32_t opcode() const { return SpvOpStore; }
@@ -78,7 +79,7 @@ struct InsnStore : public Instruction {
 
 // OpAccessChain instruction (code 65).
 struct InsnAccessChain : public Instruction {
-    InsnAccessChain(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t baseId, std::vector<uint32_t> indexesId) : Instruction(lineInfo), type(type), resultId(resultId), baseId(baseId), indexesId(indexesId) {
+    InsnAccessChain(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t baseId, std::vector<uint32_t> indexesId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(baseId);
         for (auto _argId : indexesId) {
@@ -86,9 +87,10 @@ struct InsnAccessChain : public Instruction {
         }
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t baseId; // operand from register
-    std::vector<uint32_t> indexesId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t baseId() const { return argIdList[0]; } // operand from register
+    uint32_t indexesId(size_t i) const { return argIdList[1 + i]; } // operand from register
+    size_t indexesIdCount() const { return argIdList.size() - 1; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepAccessChain(*this); }
     virtual uint32_t opcode() const { return SpvOpAccessChain; }
     virtual std::string name() const { return "OpAccessChain"; }
@@ -97,15 +99,15 @@ struct InsnAccessChain : public Instruction {
 
 // OpVectorShuffle instruction (code 79).
 struct InsnVectorShuffle : public Instruction {
-    InsnVectorShuffle(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id, std::vector<uint32_t> componentsId) : Instruction(lineInfo), type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id), componentsId(componentsId) {
+    InsnVectorShuffle(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id, std::vector<uint32_t> componentsId) : Instruction(lineInfo), type(type), componentsId(componentsId) {
         addResult(resultId);
         addParameter(vector1Id);
         addParameter(vector2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t vector1Id; // operand from register
-    uint32_t vector2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t vector1Id() const { return argIdList[0]; } // operand from register
+    uint32_t vector2Id() const { return argIdList[1]; } // operand from register
     std::vector<uint32_t> componentsId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepVectorShuffle(*this); }
     virtual uint32_t opcode() const { return SpvOpVectorShuffle; }
@@ -114,15 +116,16 @@ struct InsnVectorShuffle : public Instruction {
 
 // OpCompositeConstruct instruction (code 80).
 struct InsnCompositeConstruct : public Instruction {
-    InsnCompositeConstruct(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, std::vector<uint32_t> constituentsId) : Instruction(lineInfo), type(type), resultId(resultId), constituentsId(constituentsId) {
+    InsnCompositeConstruct(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, std::vector<uint32_t> constituentsId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         for (auto _argId : constituentsId) {
             addParameter(_argId);
         }
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    std::vector<uint32_t> constituentsId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t constituentsId(size_t i) const { return argIdList[0 + i]; } // operand from register
+    size_t constituentsIdCount() const { return argIdList.size() - 0; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepCompositeConstruct(*this); }
     virtual uint32_t opcode() const { return SpvOpCompositeConstruct; }
     virtual std::string name() const { return "OpCompositeConstruct"; }
@@ -130,13 +133,13 @@ struct InsnCompositeConstruct : public Instruction {
 
 // OpCompositeExtract instruction (code 81).
 struct InsnCompositeExtract : public Instruction {
-    InsnCompositeExtract(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(lineInfo), type(type), resultId(resultId), compositeId(compositeId), indexesId(indexesId) {
+    InsnCompositeExtract(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(lineInfo), type(type), indexesId(indexesId) {
         addResult(resultId);
         addParameter(compositeId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t compositeId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t compositeId() const { return argIdList[0]; } // operand from register
     std::vector<uint32_t> indexesId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepCompositeExtract(*this); }
     virtual uint32_t opcode() const { return SpvOpCompositeExtract; }
@@ -145,15 +148,15 @@ struct InsnCompositeExtract : public Instruction {
 
 // OpCompositeInsert instruction (code 82).
 struct InsnCompositeInsert : public Instruction {
-    InsnCompositeInsert(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t objectId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(lineInfo), type(type), resultId(resultId), objectId(objectId), compositeId(compositeId), indexesId(indexesId) {
+    InsnCompositeInsert(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t objectId, uint32_t compositeId, std::vector<uint32_t> indexesId) : Instruction(lineInfo), type(type), indexesId(indexesId) {
         addResult(resultId);
         addParameter(objectId);
         addParameter(compositeId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t objectId; // operand from register
-    uint32_t compositeId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t objectId() const { return argIdList[0]; } // operand from register
+    uint32_t compositeId() const { return argIdList[1]; } // operand from register
     std::vector<uint32_t> indexesId; // LiteralInteger
     virtual void step(Interpreter *interpreter) { interpreter->stepCompositeInsert(*this); }
     virtual uint32_t opcode() const { return SpvOpCompositeInsert; }
@@ -162,15 +165,15 @@ struct InsnCompositeInsert : public Instruction {
 
 // OpImageSampleImplicitLod instruction (code 87).
 struct InsnImageSampleImplicitLod : public Instruction {
-    InsnImageSampleImplicitLod(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(lineInfo), type(type), resultId(resultId), sampledImageId(sampledImageId), coordinateId(coordinateId), imageOperands(imageOperands) {
+    InsnImageSampleImplicitLod(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(lineInfo), type(type), imageOperands(imageOperands) {
         addResult(resultId);
         addParameter(sampledImageId);
         addParameter(coordinateId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t sampledImageId; // operand from register
-    uint32_t coordinateId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t sampledImageId() const { return argIdList[0]; } // operand from register
+    uint32_t coordinateId() const { return argIdList[1]; } // operand from register
     uint32_t imageOperands; // ImageOperands (optional)
     virtual void step(Interpreter *interpreter) { interpreter->stepImageSampleImplicitLod(*this); }
     virtual uint32_t opcode() const { return SpvOpImageSampleImplicitLod; }
@@ -179,15 +182,15 @@ struct InsnImageSampleImplicitLod : public Instruction {
 
 // OpImageSampleExplicitLod instruction (code 88).
 struct InsnImageSampleExplicitLod : public Instruction {
-    InsnImageSampleExplicitLod(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(lineInfo), type(type), resultId(resultId), sampledImageId(sampledImageId), coordinateId(coordinateId), imageOperands(imageOperands) {
+    InsnImageSampleExplicitLod(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(lineInfo), type(type), imageOperands(imageOperands) {
         addResult(resultId);
         addParameter(sampledImageId);
         addParameter(coordinateId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t sampledImageId; // operand from register
-    uint32_t coordinateId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t sampledImageId() const { return argIdList[0]; } // operand from register
+    uint32_t coordinateId() const { return argIdList[1]; } // operand from register
     uint32_t imageOperands; // ImageOperands
     virtual void step(Interpreter *interpreter) { interpreter->stepImageSampleExplicitLod(*this); }
     virtual uint32_t opcode() const { return SpvOpImageSampleExplicitLod; }
@@ -196,13 +199,13 @@ struct InsnImageSampleExplicitLod : public Instruction {
 
 // OpConvertFToS instruction (code 110).
 struct InsnConvertFToS : public Instruction {
-    InsnConvertFToS(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t floatValueId) : Instruction(lineInfo), type(type), resultId(resultId), floatValueId(floatValueId) {
+    InsnConvertFToS(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t floatValueId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(floatValueId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t floatValueId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t floatValueId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepConvertFToS(*this); }
     virtual uint32_t opcode() const { return SpvOpConvertFToS; }
     virtual std::string name() const { return "OpConvertFToS"; }
@@ -210,13 +213,13 @@ struct InsnConvertFToS : public Instruction {
 
 // OpConvertSToF instruction (code 111).
 struct InsnConvertSToF : public Instruction {
-    InsnConvertSToF(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t signedValueId) : Instruction(lineInfo), type(type), resultId(resultId), signedValueId(signedValueId) {
+    InsnConvertSToF(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t signedValueId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(signedValueId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t signedValueId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t signedValueId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepConvertSToF(*this); }
     virtual uint32_t opcode() const { return SpvOpConvertSToF; }
     virtual std::string name() const { return "OpConvertSToF"; }
@@ -224,13 +227,13 @@ struct InsnConvertSToF : public Instruction {
 
 // OpFNegate instruction (code 127).
 struct InsnFNegate : public Instruction {
-    InsnFNegate(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(lineInfo), type(type), resultId(resultId), operandId(operandId) {
+    InsnFNegate(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operandId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operandId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operandId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFNegate(*this); }
     virtual uint32_t opcode() const { return SpvOpFNegate; }
     virtual std::string name() const { return "OpFNegate"; }
@@ -238,15 +241,15 @@ struct InsnFNegate : public Instruction {
 
 // OpIAdd instruction (code 128).
 struct InsnIAdd : public Instruction {
-    InsnIAdd(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnIAdd(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepIAdd(*this); }
     virtual uint32_t opcode() const { return SpvOpIAdd; }
     virtual std::string name() const { return "OpIAdd"; }
@@ -255,15 +258,15 @@ struct InsnIAdd : public Instruction {
 
 // OpFAdd instruction (code 129).
 struct InsnFAdd : public Instruction {
-    InsnFAdd(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFAdd(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFAdd(*this); }
     virtual uint32_t opcode() const { return SpvOpFAdd; }
     virtual std::string name() const { return "OpFAdd"; }
@@ -272,15 +275,15 @@ struct InsnFAdd : public Instruction {
 
 // OpISub instruction (code 130).
 struct InsnISub : public Instruction {
-    InsnISub(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnISub(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepISub(*this); }
     virtual uint32_t opcode() const { return SpvOpISub; }
     virtual std::string name() const { return "OpISub"; }
@@ -288,15 +291,15 @@ struct InsnISub : public Instruction {
 
 // OpFSub instruction (code 131).
 struct InsnFSub : public Instruction {
-    InsnFSub(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFSub(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFSub(*this); }
     virtual uint32_t opcode() const { return SpvOpFSub; }
     virtual std::string name() const { return "OpFSub"; }
@@ -305,15 +308,15 @@ struct InsnFSub : public Instruction {
 
 // OpFMul instruction (code 133).
 struct InsnFMul : public Instruction {
-    InsnFMul(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFMul(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFMul(*this); }
     virtual uint32_t opcode() const { return SpvOpFMul; }
     virtual std::string name() const { return "OpFMul"; }
@@ -322,15 +325,15 @@ struct InsnFMul : public Instruction {
 
 // OpSDiv instruction (code 135).
 struct InsnSDiv : public Instruction {
-    InsnSDiv(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnSDiv(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepSDiv(*this); }
     virtual uint32_t opcode() const { return SpvOpSDiv; }
     virtual std::string name() const { return "OpSDiv"; }
@@ -338,15 +341,15 @@ struct InsnSDiv : public Instruction {
 
 // OpFDiv instruction (code 136).
 struct InsnFDiv : public Instruction {
-    InsnFDiv(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFDiv(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFDiv(*this); }
     virtual uint32_t opcode() const { return SpvOpFDiv; }
     virtual std::string name() const { return "OpFDiv"; }
@@ -355,15 +358,15 @@ struct InsnFDiv : public Instruction {
 
 // OpFMod instruction (code 141).
 struct InsnFMod : public Instruction {
-    InsnFMod(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFMod(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFMod(*this); }
     virtual uint32_t opcode() const { return SpvOpFMod; }
     virtual std::string name() const { return "OpFMod"; }
@@ -371,15 +374,15 @@ struct InsnFMod : public Instruction {
 
 // OpVectorTimesScalar instruction (code 142).
 struct InsnVectorTimesScalar : public Instruction {
-    InsnVectorTimesScalar(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t scalarId) : Instruction(lineInfo), type(type), resultId(resultId), vectorId(vectorId), scalarId(scalarId) {
+    InsnVectorTimesScalar(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t scalarId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(vectorId);
         addParameter(scalarId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t vectorId; // operand from register
-    uint32_t scalarId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t vectorId() const { return argIdList[0]; } // operand from register
+    uint32_t scalarId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepVectorTimesScalar(*this); }
     virtual uint32_t opcode() const { return SpvOpVectorTimesScalar; }
     virtual std::string name() const { return "OpVectorTimesScalar"; }
@@ -387,15 +390,15 @@ struct InsnVectorTimesScalar : public Instruction {
 
 // OpVectorTimesMatrix instruction (code 144).
 struct InsnVectorTimesMatrix : public Instruction {
-    InsnVectorTimesMatrix(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t matrixId) : Instruction(lineInfo), type(type), resultId(resultId), vectorId(vectorId), matrixId(matrixId) {
+    InsnVectorTimesMatrix(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId, uint32_t matrixId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(vectorId);
         addParameter(matrixId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t vectorId; // operand from register
-    uint32_t matrixId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t vectorId() const { return argIdList[0]; } // operand from register
+    uint32_t matrixId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepVectorTimesMatrix(*this); }
     virtual uint32_t opcode() const { return SpvOpVectorTimesMatrix; }
     virtual std::string name() const { return "OpVectorTimesMatrix"; }
@@ -403,15 +406,15 @@ struct InsnVectorTimesMatrix : public Instruction {
 
 // OpMatrixTimesVector instruction (code 145).
 struct InsnMatrixTimesVector : public Instruction {
-    InsnMatrixTimesVector(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t matrixId, uint32_t vectorId) : Instruction(lineInfo), type(type), resultId(resultId), matrixId(matrixId), vectorId(vectorId) {
+    InsnMatrixTimesVector(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t matrixId, uint32_t vectorId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(matrixId);
         addParameter(vectorId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t matrixId; // operand from register
-    uint32_t vectorId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t matrixId() const { return argIdList[0]; } // operand from register
+    uint32_t vectorId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepMatrixTimesVector(*this); }
     virtual uint32_t opcode() const { return SpvOpMatrixTimesVector; }
     virtual std::string name() const { return "OpMatrixTimesVector"; }
@@ -419,15 +422,15 @@ struct InsnMatrixTimesVector : public Instruction {
 
 // OpMatrixTimesMatrix instruction (code 146).
 struct InsnMatrixTimesMatrix : public Instruction {
-    InsnMatrixTimesMatrix(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t leftMatrixId, uint32_t rightMatrixId) : Instruction(lineInfo), type(type), resultId(resultId), leftMatrixId(leftMatrixId), rightMatrixId(rightMatrixId) {
+    InsnMatrixTimesMatrix(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t leftMatrixId, uint32_t rightMatrixId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(leftMatrixId);
         addParameter(rightMatrixId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t leftMatrixId; // operand from register
-    uint32_t rightMatrixId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t leftMatrixId() const { return argIdList[0]; } // operand from register
+    uint32_t rightMatrixId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepMatrixTimesMatrix(*this); }
     virtual uint32_t opcode() const { return SpvOpMatrixTimesMatrix; }
     virtual std::string name() const { return "OpMatrixTimesMatrix"; }
@@ -435,15 +438,15 @@ struct InsnMatrixTimesMatrix : public Instruction {
 
 // OpDot instruction (code 148).
 struct InsnDot : public Instruction {
-    InsnDot(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id) : Instruction(lineInfo), type(type), resultId(resultId), vector1Id(vector1Id), vector2Id(vector2Id) {
+    InsnDot(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vector1Id, uint32_t vector2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(vector1Id);
         addParameter(vector2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t vector1Id; // operand from register
-    uint32_t vector2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t vector1Id() const { return argIdList[0]; } // operand from register
+    uint32_t vector2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepDot(*this); }
     virtual uint32_t opcode() const { return SpvOpDot; }
     virtual std::string name() const { return "OpDot"; }
@@ -451,13 +454,13 @@ struct InsnDot : public Instruction {
 
 // OpAny instruction (code 154).
 struct InsnAny : public Instruction {
-    InsnAny(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId) : Instruction(lineInfo), type(type), resultId(resultId), vectorId(vectorId) {
+    InsnAny(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(vectorId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t vectorId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t vectorId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepAny(*this); }
     virtual uint32_t opcode() const { return SpvOpAny; }
     virtual std::string name() const { return "OpAny"; }
@@ -465,13 +468,13 @@ struct InsnAny : public Instruction {
 
 // OpAll instruction (code 155).
 struct InsnAll : public Instruction {
-    InsnAll(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId) : Instruction(lineInfo), type(type), resultId(resultId), vectorId(vectorId) {
+    InsnAll(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t vectorId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(vectorId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t vectorId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t vectorId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepAll(*this); }
     virtual uint32_t opcode() const { return SpvOpAll; }
     virtual std::string name() const { return "OpAll"; }
@@ -479,15 +482,15 @@ struct InsnAll : public Instruction {
 
 // OpLogicalOr instruction (code 166).
 struct InsnLogicalOr : public Instruction {
-    InsnLogicalOr(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnLogicalOr(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepLogicalOr(*this); }
     virtual uint32_t opcode() const { return SpvOpLogicalOr; }
     virtual std::string name() const { return "OpLogicalOr"; }
@@ -495,15 +498,15 @@ struct InsnLogicalOr : public Instruction {
 
 // OpLogicalAnd instruction (code 167).
 struct InsnLogicalAnd : public Instruction {
-    InsnLogicalAnd(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnLogicalAnd(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepLogicalAnd(*this); }
     virtual uint32_t opcode() const { return SpvOpLogicalAnd; }
     virtual std::string name() const { return "OpLogicalAnd"; }
@@ -511,13 +514,13 @@ struct InsnLogicalAnd : public Instruction {
 
 // OpLogicalNot instruction (code 168).
 struct InsnLogicalNot : public Instruction {
-    InsnLogicalNot(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(lineInfo), type(type), resultId(resultId), operandId(operandId) {
+    InsnLogicalNot(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operandId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operandId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operandId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepLogicalNot(*this); }
     virtual uint32_t opcode() const { return SpvOpLogicalNot; }
     virtual std::string name() const { return "OpLogicalNot"; }
@@ -525,17 +528,17 @@ struct InsnLogicalNot : public Instruction {
 
 // OpSelect instruction (code 169).
 struct InsnSelect : public Instruction {
-    InsnSelect(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t conditionId, uint32_t object1Id, uint32_t object2Id) : Instruction(lineInfo), type(type), resultId(resultId), conditionId(conditionId), object1Id(object1Id), object2Id(object2Id) {
+    InsnSelect(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t conditionId, uint32_t object1Id, uint32_t object2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(conditionId);
         addParameter(object1Id);
         addParameter(object2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t conditionId; // operand from register
-    uint32_t object1Id; // operand from register
-    uint32_t object2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t conditionId() const { return argIdList[0]; } // operand from register
+    uint32_t object1Id() const { return argIdList[1]; } // operand from register
+    uint32_t object2Id() const { return argIdList[2]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepSelect(*this); }
     virtual uint32_t opcode() const { return SpvOpSelect; }
     virtual std::string name() const { return "OpSelect"; }
@@ -543,15 +546,15 @@ struct InsnSelect : public Instruction {
 
 // OpIEqual instruction (code 170).
 struct InsnIEqual : public Instruction {
-    InsnIEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnIEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepIEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpIEqual; }
     virtual std::string name() const { return "OpIEqual"; }
@@ -559,15 +562,15 @@ struct InsnIEqual : public Instruction {
 
 // OpINotEqual instruction (code 171).
 struct InsnINotEqual : public Instruction {
-    InsnINotEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnINotEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepINotEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpINotEqual; }
     virtual std::string name() const { return "OpINotEqual"; }
@@ -575,15 +578,15 @@ struct InsnINotEqual : public Instruction {
 
 // OpSLessThan instruction (code 177).
 struct InsnSLessThan : public Instruction {
-    InsnSLessThan(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnSLessThan(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepSLessThan(*this); }
     virtual uint32_t opcode() const { return SpvOpSLessThan; }
     virtual std::string name() const { return "OpSLessThan"; }
@@ -591,15 +594,15 @@ struct InsnSLessThan : public Instruction {
 
 // OpSLessThanEqual instruction (code 179).
 struct InsnSLessThanEqual : public Instruction {
-    InsnSLessThanEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnSLessThanEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepSLessThanEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpSLessThanEqual; }
     virtual std::string name() const { return "OpSLessThanEqual"; }
@@ -607,15 +610,15 @@ struct InsnSLessThanEqual : public Instruction {
 
 // OpFOrdEqual instruction (code 180).
 struct InsnFOrdEqual : public Instruction {
-    InsnFOrdEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpFOrdEqual; }
     virtual std::string name() const { return "OpFOrdEqual"; }
@@ -623,15 +626,15 @@ struct InsnFOrdEqual : public Instruction {
 
 // OpFOrdLessThan instruction (code 184).
 struct InsnFOrdLessThan : public Instruction {
-    InsnFOrdLessThan(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdLessThan(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdLessThan(*this); }
     virtual uint32_t opcode() const { return SpvOpFOrdLessThan; }
     virtual std::string name() const { return "OpFOrdLessThan"; }
@@ -639,15 +642,15 @@ struct InsnFOrdLessThan : public Instruction {
 
 // OpFOrdGreaterThan instruction (code 186).
 struct InsnFOrdGreaterThan : public Instruction {
-    InsnFOrdGreaterThan(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdGreaterThan(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdGreaterThan(*this); }
     virtual uint32_t opcode() const { return SpvOpFOrdGreaterThan; }
     virtual std::string name() const { return "OpFOrdGreaterThan"; }
@@ -655,15 +658,15 @@ struct InsnFOrdGreaterThan : public Instruction {
 
 // OpFOrdLessThanEqual instruction (code 188).
 struct InsnFOrdLessThanEqual : public Instruction {
-    InsnFOrdLessThanEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdLessThanEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdLessThanEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpFOrdLessThanEqual; }
     virtual std::string name() const { return "OpFOrdLessThanEqual"; }
@@ -672,15 +675,15 @@ struct InsnFOrdLessThanEqual : public Instruction {
 
 // OpFOrdGreaterThanEqual instruction (code 190).
 struct InsnFOrdGreaterThanEqual : public Instruction {
-    InsnFOrdGreaterThanEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type), resultId(resultId), operand1Id(operand1Id), operand2Id(operand2Id) {
+    InsnFOrdGreaterThanEqual(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operand1Id, uint32_t operand2Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(operand1Id);
         addParameter(operand2Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t operand1Id; // operand from register
-    uint32_t operand2Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operand1Id() const { return argIdList[0]; } // operand from register
+    uint32_t operand2Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdGreaterThanEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpFOrdGreaterThanEqual; }
     virtual std::string name() const { return "OpFOrdGreaterThanEqual"; }
@@ -688,15 +691,17 @@ struct InsnFOrdGreaterThanEqual : public Instruction {
 
 // OpPhi instruction (code 245).
 struct InsnPhi : public Instruction {
-    InsnPhi(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, std::vector<uint32_t> operandId) : Instruction(lineInfo), type(type), resultId(resultId), operandId(operandId) {
+    InsnPhi(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, std::vector<uint32_t> operandId, std::vector<uint32_t> labelId) : Instruction(lineInfo), type(type), labelId(labelId) {
         addResult(resultId);
-        for (int i = 0; i < operandId.size(); i += 2) {
-            addParameter(operandId[i]);
+        for (auto _argId : operandId) {
+            addParameter(_argId);
         }
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    std::vector<uint32_t> operandId; // PairIdRefIdRef
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operandId(size_t i) const { return argIdList[0 + i]; } // source ref IDs
+    size_t operandIdCount() const { return argIdList.size() - 0; } // source ref IDs
+    std::vector<uint32_t> labelId; // source labels
     virtual void step(Interpreter *interpreter) { interpreter->stepPhi(*this); }
     virtual uint32_t opcode() const { return SpvOpPhi; }
     virtual std::string name() const { return "OpPhi"; }
@@ -719,12 +724,12 @@ struct InsnBranch : public Instruction {
 
 // OpBranchConditional instruction (code 250).
 struct InsnBranchConditional : public Instruction {
-    InsnBranchConditional(const LineInfo& lineInfo, uint32_t conditionId, uint32_t trueLabelId, uint32_t falseLabelId, std::vector<uint32_t> branchweightsId) : Instruction(lineInfo), conditionId(conditionId), trueLabelId(trueLabelId), falseLabelId(falseLabelId), branchweightsId(branchweightsId) {
+    InsnBranchConditional(const LineInfo& lineInfo, uint32_t conditionId, uint32_t trueLabelId, uint32_t falseLabelId, std::vector<uint32_t> branchweightsId) : Instruction(lineInfo), trueLabelId(trueLabelId), falseLabelId(falseLabelId), branchweightsId(branchweightsId) {
         addParameter(conditionId);
         targetLabelIds.insert(trueLabelId);
         targetLabelIds.insert(falseLabelId);
     }
-    uint32_t conditionId; // operand from register
+    uint32_t conditionId() const { return argIdList[0]; } // operand from register
     uint32_t trueLabelId; // operand from register
     uint32_t falseLabelId; // operand from register
     std::vector<uint32_t> branchweightsId; // LiteralInteger
@@ -760,10 +765,10 @@ struct InsnReturn : public Instruction {
 
 // OpReturnValue instruction (code 254).
 struct InsnReturnValue : public Instruction {
-    InsnReturnValue(const LineInfo& lineInfo, uint32_t valueId) : Instruction(lineInfo), valueId(valueId) {
+    InsnReturnValue(const LineInfo& lineInfo, uint32_t valueId) : Instruction(lineInfo) {
         addParameter(valueId);
     }
-    uint32_t valueId; // operand from register
+    uint32_t valueId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepReturnValue(*this); }
     virtual uint32_t opcode() const { return SpvOpReturnValue; }
     virtual std::string name() const { return "OpReturnValue"; }
@@ -774,13 +779,13 @@ struct InsnReturnValue : public Instruction {
 
 // GLSLstd450FAbs instruction (code 4).
 struct InsnGLSLstd450FAbs : public Instruction {
-    InsnGLSLstd450FAbs(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450FAbs(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FAbs(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FAbs; }
     virtual std::string name() const { return "GLSLstd450FAbs"; }
@@ -789,13 +794,13 @@ struct InsnGLSLstd450FAbs : public Instruction {
 
 // GLSLstd450FSign instruction (code 6).
 struct InsnGLSLstd450FSign : public Instruction {
-    InsnGLSLstd450FSign(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450FSign(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FSign(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FSign; }
     virtual std::string name() const { return "GLSLstd450FSign"; }
@@ -803,13 +808,13 @@ struct InsnGLSLstd450FSign : public Instruction {
 
 // GLSLstd450Floor instruction (code 8).
 struct InsnGLSLstd450Floor : public Instruction {
-    InsnGLSLstd450Floor(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Floor(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Floor(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Floor; }
     virtual std::string name() const { return "GLSLstd450Floor"; }
@@ -818,13 +823,13 @@ struct InsnGLSLstd450Floor : public Instruction {
 
 // GLSLstd450Fract instruction (code 10).
 struct InsnGLSLstd450Fract : public Instruction {
-    InsnGLSLstd450Fract(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Fract(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Fract(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Fract; }
     virtual std::string name() const { return "GLSLstd450Fract"; }
@@ -833,13 +838,13 @@ struct InsnGLSLstd450Fract : public Instruction {
 
 // GLSLstd450Radians instruction (code 11).
 struct InsnGLSLstd450Radians : public Instruction {
-    InsnGLSLstd450Radians(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t degreesId) : Instruction(lineInfo), type(type), resultId(resultId), degreesId(degreesId) {
+    InsnGLSLstd450Radians(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t degreesId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(degreesId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t degreesId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t degreesId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Radians(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Radians; }
     virtual std::string name() const { return "GLSLstd450Radians"; }
@@ -847,13 +852,13 @@ struct InsnGLSLstd450Radians : public Instruction {
 
 // GLSLstd450Sin instruction (code 13).
 struct InsnGLSLstd450Sin : public Instruction {
-    InsnGLSLstd450Sin(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Sin(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Sin(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Sin; }
     virtual std::string name() const { return "GLSLstd450Sin"; }
@@ -862,13 +867,13 @@ struct InsnGLSLstd450Sin : public Instruction {
 
 // GLSLstd450Cos instruction (code 14).
 struct InsnGLSLstd450Cos : public Instruction {
-    InsnGLSLstd450Cos(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Cos(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Cos(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Cos; }
     virtual std::string name() const { return "GLSLstd450Cos"; }
@@ -877,13 +882,13 @@ struct InsnGLSLstd450Cos : public Instruction {
 
 // GLSLstd450Atan instruction (code 18).
 struct InsnGLSLstd450Atan : public Instruction {
-    InsnGLSLstd450Atan(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t y_over_xId) : Instruction(lineInfo), type(type), resultId(resultId), y_over_xId(y_over_xId) {
+    InsnGLSLstd450Atan(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t y_over_xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(y_over_xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t y_over_xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t y_over_xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Atan(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Atan; }
     virtual std::string name() const { return "GLSLstd450Atan"; }
@@ -891,15 +896,15 @@ struct InsnGLSLstd450Atan : public Instruction {
 
 // GLSLstd450Atan2 instruction (code 25).
 struct InsnGLSLstd450Atan2 : public Instruction {
-    InsnGLSLstd450Atan2(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t yId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), yId(yId), xId(xId) {
+    InsnGLSLstd450Atan2(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t yId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(yId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t yId; // operand from register
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t yId() const { return argIdList[0]; } // operand from register
+    uint32_t xId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Atan2(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Atan2; }
     virtual std::string name() const { return "GLSLstd450Atan2"; }
@@ -908,15 +913,15 @@ struct InsnGLSLstd450Atan2 : public Instruction {
 
 // GLSLstd450Pow instruction (code 26).
 struct InsnGLSLstd450Pow : public Instruction {
-    InsnGLSLstd450Pow(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId), yId(yId) {
+    InsnGLSLstd450Pow(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
         addParameter(yId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
-    uint32_t yId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
+    uint32_t yId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Pow(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Pow; }
     virtual std::string name() const { return "GLSLstd450Pow"; }
@@ -924,13 +929,13 @@ struct InsnGLSLstd450Pow : public Instruction {
 
 // GLSLstd450Exp instruction (code 27).
 struct InsnGLSLstd450Exp : public Instruction {
-    InsnGLSLstd450Exp(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Exp(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Exp; }
     virtual std::string name() const { return "GLSLstd450Exp"; }
@@ -938,13 +943,13 @@ struct InsnGLSLstd450Exp : public Instruction {
 
 // GLSLstd450Exp2 instruction (code 29).
 struct InsnGLSLstd450Exp2 : public Instruction {
-    InsnGLSLstd450Exp2(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Exp2(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp2(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Exp2; }
     virtual std::string name() const { return "GLSLstd450Exp2"; }
@@ -952,13 +957,13 @@ struct InsnGLSLstd450Exp2 : public Instruction {
 
 // GLSLstd450Sqrt instruction (code 31).
 struct InsnGLSLstd450Sqrt : public Instruction {
-    InsnGLSLstd450Sqrt(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Sqrt(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Sqrt(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Sqrt; }
     virtual std::string name() const { return "GLSLstd450Sqrt"; }
@@ -966,15 +971,15 @@ struct InsnGLSLstd450Sqrt : public Instruction {
 
 // GLSLstd450FMin instruction (code 37).
 struct InsnGLSLstd450FMin : public Instruction {
-    InsnGLSLstd450FMin(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId), yId(yId) {
+    InsnGLSLstd450FMin(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
         addParameter(yId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
-    uint32_t yId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
+    uint32_t yId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMin(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FMin; }
     virtual std::string name() const { return "GLSLstd450FMin"; }
@@ -982,15 +987,15 @@ struct InsnGLSLstd450FMin : public Instruction {
 
 // GLSLstd450FMax instruction (code 40).
 struct InsnGLSLstd450FMax : public Instruction {
-    InsnGLSLstd450FMax(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId), yId(yId) {
+    InsnGLSLstd450FMax(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
         addParameter(yId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
-    uint32_t yId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
+    uint32_t yId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMax(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FMax; }
     virtual std::string name() const { return "GLSLstd450FMax"; }
@@ -998,17 +1003,17 @@ struct InsnGLSLstd450FMax : public Instruction {
 
 // GLSLstd450FClamp instruction (code 43).
 struct InsnGLSLstd450FClamp : public Instruction {
-    InsnGLSLstd450FClamp(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t minValId, uint32_t maxValId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId), minValId(minValId), maxValId(maxValId) {
+    InsnGLSLstd450FClamp(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t minValId, uint32_t maxValId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
         addParameter(minValId);
         addParameter(maxValId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
-    uint32_t minValId; // operand from register
-    uint32_t maxValId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
+    uint32_t minValId() const { return argIdList[1]; } // operand from register
+    uint32_t maxValId() const { return argIdList[2]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FClamp(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FClamp; }
     virtual std::string name() const { return "GLSLstd450FClamp"; }
@@ -1016,17 +1021,17 @@ struct InsnGLSLstd450FClamp : public Instruction {
 
 // GLSLstd450FMix instruction (code 46).
 struct InsnGLSLstd450FMix : public Instruction {
-    InsnGLSLstd450FMix(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId, uint32_t aId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId), yId(yId), aId(aId) {
+    InsnGLSLstd450FMix(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId, uint32_t aId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
         addParameter(yId);
         addParameter(aId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
-    uint32_t yId; // operand from register
-    uint32_t aId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
+    uint32_t yId() const { return argIdList[1]; } // operand from register
+    uint32_t aId() const { return argIdList[2]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMix(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FMix; }
     virtual std::string name() const { return "GLSLstd450FMix"; }
@@ -1034,15 +1039,15 @@ struct InsnGLSLstd450FMix : public Instruction {
 
 // GLSLstd450Step instruction (code 48).
 struct InsnGLSLstd450Step : public Instruction {
-    InsnGLSLstd450Step(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t edgeId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), edgeId(edgeId), xId(xId) {
+    InsnGLSLstd450Step(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t edgeId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(edgeId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t edgeId; // operand from register
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t edgeId() const { return argIdList[0]; } // operand from register
+    uint32_t xId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Step(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Step; }
     virtual std::string name() const { return "GLSLstd450Step"; }
@@ -1051,17 +1056,17 @@ struct InsnGLSLstd450Step : public Instruction {
 
 // GLSLstd450SmoothStep instruction (code 49).
 struct InsnGLSLstd450SmoothStep : public Instruction {
-    InsnGLSLstd450SmoothStep(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t edge0Id, uint32_t edge1Id, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), edge0Id(edge0Id), edge1Id(edge1Id), xId(xId) {
+    InsnGLSLstd450SmoothStep(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t edge0Id, uint32_t edge1Id, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(edge0Id);
         addParameter(edge1Id);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t edge0Id; // operand from register
-    uint32_t edge1Id; // operand from register
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t edge0Id() const { return argIdList[0]; } // operand from register
+    uint32_t edge1Id() const { return argIdList[1]; } // operand from register
+    uint32_t xId() const { return argIdList[2]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450SmoothStep(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450SmoothStep; }
     virtual std::string name() const { return "GLSLstd450SmoothStep"; }
@@ -1069,13 +1074,13 @@ struct InsnGLSLstd450SmoothStep : public Instruction {
 
 // GLSLstd450Length instruction (code 66).
 struct InsnGLSLstd450Length : public Instruction {
-    InsnGLSLstd450Length(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Length(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Length(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Length; }
     virtual std::string name() const { return "GLSLstd450Length"; }
@@ -1083,15 +1088,15 @@ struct InsnGLSLstd450Length : public Instruction {
 
 // GLSLstd450Distance instruction (code 67).
 struct InsnGLSLstd450Distance : public Instruction {
-    InsnGLSLstd450Distance(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t p0Id, uint32_t p1Id) : Instruction(lineInfo), type(type), resultId(resultId), p0Id(p0Id), p1Id(p1Id) {
+    InsnGLSLstd450Distance(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t p0Id, uint32_t p1Id) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(p0Id);
         addParameter(p1Id);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t p0Id; // operand from register
-    uint32_t p1Id; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t p0Id() const { return argIdList[0]; } // operand from register
+    uint32_t p1Id() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Distance(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Distance; }
     virtual std::string name() const { return "GLSLstd450Distance"; }
@@ -1099,15 +1104,15 @@ struct InsnGLSLstd450Distance : public Instruction {
 
 // GLSLstd450Cross instruction (code 68).
 struct InsnGLSLstd450Cross : public Instruction {
-    InsnGLSLstd450Cross(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId), yId(yId) {
+    InsnGLSLstd450Cross(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId, uint32_t yId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
         addParameter(yId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
-    uint32_t yId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
+    uint32_t yId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Cross(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Cross; }
     virtual std::string name() const { return "GLSLstd450Cross"; }
@@ -1115,13 +1120,13 @@ struct InsnGLSLstd450Cross : public Instruction {
 
 // GLSLstd450Normalize instruction (code 69).
 struct InsnGLSLstd450Normalize : public Instruction {
-    InsnGLSLstd450Normalize(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type), resultId(resultId), xId(xId) {
+    InsnGLSLstd450Normalize(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(xId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t xId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Normalize(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Normalize; }
     virtual std::string name() const { return "GLSLstd450Normalize"; }
@@ -1129,15 +1134,15 @@ struct InsnGLSLstd450Normalize : public Instruction {
 
 // GLSLstd450Reflect instruction (code 71).
 struct InsnGLSLstd450Reflect : public Instruction {
-    InsnGLSLstd450Reflect(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId) : Instruction(lineInfo), type(type), resultId(resultId), iId(iId), nId(nId) {
+    InsnGLSLstd450Reflect(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(iId);
         addParameter(nId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t iId; // operand from register
-    uint32_t nId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t iId() const { return argIdList[0]; } // operand from register
+    uint32_t nId() const { return argIdList[1]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Reflect(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Reflect; }
     virtual std::string name() const { return "GLSLstd450Reflect"; }
@@ -1145,17 +1150,17 @@ struct InsnGLSLstd450Reflect : public Instruction {
 
 // GLSLstd450Refract instruction (code 72).
 struct InsnGLSLstd450Refract : public Instruction {
-    InsnGLSLstd450Refract(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId, uint32_t etaId) : Instruction(lineInfo), type(type), resultId(resultId), iId(iId), nId(nId), etaId(etaId) {
+    InsnGLSLstd450Refract(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t iId, uint32_t nId, uint32_t etaId) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         addParameter(iId);
         addParameter(nId);
         addParameter(etaId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
-    uint32_t iId; // operand from register
-    uint32_t nId; // operand from register
-    uint32_t etaId; // operand from register
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t iId() const { return argIdList[0]; } // operand from register
+    uint32_t nId() const { return argIdList[1]; } // operand from register
+    uint32_t etaId() const { return argIdList[2]; } // operand from register
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Refract(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Refract; }
     virtual std::string name() const { return "GLSLstd450Refract"; }

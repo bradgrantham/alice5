@@ -929,8 +929,14 @@ case SpvOpFOrdGreaterThanEqual: {
 case SpvOpPhi: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();
-    std::vector<uint32_t> operandId = restv();
-    pgm->instructions.push_back(std::make_shared<InsnPhi>(pgm->currentLine, type, resultId, operandId));
+    std::vector<uint32_t> pairs = restv();
+    std::vector<uint32_t> operandId;
+    std::vector<uint32_t> labelId;
+    for (int i = 0; i < pairs.size(); i += 2) {
+        operandId.push_back(pairs[i]);
+        labelId.push_back(pairs[i + 1]);
+    }
+    pgm->instructions.push_back(std::make_shared<InsnPhi>(pgm->currentLine, type, resultId, operandId, labelId));
     pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "Phi";
@@ -941,6 +947,9 @@ case SpvOpPhi: {
         std::cout << " operandId ";
         for(int i = 0; i < operandId.size(); i++)
             std::cout << operandId[i] << " ";
+        std::cout << " labelId ";
+        for(int i = 0; i < labelId.size(); i++)
+            std::cout << labelId[i] << " ";
         std::cout << "\n";
     }
     break;

@@ -63,15 +63,15 @@ void Interpreter::stepNop(const InsnNop& insn)
 
 void Interpreter::stepLoad(const InsnLoad& insn)
 {
-    Pointer& ptr = pointers.at(insn.pointerId);
-    Register& obj = registers.at(insn.resultId);
+    Pointer& ptr = pointers.at(insn.pointerId());
+    Register& obj = registers.at(insn.resultId());
     size_t size = pgm->typeSizes.at(insn.type);
     size_t result = checkMemory(ptr.address, size);
     if(result != MEMORY_CHECK_OKAY) {
-        std::cerr << "Warning: Reading uninitialized byte " << result << " within object at " << ptr.address << " of size " << size << " in stepLoad from pointer " << insn.pointerId;
+        std::cerr << "Warning: Reading uninitialized byte " << result << " within object at " << ptr.address << " of size " << size << " in stepLoad from pointer " << insn.pointerId();
 
-        if(pgm->names.find(insn.pointerId) != pgm->names.end()) {
-            std::cerr << " named \"" << pgm->names.at(insn.pointerId) << "\"";
+        if(pgm->names.find(insn.pointerId()) != pgm->names.end()) {
+            std::cerr << " named \"" << pgm->names.at(insn.pointerId()) << "\"";
         } else {
             std::cerr << " with no name";
         }
@@ -100,11 +100,11 @@ void Interpreter::stepLoad(const InsnLoad& insn)
 
 void Interpreter::stepStore(const InsnStore& insn)
 {
-    Pointer& ptr = pointers.at(insn.pointerId);
-    Register& obj = registers.at(insn.objectId);
+    Pointer& ptr = pointers.at(insn.pointerId());
+    Register& obj = registers.at(insn.objectId());
 #ifdef CHECK_REGISTER_ACCESS
     if (!obj.initialized) {
-        std::cerr << "Warning: Storing uninitialized register " << insn.objectId << "\n";
+        std::cerr << "Warning: Storing uninitialized register " << insn.objectId() << "\n";
     }
 #endif
     std::copy(obj.data, obj.data + obj.size, memory + ptr.address);
@@ -113,11 +113,11 @@ void Interpreter::stepStore(const InsnStore& insn)
 
 void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
 {
-    Register& obj = registers.at(insn.resultId);
-    Register& src = registers.at(insn.compositeId);
+    Register& obj = registers.at(insn.resultId());
+    Register& src = registers.at(insn.compositeId());
 #ifdef CHECK_REGISTER_ACCESS
     if (!src.initialized) {
-        std::cerr << "Warning: Extracting uninitialized register " << insn.compositeId << "\n";
+        std::cerr << "Warning: Extracting uninitialized register " << insn.compositeId() << "\n";
     }
 #endif
     /* use indexes to walk blob */
@@ -142,16 +142,16 @@ void Interpreter::stepCompositeExtract(const InsnCompositeExtract& insn)
 // XXX This method has not been tested.
 void Interpreter::stepCompositeInsert(const InsnCompositeInsert& insn)
 {
-    Register& res = registers.at(insn.resultId);
-    Register& obj = registers.at(insn.objectId);
-    Register& cmp = registers.at(insn.compositeId);
+    Register& res = registers.at(insn.resultId());
+    Register& obj = registers.at(insn.objectId());
+    Register& cmp = registers.at(insn.compositeId());
 
 #ifdef CHECK_REGISTER_ACCESS
     if (!obj.initialized) {
-        std::cerr << "Warning: Inserting uninitialized register " << insn.objectId << "\n";
+        std::cerr << "Warning: Inserting uninitialized register " << insn.objectId() << "\n";
     }
     if (!cmp.initialized) {
-        std::cerr << "Warning: Inserting from uninitialized register " << insn.compositeId << "\n";
+        std::cerr << "Warning: Inserting from uninitialized register " << insn.compositeId() << "\n";
     }
 #endif
 
@@ -172,10 +172,11 @@ void Interpreter::stepCompositeInsert(const InsnCompositeInsert& insn)
 
 void Interpreter::stepCompositeConstruct(const InsnCompositeConstruct& insn)
 {
-    Register& obj = registers.at(insn.resultId);
+    Register& obj = registers.at(insn.resultId());
     size_t offset = 0;
-    for(auto& j: insn.constituentsId) {
-        Register& src = registers.at(j);
+    for (int i = 0; i < insn.constituentsIdCount(); i++) {
+        uint32_t id = insn.constituentsId(i);
+        Register& src = registers.at(id);
 #ifdef CHECK_REGISTER_ACCESS
         if (!src.initialized) {
             std::cerr << "Warning: Compositing from uninitialized register " << j << "\n";
@@ -199,17 +200,17 @@ void Interpreter::stepIAdd(const InsnIAdd& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id);
-        const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id);
-        uint32_t* result = &toRegister<uint32_t>(insn.resultId);
+        const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id());
+        const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id());
+        uint32_t* result = &toRegister<uint32_t>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] + operand2[i];
         }
     } else {
-        uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id);
-        uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id);
+        uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id());
+        uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id());
         uint32_t result = operand1 + operand2;
-        toRegister<uint32_t>(insn.resultId) = result;
+        toRegister<uint32_t>(insn.resultId()) = result;
     }
 }
 
@@ -220,17 +221,17 @@ void Interpreter::stepISub(const InsnISub& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id);
-        const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id);
-        uint32_t* result = &toRegister<uint32_t>(insn.resultId);
+        const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id());
+        const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id());
+        uint32_t* result = &toRegister<uint32_t>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] - operand2[i];
         }
     } else {
-        uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id);
-        uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id);
+        uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id());
+        uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id());
         uint32_t result = operand1 - operand2;
-        toRegister<uint32_t>(insn.resultId) = result;
+        toRegister<uint32_t>(insn.resultId()) = result;
     }
 }
 
@@ -241,17 +242,17 @@ void Interpreter::stepFAdd(const InsnFAdd& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] + operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         float result = operand1 + operand2;
-        toRegister<float>(insn.resultId) = result;
+        toRegister<float>(insn.resultId()) = result;
     }
 }
 
@@ -262,17 +263,17 @@ void Interpreter::stepFSub(const InsnFSub& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] - operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         float result = operand1 - operand2;
-        toRegister<float>(insn.resultId) = result;
+        toRegister<float>(insn.resultId()) = result;
     }
 }
 
@@ -283,17 +284,17 @@ void Interpreter::stepFMul(const InsnFMul& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] * operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         float result = operand1 * operand2;
-        toRegister<float>(insn.resultId) = result;
+        toRegister<float>(insn.resultId()) = result;
     }
 }
 
@@ -304,17 +305,17 @@ void Interpreter::stepFDiv(const InsnFDiv& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] / operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         float result = operand1 / operand2;
-        toRegister<float>(insn.resultId) = result;
+        toRegister<float>(insn.resultId()) = result;
     }
 }
 
@@ -325,17 +326,17 @@ void Interpreter::stepFMod(const InsnFMod& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] - floor(operand1[i]/operand2[i])*operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         float result = operand1 - floor(operand1/operand2)*operand2;
-        toRegister<float>(insn.resultId) = result;
+        toRegister<float>(insn.resultId()) = result;
     }
 }
 
@@ -346,17 +347,17 @@ void Interpreter::stepFOrdLessThan(const InsnFOrdLessThan& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] < operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         bool result = operand1 < operand2;
-        toRegister<bool>(insn.resultId) = result;
+        toRegister<bool>(insn.resultId()) = result;
     }
 }
 
@@ -367,17 +368,17 @@ void Interpreter::stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] > operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         bool result = operand1 > operand2;
-        toRegister<bool>(insn.resultId) = result;
+        toRegister<bool>(insn.resultId()) = result;
     }
 }
 
@@ -388,17 +389,17 @@ void Interpreter::stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] <= operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         bool result = operand1 <= operand2;
-        toRegister<bool>(insn.resultId) = result;
+        toRegister<bool>(insn.resultId()) = result;
     }
 }
 
@@ -409,19 +410,19 @@ void Interpreter::stepFOrdEqual(const InsnFOrdEqual& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] == operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         // XXX I don't know the difference between ordered and equal
         // vs. unordered and equal, so I don't know which this is.
         bool result = operand1 == operand2;
-        toRegister<bool>(insn.resultId) = result;
+        toRegister<bool>(insn.resultId()) = result;
     }
 }
 
@@ -432,13 +433,13 @@ void Interpreter::stepFNegate(const InsnFNegate& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand = &fromRegister<float>(insn.operandId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* operand = &fromRegister<float>(insn.operandId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = -operand[i];
         }
     } else {
-        toRegister<float>(insn.resultId) = -fromRegister<float>(insn.operandId);
+        toRegister<float>(insn.resultId()) = -fromRegister<float>(insn.operandId());
     }
 }
 
@@ -456,12 +457,12 @@ float dotProduct(const float *a, const float *b, int count)
 
 void Interpreter::stepDot(const InsnDot& insn)
 {
-    const Register &r1 = registers[insn.vector1Id];
+    const Register &r1 = registers[insn.vector1Id()];
     const TypeVector *t1 = dynamic_cast<const TypeVector *>(pgm->types.at(r1.type).get());
 
-    const float* vector1 = &fromRegister<float>(insn.vector1Id);
-    const float* vector2 = &fromRegister<float>(insn.vector2Id);
-    toRegister<float>(insn.resultId) = dotProduct(vector1, vector2, t1->count);
+    const float* vector1 = &fromRegister<float>(insn.vector1Id());
+    const float* vector2 = &fromRegister<float>(insn.vector2Id());
+    toRegister<float>(insn.resultId()) = dotProduct(vector1, vector2, t1->count);
 }
 
 void Interpreter::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
@@ -471,17 +472,17 @@ void Interpreter::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* operand1 = &fromRegister<float>(insn.operand1Id);
-        const float* operand2 = &fromRegister<float>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const float* operand1 = &fromRegister<float>(insn.operand1Id());
+        const float* operand2 = &fromRegister<float>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] >= operand2[i];
         }
     } else {
-        float operand1 = fromRegister<float>(insn.operand1Id);
-        float operand2 = fromRegister<float>(insn.operand2Id);
+        float operand1 = fromRegister<float>(insn.operand1Id());
+        float operand2 = fromRegister<float>(insn.operand2Id());
         bool result = operand1 >= operand2;
-        toRegister<bool>(insn.resultId) = result;
+        toRegister<bool>(insn.resultId()) = result;
     }
 } 
 
@@ -492,17 +493,17 @@ void Interpreter::stepSLessThanEqual(const InsnSLessThanEqual& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id);
-        const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id());
+        const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] <= operand2[i];
         }
     } else {
-        int32_t operand1 = fromRegister<int32_t>(insn.operand1Id);
-        int32_t operand2 = fromRegister<int32_t>(insn.operand2Id);
+        int32_t operand1 = fromRegister<int32_t>(insn.operand1Id());
+        int32_t operand2 = fromRegister<int32_t>(insn.operand2Id());
         bool result = operand1 <= operand2;
-        toRegister<bool>(insn.resultId) = result;
+        toRegister<bool>(insn.resultId()) = result;
     }
 }
 
@@ -513,17 +514,17 @@ void Interpreter::stepSLessThan(const InsnSLessThan& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id);
-        const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id());
+        const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] < operand2[i];
         }
     } else {
-        int32_t operand1 = fromRegister<int32_t>(insn.operand1Id);
-        int32_t operand2 = fromRegister<int32_t>(insn.operand2Id);
+        int32_t operand1 = fromRegister<int32_t>(insn.operand1Id());
+        int32_t operand2 = fromRegister<int32_t>(insn.operand2Id());
         bool result = operand1 < operand2;
-        toRegister<bool>(insn.resultId) = result;
+        toRegister<bool>(insn.resultId()) = result;
     }
 }
 
@@ -534,17 +535,17 @@ void Interpreter::stepSDiv(const InsnSDiv& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id);
-        const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id);
-        int32_t* result = &toRegister<int32_t>(insn.resultId);
+        const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id());
+        const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id());
+        int32_t* result = &toRegister<int32_t>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] / operand2[i];
         }
     } else {
-        int32_t operand1 = fromRegister<int32_t>(insn.operand1Id);
-        int32_t operand2 = fromRegister<int32_t>(insn.operand2Id);
+        int32_t operand1 = fromRegister<int32_t>(insn.operand1Id());
+        int32_t operand2 = fromRegister<int32_t>(insn.operand2Id());
         int32_t result = operand1 / operand2;
-        toRegister<int32_t>(insn.resultId) = result;
+        toRegister<int32_t>(insn.resultId()) = result;
     }
 }
 
@@ -555,17 +556,17 @@ void Interpreter::stepINotEqual(const InsnINotEqual& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id);
-        const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id());
+        const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] != operand2[i];
         }
     } else {
-        uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id);
-        uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id);
+        uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id());
+        uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id());
         bool result = operand1 != operand2;
-        toRegister<bool>(insn.resultId) = result;
+        toRegister<bool>(insn.resultId()) = result;
     }
 }
 
@@ -576,17 +577,17 @@ void Interpreter::stepIEqual(const InsnIEqual& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id);
-        const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id());
+        const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] == operand2[i];
         }
     } else {
-        uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id);
-        uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id);
+        uint32_t operand1 = fromRegister<uint32_t>(insn.operand1Id());
+        uint32_t operand2 = fromRegister<uint32_t>(insn.operand2Id());
         bool result = operand1 == operand2;
-        toRegister<bool>(insn.resultId) = result;
+        toRegister<bool>(insn.resultId()) = result;
     }
 }
 
@@ -597,13 +598,13 @@ void Interpreter::stepLogicalNot(const InsnLogicalNot& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const bool* operand = &fromRegister<bool>(insn.operandId);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const bool* operand = &fromRegister<bool>(insn.operandId());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = !operand[i];
         }
     } else {
-        toRegister<bool>(insn.resultId) = !fromRegister<bool>(insn.operandId);
+        toRegister<bool>(insn.resultId()) = !fromRegister<bool>(insn.operandId());
     }
 }
 
@@ -614,25 +615,25 @@ void Interpreter::stepLogicalAnd(const InsnLogicalAnd& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const bool* operand1 = &fromRegister<bool>(insn.operand1Id);
-        const bool* operand2 = &fromRegister<bool>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const bool* operand1 = &fromRegister<bool>(insn.operand1Id());
+        const bool* operand2 = &fromRegister<bool>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] && operand2[i];
         }
     } else {
-        bool operand1 = fromRegister<bool>(insn.operand1Id);
-        bool operand2 = fromRegister<bool>(insn.operand2Id);
-        toRegister<bool>(insn.resultId) = operand1 && operand2;
+        bool operand1 = fromRegister<bool>(insn.operand1Id());
+        bool operand2 = fromRegister<bool>(insn.operand2Id());
+        toRegister<bool>(insn.resultId()) = operand1 && operand2;
     }
 }
 
 void Interpreter::stepAll(const InsnAll& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.vectorId].type).get();
+    const Type *type = pgm->types.at(registers[insn.vectorId()].type).get();
     const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-    const bool* operand = &fromRegister<bool>(insn.vectorId);
+    const bool* operand = &fromRegister<bool>(insn.vectorId());
 
     bool result = true;
     for(int i = 0; i < typeVector->count; i++) {
@@ -642,15 +643,15 @@ void Interpreter::stepAll(const InsnAll& insn)
         }
     }
 
-    toRegister<bool>(insn.resultId) = result;
+    toRegister<bool>(insn.resultId()) = result;
 }
 
 void Interpreter::stepAny(const InsnAny& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.vectorId].type).get();
+    const Type *type = pgm->types.at(registers[insn.vectorId()].type).get();
     const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-    const bool* operand = &fromRegister<bool>(insn.vectorId);
+    const bool* operand = &fromRegister<bool>(insn.vectorId());
 
     bool result = false;
     for(int i = 0; i < typeVector->count; i++) {
@@ -660,7 +661,7 @@ void Interpreter::stepAny(const InsnAny& insn)
         }
     }
 
-    toRegister<bool>(insn.resultId) = result;
+    toRegister<bool>(insn.resultId()) = result;
 }
 
 void Interpreter::stepLogicalOr(const InsnLogicalOr& insn)
@@ -670,16 +671,16 @@ void Interpreter::stepLogicalOr(const InsnLogicalOr& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const bool* operand1 = &fromRegister<bool>(insn.operand1Id);
-        const bool* operand2 = &fromRegister<bool>(insn.operand2Id);
-        bool* result = &toRegister<bool>(insn.resultId);
+        const bool* operand1 = &fromRegister<bool>(insn.operand1Id());
+        const bool* operand2 = &fromRegister<bool>(insn.operand2Id());
+        bool* result = &toRegister<bool>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] || operand2[i];
         }
     } else {
-        bool operand1 = fromRegister<bool>(insn.operand1Id);
-        bool operand2 = fromRegister<bool>(insn.operand2Id);
-        toRegister<bool>(insn.resultId) = operand1 || operand2;
+        bool operand1 = fromRegister<bool>(insn.operand1Id());
+        bool operand2 = fromRegister<bool>(insn.operand2Id());
+        toRegister<bool>(insn.resultId()) = operand1 || operand2;
     }
 }
 
@@ -690,28 +691,28 @@ void Interpreter::stepSelect(const InsnSelect& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const bool* condition = &fromRegister<bool>(insn.conditionId);
+        const bool* condition = &fromRegister<bool>(insn.conditionId());
         // XXX shouldn't assume floats here. Any data is valid.
-        const float* object1 = &fromRegister<float>(insn.object1Id);
-        const float* object2 = &fromRegister<float>(insn.object2Id);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* object1 = &fromRegister<float>(insn.object1Id());
+        const float* object2 = &fromRegister<float>(insn.object2Id());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = condition[i] ? object1[i] : object2[i];
         }
     } else {
-        bool condition = fromRegister<bool>(insn.conditionId);
-        float object1 = fromRegister<float>(insn.object1Id);
-        float object2 = fromRegister<float>(insn.object2Id);
+        bool condition = fromRegister<bool>(insn.conditionId());
+        float object1 = fromRegister<float>(insn.object1Id());
+        float object2 = fromRegister<float>(insn.object2Id());
         float result = condition ? object1 : object2;
-        toRegister<float>(insn.resultId) = result;
+        toRegister<float>(insn.resultId()) = result;
     }
 }
 
 void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 {
-    const float* vector = &fromRegister<float>(insn.vectorId);
-    float scalar = fromRegister<float>(insn.scalarId);
-    float* result = &toRegister<float>(insn.resultId);
+    const float* vector = &fromRegister<float>(insn.vectorId());
+    float scalar = fromRegister<float>(insn.scalarId());
+    float* result = &toRegister<float>(insn.resultId());
 
     const TypeVector *typeVector = pgm->type<TypeVector>(insn.type);
 
@@ -722,11 +723,11 @@ void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 
 void Interpreter::stepMatrixTimesMatrix(const InsnMatrixTimesMatrix& insn)
 {
-    const float* left = &fromRegister<float>(insn.leftMatrixId);
-    const float* right = &fromRegister<float>(insn.rightMatrixId);
-    float* result = &toRegister<float>(insn.resultId);
+    const float* left = &fromRegister<float>(insn.leftMatrixId());
+    const float* right = &fromRegister<float>(insn.rightMatrixId());
+    float* result = &toRegister<float>(insn.resultId());
 
-    const Register &leftMatrixReg = registers[insn.leftMatrixId];
+    const Register &leftMatrixReg = registers[insn.leftMatrixId()];
 
     const TypeMatrix *leftMatrixType = pgm->type<TypeMatrix>(leftMatrixReg.type);
     const TypeVector *leftMatrixVectorType = pgm->type<TypeVector>(leftMatrixType->columnType);
@@ -757,11 +758,11 @@ void Interpreter::stepMatrixTimesMatrix(const InsnMatrixTimesMatrix& insn)
 
 void Interpreter::stepMatrixTimesVector(const InsnMatrixTimesVector& insn)
 {
-    const float* matrix = &fromRegister<float>(insn.matrixId);
-    const float* vector = &fromRegister<float>(insn.vectorId);
-    float* result = &toRegister<float>(insn.resultId);
+    const float* matrix = &fromRegister<float>(insn.matrixId());
+    const float* vector = &fromRegister<float>(insn.vectorId());
+    float* result = &toRegister<float>(insn.resultId());
 
-    const Register &vectorReg = registers[insn.vectorId];
+    const Register &vectorReg = registers[insn.vectorId()];
 
     const TypeVector *resultType = pgm->type<TypeVector>(insn.type);
     const TypeVector *vectorType = pgm->type<TypeVector>(vectorReg.type);
@@ -782,11 +783,11 @@ void Interpreter::stepMatrixTimesVector(const InsnMatrixTimesVector& insn)
 
 void Interpreter::stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn)
 {
-    const float* vector = &fromRegister<float>(insn.vectorId);
-    const float* matrix = &fromRegister<float>(insn.matrixId);
-    float* result = &toRegister<float>(insn.resultId);
+    const float* vector = &fromRegister<float>(insn.vectorId());
+    const float* matrix = &fromRegister<float>(insn.matrixId());
+    float* result = &toRegister<float>(insn.resultId());
 
-    const Register &vectorReg = registers[insn.vectorId];
+    const Register &vectorReg = registers[insn.vectorId()];
 
     const TypeVector *resultType = pgm->type<TypeVector>(insn.type);
     const TypeVector *vectorType = pgm->type<TypeVector>(vectorReg.type);
@@ -801,19 +802,19 @@ void Interpreter::stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn)
 
 void Interpreter::stepVectorShuffle(const InsnVectorShuffle& insn)
 {
-    Register& obj = registers.at(insn.resultId);
-    const Register &r1 = registers.at(insn.vector1Id);
-    const Register &r2 = registers.at(insn.vector2Id);
+    Register& obj = registers.at(insn.resultId());
+    const Register &r1 = registers.at(insn.vector1Id());
+    const Register &r2 = registers.at(insn.vector2Id());
     const TypeVector *t1 = pgm->type<TypeVector>(r1.type);
     uint32_t n1 = t1->count;
     uint32_t elementSize = pgm->typeSizes.at(t1->type);
 
 #ifdef CHECK_REGISTER_ACCESS
     if (!r1.initialized) {
-        std::cerr << "Warning: Shuffling register " << insn.vector1Id << "\n";
+        std::cerr << "Warning: Shuffling register " << insn.vector1Id() << "\n";
     }
     if (!r2.initialized) {
-        std::cerr << "Warning: Shuffling register " << insn.vector2Id << "\n";
+        std::cerr << "Warning: Shuffling register " << insn.vector2Id() << "\n";
     }
 #endif
 
@@ -834,14 +835,14 @@ void Interpreter::stepConvertSToF(const InsnConvertSToF& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const int32_t* src = &fromRegister<int32_t>(insn.signedValueId);
-        float* dst = &toRegister<float>(insn.resultId);
+        const int32_t* src = &fromRegister<int32_t>(insn.signedValueId());
+        float* dst = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             dst[i] = src[i];
         }
     } else {
-        int32_t src = fromRegister<int32_t>(insn.signedValueId);
-        toRegister<float>(insn.resultId) = src;
+        int32_t src = fromRegister<int32_t>(insn.signedValueId());
+        toRegister<float>(insn.resultId()) = src;
     }
 }
 
@@ -852,23 +853,24 @@ void Interpreter::stepConvertFToS(const InsnConvertFToS& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* src = &fromRegister<float>(insn.floatValueId);
-        uint32_t* dst = &toRegister<uint32_t>(insn.resultId);
+        const float* src = &fromRegister<float>(insn.floatValueId());
+        uint32_t* dst = &toRegister<uint32_t>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             dst[i] = src[i];
         }
     } else {
-        float src = fromRegister<float>(insn.floatValueId);
-        toRegister<uint32_t>(insn.resultId) = src;
+        float src = fromRegister<float>(insn.floatValueId());
+        toRegister<uint32_t>(insn.resultId()) = src;
     }
 }
 
 void Interpreter::stepAccessChain(const InsnAccessChain& insn)
 {
-    Pointer& basePointer = pointers.at(insn.baseId);
+    Pointer& basePointer = pointers.at(insn.baseId());
     uint32_t type = basePointer.type;
     size_t address = basePointer.address;
-    for(auto& id: insn.indexesId) {
+    for (int i = 0; i < insn.indexesIdCount(); i++) {
+        uint32_t id = insn.indexesId(i);
         int32_t j = fromRegister<int32_t>(id);
         ConstituentInfo info = pgm->getConstituentInfo(type, j);
         type = info.subtype;
@@ -878,15 +880,15 @@ void Interpreter::stepAccessChain(const InsnAccessChain& insn)
         std::cout << "accesschain of " << basePointer.address << " yielded " << address << "\n";
     }
     uint32_t pointedType = pgm->type<TypePointer>(insn.type)->type;
-    pointers[insn.resultId] = Pointer { pointedType, basePointer.storageClass, address };
+    pointers[insn.resultId()] = Pointer { pointedType, basePointer.storageClass, address };
 }
 
 void Interpreter::stepFunctionParameter(const InsnFunctionParameter& insn)
 {
     uint32_t sourceId = callstack.back(); callstack.pop_back();
     // XXX is this ever a register?
-    pointers[insn.resultId] = pointers[sourceId];
-    if(false) std::cout << "function parameter " << insn.resultId << " receives " << sourceId << "\n";
+    pointers[insn.resultId()] = pointers[sourceId];
+    if(false) std::cout << "function parameter " << insn.resultId() << " receives " << sourceId << "\n";
 }
 
 void Interpreter::stepKill(const InsnKill& insn)
@@ -905,10 +907,10 @@ void Interpreter::stepReturnValue(const InsnReturnValue& insn)
     // Return value.
     uint32_t returnId = callstack.back(); callstack.pop_back();
 
-    Register &value = registers.at(insn.valueId);
+    Register &value = registers.at(insn.valueId());
 #ifdef CHECK_REGISTER_ACCESS
     if (!value.initialized) {
-        std::cerr << "Warning: Returning uninitialized register " << insn.valueId << "\n";
+        std::cerr << "Warning: Returning uninitialized register " << insn.valueId() << "\n";
     }
 #endif
 
@@ -922,51 +924,51 @@ void Interpreter::stepFunctionCall(const InsnFunctionCall& insn)
     const Function& function = pgm->functions.at(insn.functionId);
 
     callstack.push_back(pc);
-    callstack.push_back(insn.resultId);
-    for(int i = insn.operandId.size() - 1; i >= 0; i--) {
-        callstack.push_back(insn.operandId[i]);
+    callstack.push_back(insn.resultId());
+    for (int i = insn.operandIdCount() - 1; i >= 0; i--) {
+        callstack.push_back(insn.operandId(i));
     }
     pc = function.start;
 }
 
 void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.p0Id].type).get();
+    const Type *type = pgm->types.at(registers[insn.p0Id()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* p0 = &fromRegister<float>(insn.p0Id);
-        const float* p1 = &fromRegister<float>(insn.p1Id);
+        const float* p0 = &fromRegister<float>(insn.p0Id());
+        const float* p1 = &fromRegister<float>(insn.p1Id());
         float radicand = 0;
         for(int i = 0; i < typeVector->count; i++) {
             radicand += (p1[i] - p0[i]) * (p1[i] - p0[i]);
         }
-        toRegister<float>(insn.resultId) = sqrtf(radicand);
+        toRegister<float>(insn.resultId()) = sqrtf(radicand);
     } else {
-        float p0 = fromRegister<float>(insn.p0Id);
-        float p1 = fromRegister<float>(insn.p1Id);
+        float p0 = fromRegister<float>(insn.p0Id());
+        float p1 = fromRegister<float>(insn.p1Id());
         float radicand = (p1 - p0) * (p1 - p0);
-        toRegister<float>(insn.resultId) = sqrtf(radicand);
+        toRegister<float>(insn.resultId()) = sqrtf(radicand);
     }
 }
 
 void Interpreter::stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.xId].type).get();
+    const Type *type = pgm->types.at(registers[insn.xId()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
+        const float* x = &fromRegister<float>(insn.xId());
         float length = 0;
         for(int i = 0; i < typeVector->count; i++) {
             length += x[i]*x[i];
         }
-        toRegister<float>(insn.resultId) = sqrtf(length);
+        toRegister<float>(insn.resultId()) = sqrtf(length);
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = fabsf(x);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = fabsf(x);
     }
 }
 
@@ -977,16 +979,16 @@ void Interpreter::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        const float* y = &fromRegister<float>(insn.yId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        const float* y = &fromRegister<float>(insn.yId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = fmaxf(x[i], y[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        float y = fromRegister<float>(insn.yId);
-        toRegister<float>(insn.resultId) = fmaxf(x, y);
+        float x = fromRegister<float>(insn.xId());
+        float y = fromRegister<float>(insn.yId());
+        toRegister<float>(insn.resultId()) = fmaxf(x, y);
     }
 }
 
@@ -997,16 +999,16 @@ void Interpreter::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        const float* y = &fromRegister<float>(insn.yId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        const float* y = &fromRegister<float>(insn.yId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = fminf(x[i], y[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        float y = fromRegister<float>(insn.yId);
-        toRegister<float>(insn.resultId) = fminf(x, y);
+        float x = fromRegister<float>(insn.xId());
+        float y = fromRegister<float>(insn.yId());
+        toRegister<float>(insn.resultId()) = fminf(x, y);
     }
 }
 
@@ -1017,40 +1019,40 @@ void Interpreter::stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        const float* y = &fromRegister<float>(insn.yId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        const float* y = &fromRegister<float>(insn.yId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = powf(x[i], y[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        float y = fromRegister<float>(insn.yId);
-        toRegister<float>(insn.resultId) = powf(x, y);
+        float x = fromRegister<float>(insn.xId());
+        float y = fromRegister<float>(insn.yId());
+        toRegister<float>(insn.resultId()) = powf(x, y);
     }
 }
 
 void Interpreter::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.xId].type).get();
+    const Type *type = pgm->types.at(registers[insn.xId()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
+        const float* x = &fromRegister<float>(insn.xId());
         float length = 0;
         for(int i = 0; i < typeVector->count; i++) {
             length += x[i]*x[i];
         }
         length = sqrtf(length);
 
-        float* result = &toRegister<float>(insn.resultId);
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = length == 0 ? 0 : x[i]/length;
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = x < 0 ? -1 : 1;
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = x < 0 ? -1 : 1;
     }
 }
 
@@ -1061,14 +1063,14 @@ void Interpreter::stepGLSLstd450Radians(const InsnGLSLstd450Radians& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* degrees = &fromRegister<float>(insn.degreesId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* degrees = &fromRegister<float>(insn.degreesId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = degrees[i] / 180.0 * M_PI;
         }
     } else {
-        float degrees = fromRegister<float>(insn.degreesId);
-        toRegister<float>(insn.resultId) = degrees / 180.0 * M_PI;
+        float degrees = fromRegister<float>(insn.degreesId());
+        toRegister<float>(insn.resultId()) = degrees / 180.0 * M_PI;
     }
 }
 
@@ -1079,14 +1081,14 @@ void Interpreter::stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = sin(x[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = sin(x);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = sin(x);
     }
 }
 
@@ -1097,14 +1099,14 @@ void Interpreter::stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = cos(x[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = cos(x);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = cos(x);
     }
 }
 
@@ -1115,14 +1117,14 @@ void Interpreter::stepGLSLstd450Atan(const InsnGLSLstd450Atan& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* y_over_x = &fromRegister<float>(insn.y_over_xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* y_over_x = &fromRegister<float>(insn.y_over_xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = atanf(y_over_x[i]);
         }
     } else {
-        float y_over_x = fromRegister<float>(insn.y_over_xId);
-        toRegister<float>(insn.resultId) = atanf(y_over_x);
+        float y_over_x = fromRegister<float>(insn.y_over_xId());
+        toRegister<float>(insn.resultId()) = atanf(y_over_x);
     }
 }
 
@@ -1133,16 +1135,16 @@ void Interpreter::stepGLSLstd450Atan2(const InsnGLSLstd450Atan2& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* y = &fromRegister<float>(insn.yId);
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* y = &fromRegister<float>(insn.yId());
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = atan2f(y[i], x[i]);
         }
     } else {
-        float y = fromRegister<float>(insn.yId);
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = atan2f(y, x);
+        float y = fromRegister<float>(insn.yId());
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = atan2f(y, x);
     }
 }
 
@@ -1153,14 +1155,14 @@ void Interpreter::stepGLSLstd450FSign(const InsnGLSLstd450FSign& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = x[i] < 0.0f ? -1.0f : ((x[i] == 0.0f) ? 0.0f : 1.0f);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = (x < 0.0f) ? -1.0f : ((x == 0.0f) ? 0.0f : 1.0f);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = (x < 0.0f) ? -1.0f : ((x == 0.0f) ? 0.0f : 1.0f);
     }
 }
 
@@ -1171,14 +1173,14 @@ void Interpreter::stepGLSLstd450Sqrt(const InsnGLSLstd450Sqrt& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = sqrtf(x[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = sqrtf(x);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = sqrtf(x);
     }
 }
 
@@ -1189,14 +1191,14 @@ void Interpreter::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = fabsf(x[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = fabsf(x);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = fabsf(x);
     }
 }
 
@@ -1207,14 +1209,14 @@ void Interpreter::stepGLSLstd450Exp(const InsnGLSLstd450Exp& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = expf(x[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = expf(x);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = expf(x);
     }
 }
 
@@ -1225,14 +1227,14 @@ void Interpreter::stepGLSLstd450Exp2(const InsnGLSLstd450Exp2& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = exp2f(x[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = exp2f(x);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = exp2f(x);
     }
 }
 
@@ -1243,14 +1245,14 @@ void Interpreter::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = floor(x[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = floor(x);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = floor(x);
     }
 }
 
@@ -1261,14 +1263,14 @@ void Interpreter::stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn)
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = x[i] - floor(x[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = x - floor(x);
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = x - floor(x);
     }
 }
 
@@ -1299,87 +1301,87 @@ static float fmix(float x, float y, float a)
 
 void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.xId].type).get();
+    const Type *type = pgm->types.at(registers[insn.xId()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        const float* minVal = &fromRegister<float>(insn.minValId);
-        const float* maxVal = &fromRegister<float>(insn.maxValId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        const float* minVal = &fromRegister<float>(insn.minValId());
+        const float* maxVal = &fromRegister<float>(insn.maxValId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = fclamp(x[i], minVal[i], maxVal[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        float minVal = fromRegister<float>(insn.minValId);
-        float maxVal = fromRegister<float>(insn.maxValId);
-        toRegister<float>(insn.resultId) = fclamp(x, minVal, maxVal);
+        float x = fromRegister<float>(insn.xId());
+        float minVal = fromRegister<float>(insn.minValId());
+        float maxVal = fromRegister<float>(insn.maxValId());
+        toRegister<float>(insn.resultId()) = fclamp(x, minVal, maxVal);
     }
 }
 
 void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.xId].type).get();
+    const Type *type = pgm->types.at(registers[insn.xId()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* x = &fromRegister<float>(insn.xId);
-        const float* y = &fromRegister<float>(insn.yId);
-        const float* a = &fromRegister<float>(insn.aId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* x = &fromRegister<float>(insn.xId());
+        const float* y = &fromRegister<float>(insn.yId());
+        const float* a = &fromRegister<float>(insn.aId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = fmix(x[i], y[i], a[i]);
         }
     } else {
-        float x = fromRegister<float>(insn.xId);
-        float y = fromRegister<float>(insn.yId);
-        float a = fromRegister<float>(insn.aId);
-        toRegister<float>(insn.resultId) = fmix(x, y, a);
+        float x = fromRegister<float>(insn.xId());
+        float y = fromRegister<float>(insn.yId());
+        float a = fromRegister<float>(insn.aId());
+        toRegister<float>(insn.resultId()) = fmix(x, y, a);
     }
 }
 
 void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.xId].type).get();
+    const Type *type = pgm->types.at(registers[insn.xId()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* edge0 = &fromRegister<float>(insn.edge0Id);
-        const float* edge1 = &fromRegister<float>(insn.edge1Id);
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* edge0 = &fromRegister<float>(insn.edge0Id());
+        const float* edge1 = &fromRegister<float>(insn.edge1Id());
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = smoothstep(edge0[i], edge1[i], x[i]);
         }
     } else {
-        float edge0 = fromRegister<float>(insn.edge0Id);
-        float edge1 = fromRegister<float>(insn.edge1Id);
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = smoothstep(edge0, edge1, x);
+        float edge0 = fromRegister<float>(insn.edge0Id());
+        float edge1 = fromRegister<float>(insn.edge1Id());
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = smoothstep(edge0, edge1, x);
     }
 }
 
 void Interpreter::stepGLSLstd450Step(const InsnGLSLstd450Step& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.xId].type).get();
+    const Type *type = pgm->types.at(registers[insn.xId()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* edge = &fromRegister<float>(insn.edgeId);
-        const float* x = &fromRegister<float>(insn.xId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* edge = &fromRegister<float>(insn.edgeId());
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
         for(int i = 0; i < typeVector->count; i++) {
             result[i] = x[i] < edge[i] ? 0.0 : 1.0;
         }
     } else {
-        float edge = fromRegister<float>(insn.edgeId);
-        float x = fromRegister<float>(insn.xId);
-        toRegister<float>(insn.resultId) = x < edge ? 0.0 : 1.0;
+        float edge = fromRegister<float>(insn.edgeId());
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = x < edge ? 0.0 : 1.0;
     }
 }
 
@@ -1387,9 +1389,9 @@ void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 {
     const TypeVector *typeVector = pgm->type<TypeVector>(insn.type);
 
-    const float* x = &fromRegister<float>(insn.xId);
-    const float* y = &fromRegister<float>(insn.yId);
-    float* result = &toRegister<float>(insn.resultId);
+    const float* x = &fromRegister<float>(insn.xId());
+    const float* y = &fromRegister<float>(insn.yId());
+    float* result = &toRegister<float>(insn.resultId());
 
     assert(typeVector->count == 3);
 
@@ -1400,14 +1402,14 @@ void Interpreter::stepGLSLstd450Cross(const InsnGLSLstd450Cross& insn)
 
 void Interpreter::stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.iId].type).get();
+    const Type *type = pgm->types.at(registers[insn.iId()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* i = &fromRegister<float>(insn.iId);
-        const float* n = &fromRegister<float>(insn.nId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* i = &fromRegister<float>(insn.iId());
+        const float* n = &fromRegister<float>(insn.nId());
+        float* result = &toRegister<float>(insn.resultId());
 
         float dot = dotProduct(n, i, typeVector->count);
 
@@ -1415,26 +1417,26 @@ void Interpreter::stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn)
             result[k] = i[k] - 2.0*dot*n[k];
         }
     } else {
-        float i = fromRegister<float>(insn.iId);
-        float n = fromRegister<float>(insn.nId);
+        float i = fromRegister<float>(insn.iId());
+        float n = fromRegister<float>(insn.nId());
 
         float dot = n*i;
 
-        toRegister<float>(insn.resultId) = i - 2.0*dot*n;
+        toRegister<float>(insn.resultId()) = i - 2.0*dot*n;
     }
 }
 
 void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
 {
-    const Type *type = pgm->types.at(registers[insn.iId].type).get();
+    const Type *type = pgm->types.at(registers[insn.iId()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
-        const float* i = &fromRegister<float>(insn.iId);
-        const float* n = &fromRegister<float>(insn.nId);
-        float eta = fromRegister<float>(insn.etaId);
-        float* result = &toRegister<float>(insn.resultId);
+        const float* i = &fromRegister<float>(insn.iId());
+        const float* n = &fromRegister<float>(insn.nId());
+        float eta = fromRegister<float>(insn.etaId());
+        float* result = &toRegister<float>(insn.resultId());
 
         float dot = dotProduct(n, i, typeVector->count);
 
@@ -1450,18 +1452,18 @@ void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
             }
         }
     } else {
-        float i = fromRegister<float>(insn.iId);
-        float n = fromRegister<float>(insn.nId);
-        float eta = fromRegister<float>(insn.etaId);
+        float i = fromRegister<float>(insn.iId());
+        float n = fromRegister<float>(insn.nId());
+        float eta = fromRegister<float>(insn.etaId());
 
         float dot = n*i;
 
         float k = 1.0 - eta * eta * (1.0 - dot * dot);
 
         if(k < 0.0)
-            toRegister<float>(insn.resultId) = 0.0;
+            toRegister<float>(insn.resultId()) = 0.0;
         else
-            toRegister<float>(insn.resultId) = eta * i - (eta * dot + sqrtf(k)) * n;
+            toRegister<float>(insn.resultId()) = eta * i - (eta * dot + sqrtf(k)) * n;
     }
 }
 
@@ -1472,19 +1474,19 @@ void Interpreter::stepBranch(const InsnBranch& insn)
 
 void Interpreter::stepBranchConditional(const InsnBranchConditional& insn)
 {
-    bool condition = fromRegister<bool>(insn.conditionId);
+    bool condition = fromRegister<bool>(insn.conditionId());
     pc = pgm->labels.at(condition ? insn.trueLabelId : insn.falseLabelId);
 }
 
 void Interpreter::stepPhi(const InsnPhi& insn)
 {
-    Register& obj = registers.at(insn.resultId);
+    Register& obj = registers.at(insn.resultId());
     uint32_t size = pgm->typeSizes.at(obj.type);
 
     bool found = false;
-    for(int i = 0; !found && i < insn.operandId.size(); i += 2) {
-        uint32_t srcId = insn.operandId[i];
-        uint32_t parentId = insn.operandId[i + 1];
+    for(int i = 0; !found && i < insn.operandIdCount(); i++) {
+        uint32_t srcId = insn.operandId(i);
+        uint32_t parentId = insn.labelId[i];
 
         if (parentId == previousBlockId) {
             const Register &src = registers.at(srcId);
@@ -1503,8 +1505,8 @@ void Interpreter::stepPhi(const InsnPhi& insn)
     } else {
         std::cout << "Error: Phi didn't find any label, previous " << previousBlockId
             << ", current " << currentBlockId << "\n";
-        for(int i = 0; i < insn.operandId.size(); i += 2) {
-            std::cout << "    " << insn.operandId[i + 1] << "\n";
+        for (auto labelId : insn.labelId) { 
+            std::cout << "    " << labelId << "\n";
         }
     }
 }
@@ -1540,9 +1542,9 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
 
         assert(typeVector->count == 2);
 
-        auto [u, v] = fromRegister<v2float>(insn.coordinateId);
+        auto [u, v] = fromRegister<v2float>(insn.coordinateId());
 
-        int imageIndex = fromRegister<int>(insn.sampledImageId);
+        int imageIndex = fromRegister<int>(insn.sampledImageId());
         const SampledImage& si = pgm->sampledImages[imageIndex];
         const ImagePtr image = si.image;
 
@@ -1583,12 +1585,12 @@ void Interpreter::stepImageSampleImplicitLod(const InsnImageSampleImplicitLod& i
         std::cout << "Unhandled type for ImageSampleImplicitLod coordinate\n";
     }
 
-    uint32_t resultTypeId = pgm->type<TypeVector>(registers[insn.resultId].type)->type;
+    uint32_t resultTypeId = pgm->type<TypeVector>(registers[insn.resultId()].type)->type;
 
     // Store the sample result in register
     const Type *resultType = pgm->types.at(resultTypeId).get();
     if (resultType->op() == SpvOpTypeFloat) {
-        toRegister<v4float>(insn.resultId) = rgba;
+        toRegister<v4float>(insn.resultId()) = rgba;
     } else {
         std::cout << "Unhandled type for ImageSampleImplicitLod result\n";
     }
@@ -1605,16 +1607,16 @@ void Interpreter::stepImageSampleExplicitLod(const InsnImageSampleExplicitLod& i
     v4float rgba;
 
     // Sample the image
-    const Type *type = pgm->types.at(registers[insn.coordinateId].type).get();
+    const Type *type = pgm->types.at(registers[insn.coordinateId()].type).get();
 
     if (type->op() == SpvOpTypeVector) {
         const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
 
         assert(typeVector->count == 2);
 
-        auto [u, v] = fromRegister<v2float>(insn.coordinateId);
+        auto [u, v] = fromRegister<v2float>(insn.coordinateId());
 
-        int imageIndex = fromRegister<int>(insn.sampledImageId);
+        int imageIndex = fromRegister<int>(insn.sampledImageId());
         const SampledImage& si = pgm->sampledImages[imageIndex];
 
         unsigned int s, t;
@@ -1645,13 +1647,13 @@ void Interpreter::stepImageSampleExplicitLod(const InsnImageSampleExplicitLod& i
 
     }
 
-    uint32_t resultTypeId = pgm->type<TypeVector>(registers[insn.resultId].type)->type;
+    uint32_t resultTypeId = pgm->type<TypeVector>(registers[insn.resultId()].type)->type;
 
     // Store the sample result in register
     const Type *resultType = pgm->types.at(resultTypeId).get();
 
     if (resultType->op() == SpvOpTypeFloat) {
-        toRegister<v4float>(insn.resultId) = rgba;
+        toRegister<v4float>(insn.resultId()) = rgba;
     } else {
         std::cout << "Unhandled type for ImageSampleExplicitLod result\n";
     }

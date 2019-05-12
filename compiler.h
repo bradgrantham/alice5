@@ -132,7 +132,7 @@ struct Compiler {
 
     // Just before a Branch or BranchConditional instruction, copy any
     // registers that a target OpPhi instruction might need.
-    void emitPhiCopy(Instruction *instruction, uint32_t labelId);
+    /// XXX delete void emitPhiCopy(Instruction *instruction, uint32_t labelId);
 
     // Assert that the block at the label ID does not start with a Phi instruction.
     void assertNoPhi(uint32_t labelId);

@@ -53,18 +53,18 @@ void RiscVPhi::emit(Compiler *compiler)
 
 void RiscVAddi::emit(Compiler *compiler)
 {
-    compiler->emitBinaryImmOp("addi", resultId, rs1, imm);
+    compiler->emitBinaryImmOp("addi", resultId(), rs1, imm);
 }
 
 void RiscVLoad::emit(Compiler *compiler)
 {
     std::ostringstream ss1;
-    if (compiler->isRegFloat(resultId)) {
+    if (compiler->isRegFloat(resultId())) {
         ss1 << "flw ";
     } else {
         ss1 << "lw ";
     }
-    ss1 << compiler->reg(resultId) << ", ";
+    ss1 << compiler->reg(resultId()) << ", ";
     auto r = compiler->asRegister(pointerId);
     if (r == nullptr) {
         // It's a variable reference.
@@ -78,7 +78,7 @@ void RiscVLoad::emit(Compiler *compiler)
         ss1 << offset << "(" << compiler->reg(pointerId) << ")";
     }
     std::ostringstream ss2;
-    ss2 << "r" << resultId << " = (r" << pointerId << ")";
+    ss2 << "r" << resultId() << " = (r" << pointerId << ")";
     compiler->emit(ss1.str(), ss2.str());
 }
 
@@ -125,24 +125,24 @@ void RiscVCross::emit(Compiler *compiler)
 
 void RiscVMove::emit(Compiler *compiler)
 {
-    const CompilerRegister *r1 = compiler->asRegister(resultId);
+    const CompilerRegister *r1 = compiler->asRegister(resultId());
     const CompilerRegister *r2 = compiler->asRegister(rs);
     assert(r1 != nullptr);
     assert(r2 != nullptr);
 
     std::ostringstream ss1;
     if (r1->phy != r2->phy) {
-        if (compiler->isRegFloat(resultId)) {
+        if (compiler->isRegFloat(resultId())) {
             ss1 << "fsgnj.s ";
         } else {
             ss1 << "and ";
         }
-        ss1 << compiler->reg(resultId) << ", "
+        ss1 << compiler->reg(resultId()) << ", "
             << compiler->reg(rs) << ", "
             << compiler->reg(rs);
     }
     std::ostringstream ss2;
-    ss2 << "r" << resultId << " = r" << rs;
+    ss2 << "r" << resultId() << " = r" << rs;
     compiler->emit(ss1.str(), ss2.str());
 }
 
@@ -152,7 +152,7 @@ void RiscVLength::emit(Compiler *compiler)
     assert(n <= 4);
 
     std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId);
+    resultIds.push_back(resultId());
 
     std::ostringstream functionName;
     functionName << ".length" << n;
@@ -177,7 +177,7 @@ void RiscVDistance::emit(Compiler *compiler)
     assert(n <= 4);
 
     std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId);
+    resultIds.push_back(resultId());
 
     std::vector<uint32_t> operandIds;
     for (auto id : vector1Ids) {
@@ -199,7 +199,7 @@ void RiscVDot::emit(Compiler *compiler)
     assert(n <= 4);
 
     std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId);
+    resultIds.push_back(resultId());
 
     std::vector<uint32_t> operandIds;
     for (auto id : vector1Ids) {
@@ -221,7 +221,7 @@ void RiscVAll::emit(Compiler *compiler)
     assert(n <= 4);
 
     std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId);
+    resultIds.push_back(resultId());
 
     std::ostringstream functionName;
     functionName << ".all" << n;
@@ -235,7 +235,7 @@ void RiscVAny::emit(Compiler *compiler)
     assert(n <= 4);
 
     std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId);
+    resultIds.push_back(resultId());
 
     std::ostringstream functionName;
     functionName << ".any" << n;
@@ -259,51 +259,51 @@ void Instruction::emit(Compiler *compiler)
 
 void InsnFAdd::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fadd.s", resultId, operand1Id, operand2Id);
+    compiler->emitBinaryOp("fadd.s", resultId(), operand1Id(), operand2Id());
 }
 
 void InsnFSub::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fsub.s", resultId, operand1Id, operand2Id);
+    compiler->emitBinaryOp("fsub.s", resultId(), operand1Id(), operand2Id());
 }
 
 void InsnFMul::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fmul.s", resultId, operand1Id, operand2Id);
+    compiler->emitBinaryOp("fmul.s", resultId(), operand1Id(), operand2Id());
 }
 
 void InsnFDiv::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("fdiv.s", resultId, operand1Id, operand2Id);
+    compiler->emitBinaryOp("fdiv.s", resultId(), operand1Id(), operand2Id());
 }
 
 void InsnIAdd::emit(Compiler *compiler)
 {
     uint32_t intValue;
-    if (compiler->asIntegerConstant(operand1Id, intValue)) {
+    if (compiler->asIntegerConstant(operand1Id(), intValue)) {
         // XXX Verify that immediate fits in 12 bits.
-        compiler->emitBinaryImmOp("addi", resultId, operand2Id, intValue);
-    } else if (compiler->asIntegerConstant(operand2Id, intValue)) {
+        compiler->emitBinaryImmOp("addi", resultId(), operand2Id(), intValue);
+    } else if (compiler->asIntegerConstant(operand2Id(), intValue)) {
         // XXX Verify that immediate fits in 12 bits.
-        compiler->emitBinaryImmOp("addi", resultId, operand1Id, intValue);
+        compiler->emitBinaryImmOp("addi", resultId(), operand1Id(), intValue);
     } else {
-        compiler->emitBinaryOp("add", resultId, operand1Id, operand2Id);
+        compiler->emitBinaryOp("add", resultId(), operand1Id(), operand2Id());
     }
 }
 
 void InsnFunctionCall::emit(Compiler *compiler)
 {
     compiler->emit("push pc", "");
-    for(int i = operandId.size() - 1; i >= 0; i--) {
-        compiler->emit(std::string("push ") + compiler->reg(operandId[i]), "");
+    for(int i = operandIdCount() - 1; i >= 0; i--) {
+        compiler->emit(std::string("push ") + compiler->reg(operandId(i)), "");
     }
     compiler->emit(std::string("call ") + compiler->pgm->cleanUpFunctionName(functionId), "");
-    compiler->emit(std::string("pop ") + compiler->reg(resultId), "");
+    compiler->emit(std::string("pop ") + compiler->reg(resultId()), "");
 }
 
 void InsnFunctionParameter::emit(Compiler *compiler)
 {
-    compiler->emit(std::string("pop ") + compiler->reg(resultId), "");
+    compiler->emit(std::string("pop ") + compiler->reg(resultId()), "");
 }
 
 void InsnLoad::emit(Compiler *compiler)
@@ -321,7 +321,7 @@ void InsnStore::emit(Compiler *compiler)
 void InsnBranch::emit(Compiler *compiler)
 {
     // See if we need to emit any copies for Phis at our target.
-    compiler->emitPhiCopy(this, targetLabelId);
+    /// XXX delete compiler->emitPhiCopy(this, targetLabelId);
 
     std::ostringstream ss;
     ss << "jal x0, label" << targetLabelId;
@@ -336,9 +336,9 @@ void InsnReturn::emit(Compiler *compiler)
 void InsnReturnValue::emit(Compiler *compiler)
 {
     std::ostringstream ss1;
-    ss1 << "mov x10, " << compiler->reg(valueId);
+    ss1 << "mov x10, " << compiler->reg(valueId());
     std::ostringstream ss2;
-    ss2 << "return " << valueId;
+    ss2 << "return " << valueId();
     compiler->emit(ss1.str(), ss2.str());
     compiler->emit("jalr x0, ra, 0", "");
 }
@@ -350,7 +350,7 @@ void InsnPhi::emit(Compiler *compiler)
 
 void InsnFOrdLessThanEqual::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("lte", resultId, operand1Id, operand2Id);
+    compiler->emitBinaryOp("lte", resultId(), operand1Id(), operand2Id());
 }
 
 void InsnBranchConditional::emit(Compiler *compiler)
@@ -358,19 +358,19 @@ void InsnBranchConditional::emit(Compiler *compiler)
     std::string localLabel = compiler->makeLocalLabel();
 
     std::ostringstream ss1;
-    ss1 << "beq " << compiler->reg(conditionId)
+    ss1 << "beq " << compiler->reg(conditionId())
         << ", x0, " << localLabel;
     std::ostringstream ssid;
-    ssid << "r" << conditionId;
+    ssid << "r" << conditionId();
     compiler->emit(ss1.str(), ssid.str());
     // True path.
-    compiler->emitPhiCopy(this, trueLabelId);
+    /// XXX delete compiler->emitPhiCopy(this, trueLabelId);
     std::ostringstream ss2;
     ss2 << "jal x0, label" << trueLabelId;
     compiler->emit(ss2.str(), "");
     // False path.
     compiler->emitLabel(localLabel);
-    compiler->emitPhiCopy(this, falseLabelId);
+    /// XXX delete compiler->emitPhiCopy(this, falseLabelId);
     std::ostringstream ss3;
     ss3 << "jal x0, label" << falseLabelId;
     compiler->emit(ss3.str(), "");
@@ -380,9 +380,10 @@ void InsnAccessChain::emit(Compiler *compiler)
 {
     uint32_t offset = 0;
 
-    const Variable &variable = compiler->pgm->variables.at(baseId);
+    const Variable &variable = compiler->pgm->variables.at(baseId());
     uint32_t type = variable.type;
-    for (auto &id : indexesId) {
+    for (int i = 0; i < indexesIdCount(); i++) {
+        uint32_t id = indexesId(i);
         uint32_t intValue;
         if (compiler->asIntegerConstant(id, intValue)) {
             auto [subtype, subOffset] = compiler->pgm->getConstituentInfo(type, intValue);
@@ -395,61 +396,61 @@ void InsnAccessChain::emit(Compiler *compiler)
         }
     }
 
-    auto name = compiler->pgm->names.find(baseId);
+    auto name = compiler->pgm->names.find(baseId());
     if (name == compiler->pgm->names.end()) {
         std::cerr << "Error: Don't yet handle pointer reference in AccessChain ("
-            << baseId << ").\n";
+            << baseId() << ").\n";
         exit(EXIT_FAILURE);
     }
 
     std::ostringstream ss;
-    ss << "addi " << compiler->reg(resultId) << ", x0, "
+    ss << "addi " << compiler->reg(resultId()) << ", x0, "
         << compiler->notEmptyLabel(name->second) << "+" << offset;
     compiler->emit(ss.str(), "");
 }
 
 void InsnGLSLstd450Sin::emit(Compiler *compiler)
 {
-    compiler->emitUniCall(".sin", resultId, xId);
+    compiler->emitUniCall(".sin", resultId(), xId());
 }
 
 void InsnGLSLstd450Cos::emit(Compiler *compiler)
 {
-    compiler->emitUniCall(".cos", resultId, xId);
+    compiler->emitUniCall(".cos", resultId(), xId());
 }
 
 void InsnGLSLstd450Atan2::emit(Compiler *compiler)
 {
-    compiler->emitBinCall(".atan2", resultId, yId, xId);
+    compiler->emitBinCall(".atan2", resultId(), yId(), xId());
 }
 
 void InsnGLSLstd450FAbs::emit(Compiler *compiler)
 {
     std::ostringstream ss1;
     ss1 << "fsgnjx.s "
-        << compiler->reg(resultId) << ", "
-        << compiler->reg(xId) << ", "
-        << compiler->reg(xId);
+        << compiler->reg(resultId()) << ", "
+        << compiler->reg(xId()) << ", "
+        << compiler->reg(xId());
 
     std::ostringstream ss2;
-    ss2 << resultId << " = fabs(" << xId << ")";
+    ss2 << resultId() << " = fabs(" << xId() << ")";
 
     compiler->emit(ss1.str(), ss2.str());
 }
 
 void InsnGLSLstd450Fract::emit(Compiler *compiler)
 {
-    compiler->emitUniCall(".fract", resultId, xId);
+    compiler->emitUniCall(".fract", resultId(), xId());
 }
 
 void InsnGLSLstd450Floor::emit(Compiler *compiler)
 {
-    compiler->emitUniCall(".floor", resultId, xId);
+    compiler->emitUniCall(".floor", resultId(), xId());
 }
 
 void InsnGLSLstd450Step::emit(Compiler *compiler)
 {
-    compiler->emitBinCall(".step", resultId, edgeId, xId);
+    compiler->emitBinCall(".step", resultId(), edgeId(), xId());
 }
 
 // -----------------------------------------------------------------------------------
@@ -708,9 +709,14 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
         return false;
     }
 
+    if (scalarize) {
+        // Convert vector instructions to scalar instructions.
+        program.expandVectors();
+    }
+
     {
         Timer timer;
-        program.postParse(scalarize);
+        program.postParse();
         std::cerr << "Post-parse took " << timer.elapsed() << " seconds.\n";
     }
 
@@ -915,6 +921,7 @@ int main(int argc, char **argv)
         }
 
         if (compile) {
+            pass->pgm.prepareForCompile();
             bool success = compileProgram(pass->pgm);
             exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
         }

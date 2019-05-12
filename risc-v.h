@@ -20,12 +20,12 @@ enum {
 
 // "addi" instruction.
 struct RiscVAddi : public Instruction {
-    RiscVAddi(LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t rs1, uint32_t imm) : Instruction(lineInfo), type(type), resultId(resultId), rs1(rs1), imm(imm) {
+    RiscVAddi(LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t rs1, uint32_t imm) : Instruction(lineInfo), type(type), rs1(rs1), imm(imm) {
         addResult(resultId);
         addParameter(rs1);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     uint32_t rs1; // operand from register
     uint32_t imm; // 12-bit immediate
     virtual void step(Interpreter *interpreter) { assert(false); }
@@ -36,12 +36,12 @@ struct RiscVAddi : public Instruction {
 
 // Load instruction (int or float).
 struct RiscVLoad : public Instruction {
-    RiscVLoad(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo), type(type), resultId(resultId), pointerId(pointerId), memoryAccess(memoryAccess), offset(offset) {
+    RiscVLoad(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo), type(type), pointerId(pointerId), memoryAccess(memoryAccess), offset(offset) {
         addResult(resultId);
         addParameter(pointerId);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     uint32_t pointerId; // operand from register
     uint32_t memoryAccess; // MemoryAccess (optional)
     uint32_t offset; // In bytes.
@@ -117,12 +117,12 @@ struct RiscVCross : public Instruction {
 
 // Move instruction.
 struct RiscVMove : public Instruction {
-    RiscVMove(LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t rs) : Instruction(lineInfo), type(type), resultId(resultId), rs(rs) {
+    RiscVMove(LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t rs) : Instruction(lineInfo), type(type), rs(rs) {
         addResult(resultId);
         addParameter(rs);
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     uint32_t rs; // operand from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpMove; }
@@ -132,14 +132,14 @@ struct RiscVMove : public Instruction {
 
 // Length instruction.
 struct RiscVLength : public Instruction {
-    RiscVLength(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), resultId(resultId), operandIds(operandIds) {
+    RiscVLength(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), operandIds(operandIds) {
         addResult(resultId);
         for (auto operandId : operandIds) {
             addParameter(operandId);
         }
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     std::vector<uint32_t> operandIds; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpLength; }
@@ -168,7 +168,7 @@ struct RiscVNormalize : public Instruction {
 
 // Dot instruction.
 struct RiscVDot : public Instruction {
-    RiscVDot(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &vector1Ids, const std::vector<uint32_t> &vector2Ids) : Instruction(lineInfo), type(type), resultId(resultId), vector1Ids(vector1Ids), vector2Ids(vector2Ids) {
+    RiscVDot(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &vector1Ids, const std::vector<uint32_t> &vector2Ids) : Instruction(lineInfo), type(type), vector1Ids(vector1Ids), vector2Ids(vector2Ids) {
         addResult(resultId);
         for (auto id : vector1Ids) {
             addParameter(id);
@@ -178,7 +178,7 @@ struct RiscVDot : public Instruction {
         }
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     std::vector<uint32_t> vector1Ids; // operands from register
     std::vector<uint32_t> vector2Ids; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
@@ -189,14 +189,14 @@ struct RiscVDot : public Instruction {
 
 // All instruction.
 struct RiscVAll : public Instruction {
-    RiscVAll(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), resultId(resultId), operandIds(operandIds) {
+    RiscVAll(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), operandIds(operandIds) {
         addResult(resultId);
         for (auto operandId : operandIds) {
             addParameter(operandId);
         }
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     std::vector<uint32_t> operandIds; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpAll; }
@@ -206,14 +206,14 @@ struct RiscVAll : public Instruction {
 
 // Any instruction.
 struct RiscVAny : public Instruction {
-    RiscVAny(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), resultId(resultId), operandIds(operandIds) {
+    RiscVAny(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), operandIds(operandIds) {
         addResult(resultId);
         for (auto operandId : operandIds) {
             addParameter(operandId);
         }
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     std::vector<uint32_t> operandIds; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpAny; }
@@ -223,7 +223,7 @@ struct RiscVAny : public Instruction {
 
 // Distance instruction.
 struct RiscVDistance : public Instruction {
-    RiscVDistance(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &vector1Ids, const std::vector<uint32_t> &vector2Ids) : Instruction(lineInfo), type(type), resultId(resultId), vector1Ids(vector1Ids), vector2Ids(vector2Ids) {
+    RiscVDistance(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &vector1Ids, const std::vector<uint32_t> &vector2Ids) : Instruction(lineInfo), type(type), vector1Ids(vector1Ids), vector2Ids(vector2Ids) {
         addResult(resultId);
         for (auto id : vector1Ids) {
             addParameter(id);
@@ -233,7 +233,7 @@ struct RiscVDistance : public Instruction {
         }
     }
     uint32_t type; // result type
-    uint32_t resultId; // SSA register for result value
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
     std::vector<uint32_t> vector1Ids; // operands from register
     std::vector<uint32_t> vector2Ids; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }

@@ -19,12 +19,13 @@ TARGET_LABEL_IDS = {
 
 # Instruction operand (with some of our own info).
 class Operand:
-    def __init__(self, json_operand, operand_kind_map, operand_index, opname):
+    def __init__(self, json_operand, operand_kind_map, opname):
         kind = json_operand["kind"]
         name = json_operand.get("name")
         quantifier = json_operand.get("quantifier")
 
         cpp_type = "uint32_t"
+        cpp_subtype = ""
         cpp_name = cleanUpName(name) + "Id" if name else None
         decode_function = "nextu"
         default_value = ""
@@ -32,7 +33,12 @@ class Operand:
         is_argument = False
         is_label = False
 
-        if kind == "IdResultType":
+        if kind == "IdLabel": # Our own pseudo-kind.
+            cpp_comment = "source labels"
+        elif kind == "PairIdRefIdRef" and opname == "OpPhi":
+            is_argument = True
+            cpp_comment = "source ref IDs"
+        elif kind == "IdResultType":
             assert(not name)
             cpp_name = "type"
             cpp_comment = "result type"
@@ -72,6 +78,7 @@ class Operand:
 
         # Varargs.
         if quantifier == "*":
+            cpp_subtype = cpp_type
             cpp_type = "std::vector<" + cpp_type + ">"
             decode_function = "restv"
 
@@ -80,8 +87,10 @@ class Operand:
 
         # Should have a default if it's optional.
         if quantifier == "?" and not default_value:
-            sys.stderr.write("Warning: No default for optional operand %d of %s.\n"
-                    % (operand_index + 1, opname))
+            # Disable this warning, we don't know what to do with it anyway.
+            if False:
+                sys.stderr.write("Warning: No default for optional operand %s of %s.\n"
+                        % (cpp_name, opname))
 
         # Target labels of this instruction.
         targetLabelIds = TARGET_LABEL_IDS.get(opname, [])
@@ -93,6 +102,7 @@ class Operand:
         self.name = name
         self.quantifier = quantifier
         self.cpp_type = cpp_type
+        self.cpp_subtype = cpp_subtype
         self.cpp_name = cpp_name
         self.cpp_comment = cpp_comment
         self.decode_function = decode_function
@@ -162,15 +172,23 @@ def generate_instruction(instruction, opname_prefix, opcode_prefix, clip_prefix,
     if opname_prefix == "GLSLstd450":
         # Set up 2 operands from OpExtInst that are handled by the extension instruction
         extinst_operands = [
-                Operand({"kind": "IdResultType"}, operand_kind_map, 0, opname),
-                Operand({"kind": "IdResult"}, operand_kind_map, 1, opname)
+                Operand({"kind": "IdResultType"}, operand_kind_map, opname),
+                Operand({"kind": "IdResult"}, operand_kind_map, opname)
         ]
     else:
         extinst_operands = []
 
     # Process the operands, adding our own custom fields to them.
-    operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
-            for operand_index, json_operand in enumerate(instruction.get("operands", []))]
+    operands = [Operand(json_operand, operand_kind_map, opname)
+            for json_operand in instruction.get("operands", [])]
+
+    # Add pseudo-operand for labels for OpPhi instruction.
+    if opname == "OpPhi":
+        operands.append(Operand({
+                "kind": "IdLabel",
+                "name": "\"label\"",
+                "quantifier": "*"
+            }, operand_kind_map, opname))
 
     # All operands, including the extension ones.
     all_operands = extinst_operands + operands
@@ -192,7 +210,8 @@ def generate_instruction(instruction, opname_prefix, opcode_prefix, clip_prefix,
         inits = ["Instruction(lineInfo)"]
         for operand in all_operands:
             params.append("%s %s" % (operand.cpp_type, operand.cpp_name))
-            inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
+            if not operand.is_result and not operand.is_argument:
+                inits.append("%s(%s)" % (operand.cpp_name, operand.cpp_name))
         opcode_structs_f.write("    %s(%s) : %s {\n" %
                 (struct_opname,
                     ", ".join(params),
@@ -200,11 +219,6 @@ def generate_instruction(instruction, opname_prefix, opcode_prefix, clip_prefix,
         for operand in all_operands:
             if operand.is_result:
                 opcode_structs_f.write("        addResult(%s);\n" % operand.cpp_name)
-            elif opname == "OpPhi" and operand.cpp_name == "operandId":
-                # Special case the phi operands.
-                opcode_structs_f.write("        for (int i = 0; i < %s.size(); i += 2) {\n" % operand.cpp_name)
-                opcode_structs_f.write("            addParameter(%s[i]);\n" % operand.cpp_name)
-                opcode_structs_f.write("        }\n")
             elif operand.is_argument:
                 if operand.quantifier == "*":
                     opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
@@ -215,10 +229,36 @@ def generate_instruction(instruction, opname_prefix, opcode_prefix, clip_prefix,
             if operand.is_label:
                 opcode_structs_f.write("        targetLabelIds.insert(%s);\n" % operand.cpp_name)
         opcode_structs_f.write("    }\n")
+        result_index = 0
+        argument_index = 0
         for operand in all_operands:
-            opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
-                operand.cpp_name, operand.cpp_comment,
-                " (optional)" if operand.quantifier == "?" else ""))
+            if operand.is_result:
+                opcode_structs_f.write("    %s %s() const { return resIdList[%d]; } // %s%s\n" %
+                        (operand.cpp_type, operand.cpp_name, result_index,
+                            operand.cpp_comment,
+                            " (optional)" if operand.quantifier == "?" else ""))
+                result_index += 1
+            elif operand.is_argument:
+                if operand.quantifier == "*":
+                    opcode_structs_f.write("    %s %s(size_t i) const { return argIdList[%d + i]; } // %s%s\n" %
+                            (operand.cpp_subtype, operand.cpp_name, argument_index,
+                                operand.cpp_comment,
+                                " (optional)" if operand.quantifier == "?" else ""))
+                    opcode_structs_f.write("    size_t %sCount() const { return argIdList.size() - %d; } // %s%s\n" %
+                            (operand.cpp_name, argument_index,
+                                operand.cpp_comment,
+                                " (optional)" if operand.quantifier == "?" else ""))
+                    argument_index = None # Force a fail if it's used again.
+                else:
+                    opcode_structs_f.write("    %s %s() const { return argIdList[%d]; } // %s%s\n" %
+                            (operand.cpp_type, operand.cpp_name, argument_index,
+                                operand.cpp_comment,
+                                " (optional)" if operand.quantifier == "?" else ""))
+                    argument_index += 1
+            else:
+                opcode_structs_f.write("    %s %s; // %s%s\n" % (operand.cpp_type,
+                    operand.cpp_name, operand.cpp_comment,
+                    " (optional)" if operand.quantifier == "?" else ""))
         opcode_structs_f.write("    virtual void step(Interpreter *interpreter) { interpreter->step%s(*this); }\n" % short_opname)
         opcode_structs_f.write("    virtual uint32_t opcode() const { return %s%s%s; }\n" % (opcode_namespace, opcode_prefix, opname))
         opcode_structs_f.write("    virtual std::string name() const { return \"%s\"; }\n" % opname)
@@ -237,10 +277,22 @@ def generate_instruction(instruction, opname_prefix, opcode_prefix, clip_prefix,
 
         # Decode file.
         opcode_decode_f.write("case %s%s: {\n" % (opcode_prefix, opname))
-        for operand in operands:
-            opcode_decode_f.write("    %s %s = %s(%s);\n" %
-                    (operand.cpp_type, operand.cpp_name,
-                        operand.decode_function, operand.default_value))
+        if opname == "OpPhi":
+            # Split up the (operand,label) pairs of the restv().
+            opcode_decode_f.write("    uint32_t type = nextu();\n")
+            opcode_decode_f.write("    uint32_t resultId = nextu();\n")
+            opcode_decode_f.write("    std::vector<uint32_t> pairs = restv();\n")
+            opcode_decode_f.write("    std::vector<uint32_t> operandId;\n")
+            opcode_decode_f.write("    std::vector<uint32_t> labelId;\n")
+            opcode_decode_f.write("    for (int i = 0; i < pairs.size(); i += 2) {\n")
+            opcode_decode_f.write("        operandId.push_back(pairs[i]);\n")
+            opcode_decode_f.write("        labelId.push_back(pairs[i + 1]);\n")
+            opcode_decode_f.write("    }\n")
+        else:
+            for operand in operands:
+                opcode_decode_f.write("    %s %s = %s(%s);\n" %
+                        (operand.cpp_type, operand.cpp_name,
+                            operand.decode_function, operand.default_value))
         opcode_decode_f.write("    pgm->instructions.push_back(std::make_shared<%s>(%s));\n" %
                 (struct_opname, ", ".join(["pgm->currentLine"]+[operand.cpp_name for operand in all_operands])))
         if 'IdResultType' in [op.kind for op in all_operands] and 'IdResult' in [op.kind for op in all_operands]:

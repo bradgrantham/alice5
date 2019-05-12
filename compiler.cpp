@@ -167,15 +167,15 @@ void Compiler::transformInstructions(const InstructionList &inList, InstructionL
             InsnIAdd *insnIAdd = dynamic_cast<InsnIAdd *>(instruction);
 
             uint32_t imm;
-            if (asIntegerConstant(insnIAdd->operand1Id, imm)) {
+            if (asIntegerConstant(insnIAdd->operand1Id(), imm)) {
                 // XXX Verify that immediate fits in 12 bits.
                 newList.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
-                            insnIAdd->type, insnIAdd->resultId, insnIAdd->operand2Id, imm));
+                            insnIAdd->type, insnIAdd->resultId(), insnIAdd->operand2Id(), imm));
                 replaced = true;
-            } else if (asIntegerConstant(insnIAdd->operand2Id, imm)) {
+            } else if (asIntegerConstant(insnIAdd->operand2Id(), imm)) {
                 // XXX Verify that immediate fits in 12 bits.
                 newList.push_back(std::make_shared<RiscVAddi>(insnIAdd->lineInfo,
-                            insnIAdd->type, insnIAdd->resultId, insnIAdd->operand1Id, imm));
+                            insnIAdd->type, insnIAdd->resultId(), insnIAdd->operand1Id(), imm));
                 replaced = true;
             }
         }
@@ -579,6 +579,7 @@ void Compiler::emit(const std::string &op, const std::string &comment) {
     std::cout.copyfmt(oldState);
 }
 
+/* XXX delete
 void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
     Block *block = pgm->blocks.at(labelId).get();
     for (int pc = block->begin; pc < block->end; pc++) {
@@ -615,6 +616,7 @@ void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
         }
     }
 }
+*/
 
 void Compiler::assertNoPhi(uint32_t labelId) {
     Block *block = pgm->blocks.at(labelId).get();

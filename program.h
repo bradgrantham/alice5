@@ -291,7 +291,10 @@ struct Program
     }
 
     // Post-parsing work.
-    void postParse(bool scalarize);
+    void postParse();
+
+    // Create data structures that compiler will use.
+    void prepareForCompile();
 
     // Return the scalar for the vector register's index.
     uint32_t scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg = 0);
@@ -307,13 +310,13 @@ struct Program
     template <class T>
     void expandVectorsUniOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
         T *insn = dynamic_cast<T *>(instruction);
-        const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId));
+        const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId()));
         if (typeVector != nullptr) {
             for (int i = 0; i < typeVector->count; i++) {
                 auto [subtype, offset] = getConstituentInfo(insn->type, i);
                 newList.push_back(std::make_shared<T>(insn->lineInfo,
                             subtype,
-                            scalarize(insn->resultId, i, subtype),
+                            scalarize(insn->resultId(), i, subtype),
                             scalarize(insn->argIdList[0], i, subtype)));
             }
             replaced = true;
@@ -324,7 +327,7 @@ struct Program
     template <class T>
     void expandVectorsBinOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
         T *insn = dynamic_cast<T *>(instruction);
-        const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId));
+        const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId()));
         if (typeVector != nullptr) {
             const TypeVector *typeVector0 = getTypeAsVector(typeIdOf(insn->argIdList[0]));
             const TypeVector *typeVector1 = getTypeAsVector(typeIdOf(insn->argIdList[1]));
@@ -335,7 +338,7 @@ struct Program
                 auto [subtype, offset] = getConstituentInfo(insn->type, i);
                 newList.push_back(std::make_shared<T>(insn->lineInfo,
                             subtype,
-                            scalarize(insn->resultId, i, subtype),
+                            scalarize(insn->resultId(), i, subtype),
                             scalarize(insn->argIdList[0], i, arg0Subtype),
                             scalarize(insn->argIdList[1], i, arg1Subtype)));
             }
@@ -347,13 +350,13 @@ struct Program
     template <class T>
     void expandVectorsTerOp(Instruction *instruction, InstructionList &newList, bool &replaced) {
         T *insn = dynamic_cast<T *>(instruction);
-        const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId));
+        const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId()));
         if (typeVector != nullptr) {
             for (int i = 0; i < typeVector->count; i++) {
                 auto [subtype, offset] = getConstituentInfo(insn->type, i);
                 newList.push_back(std::make_shared<T>(insn->lineInfo,
                             subtype,
-                            scalarize(insn->resultId, i, subtype),
+                            scalarize(insn->resultId(), i, subtype),
                             scalarize(insn->argIdList[0], i, subtype),
                             scalarize(insn->argIdList[1], i, subtype),
                             scalarize(insn->argIdList[2], i, subtype)));
