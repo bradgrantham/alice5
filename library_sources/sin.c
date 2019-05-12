@@ -210,7 +210,13 @@ int main(int argc, char **argv)
 {
     float a;
 
-    for(a = -10.0; a < 10.0; a+= .01)
-        printf("%10f: %10f <=> %10f\n", a, sin(a), test_sin(a));
+    for(a = -100.0; a < 100.0; a+= .01) {
+        float real = sin(a);
+        float ours = test_sin(a);
+        float error = fabs(real - ours);
+        if(error > .00001) {
+            printf("%10f: %10f.  %10f <=> %10f\n", a, error, sin(a), test_sin(a));
+        }
+    }
 }
 #endif
