@@ -193,9 +193,6 @@ def main():
         operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
                 for operand_index, json_operand in enumerate(instruction.get("operands", []))]
 
-        # Name of result registers.
-        resultIds = [operand.cpp_name for operand in operands if operand.is_result]
-
         # Opcode to string file.
         opcode_to_string_f.write("    {%d, \"%s\"},\n" % (opcode, short_opname))
 
@@ -212,10 +209,10 @@ def main():
                     (struct_opname,
                         ", ".join(params),
                         ", ".join(inits)))
-            for resultId in resultIds:
-                opcode_structs_f.write("        addResult(%s);\n" % resultId)
             for operand in operands:
-                if opname == "OpPhi" and operand.cpp_name == "operandId":
+                if operand.is_result:
+                    opcode_structs_f.write("        addResult(%s);\n" % operand.cpp_name)
+                elif opname == "OpPhi" and operand.cpp_name == "operandId":
                     # Special case the phi operands.
                     opcode_structs_f.write("        for (int i = 0; i < %s.size(); i += 2) {\n" % operand.cpp_name)
                     opcode_structs_f.write("            addParameter(%s[i]);\n" % operand.cpp_name)
@@ -301,14 +298,14 @@ def main():
         struct_opname = "Insn" + opname
 
         # Set up 2 operands from OpExtInst that are handled by the extension instruction
-        extinst_operands = [Operand(type_json_operand, operand_kind_map, 0, opname), Operand(resultid_json_operand, operand_kind_map, 1, opname)]
+        extinst_operands = [
+                Operand(type_json_operand, operand_kind_map, 0, opname),
+                Operand(resultid_json_operand, operand_kind_map, 1, opname)
+        ]
 
         # Process the operands, adding our own custom fields to them.
         operands = [Operand(json_operand, operand_kind_map, operand_index, opname)
                 for operand_index, json_operand in enumerate(instruction.get("operands", []))]
-
-        # Name of result register.
-        resultIds = [operand.cpp_name for operand in operands + extinst_operands if operand.is_result]
 
         # Opcode to string file.
         opcode_to_string_f.write("    {0x10000 | %d, \"%s\"},\n" % (opcode, opname))
@@ -326,10 +323,10 @@ def main():
                     (struct_opname,
                         ", ".join(params),
                         ", ".join(inits)))
-            for resultId in resultIds:
-                opcode_structs_f.write("        addResult(%s);\n" % resultId)
-            for operand in operands:
-                if operand.is_argument:
+            for operand in extinst_operands + operands:
+                if operand.is_result:
+                    opcode_structs_f.write("        addResult(%s);\n" % operand.cpp_name)
+                elif operand.is_argument:
                     if operand.quantifier == "*":
                         opcode_structs_f.write("        for (auto _argId : %s) {\n" % operand.cpp_name)
                         opcode_structs_f.write("            addParameter(_argId);\n")
