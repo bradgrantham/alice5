@@ -8,6 +8,12 @@ std::map<uint32_t, std::string> OpcodeToString = {
 #include "opcode_to_string.h"
 };
 
+// Convenience function to get the number of items in a variable.
+// If it's a vector, returns its count. Otherwise returns 1.
+static int vectorCount(const TypeVector *typeVector) {
+    return typeVector == nullptr ? 1 : typeVector->count;
+}
+
 Program::Program(bool throwOnUnimplemented_, bool verbose_) :
     throwOnUnimplemented(throwOnUnimplemented_),
     hasUnimplemented(false),
@@ -76,6 +82,10 @@ uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t sca
     }
 
     return scalarReg;
+}
+
+uint32_t Program::scalarize(uint32_t vreg, int i, const TypeVector *typeVector) {
+    return typeVector == nullptr ? vreg : scalarize(vreg, i, typeVector->type);
 }
 
 // Post-parsing work.
@@ -210,11 +220,10 @@ void Program::postParse(bool scalarize) {
         pc_worklist.insert(pc);
     }
     while (!pc_worklist.empty()) {
-        // Pick any PC to start with. Starting at the end is a bit more efficient
+        // Pick any PC to start with. Starting at the end is more efficient
         // since our predecessor depends on us.
-        auto itr = pc_worklist.rbegin();
-        uint32_t pc = *itr;
-        pc_worklist.erase(*itr);
+        uint32_t pc = *pc_worklist.rbegin();
+        pc_worklist.erase(pc);
 
         // Keep track of old livein/liveout for comparison.
         Instruction *instruction = instructions[pc].get();
@@ -250,14 +259,31 @@ void Program::postParse(bool scalarize) {
         }
         // ... plus what we need.
         if (instruction->opcode() == SpvOpPhi) {
+            // XXX delete
             // Special handling of Phi instruction, because we must specify
             // which branch our livein is from. Otherwise all branches will
             // think they need all inputs, which is incorrect.
+            assert(false);
             InsnPhi *phi = dynamic_cast<InsnPhi *>(instruction);
             for (int i = 0; i < phi->operandId.size(); i += 2) {
                 uint32_t data = phi->operandId[i];
                 uint32_t label = phi->operandId[i + 1];
                 instruction->livein[label].insert(data);
+            }
+        } else if (instruction->opcode() == RiscVOpPhi) {
+            // Special handling of Phi instruction, because we must specify
+            // which branch our livein is from. Otherwise all branches will
+            // think they need all inputs, which is incorrect.
+            RiscVPhi *phi = dynamic_cast<RiscVPhi *>(instruction);
+            assert(phi->operandIds.size() == phi->resultIds.size());
+            for (int i = 0; i < phi->operandIds.size(); i++) {
+                // Operands for a specific result.
+                const std::vector<uint32_t> &operandIds = phi->operandIds[i];
+                assert(phi->labelIds.size() == operandIds.size());
+
+                for (int j = 0; j < operandIds.size(); j++) {
+                    instruction->livein[phi->labelIds[j]].insert(operandIds[j]);
+                }
             }
         } else {
             // Non-phi instruction, all parameters are livein.
@@ -478,13 +504,17 @@ void Program::postParse(bool scalarize) {
             for (auto line : instruction->succ) {
                 std::cout << " " << line;
             }
-            std::cout << ", live";
+            std::cout << ", livein";
             for (auto &[label,liveinSet] : instruction->livein) {
                 std::cout << " " << label << "(";
                 for (auto regId : liveinSet) {
                     std::cout << " " << regId;
                 }
                 std::cout << ")";
+            }
+            std::cout << ", liveout";
+            for (auto regId : instruction->liveout) {
+                std::cout << " " << regId;
             }
 
             std::cout << ")\n";
@@ -542,7 +572,7 @@ void Program::expandVectors() {
         const std::shared_ptr<Instruction> &instructionPtr = instructions[pc];
         Instruction *instruction = instructionPtr.get();
 
-        // Keep track of where this instructions ends up.
+        // Keep track of where this instruction ends up.
         lineMap.push_back(newList.size());
 
         switch (instruction->opcode()) {
@@ -836,24 +866,56 @@ void Program::expandVectors() {
             }
 
             case SpvOpPhi: {
-                InsnPhi *insn = dynamic_cast<InsnPhi *>(instruction);
-                const TypeVector *typeVector = getTypeAsVector(
-                        resultTypes.at(insn->resultId));
-                if (typeVector != nullptr) {
-                    // Operands are <data, label> pairs.
-                    for (int i = 0; i < typeVector->count; i++) {
-                        std::vector<uint32_t> operandIds;
-                        for (int j = 0; j < insn->operandId.size(); j += 2) {
-                            operandIds.push_back(scalarize(insn->operandId[j], i, typeVector->type));
-                            operandIds.push_back(insn->operandId[j + 1]);
-                        }
-                        newList.push_back(std::make_shared<InsnPhi>(insn->lineInfo,
-                                    insn->type,
-                                    scalarize(insn->resultId, i, typeVector->type),
-                                    operandIds));
+                // Here we not only expand the vectors, but we collapse all
+                // the consecutive phi instructions into our own.
+                std::shared_ptr<RiscVPhi> newPhi = std::make_shared<RiscVPhi>(
+                        instruction->lineInfo);
+                uint32_t newPc = newList.size();
+                newList.push_back(newPhi);
+
+                // Eat up all consecutive phis.
+                bool first = true;
+                while (pc < instructions.size() && instructions[pc]->opcode() == SpvOpPhi) {
+                    InsnPhi *oldPhi = dynamic_cast<InsnPhi *>(instructions[pc].get());
+
+                    if (!first) {
+                        // We did the first at the top of the loop.
+                        lineMap.push_back(newPc);
                     }
-                    replaced = true;
+
+                    // See if we should expand a vector.
+                    const TypeVector *typeVector = getTypeAsVector(typeIdOf(oldPhi->resultId));
+
+                    // Expand vectors in this loop.
+                    for (int j = 0; j < vectorCount(typeVector); j++) {
+                        uint32_t regId = scalarize(oldPhi->resultId, j, typeVector);
+                        newPhi->resultIds.push_back(regId);
+                        newPhi->addResult(regId);
+
+                        std::vector<uint32_t> operandIds;
+                        for (int i = 0; i < oldPhi->operandId.size()/2; i++) {
+                            uint32_t operandId = oldPhi->operandId[i*2];
+                            uint32_t labelId = oldPhi->operandId[i*2 + 1];
+                            if (first) {
+                                newPhi->labelIds.push_back(labelId);
+                            } else {
+                                // Make sure labels are consistent across phi instructions.
+                                assert(newPhi->labelIds[i] == labelId);
+                            }
+
+                            uint32_t regId = scalarize(operandId, j, typeVector);
+                            operandIds.push_back(regId);
+                            newPhi->addParameter(regId);
+                        }
+                        newPhi->operandIds.push_back(operandIds);
+
+                        first = false;
+                    }
+
+                    pc++;
                 }
+
+                replaced = true;
                 break;
             }
 

@@ -15,6 +15,7 @@ enum {
     RiscVOpAll,
     RiscVOpAny,
     RiscVOpDistance,
+    RiscVOpPhi,
 };
 
 // "addi" instruction.
@@ -238,5 +239,20 @@ struct RiscVDistance : public Instruction {
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpDistance; }
     virtual std::string name() const { return "distance"; }
+    virtual void emit(Compiler *compiler);
+};
+
+// Our own phi instruction. Not RISC-V related at all. This is like the
+// regular SPIR-V phi instruction, but can hold all of them at once,
+// which makes analysis easier.
+struct RiscVPhi : public Instruction {
+    RiscVPhi(LineInfo& lineInfo) : Instruction(lineInfo) {}
+    std::vector<uint32_t> resultIds;    // Each result.
+    std::vector<uint32_t> labelIds;     // Each source label.
+    // Outer is per-result (same size as resultIds), inner is per-label (same size as labelIds):
+    std::vector<std::vector<uint32_t>> operandIds;
+    virtual void step(Interpreter *interpreter) { assert(false); }
+    virtual uint32_t opcode() const { return RiscVOpPhi; }
+    virtual std::string name() const { return "phi"; }
     virtual void emit(Compiler *compiler);
 };

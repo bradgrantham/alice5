@@ -46,6 +46,11 @@
 
 // -----------------------------------------------------------------------------------
 
+void RiscVPhi::emit(Compiler *compiler)
+{
+    compiler->emit("", "our phi instruction, nothing to do.");
+}
+
 void RiscVAddi::emit(Compiler *compiler)
 {
     compiler->emitBinaryImmOp("addi", resultId, rs1, imm);

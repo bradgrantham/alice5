@@ -296,6 +296,10 @@ struct Program
     // Return the scalar for the vector register's index.
     uint32_t scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg = 0);
 
+    // If typeVector is null, just returns vreg. Else calls scalarize() with the
+    // typeVector's subtype.
+    uint32_t scalarize(uint32_t vreg, int i, const TypeVector *typeVector);
+
     // Transform vector instructions to scalar instructions.
     void expandVectors();
 

@@ -580,7 +580,6 @@ struct Instruction {
     // OpUnreachable).
     virtual bool isTermination() const { return false; }
 
-protected:
     // Add a result to the instruction.
     void addResult(uint32_t id) {
         resIdSet.insert(id);
