@@ -21,8 +21,9 @@ do
     echo "============================================== $i"
     if [ $compile = true ]; then
         ./shade -c -s -O shaders/$i.frag > x.s
+        if [ -f x.o ]; then rm x.o; fi
         ./as x.s
-        ./gpuemu --term x.o
+        if [ -f x.o ]; then ./gpuemu --term x.o; fi
     else
         ./shade --term -f 90 90 shaders/$i.frag
         mv image0090.ppm $i.ppm
