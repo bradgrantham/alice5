@@ -29,17 +29,37 @@ void dumpGPUCore(const GPUCore& core)
 {
     std::cout << std::setfill('0');
     for(int i = 0; i < 32; i++) {
-        std::cout << "x" << std::setw(2) << i << ":" << std::hex << std::setw(8) << core.reg.x[i] << std::dec;
+        std::cout << "x" << std::setw(2) << i << ":" << std::hex << std::setw(8) << core.regs.x[i] << std::dec;
         std::cout << (((i + 1) % 4 == 0) ? "\n" : " ");
     }
     for(int i = 0; i < 32; i++) {
-        std::cout << "ft" << std::setfill('0') << std::setw(2) << i << ":" << std::setw(8) << std::setfill(' ') << core.reg.f[i];
+        std::cout << "ft" << std::setfill('0') << std::setw(2) << i << ":" << std::setw(8) << std::setfill(' ') << core.regs.f[i];
         std::cout << (((i + 1) % 4 == 0) ? "\n" : " ");
     }
-    std::cout << "pc :" << std::hex << std::setw(8) << core.reg.pc << '\n' << std::dec;
+    std::cout << "pc :" << std::hex << std::setw(8) << core.regs.pc << '\n' << std::dec;
     std::cout << std::setfill(' ');
 }
 
+void dumpRegsDiff(const GPUCore::Registers& prev, const GPUCore::Registers& cur)
+{
+    std::cout << std::setfill('0');
+    if(prev.pc != cur.pc) {
+        std::cout << "pc changed to " << std::hex << std::setw(8) << cur.pc << std::dec << '\n';
+    }
+    for(int i = 0; i < 32; i++) {
+        if(prev.x[i] != cur.x[i]) {
+            std::cout << "x" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << cur.x[i] << std::dec << '\n';
+        }
+    }
+    for(int i = 0; i < 32; i++) {
+        bool bothnan = isnan(cur.f[i]) && isnan(prev.f[i]);
+        if((prev.f[i] != cur.f[i]) && !bothnan) { // if both NaN, equality test still fails)
+            uint32_t x = *reinterpret_cast<const uint32_t*>(&cur.f[i]);
+            std::cout << "f" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << x << std::dec << "(" << cur.f[i] << ")\n";
+        }
+    }
+    std::cout << std::setfill(' ');
+}
 struct Memory
 {
     std::vector<uint8_t> memorybytes;
@@ -345,23 +365,27 @@ int main(int argc, char **argv)
             if(false) // XXX TODO: when iTime is exported by compilation
                 set(m, iTimeAddress, frameTime);
 
-            core.reg.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
-            core.reg.x[2] = bytes.size(); // Set SP to end of memory 
-            core.reg.pc = header.initialPC;
+            core.regs.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
+            core.regs.x[2] = bytes.size(); // Set SP to end of memory 
+            core.regs.pc = header.initialPC;
 
             if(disassemble) {
                 std::cout << "; pixel " << i << ", " << j << '\n';
             }
             try {
                 do {
+                    GPUCore::Registers oldRegs = core.regs;
                     if(disassemble) {
-                        print_inst(core.reg.pc, m.read32(core.reg.pc), addressesToSymbols);
+                        print_inst(core.regs.pc, m.read32(core.regs.pc), addressesToSymbols);
                     }
                     m.verbose = verboseMemory;
                     status = core.step(m);
                     dispatchedCount ++;
                     m.verbose = false;
-                } while(core.reg.pc != 0xffffffff && status == GPUCore::RUNNING);
+                    if(printCoreDiff) {
+                        dumpRegsDiff(oldRegs, core.regs);
+                    }
+                } while(core.regs.pc != 0xffffffff && status == GPUCore::RUNNING);
             } catch(const std::exception& e) {
                 std::cerr << e.what() << '\n';
                 dumpGPUCore(core);
