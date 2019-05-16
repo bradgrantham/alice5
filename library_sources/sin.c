@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define USE_ARMS 0
+
 #ifdef TEST_PROGRAM
 #include <stdio.h>
 #include <math.h>
@@ -52,10 +54,12 @@
 #define _sin test_sin
 #endif
 
-#define FAST_MATH_TABLE_SIZE  512
+#define FAST_MATH_TABLE_SIZE  512 /* MUST BE POWER OF TWO TO ALLOW MASKING OPERATIONS */
+#define FAST_MATH_TABLE_MASK  (FAST_MATH_TABLE_SIZE - 1)
 
 typedef float float32_t;
 
+// grantham - Has an extra element so interpolation can always get lower and upper table elements
 const float32_t sinTable_f32[FAST_MATH_TABLE_SIZE + 1] = {
    0.00000000f, 0.01227154f, 0.02454123f, 0.03680722f, 0.04906767f, 0.06132074f,
    0.07356456f, 0.08579731f, 0.09801714f, 0.11022221f, 0.12241068f, 0.13458071f,
@@ -153,57 +157,112 @@ const float32_t sinTable_f32[FAST_MATH_TABLE_SIZE + 1] = {
    -0.04906767f, -0.03680722f, -0.02454123f, -0.01227154f, -0.00000000f
 };
 
+#if USE_ARMS
+
 float32_t _sin(
   float32_t x)
 {
-  float32_t sinVal, fract, in;                           /* Temporary variables for input, output */
-  uint16_t index;                                        /* Index variable */
-  float32_t a, b;                                        /* Two nearest output values */
-  int32_t n;
+  float32_t sinVal, fract, u;                           /* Temporary variables for input, output */
+  uint32_t index;                                        /* Index variable */
+  float32_t lower, upper;                                        /* Two nearest output values */
+  int32_t whole;
   float32_t findex;
+  float32_t alpha, beta;
 
   /* input x is in radians */
   /* Scale the input to [0 1] range from [0 2*PI] , divide input by 2*pi */
-  in = x * 0.159154943092f;
+  u = x * 0.159154943092f;
 
-  /* Calculation of floor value of input */
-  n = (int32_t) in;
+  /* whole is u truncated (round-towards-zero) */
+  whole = (int32_t) u;
 
-  /* Make negative values towards -infinity */
+  /* Make "whole" be floor of u unless u was a negative whole number in which case "whole" = u - 1 */
+  /* really should use floorf here */
   if(x < 0.0f)
   {
-    n--;
+    whole--;
   }
 
-  /* Map input value to [0 1] */
-  in = in - (float32_t) n;
+  /* Get fractional part of "in" */
+  /* result can be 1.0 if "in" is a whole negative number */
+  fract = u - (float32_t) whole;
+
+  if (fract >= 1.0f) {
+    fract -= 1.0f;
+  }
 
   /* Calculation of index of the table */
-  findex = (float32_t) FAST_MATH_TABLE_SIZE * in;
-  if (findex >= 512.0f) {
-    findex -= 512.0f;
-  }
-
-  index = ((uint16_t)findex) & 0x1ff;
+  findex = (float32_t) FAST_MATH_TABLE_SIZE * u;
 
   /* fractional value calculation */
   fract = findex - (float32_t) index;
 
-  /* Read two nearest values of input value from the sin table */
-  a = sinTable_f32[index];
-  b = sinTable_f32[index+1];
+  // index = ((uint16_t)findex) & FAST_MATH_TABLE_MASK;
+  index = ((uint32_t)findex) & FAST_MATH_TABLE_MASK;
 
-  /* Linear interpolation process */
-  sinVal = (1.0f-fract)*a + fract*b;
+  /* Read two nearest values of input value from the sin table */
+  lower = sinTable_f32[index];
+  upper = sinTable_f32[index+1];
+
+  alpha = 1.0f - fract;
+  beta = fract;
+
+  /* Linear interpolation */
+  sinVal = alpha * lower + beta * upper;
 
   /* Return the output value */
-  return (sinVal);
+  return sinVal;
 }
 
+#endif /* USE_ARMS */
 
 
 /* This ends the ARM copyrighted portion of this file --------------------- */
 /* ------------------------------------------------------------------------ */
+
+#if !USE_ARMS
+
+#define floorf our_floorf
+
+inline float our_floorf(float x)
+{
+    int32_t truncated = (int32_t)x;
+
+    int32_t floored;
+    if(x < 0) {
+        floored = truncated - 1;
+    } else {
+        floored = truncated;
+    }
+
+    float fraction = x - floored;
+
+    /* special case where x is a whole negative number */
+    if(fraction >= 1.0) {
+        floored += 1;
+    }
+
+    return floored;
+}
+
+float _sin(float x)
+{
+    float u = x * 0.159154943092f;
+
+    float indexf = u * FAST_MATH_TABLE_SIZE;
+    int32_t index = (int32_t)floorf(indexf);
+
+    float beta = indexf - index;
+    float alpha = 1.0f - beta;
+
+    uint32_t lower = index & FAST_MATH_TABLE_MASK;
+    uint32_t upper = lower + 1;
+
+    return sinTable_f32[lower] * alpha + sinTable_f32[upper] * beta;
+}
+
+#endif /* !USE_ARMS */
+
 
 #ifdef TEST_PROGRAM
 int main(int argc, char **argv)
@@ -214,7 +273,7 @@ int main(int argc, char **argv)
         float real = sin(a);
         float ours = test_sin(a);
         float error = fabs(real - ours);
-        if(error > .00001) {
+        if(error > .0001) {
             printf("%10f: %10f.  %10f <=> %10f\n", a, error, sin(a), test_sin(a));
         }
     }
