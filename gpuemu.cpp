@@ -29,14 +29,14 @@ void dumpGPUCore(const GPUCore& core)
 {
     std::cout << std::setfill('0');
     for(int i = 0; i < 32; i++) {
-        std::cout << "x" << std::setw(2) << i << ":" << std::hex << std::setw(8) << core.x[i] << std::dec;
+        std::cout << "x" << std::setw(2) << i << ":" << std::hex << std::setw(8) << core.reg.x[i] << std::dec;
         std::cout << (((i + 1) % 4 == 0) ? "\n" : " ");
     }
     for(int i = 0; i < 32; i++) {
-        std::cout << "ft" << std::setfill('0') << std::setw(2) << i << ":" << std::setw(8) << std::setfill(' ') << core.f[i];
+        std::cout << "ft" << std::setfill('0') << std::setw(2) << i << ":" << std::setw(8) << std::setfill(' ') << core.reg.f[i];
         std::cout << (((i + 1) % 4 == 0) ? "\n" : " ");
     }
-    std::cout << "pc :" << std::hex << std::setw(8) << core.pc << '\n' << std::dec;
+    std::cout << "pc :" << std::hex << std::setw(8) << core.reg.pc << '\n' << std::dec;
     std::cout << std::setfill(' ');
 }
 
@@ -203,7 +203,8 @@ void usage(const char* progname)
 {
     printf("usage: %s [options] shader.blob\n", progname);
     printf("options:\n");
-    printf("\t-v        Print memory options\n");
+    printf("\t-f N      Render frame N\n");
+    printf("\t-v        Print memory access\n");
     printf("\t-S        show the disassembly of the SPIR-V code\n");
     printf("\t--term    draw output image on terminal (in addition to file)\n");
 }
@@ -213,8 +214,10 @@ int main(int argc, char **argv)
 {
     bool verboseMemory = false;
     bool disassemble = false;
+    bool printCoreDiff = false;
     bool imageToTerminal = false;
     bool printSymbols = false;
+    float frameTime = 1.5f;
 
     char *progname = argv[0];
     argv++; argc--;
@@ -223,6 +226,11 @@ int main(int argc, char **argv)
         if(strcmp(argv[0], "-v") == 0) {
 
             verboseMemory = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "--diff") == 0) {
+
+            printCoreDiff = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "--term") == 0) {
@@ -234,6 +242,16 @@ int main(int argc, char **argv)
 
             disassemble = true;
             argv++; argc--;
+
+        } else if(strcmp(argv[0], "-f") == 0) {
+
+            if(argc < 2) {
+                std::cerr << "Expected frame parameter for \"-f\"\n";
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            frameTime = atoi(argv[1]) / 60.0f;
+            argv+=2; argc-=2;
 
         } else if(strcmp(argv[0], "-d") == 0) {
 
@@ -295,7 +313,6 @@ int main(int argc, char **argv)
     float fw = imageWidth;
     float fh = imageHeight;
     float zero = 0.0;
-    float when = 1.5;
     for(auto& s: { "gl_FragCoord", "color"}) {
         if (symbols.find(s) == symbols.end()) {
             std::cerr << "No memory location for required variable " << s << ".\n";
@@ -310,12 +327,13 @@ int main(int argc, char **argv)
 
     if (symbols.find(".anonymous") != symbols.end()) {
         set(m, symbols[".anonymous"], v4float{fw, fh, zero, zero});
-        set(m, symbols[".anonymous"] + 8, when);
+        set(m, symbols[".anonymous"] + 8, frameTime);
     }
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
 
     uint32_t gl_FragCoordAddress = symbols["gl_FragCoord"];
     uint32_t colorAddress = symbols["color"];
+    uint32_t iTimeAddress = symbols["iTime"];
 
     Timer frameElapsed;
     uint64_t dispatchedCount = 0;
@@ -324,10 +342,12 @@ int main(int argc, char **argv)
 
             set(m, gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
             set(m, colorAddress, v4float{1, 1, 1, 1});
+            if(false) // XXX TODO: when iTime is exported by compilation
+                set(m, iTimeAddress, frameTime);
 
-            core.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
-            core.x[2] = bytes.size(); // Set SP to end of memory 
-            core.pc = header.initialPC;
+            core.reg.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
+            core.reg.x[2] = bytes.size(); // Set SP to end of memory 
+            core.reg.pc = header.initialPC;
 
             if(disassemble) {
                 std::cout << "; pixel " << i << ", " << j << '\n';
@@ -335,13 +355,13 @@ int main(int argc, char **argv)
             try {
                 do {
                     if(disassemble) {
-                        print_inst(core.pc, m.read32(core.pc), addressesToSymbols);
+                        print_inst(core.reg.pc, m.read32(core.reg.pc), addressesToSymbols);
                     }
                     m.verbose = verboseMemory;
                     status = core.step(m);
                     dispatchedCount ++;
                     m.verbose = false;
-                } while(core.pc != 0xffffffff && status == GPUCore::RUNNING);
+                } while(core.reg.pc != 0xffffffff && status == GPUCore::RUNNING);
             } catch(const std::exception& e) {
                 std::cerr << e.what() << '\n';
                 dumpGPUCore(core);

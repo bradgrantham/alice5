@@ -10,9 +10,11 @@ struct GPUCore
 {
     // Loosely modeled on RISC-V RVI, RVA, RVM, RVF
 
-    uint32_t x[32]; // but 0 not accessed because it's readonly 0
-    uint32_t pc;
-    float f[32];
+    struct Registers {
+        uint32_t x[32]; // but 0 not accessed because it's readonly 0
+        uint32_t pc;
+        float f[32];
+    } reg;
 
     // XXX CSRs
     // XXX FCSRs
@@ -78,9 +80,9 @@ struct GPUCore
 
     GPUCore(const SymbolTable& librarySymbols)
     {
-        std::fill(x, x + 32, 0);
-        std::fill(f, f + 32, 0.0f);
-        pc = 0;
+        std::fill(reg.x, reg.x + 32, 0);
+        std::fill(reg.f, reg.f + 32, 0.0f);
+        reg.pc = 0;
 
         std::vector<std::pair<std::string, SubstituteFunction> > substitutions = {
             { ".sin", SUBST_SIN },
@@ -200,7 +202,7 @@ const bool dump = false;
 template <class T>
 GPUCore::Status GPUCore::step(T& memory)
 {
-    uint32_t insn = memory.read32(pc);
+    uint32_t insn = memory.read32(reg.pc);
 
     Status status = RUNNING;
 
@@ -230,10 +232,10 @@ GPUCore::Status GPUCore::step(T& memory)
         (getBits(insn, 30, 21) << 1),
         21);
 
-    std::function<float(void)> popf = [&]() { float v = memory.readf(x[2]); x[2] += 4; return v; };
-    std::function<void(float)> pushf = [&](float f) { x[2] -= 4; memory.writef(x[2], f); };
-    std::function<uint32_t(void)> pop32 = [&]() { uint32_t v = memory.read32(x[2]); x[2] += 4; return v; };
-    std::function<void(uint32_t)> push32 = [&](uint32_t f) { x[2] -= 4; memory.write32(x[2], f); };
+    std::function<float(void)> popf = [&]() { float v = memory.readf(reg.x[2]); reg.x[2] += 4; return v; };
+    std::function<void(float)> pushf = [&](float f) { reg.x[2] -= 4; memory.writef(reg.x[2], f); };
+    std::function<uint32_t(void)> pop32 = [&]() { uint32_t v = memory.read32(reg.x[2]); reg.x[2] += 4; return v; };
+    std::function<void(uint32_t)> push32 = [&](uint32_t f) { reg.x[2] -= 4; memory.write32(reg.x[2], f); };
 
     std::function<void(void)> unimpl = [&]() {
         std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
@@ -243,7 +245,7 @@ GPUCore::Status GPUCore::step(T& memory)
     };
 
     std::function<void(void)> unimpl_subst = [&]() {
-        std::cerr << "unimplemented substitution " << substFunctions[pc] << "\n";
+        std::cerr << "unimplemented substitution " << substFunctions[reg.pc] << "\n";
         status = UNIMPLEMENTED_OPCODE;
     };
 
@@ -251,16 +253,16 @@ GPUCore::Status GPUCore::step(T& memory)
         // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
         case makeOpcode(2, 0x01, 3): {
             if(dump) std::cout << "flw\n";
-            f[rd] = memory.readf(x[rs1] + immI);
-            pc += 4;
+            reg.f[rd] = memory.readf(reg.x[rs1] + immI);
+            reg.pc += 4;
             break;
         }
 
         // fsw       imm12hi rs1 rs2 imm12lo 14..12=2 6..2=0x09 1..0=3
         case makeOpcode(2, 0x09, 3): {
             if(dump) std::cout << "fsw\n";
-            memory.writef(x[rs1] + immS, f[rs2]);
-            pc += 4;
+            memory.writef(reg.x[rs1] + immS, reg.f[rs2]);
+            reg.pc += 4;
             break;
         }
 
@@ -271,7 +273,7 @@ GPUCore::Status GPUCore::step(T& memory)
                 // our assembler always outputs rm = 0
                 if(funct3 == 0x0) { // size
                     // .s
-                    f[rd] = f[rs1] * f[rs2] + f[rs3];
+                    reg.f[rd] = reg.f[rs1] * reg.f[rs2] + reg.f[rs3];
                 } else {
                     printf("funct3 %d\n", funct3);
                     unimpl();
@@ -280,7 +282,7 @@ GPUCore::Status GPUCore::step(T& memory)
                 printf("fmt %d\n", fmt);
                 unimpl();
             }
-            pc += 4;
+            reg.pc += 4;
             break;
         }
 
@@ -307,20 +309,20 @@ GPUCore::Status GPUCore::step(T& memory)
                 unimpl();
             }
             switch(ffunct) {
-                case 0x00: /* fadd */ f[rd] = f[rs1] + f[rs2]; break;
-                case 0x01: /* fsub */ f[rd] = f[rs1] - f[rs2]; break;
-                case 0x02: /* fmul */ f[rd] = f[rs1] * f[rs2]; break;
-                case 0x03: /* fdiv */ f[rd] = f[rs1] / f[rs2]; break;
-                case 0x05: /* fmin or fmax */ f[rd] = (funct3 == 0) ? fminf(f[rs1], f[rs2]) : fmaxf(f[rs1], f[rs2]); break;
-                case 0x0B: /* fsqrt */ f[rd] = sqrtf(f[rs1]); break;
+                case 0x00: /* fadd */ reg.f[rd] = reg.f[rs1] + reg.f[rs2]; break;
+                case 0x01: /* fsub */ reg.f[rd] = reg.f[rs1] - reg.f[rs2]; break;
+                case 0x02: /* fmul */ reg.f[rd] = reg.f[rs1] * reg.f[rs2]; break;
+                case 0x03: /* fdiv */ reg.f[rd] = reg.f[rs1] / reg.f[rs2]; break;
+                case 0x05: /* fmin or fmax */ reg.f[rd] = (funct3 == 0) ? fminf(reg.f[rs1], reg.f[rs2]) : fmaxf(reg.f[rs1], reg.f[rs2]); break;
+                case 0x0B: /* fsqrt */ reg.f[rd] = sqrtf(reg.f[rs1]); break;
                 case 0x14:  {
                     if(rd > 0) {
                         if(funct3 == 0x0) {
-                            x[rd] = (f[rs1] <= f[rs2]) ? 1 : 0;
+                            reg.x[rd] = (reg.f[rs1] <= reg.f[rs2]) ? 1 : 0;
                         } else if(funct3 == 0x1) {
-                            x[rd] = (f[rs1] < f[rs2]) ? 1 : 0;
+                            reg.x[rd] = (reg.f[rs1] < reg.f[rs2]) ? 1 : 0;
                         } else {
-                            x[rd] = (f[rs1] == f[rs2]) ? 1 : 0;
+                            reg.x[rd] = (reg.f[rs1] == reg.f[rs2]) ? 1 : 0;
                         }
                     }
                     break;
@@ -331,9 +333,9 @@ GPUCore::Status GPUCore::step(T& memory)
                     if(rd > 0) {
                         // ignoring setting valid flags
                         if(rs2 == 0) {
-                            x[rd] = std::clamp(f[rs1] + .5, -2147483648.0, 2147483647.0);
+                            reg.x[rd] = std::clamp(reg.f[rs1] + .5, -2147483648.0, 2147483647.0);
                         } else if(rs2 == 1) {
-                            x[rd] = std::clamp(f[rs1] + .5, 0.0, 4294967295.0);
+                            reg.x[rd] = std::clamp(reg.f[rs1] + .5, 0.0, 4294967295.0);
                         }
                     }
                     break;
@@ -345,7 +347,7 @@ GPUCore::Status GPUCore::step(T& memory)
                 case 0x1E: {
                     if(funct3 == 0) {
                         if(fmt == 0) {
-                            f[rd] = *reinterpret_cast<float*>(&x[rs1]);
+                            reg.f[rd] = *reinterpret_cast<float*>(&reg.x[rs1]);
                         } else {
                             unimpl();
                         }
@@ -361,14 +363,14 @@ GPUCore::Status GPUCore::step(T& memory)
                 case 0x1A: {
                     if(rs2 == 0) {
                         if(fmt == 0) {
-                            f[rd] = *reinterpret_cast<int32_t*>(&x[rs1]);
+                            reg.f[rd] = *reinterpret_cast<int32_t*>(&reg.x[rs1]);
                         } else {
                             printf("fmt = %d\n", fmt);
                             unimpl();
                         }
                     } else if(rs2 == 1) {
                         if(fmt == 0) {
-                            f[rd] = x[rs1];
+                            reg.f[rd] = reg.x[rs1];
                         } else {
                             printf("fmt = %d\n", fmt);
                             unimpl();
@@ -384,9 +386,9 @@ GPUCore::Status GPUCore::step(T& memory)
                 // fsgnjn.s  rd rs1 rs2      31..27=0x04 14..12=1 26..25=0 6..2=0x14 1..0=3
                 // fsgnjx.s  rd rs1 rs2      31..27=0x04 14..12=2 26..25=0 6..2=0x14 1..0=3
                 case 0x04: {
-                    uint32_t& fs1 = *reinterpret_cast<uint32_t*>(&f[rs1]);
-                    uint32_t& fs2 = *reinterpret_cast<uint32_t*>(&f[rs2]);
-                    uint32_t& fd = *reinterpret_cast<uint32_t*>(&f[rd]);
+                    uint32_t& fs1 = *reinterpret_cast<uint32_t*>(&reg.f[rs1]);
+                    uint32_t& fs2 = *reinterpret_cast<uint32_t*>(&reg.f[rs2]);
+                    uint32_t& fd = *reinterpret_cast<uint32_t*>(&reg.f[rd]);
                     if(funct3 == 0) {
                         fd = (fs1 & 0x7FFFFFFF) | (fs2 & 0x80000000);
                     } else if(funct3 == 1) {
@@ -400,7 +402,7 @@ GPUCore::Status GPUCore::step(T& memory)
                 }
                 default: unimpl(); break;
             }
-            pc += 4;
+            reg.pc += 4;
             break;
         }
 
@@ -426,11 +428,11 @@ GPUCore::Status GPUCore::step(T& memory)
         { // sb, sh, sw
             if(dump) std::cout << "sw\n";
             switch(funct3) {
-                case 0: memory.write8(x[rs1] + immS, x[rs2] & 0xFF); break;
-                case 1: memory.write16(x[rs1] + immS, x[rs2] & 0xFFFF); break;
-                case 2: memory.write32(x[rs1] + immS, x[rs2]); break;
+                case 0: memory.write8(reg.x[rs1] + immS, reg.x[rs2] & 0xFF); break;
+                case 1: memory.write16(reg.x[rs1] + immS, reg.x[rs2] & 0xFFFF); break;
+                case 2: memory.write32(reg.x[rs1] + immS, reg.x[rs2]); break;
             }
-            pc += 4;
+            reg.pc += 4;
             break;
         }
 
@@ -439,15 +441,15 @@ GPUCore::Status GPUCore::step(T& memory)
             if(dump) std::cout << "load\n";
             if(rd != 0) {
                 switch(funct3) {
-                    case 0: x[rd] = extendSign(memory.read8(x[rs1] + immI), 8); break;
-                    case 1: x[rd] = extendSign(memory.read16(x[rs1] + immI), 16); break;
-                    case 2: x[rd] = memory.read32(x[rs1] + immI); break;
-                    case 4: x[rd] = memory.read8(x[rs1] + immI); break;
-                    case 5: x[rd] = memory.read16(x[rs1] + immI); break;
+                    case 0: reg.x[rd] = extendSign(memory.read8(reg.x[rs1] + immI), 8); break;
+                    case 1: reg.x[rd] = extendSign(memory.read16(reg.x[rs1] + immI), 16); break;
+                    case 2: reg.x[rd] = memory.read32(reg.x[rs1] + immI); break;
+                    case 4: reg.x[rd] = memory.read8(reg.x[rs1] + immI); break;
+                    case 5: reg.x[rd] = memory.read16(reg.x[rs1] + immI); break;
                     default: unimpl(); break;
                 }
             }
-            pc += 4;
+            reg.pc += 4;
             break;
         }
 
@@ -455,9 +457,9 @@ GPUCore::Status GPUCore::step(T& memory)
         { // lui
             if(dump) std::cout << "lui\n";
             if(rd > 0) {
-                x[rd] = immU;
+                reg.x[rd] = immU;
             }
-            pc += 4;
+            reg.pc += 4;
             break;
         }
  
@@ -465,12 +467,12 @@ GPUCore::Status GPUCore::step(T& memory)
         { // beq, bne, blt, bge, bltu, bgeu etc
             if(dump) std::cout << "bge\n";
             switch(funct3) {
-                case 0: pc += (x[rs1] == x[rs2]) ? immSB : 4; break;
-                case 1: pc += (x[rs1] != x[rs2]) ? immSB : 4; break;
-                case 4: pc += (static_cast<int32_t>(x[rs1]) < static_cast<int32_t>(x[rs2])) ? immSB : 4; break;
-                case 5: pc += (static_cast<int32_t>(x[rs1]) >= static_cast<int32_t>(x[rs2])) ? immSB : 4; break;
-                case 6: pc += (x[rs1] < x[rs2]) ? immSB : 4; break;
-                case 7: pc += (x[rs1] >= x[rs2]) ? immSB : 4; break;
+                case 0: reg.pc += (reg.x[rs1] == reg.x[rs2]) ? immSB : 4; break;
+                case 1: reg.pc += (reg.x[rs1] != reg.x[rs2]) ? immSB : 4; break;
+                case 4: reg.pc += (static_cast<int32_t>(reg.x[rs1]) < static_cast<int32_t>(reg.x[rs2])) ? immSB : 4; break;
+                case 5: reg.pc += (static_cast<int32_t>(reg.x[rs1]) >= static_cast<int32_t>(reg.x[rs2])) ? immSB : 4; break;
+                case 6: reg.pc += (reg.x[rs1] < reg.x[rs2]) ? immSB : 4; break;
+                case 7: reg.pc += (reg.x[rs1] >= reg.x[rs2]) ? immSB : 4; break;
                 default: unimpl(); break;
             }
             break;
@@ -479,19 +481,19 @@ GPUCore::Status GPUCore::step(T& memory)
         case makeOpcode(0, 0x0C, 3): { // add
             if(dump) std::cout << "add\n";
             if(rd > 0) {
-                x[rd] = x[rs1] + x[rs2];
+                reg.x[rd] = reg.x[rs1] + reg.x[rs2];
             }
-            pc += 4;
+            reg.pc += 4;
             break;
         }
 
         case makeOpcode(0, 0x19, 3): { // jalr
             if(dump) std::cout << "jalr\n";
-            uint32_t ra = (x[rs1] + immI) & ~0x00000001; // spec says set least significant bit to zero
+            uint32_t ra = (reg.x[rs1] + immI) & ~0x00000001; // spec says set least significant bit to zero
             if(rd > 0) {
-                x[rd] = pc + 4;
+                reg.x[rd] = reg.pc + 4;
             }
-            pc = ra;
+            reg.pc = ra;
             break;
         }
 
@@ -499,9 +501,9 @@ GPUCore::Status GPUCore::step(T& memory)
         { // jal
             if(dump) std::cout << "jal\n";
             if(rd > 0) {
-                x[rd] = pc + 4;
+                reg.x[rd] = reg.pc + 4;
             }
-            pc += immUJ;
+            reg.pc += immUJ;
             break;
         }
 
@@ -510,17 +512,17 @@ GPUCore::Status GPUCore::step(T& memory)
             if(dump) std::cout << "addi\n";
             if(rd > 0) {
                 switch(funct3) {
-                    case 0: x[rd] = x[rs1] + immI; break;
-                    case 1: x[rd] = x[rs1] << shamt; break;
-                    case 4: x[rd] = x[rs1] ^ immI; break;
-                    case 6: x[rd] = x[rs1] | immI; break;
-                    case 7: x[rd] = x[rs1] & immI; break;
+                    case 0: reg.x[rd] = reg.x[rs1] + immI; break;
+                    case 1: reg.x[rd] = reg.x[rs1] << shamt; break;
+                    case 4: reg.x[rd] = reg.x[rs1] ^ immI; break;
+                    case 6: reg.x[rd] = reg.x[rs1] | immI; break;
+                    case 7: reg.x[rd] = reg.x[rs1] & immI; break;
                     default: unimpl(); break;
                 }
             } else {
                 if((funct3 == 0) && (rs1 == 0) && (immI == 0)) {
-                    if(substFunctions.find(pc) != substFunctions.end()) {
-                        switch(substFunctions[pc]) {
+                    if(substFunctions.find(reg.pc) != substFunctions.end()) {
+                        switch(substFunctions[reg.pc]) {
                             case SUBST_SIN: {
                                 pushf(sinf(popf()));
                                 break;
@@ -824,13 +826,13 @@ GPUCore::Status GPUCore::step(T& memory)
                                 break;
                             }
                         }
-                        pc += 4;
+                        reg.pc += 4;
                         return RUNNING;
                     }
                 }
             }
 
-            pc += 4;
+            reg.pc += 4;
             break;
         }
 
