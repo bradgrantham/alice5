@@ -530,7 +530,7 @@ private:
         // Make sure the whole line was parsed properly.
         if (*s != '\0') {
             // Unknown error.
-            error("Error");
+            error("Syntax error");
         }
     }
 
@@ -902,12 +902,19 @@ private:
     void showMessage(const std::string &message) {
         const SourceLine &sourceLine = currentLine();
 
-        int col = s - sourceLine.code.c_str();
+        const char *line = sourceLine.code.c_str();
+        int col = s - line;
 
         std::cerr << sourceLine.pathname << ":" << (sourceLine.lineNumber+ 1) << ":"
             << (col + 1) << ": " << message << "\n";
-        std::cerr << currentLine().code << "\n";
-        std::cerr << std::string(col, ' ') << "^\n";
+        std::cerr << line << "\n";
+
+        // Print caret, handling tabs.
+        int spaces = 0;
+        for (int i = 0; i < col; i++) {
+            spaces += line[i] == '\t' ? 8 - spaces%8 : 1;
+        }
+        std::cerr << std::string(spaces, ' ') << "^\n";
     }
 
     // Warning function.
