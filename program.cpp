@@ -903,6 +903,7 @@ void Program::expandVectors() {
 
                     pc++;
                 }
+                pc--; // Compensate for loop increment.
 
                 replaced = true;
                 break;
