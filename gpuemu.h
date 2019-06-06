@@ -330,10 +330,13 @@ GPUCore::Status GPUCore::step(T& memory)
                 // fcvt.wu.s rd rs1 24..20=1 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
                     if(rd > 0) {
                         // ignoring setting valid flags
+                        // Rounding flags are very important here but ignored
+                        // C behavior of (int)(a_float) is round-towards-zero, i.e. truncate
+                        // For now we assume round-towards-zero, or "rtz" in RISC-V
                         if(rs2 == 0) {
-                            regs.x[rd] = std::clamp(regs.f[rs1] + .5, -2147483648.0, 2147483647.0);
+                            regs.x[rd] = std::clamp(regs.f[rs1], -2147483648.0f, 2147483647.0f);
                         } else if(rs2 == 1) {
-                            regs.x[rd] = std::clamp(regs.f[rs1] + .5, 0.0, 4294967295.0);
+                            regs.x[rd] = std::clamp(regs.f[rs1], 0.0f, 4294967295.0f);
                         }
                     }
                     break;
@@ -516,11 +519,11 @@ GPUCore::Status GPUCore::step(T& memory)
             if(dump) std::cout << "addi\n";
             if(rd > 0) {
                 switch(funct3) {
-                    case 0: regs.x[rd] = regs.x[rs1] + immI; break;
-                    case 1: regs.x[rd] = regs.x[rs1] << shamt; break;
-                    case 4: regs.x[rd] = regs.x[rs1] ^ immI; break;
-                    case 6: regs.x[rd] = regs.x[rs1] | immI; break;
-                    case 7: regs.x[rd] = regs.x[rs1] & immI; break;
+                    case 0: regs.x[rd] = regs.x[rs1] + immI; break;     // addi
+                    case 1: regs.x[rd] = regs.x[rs1] << shamt; break;   // slli
+                    case 4: regs.x[rd] = regs.x[rs1] ^ immI; break;     // xori
+                    case 6: regs.x[rd] = regs.x[rs1] | immI; break;     // ori
+                    case 7: regs.x[rd] = regs.x[rs1] & immI; break;     // andi
                     default: unimpl(); break;
                 }
             } else {
