@@ -1,55 +1,103 @@
 ; library of math functions
 
 .sin:
-        ; uses a5, f5, f4, f0, and a3
-        sw      a3, -4(sp)      ; save registers
-        sw      a4, -8(sp)
-        sw      a5, -12(sp)
-        fsw     fa0, -16(sp)
-        fsw     fa4, -20(sp)
-        fsw     fa5, -24(sp)
-        flw     fa0, 0(sp)       ; load first parameter ("x")
+        ; save registers here, e.g.
+        sw      a0,-4(sp)
+        sw      a1,-8(sp)
+        sw      a2,-12(sp)
+        sw      a3,-16(sp)
+        sw      a4,-20(sp)
+        sw      a5,-24(sp)
+        fsw     fa0,-28(sp)
+        fsw     fa1,-32(sp)
+        fsw     fa2,-36(sp)
+        fsw     fa3,-40(sp)
+        fsw     fa4,-44(sp)
+        fsw     fa5,-48(sp)
+        fsw     fa6,-52(sp)
+
+        flw     fa0, 0(sp)       ; load first parameter ("x"), doesn't have to be into fa0
+
+        ; .LC0 is 1/2pi
+        ; .LC1 is 512.0
+        ; .LC2 is 1.0
+        ; sinTable_f32 is 513 long
+
+        ; fa2<u> = fa0<x> * fa1<1 / (2 * pi)>
 	lui	a5,%hi(.LC0)
-	flw	fa5,%lo(.LC0)(a5)
-	fmv.s.x	fa4,zero
+	flw	fa1,%lo(.LC0)(a5)
+	fmul.s	fa2,fa0,fa1
+
+        ; fa3<indexf> = fa2<u> * fa1<tablesize>
 	lui	a5,%hi(.LC1)
-	fmul.s	fa5,fa0,fa5
-	flt.s	a4,fa0,fa4
-	flw	fa4,%lo(.LC1)(a5)
-	fcvt.w.s a5,fa5
-	sub	a5,a5,a4
-	fcvt.s.w	fa0,a5
-	fsub.s	fa0,fa5,fa0
-	fmul.s	fa0,fa0,fa4
-	flt.s	a5,fa4,fa0
-	beq	a5,x0,.L4
-	fsub.s	fa0,fa0,fa4
-.L4:
-	fcvt.wu.s a5,fa0
-	lui	a3,%hi(sinTable_f32)
-	addi	a3,a3,%lo(sinTable_f32)
-	andi	a5,a5,511
-	fcvt.s.wu	fa5,a5
-	addi	a4,a5,1
-	slli	a4,a4,2
-	fsub.s	fa0,fa0,fa5
-	add	a4,a4,a3
-	flw	fa4,0(a4)
-	lui	a4,%hi(.LC2)
-	flw	fa5,%lo(.LC2)(a4)
-	slli	a5,a5,2
-	add	a5,a5,a3
-	fsub.s	fa5,fa5,fa0
-	fmul.s	fa0,fa0,fa4
-	flw	fa4,0(a5)
-	fmadd.s	fa0,fa5,fa4,fa0
-        fsw     fa0, 0(sp)       ; store return value
-        lw      a3, -4(sp)      ; restore registers
-        lw      a4, -8(sp)
-        lw      a5, -12(sp)
-        flw     fa0, -16(sp)
-        flw     fa4, -20(sp)
-        flw     fa5, -24(sp)
+	flw	fa1,%lo(.LC1)(a5)
+	fmul.s	fa3,fa2,fa1
+
+        ; a1<index> = ifloorf(fa3<indexf>)
+	fcvt.w.s a1,fa3,rdn
+
+        ; fa6<beta> = fa3<indexf> - fa4<float(index)>
+        fcvt.s.w fa4,a1,rtz
+	fsub.s	fa6,fa3,fa4
+
+        ; fa4<alpha> = fa5<1.0f> - fa6<beta>
+	lui	a5,%hi(.LC2)
+	flw	fa5,%lo(.LC2)(a5)
+        fsub.s fa4,fa5,fa6
+
+        ; a2<lower> = a1<index> & imm<tablemask>
+	andi	a2,a1,511
+
+        ; a3<upper> = a2<lower> + imm<1>
+        addi     a3,a2,1
+
+        ; ; fa0<result> = table[a2<lower>] * fa4<alpha> + table[a3<upper>] * fa6<beta>
+        ; a1 = table + a2 * 4
+        lui     a5,%hi(sinTable_f32)
+        addi    a5,a5,%lo(sinTable_f32)
+
+        slli    a4,a2,2
+        add    a1,a5,a4
+
+        ; fa1 = *a1
+        flw     fa1,0(a1)
+
+        ; a4 = table + a3 * 4
+        lui     a5,%hi(sinTable_f32)
+        addi    a5,a5,%lo(sinTable_f32)
+        slli    a1,a3,2
+        add    a4,a5,a1
+
+        ; fa2 = *a4
+        flw     fa2,0(a4)
+
+        ; fa0 = fa2 * fa6
+        fmul.s    fa0,fa2,fa6
+
+        ; fa0 = fa1 * fa4 + fa0
+        fmadd.s   fa0,fa1,fa4,fa0
+
+        ; XXX debugging - multiply by .5
+	; lui	a5,%hi(.LC3)
+	; flw	fa1,%lo(.LC3)(a5)
+        ; fmul.s    fa0,fa0,fa1
+
+        fsw     fa0, 0(sp)      ; store return value ("x"), doesn't have to be fa0
+        ; restore registers here, e.g.
+        lw      a0,-4(sp)
+        lw      a1,-8(sp)
+        lw      a2,-12(sp)
+        lw      a3,-16(sp)
+        lw      a4,-20(sp)
+        lw      a5,-24(sp)
+        flw     fa0,-28(sp)
+        flw     fa1,-32(sp)
+        flw     fa2,-36(sp)
+        flw     fa3,-40(sp)
+        flw     fa4,-44(sp)
+        flw     fa5,-48(sp)
+        flw     fa6,-52(sp)
+
         jalr x0, ra, 0                
 
 sinTable_f32:
@@ -567,12 +615,14 @@ sinTable_f32:
         .word   3158904466
         .word   2147483648
 .LC0:
-        .word   1042479491
+        .word   1042479491      ; 1.0 / 2pi
 .LC1:
-        .word   1140850688
+        .word   1140850688      ; 0x44000000 = 512.0
 .LC2:
-        .word   1065353216
-
+        .word   1065353216      ; 1.0
+.LC3:
+        .word   1056964608      ; .5
+        
 .atan:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
