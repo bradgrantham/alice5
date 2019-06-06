@@ -83,6 +83,9 @@ struct Operator {
 
     // Hard-coded rs2 value, for FORMAT_R2 formats.
     int r2;
+    
+    // Whether instruction requires floating-point rounding mode
+    bool needRounding;
 
     Operator() {
         // Nothing.
@@ -90,7 +93,7 @@ struct Operator {
 
     Operator(Format format, uint32_t opcode, uint32_t funct3, uint32_t funct7, int bits = 0)
         : format(format), opcode(opcode), funct3(funct3), funct7(funct7), bits(bits),
-          dIsFloat(false), s1IsFloat(false), s2IsFloat(false), r2(0)
+          dIsFloat(false), s1IsFloat(false), s2IsFloat(false), r2(0), needRounding(0)
     {
         // Nothing.
     }
@@ -104,6 +107,11 @@ struct Operator {
         dIsFloat = other.dIsFloat;
         s1IsFloat = other.s1IsFloat;
         s2IsFloat = other.s2IsFloat;
+    }
+
+    Operator &setNeedRounding() {
+        needRounding = true;
+        return *this;
     }
 
     Operator &setDFloat() {
@@ -264,11 +272,11 @@ public:
         operators["fsgnjx.s"]  = Operator{FORMAT_R,  0b1010011, 0b010, 0b0010000}.setAllFloat();
 
         // Floating point conversion.
-        operators["fcvt.w.s"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1100000}.setS1Float()
+        operators["fcvt.w.s"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1100000}.setS1Float().setNeedRounding()
             .setR2(0b00000);
         operators["fcvt.wu.s"] = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1100000}.setS1Float()
             .setR2(0b00001);
-        operators["fcvt.s.w"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1101000}.setDFloat()
+        operators["fcvt.s.w"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1101000}.setDFloat().setNeedRounding()
             .setR2(0b00000);
         operators["fcvt.s.wu"] = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1101000}.setDFloat()
             .setR2(0b00001);
@@ -796,7 +804,15 @@ private:
                     error("Expected comma");
                 }
                 int rs1 = readRegister(op.s1IsFloat, "source");
-                emitR(op, rd, rs1, op.r2);
+                if(op.needRounding) {
+                    if (!foundChar(',')) {
+                        error("Expected comma");
+                    }
+                    int rounding = readRounding();
+                    emitRWithRounding(op, rd, rs1, op.r2, rounding);
+                } else {
+                    emitR(op, rd, rs1, op.r2);
+                }
                 break;
             }
 
@@ -938,6 +954,24 @@ private:
         return bin.size()*4;
     }
 
+    // Read rounding mode
+    int readRounding() {
+        std::string roundingName = readIdentifier();
+        if(roundingName == "rne")
+            return 0b000;
+        if(roundingName == "rtz")
+            return 0b001;
+        if(roundingName == "rdn")
+            return 0b010;
+        if(roundingName == "rup")
+            return 0b011;
+        if(roundingName == "rmm")
+            return 0b100;
+        std::ostringstream ss;
+        ss << "Expected rounding mode";
+        error(ss.str());
+    }
+
     // Read a register name and return its number. Emits an error
     // if the identifier is missing or is not a register name.
     int readRegister(bool isFloat, const std::string &role) {
@@ -995,6 +1029,15 @@ private:
         emit(op.opcode
                 | rd << 7
                 | op.funct3 << 12
+                | rs1 << 15
+                | rs2 << 20
+                | op.funct7 << 25);
+    }
+
+    void emitRWithRounding(const Operator &op, int rd, int rs1, int rs2, int rm) {
+        emit(op.opcode
+                | rd << 7
+                | rm << 12
                 | rs1 << 15
                 | rs2 << 20
                 | op.funct7 << 25);
