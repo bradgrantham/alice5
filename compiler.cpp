@@ -20,6 +20,8 @@ void Compiler::compile() {
 
     // Emit instructions.
     for(int pc = 0; pc < instructions.size(); pc++) {
+        // Label the function if we're at its start.
+        // XXX Make a map of functions by start instruction index, don't loop.
         for(auto &function : pgm->functions) {
             if(pc == function.second.start) {
                 std::string name = pgm->cleanUpFunctionName(function.first);
@@ -194,6 +196,7 @@ void Compiler::translateOutOfSsa() {
     // Go through all instructions look for phi.
     for (int pc = 0; pc < instructions.size(); pc++) {
         Instruction *insn = instructions.at(pc).get();
+        // XXX This is still using the old phi instruction.
         if (insn->opcode() == SpvOpPhi) {
             std::shared_ptr<PhiClass> phiClass = std::make_shared<PhiClass>();
             for (uint32_t regId : insn->resIdSet) {
@@ -306,8 +309,11 @@ void Compiler::assignRegisters(Block *block,
     std::set<uint32_t> assigned;
 
     // Registers that are live going into this block have already been
-    // assigned.
-    for (auto regId : instructions.at(block->begin)->liveinAll) {
+    // assigned. Note that we use livein[0] here, not liveinAll, because
+    // we want to ignore parameters to phi instructions. They're not
+    // considered live here, we'll add copy instructions on the edge
+    // between the block and here.
+    for (auto regId : instructions.at(block->begin)->livein.at(0)) {
         auto r = registers.find(regId);
         if (r == registers.end()) {
             std::cerr << "Warning: Initial virtual register "
