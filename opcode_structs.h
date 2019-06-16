@@ -370,6 +370,7 @@ struct InsnFMod : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepFMod(*this); }
     virtual uint32_t opcode() const { return SpvOpFMod; }
     virtual std::string name() const { return "OpFMod"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpVectorTimesScalar instruction (code 142).
@@ -590,6 +591,7 @@ struct InsnSLessThan : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepSLessThan(*this); }
     virtual uint32_t opcode() const { return SpvOpSLessThan; }
     virtual std::string name() const { return "OpSLessThan"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpSLessThanEqual instruction (code 179).

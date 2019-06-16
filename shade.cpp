@@ -277,6 +277,11 @@ void InsnFDiv::emit(Compiler *compiler)
     compiler->emitBinaryOp("fdiv.s", resultId(), operand1Id(), operand2Id());
 }
 
+void InsnFMod::emit(Compiler *compiler)
+{
+    compiler->emitBinCall(".mod", resultId(), operand1Id(), operand2Id());
+}
+
 void InsnIAdd::emit(Compiler *compiler)
 {
     uint32_t intValue;
@@ -289,6 +294,11 @@ void InsnIAdd::emit(Compiler *compiler)
     } else {
         compiler->emitBinaryOp("add", resultId(), operand1Id(), operand2Id());
     }
+}
+
+void InsnSLessThan::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("slt", resultId(), operand1Id(), operand2Id());
 }
 
 void InsnFunctionCall::emit(Compiler *compiler)

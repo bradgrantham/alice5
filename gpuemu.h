@@ -34,6 +34,7 @@ struct GPUCore
         SUBST_COS,
         SUBST_LOG2,
         SUBST_EXP,
+        SUBST_MOD,
         SUBST_INVERSESQRT,
         SUBST_ASIN,
         SUBST_LENGTH1,
@@ -99,6 +100,7 @@ struct GPUCore
             { ".cos", SUBST_COS },
             { ".log2", SUBST_LOG2 },
             { ".exp", SUBST_EXP },
+            { ".mod", SUBST_MOD },
             { ".inversesqrt", SUBST_INVERSESQRT },
             { ".asin", SUBST_ASIN },
             { ".length1", SUBST_LENGTH1 },
@@ -554,6 +556,12 @@ GPUCore::Status GPUCore::step(T& memory)
                             }
                             case SUBST_EXP: {
                                 pushf(expf(popf()));
+                                break;
+                            }
+                            case SUBST_MOD: {
+                                float x = popf();
+                                float y = popf();
+                                pushf(fmodf(x, y));
                                 break;
                             }
                             case SUBST_INVERSESQRT: {

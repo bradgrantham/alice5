@@ -618,6 +618,10 @@ void Program::expandVectors() {
             case SpvOpCompositeConstruct: {
                 InsnCompositeConstruct *insn =
                     dynamic_cast<InsnCompositeConstruct *>(instruction);
+                if (getTypeOp(insn->type) == SpvOpTypeMatrix) {
+                    std::cerr << "SpvOpCompositeConstruct doesn't handle matrices.\n";
+                    exit(1);
+                }
                 const TypeVector *typeVector = getTypeAsVector(insn->type);
                 assert(typeVector != nullptr);
                 for (int i = 0; i < typeVector->count; i++) {
@@ -652,6 +656,10 @@ void Program::expandVectors() {
                 InsnCompositeInsert *insn = dynamic_cast<InsnCompositeInsert *>(instruction);
 
                 // Only handle the simple case.
+                if (getTypeOp(insn->type) == SpvOpTypeMatrix) {
+                    std::cerr << "SpvOpCompositeInsert doesn't handle matrices.\n";
+                    exit(1);
+                }
                 const TypeVector *typeVector = getTypeAsVector(insn->type);
                 assert(typeVector != nullptr);
                 assert(insn->indexesId.size() == 1);
