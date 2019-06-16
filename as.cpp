@@ -10,11 +10,48 @@
 #include <set>
 #include <string>
 #include <iomanip>
+#include <unistd.h>
 
 extern "C" {
 #include "riscv-disas.h"
 }
 #include "gpuemu.h"
+
+enum MessageCategory {
+    CAT_INFO,
+    CAT_WARNING,
+    CAT_ERROR,
+};
+
+// Whether to output color codes in errors. We send errors to stderr, so use that.
+static bool useColors() {
+    return isatty(fileno(stderr));
+}
+
+// Reset the colors and bold.
+static std::string reset() {
+    return useColors() ? "\033[0m" : "";
+}
+
+// Turn on bold.
+static std::string bold() {
+    return useColors() ? "\033[1m" : "";
+}
+
+// Change foreground color to red.
+static std::string red() {
+    return useColors() ? "\033[31m" : "";
+}
+
+// Change foreground color to magenta.
+static std::string magenta() {
+    return useColors() ? "\033[35m" : "";
+}
+
+// Change foreground color to green.
+static std::string green() {
+    return useColors() ? "\033[32m" : "";
+}
 
 // Return the pathname without the extension ("file.x" becomes "file").
 // If the pathname does not have an extension, it is returned unchanged.
@@ -915,14 +952,25 @@ private:
     }
 
     // Message function.
-    void showMessage(const std::string &message) {
+    void showMessage(MessageCategory category, const std::string &message) {
         const SourceLine &sourceLine = currentLine();
 
         const char *line = sourceLine.code.c_str();
         int col = s - line;
 
-        std::cerr << sourceLine.pathname << ":" << (sourceLine.lineNumber+ 1) << ":"
-            << (col + 1) << ": " << message << "\n";
+        std::string categoryColor =
+            category == CAT_ERROR ? red() :
+            category == CAT_WARNING ? magenta() :
+            "";
+        std::string categoryLabel =
+            category == CAT_ERROR ? "error: " :
+            category == CAT_WARNING ? "warning: " :
+            "";
+
+        std::cerr << bold() << sourceLine.pathname << ":" << (sourceLine.lineNumber+ 1) << ":"
+            << (col + 1) << ": "
+            << categoryColor << categoryLabel << reset() << bold()
+            << message << reset() << "\n";
         std::cerr << line << "\n";
 
         // Print caret, handling tabs.
@@ -930,17 +978,17 @@ private:
         for (int i = 0; i < col; i++) {
             spaces += line[i] == '\t' ? 8 - spaces%8 : 1;
         }
-        std::cerr << std::string(spaces, ' ') << "^\n";
+        std::cerr << green() << std::string(spaces, ' ') << "^\n" << reset();
     }
 
     // Warning function.
     void warning(const std::string &message) {
-        showMessage(std::string("warning: ") + message);
+        showMessage(CAT_WARNING, message);
     }
 
     // Error function.
     [[noreturn]] void error(const std::string &message) {
-        showMessage(std::string("error: ") + message);
+        showMessage(CAT_ERROR, message);
         exit(EXIT_FAILURE);
     }
 
