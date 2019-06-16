@@ -539,7 +539,7 @@ private:
                     if (labels.find(opOrLabel) != labels.end()) {
                         s = previousToken;
                         std::ostringstream ss;
-                        ss << "Label \"" << opOrLabel << "\" is already defined";
+                        ss << "label \"" << opOrLabel << "\" is already defined";
                         error(ss.str());
                     }
 
@@ -575,7 +575,7 @@ private:
         // Make sure the whole line was parsed properly.
         if (*s != '\0') {
             // Unknown error.
-            error("Syntax error");
+            error("syntax error");
         }
     }
 
@@ -663,7 +663,7 @@ private:
 
         if (!found) {
             s = previousToken;
-            error("Expected immediate");
+            error("expected immediate");
         }
 
         if (negative) {
@@ -699,7 +699,7 @@ private:
                 const char *here = s;
                 s = expressionStart;
                 std::ostringstream ss;
-                ss << "Value " << value << " (0x"
+                ss << "value " << value << " (0x"
                     << std::hex << value << std::dec << ") does not fit in "
                     << bits << (bits == 1 ? " bit" : " bits");
                 warning(ss.str());
@@ -730,13 +730,13 @@ private:
             std::string func = readIdentifier();
 
             if (!foundChar('(')) {
-                error("Expected open parenthesis");
+                error("expected open parenthesis");
             }
 
             int64_t value = readSum();
 
             if (!foundChar(')')) {
-                error("Expected close parenthesis");
+                error("expected close parenthesis");
             }
 
             if (func == "lo") {
@@ -753,7 +753,7 @@ private:
             } else {
                 s = functionStart;
                 std::ostringstream ss;
-                ss << "Unknown assembler function \"" << func << "\"";
+                ss << "unknown assembler function \"" << func << "\"";
                 error(ss.str());
             }
         }
@@ -772,7 +772,7 @@ private:
                 } else {
                     s = previousToken;
                     std::ostringstream ss;
-                    ss << "Unknown label \"" << label << "\"";
+                    ss << "unknown label \"" << label << "\"";
                     error(ss.str());
                 }
             } else {
@@ -794,7 +794,7 @@ private:
         if (opItr == operators.end()) {
             s = previousToken;
             std::ostringstream ss;
-            ss << "Unknown operator \"" << opName << "\"";
+            ss << "unknown operator \"" << opName << "\"";
             error(ss.str());
         }
         const Operator &op = opItr->second;
@@ -806,11 +806,11 @@ private:
             case FORMAT_R: {
                 int rd = readRegister(op.dIsFloat, "destination");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int rs1 = readRegister(op.s1IsFloat, "source");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int rs2 = readRegister(op.s2IsFloat, "source");
                 emitR(op, rd, rs1, rs2);
@@ -820,15 +820,15 @@ private:
             case FORMAT_R4: {
                 int rd = readRegister(op.dIsFloat, "destination");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int rs1 = readRegister(op.s1IsFloat, "source");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int rs2 = readRegister(op.s2IsFloat, "source");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int rs3 = readRegister(true, "source");
                 emitR4(op, rd, rs1, rs2, rs3);
@@ -838,12 +838,12 @@ private:
             case FORMAT_R2: {
                 int rd = readRegister(op.dIsFloat, "destination");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int rs1 = readRegister(op.s1IsFloat, "source");
                 if(op.needRounding) {
                     if (!foundChar(',')) {
-                        error("Expected comma");
+                        error("expected comma");
                     }
                     int rounding = readRounding();
                     emitRWithRounding(op, rd, rs1, op.r2, rounding);
@@ -856,11 +856,11 @@ private:
             case FORMAT_I: {
                 int rd = readRegister(op.dIsFloat, "destination");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int rs1 = readRegister(op.s1IsFloat, "source");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int32_t imm = readExpression(op.bits);
                 emitI(op, rd, rs1, imm);
@@ -870,15 +870,15 @@ private:
             case FORMAT_IL: {
                 int rd = readRegister(op.dIsFloat, "destination");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int32_t imm = readExpression(op.bits);
                 if (!foundChar('(')) {
-                    error("Expected open parenthesis");
+                    error("expected open parenthesis");
                 }
                 int rs1 = readRegister(op.s1IsFloat, "source");
                 if (!foundChar(')')) {
-                    error("Expected close parenthesis");
+                    error("expected close parenthesis");
                 }
                 emitI(op, rd, rs1, imm);
                 break;
@@ -893,15 +893,15 @@ private:
             case FORMAT_S: {
                 int rs2 = readRegister(op.s2IsFloat, "source");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int32_t imm = readExpression(op.bits);
                 if (!foundChar('(')) {
-                    error("Expected open parenthesis");
+                    error("expected open parenthesis");
                 }
                 int rs1 = readRegister(op.s1IsFloat, "source");
                 if (!foundChar(')')) {
-                    error("Expected close parenthesis");
+                    error("expected close parenthesis");
                 }
                 emitS(op, rs2, imm, rs1);
                 break;
@@ -910,11 +910,11 @@ private:
             case FORMAT_SB: {
                 int rs1 = readRegister(op.s1IsFloat, "source");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int rs2 = readRegister(op.s2IsFloat, "source");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int32_t imm = readExpression(op.bits);
                 // Jump labels are PC-relative.
@@ -926,7 +926,7 @@ private:
             case FORMAT_U: {
                 int rd = readRegister(op.dIsFloat, "destination");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int32_t imm = readExpression(op.bits);
                 emitU(op, rd, imm);
@@ -936,7 +936,7 @@ private:
             case FORMAT_UJ: {
                 int rd = readRegister(op.dIsFloat, "destination");
                 if (!foundChar(',')) {
-                    error("Expected comma");
+                    error("expected comma");
                 }
                 int32_t imm = readExpression(op.bits);
                 // Jump labels are PC-relative.
@@ -1016,7 +1016,7 @@ private:
         if(roundingName == "rmm")
             return 0b100;
         std::ostringstream ss;
-        ss << "Expected rounding mode";
+        ss << "expected rounding mode";
         error(ss.str());
     }
 
@@ -1026,7 +1026,7 @@ private:
         std::string regName = readIdentifier();
         if (regName.empty()) {
             std::ostringstream ss;
-            ss << "Expected " << role << " register";
+            ss << "expected " << role << " register";
             error(ss.str());
         }
 
@@ -1045,7 +1045,7 @@ private:
             if (reg < 32) {
                 s = previousToken;
                 std::ostringstream ss;
-                ss << "Expected float register for " << role;
+                ss << "expected float register for " << role;
                 error(ss.str());
             } else {
                 reg -= 32;
@@ -1054,7 +1054,7 @@ private:
             if (reg >= 32) {
                 s = previousToken;
                 std::ostringstream ss;
-                ss << "Expected integer register for " << role;
+                ss << "expected integer register for " << role;
                 error(ss.str());
             }
         }
