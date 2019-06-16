@@ -11,7 +11,7 @@ struct CompilerRegister {
     // Number of words of data in this register.
     int count;
 
-    // Physical registers.
+    // Physical registers. XXX should just be uint32_t? We've scalarized, right?
     std::vector<uint32_t> phy;
 
     CompilerRegister()
@@ -42,6 +42,7 @@ struct PhiClass {
 // Compiles a Program to our ISA.
 struct Compiler {
     const Program *pgm;
+    // Map from virtual register to our own info about the register.
     std::map<uint32_t, CompilerRegister> registers;
     uint32_t localLabelCounter;
 

@@ -223,16 +223,22 @@ struct Program
         return type->op() == SpvOpTypeVector ? dynamic_cast<const TypeVector *>(type) : nullptr;
     }
 
+    // Return the SPIR-V operator for the type (SpvOpTypeInt, SpvOpTypePointer, SpvOpTypeBool,
+    // SpvOpTypeFloat, etc.).
+    uint32_t getTypeOp(uint32_t typeId) const {
+        return types.at(typeId)->op();
+    }
+
     // Returns true if a type is a float, false if it's an integer, pointer, or bool,
     // otherwise asserts.
     bool isTypeFloat(uint32_t typeId) const {
-        const Type *type = types.at(typeId).get();
-        if (type->op() == SpvOpTypeInt
-                || type->op() == SpvOpTypePointer
-                || type->op() == SpvOpTypeBool) {
+        uint32_t op = getTypeOp(typeId);
+        if (op == SpvOpTypeInt
+                || op == SpvOpTypePointer
+                || op == SpvOpTypeBool) {
 
             return false;
-        } else if (type->op() == SpvOpTypeFloat) {
+        } else if (op == SpvOpTypeFloat) {
             return true;
         } else {
             std::cerr << "Error: Type " << typeId << " is neither int nor float.\n";

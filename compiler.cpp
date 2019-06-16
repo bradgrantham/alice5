@@ -40,7 +40,36 @@ void Compiler::compile() {
                         ss << "lw x" << r->second.phy.at(0);
                     }
                     ss << ", .C" << regId << "(x0)";
-                    emit(ss.str(), "Load constant");
+
+                    // Build comment with constant value.
+                    std::ostringstream ssc;
+                    ssc << "Load constant (";
+                    Register const &pr = pgm->constants.at(regId);
+                    uint32_t typeOp = pgm->getTypeOp(r->second.type);
+                    switch (typeOp) {
+                        case SpvOpTypeInt:
+                            ssc << *reinterpret_cast<uint32_t *>(pr.data);
+                            break;
+
+                        case SpvOpTypeFloat:
+                            ssc << *reinterpret_cast<float *>(pr.data);
+                            break;
+
+                        case SpvOpTypePointer:
+                            // Do we get constant pointers?
+                            ssc << "pointer";
+                            break;
+
+                        case SpvOpTypeBool:
+                            ssc << (*reinterpret_cast<uint32_t *>(pr.data) ? "true" : "false");
+                            break;
+
+                        default:
+                            ssc << "unknown type " << r->second.type << ", op " << typeOp;
+                    }
+                    ssc << ")";
+
+                    emit(ss.str(), ssc.str());
                 }
             }
         }
