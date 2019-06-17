@@ -496,6 +496,32 @@ GPUCore::Status GPUCore::step(T& memory)
             break;
         }
 
+        case makeOpcode(2, 0x0C, 3): { // slt
+            if(dump) std::cout << "slt\n";
+            if(rd > 0) {
+                if(funct7 == 0) {
+                    regs.x[rd] = (int32_t) regs.x[rs1] < (int32_t) regs.x[rs2];
+                } else {
+                    unimpl();
+                }
+            }
+            regs.pc += 4;
+            break;
+        }
+
+        case makeOpcode(3, 0x0C, 3): { // sltu
+            if(dump) std::cout << "sltu\n";
+            if(rd > 0) {
+                if(funct7 == 0) {
+                    regs.x[rd] = (uint32_t) regs.x[rs1] < (uint32_t) regs.x[rs2];
+                } else {
+                    unimpl();
+                }
+            }
+            regs.pc += 4;
+            break;
+        }
+
         case makeOpcode(0, 0x19, 3): { // jalr
             if(dump) std::cout << "jalr\n";
             uint32_t ra = (regs.x[rs1] + immI) & ~0x00000001; // spec says set least significant bit to zero
