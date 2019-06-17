@@ -220,6 +220,13 @@ void Compiler::transformInstructions(const InstructionList &inList, InstructionL
 }
 
 void Compiler::translateOutOfSsa() {
+    // Compute the phi equivalent classes.
+    // Disable this. It's efficient because it maps registers together, but
+    // we need to make sure they don't interfere. See end of that function.
+    /// computePhiClassMap();
+}
+
+void Compiler::computePhiClassMap() {
     phiClassMap.clear();
 
     // Go through all instructions look for phi.
@@ -246,6 +253,7 @@ void Compiler::translateOutOfSsa() {
             }
             std::cout << " (" << itr.second->getId() << ")\n";
         }
+        std::cout << "-----------------------\n";
     }
 
     // We've created all the phi classes. We must make sure that
@@ -655,5 +663,7 @@ void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
 
 void Compiler::assertNoPhi(uint32_t labelId) {
     Block *block = pgm->blocks.at(labelId).get();
-    assert(instructions[block->begin]->opcode() != SpvOpPhi);
+    uint32_t opcode = instructions[block->begin]->opcode();
+    assert(opcode != SpvOpPhi);
+    assert(opcode != RiscVOpPhi);
 }

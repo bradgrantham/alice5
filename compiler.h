@@ -97,6 +97,9 @@ struct Compiler {
     // Get rid of phi instructions.
     void translateOutOfSsa();
 
+    // Compute the phi equivalent classes.
+    void computePhiClassMap();
+
     // Add register to phi class and phi class map, replacing phiClass if
     // the register is already part of a class.
     void processPhiRegister(uint32_t regId, std::shared_ptr<PhiClass> &phiClass);
