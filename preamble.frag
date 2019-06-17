@@ -6,7 +6,7 @@
 precision highp float;
 
 layout (binding = 0) uniform params {
-	vec2 iResolution;            // viewport resolution in pixels
+	vec4 iResolution;            // viewport resolution in pixels
 	float iTime;                 // Current time
 	ivec4 iMouse;                // Mouse coords and click coords
         vec3 iChannelResolution[4];  // channel resolution (in pixels)

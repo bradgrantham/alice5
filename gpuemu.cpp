@@ -347,7 +347,7 @@ int main(int argc, char **argv)
 
     if (symbols.find(".anonymous") != symbols.end()) {
         set(m, symbols[".anonymous"], v4float{fw, fh, zero, zero});
-        set(m, symbols[".anonymous"] + 8, frameTime);
+        set(m, symbols[".anonymous"] + sizeof(v4float), frameTime);
     }
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
 
