@@ -588,16 +588,22 @@ void Program::expandVectors() {
 
             case SpvOpStore: {
                 InsnStore *insn = dynamic_cast<InsnStore *>(instruction);
-                const TypeVector *typeVector = nullptr;
-                // XXX handle case of objectId being a constant.
+                // Look for it as a variable.
+                uint32_t type = 0;
                 auto itr = resultTypes.find(insn->objectId());
                 if (itr != resultTypes.end()) {
-                    typeVector = getTypeAsVector(itr->second);
+                    type = itr->second;
+                } else {
+                    // Look for it as a constant.
+                    auto itr2 = constants.find(insn->objectId());
+                    if (itr2 != constants.end()) {
+                        type = itr2->second.type;
+                    }
                 }
+                const TypeVector *typeVector = type == 0 ? nullptr : getTypeAsVector(type);
                 if (typeVector != nullptr) {
                     for (int i = 0; i < typeVector->count; i++) {
-                        auto [subtype, offset] = getConstituentInfo(
-                                resultTypes.at(insn->objectId()), i);
+                        auto [subtype, offset] = getConstituentInfo(type, i);
                         newList.push_back(std::make_shared<RiscVStore>(insn->lineInfo,
                                     insn->pointerId(),
                                     scalarize(insn->objectId(), i, subtype),
