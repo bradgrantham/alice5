@@ -25,7 +25,7 @@ void Compiler::compile() {
         for(auto &function : pgm->functions) {
             if(pc == function.second.start) {
                 std::string name = pgm->cleanUpFunctionName(function.first);
-                std::cout << "; ---------------------------- function \"" << name << "\"\n";
+                outFile << "; ---------------------------- function \"" << name << "\"\n";
                 emitLabel(name);
 
                 // Emit instructions to fill constants.
@@ -119,7 +119,7 @@ void Compiler::compile() {
     }
 
     // Emit library.
-    std::cout << readFileContents("library.s");
+    outFile << readFileContents("library.s");
 }
 
 void Compiler::emitConstant(uint32_t id, uint32_t typeId, unsigned char *data) {
@@ -519,7 +519,7 @@ void Compiler::emitBinaryImmOp(const std::string &opName, int result, int op, ui
 }
 
 void Compiler::emitLabel(const std::string &label) {
-    std::cout << notEmptyLabel(label) << ":\n";
+    outFile << notEmptyLabel(label) << ":\n";
 }
 
 std::string Compiler::notEmptyLabel(const std::string &label) const {
@@ -599,19 +599,19 @@ void Compiler::emitBinCall(const std::string &functionName, uint32_t resultId,
 
 void Compiler::emit(const std::string &op, const std::string &comment) {
     std::ios oldState(nullptr);
-    oldState.copyfmt(std::cout);
+    oldState.copyfmt(outFile);
 
-    std::cout
+    outFile
         << "        "
         << std::left
         << std::setw(30) << op
         << std::setw(0);
     if(!comment.empty()) {
-        std::cout << "; " << comment;
+        outFile << "; " << comment;
     }
-    std::cout << "\n";
+    outFile << "\n";
 
-    std::cout.copyfmt(oldState);
+    outFile.copyfmt(oldState);
 }
 
 /* XXX delete

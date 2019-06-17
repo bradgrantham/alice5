@@ -44,6 +44,8 @@
 // Enable this to check if our virtual registers are being initialized properly.
 #define CHECK_REGISTER_ACCESS
 
+static const char *DEFAULT_ASSEMBLY_PATHNAME = "out.s";
+
 // -----------------------------------------------------------------------------------
 
 void RiscVPhi::emit(Compiler *compiler)
@@ -496,9 +498,9 @@ void InsnGLSLstd450Step::emit(Compiler *compiler)
 // -----------------------------------------------------------------------------------
 
 // Returns whether successful.
-bool compileProgram(const Program &pgm)
+bool compileProgram(const Program &pgm, const std::string &outputAssemblyPathname)
 {
-    Compiler compiler(&pgm);
+    Compiler compiler(&pgm, outputAssemblyPathname);
 
     compiler.compile();
 
@@ -558,6 +560,7 @@ void usage(const char* progname)
     printf("\t-s        convert vector operations to scalar operations\n");
     printf("\t--json    input file is a ShaderToy JSON file\n");
     printf("\t--term    draw output image on terminal (in addition to file)\n");
+    printf("\t-o out.s  output assembly pathname [%s]\n", DEFAULT_ASSEMBLY_PATHNAME);
 }
 
 const std::string shaderPreambleFilename = "preamble.frag";
@@ -801,6 +804,7 @@ int main(int argc, char **argv)
     int threadCount = std::thread::hardware_concurrency();
     int frameStart = 0, frameEnd = 0;
     CommandLineParameters params;
+    std::string outputAssemblyPathname = DEFAULT_ASSEMBLY_PATHNAME;
 
     params.outputWidth = DEFAULT_WIDTH;
     params.outputHeight = DEFAULT_HEIGHT;
@@ -860,6 +864,15 @@ int main(int argc, char **argv)
                 exit(EXIT_FAILURE);
             }
             threadCount = atoi(argv[1]);
+            argv += 2; argc -= 2;
+
+        } else if(strcmp(argv[0], "-o") == 0) {
+
+            if(argc < 2) {
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            outputAssemblyPathname = argv[1];
             argv += 2; argc -= 2;
 
         } else if(strcmp(argv[0], "-v") == 0) {
@@ -962,7 +975,7 @@ int main(int argc, char **argv)
 
         if (compile) {
             pass->pgm.prepareForCompile();
-            bool success = compileProgram(pass->pgm);
+            bool success = compileProgram(pass->pgm, outputAssemblyPathname);
             exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
         }
 

@@ -1,6 +1,7 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+#include <fstream>
 #include "program.h"
 
 // Virtual register used by the compiler.
@@ -53,10 +54,21 @@ struct Compiler {
     // entry here if the register participates in a phi instruction.
     std::map<uint32_t,std::shared_ptr<PhiClass>> phiClassMap;
 
-    Compiler(const Program *pgm)
-        : pgm(pgm), localLabelCounter(1)
+    std::ofstream outFile;
+
+    Compiler(const Program *pgm, const std::string &outputAssemblyPathname)
+        : pgm(pgm),
+          localLabelCounter(1),
+          outFile(outputAssemblyPathname, std::ios::out)
     {
-        // Nothing.
+        if (!outFile.good()) {
+            std::cerr << "Can't open file \"" << outputAssemblyPathname << "\".\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    virtual ~Compiler() {
+        outFile.close();
     }
 
     void compile();

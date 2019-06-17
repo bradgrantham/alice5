@@ -20,7 +20,7 @@ for i in $shaders
 do
     echo "============================================== $i"
     if [ $compile = true ]; then
-        ./shade -c -s -O shaders/$i.frag > x.s && \
+        ./shade -c -s -O -o x.s shaders/$i.frag && \
             ./as x.s && \
             ./gpuemu -f 90 --term x.o
     else
