@@ -559,6 +559,7 @@ struct InsnIEqual : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepIEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpIEqual; }
     virtual std::string name() const { return "OpIEqual"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpINotEqual instruction (code 171).
