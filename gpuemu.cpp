@@ -333,6 +333,7 @@ int main(int argc, char **argv)
     float fw = imageWidth;
     float fh = imageHeight;
     float zero = 0.0;
+    float one = 1.0;
     for(auto& s: { "gl_FragCoord", "color"}) {
         if (symbols.find(s) == symbols.end()) {
             std::cerr << "No memory location for required variable " << s << ".\n";
@@ -346,8 +347,8 @@ int main(int argc, char **argv)
     }
 
     if (symbols.find(".anonymous") != symbols.end()) {
-        set(m, symbols[".anonymous"], v4float{fw, fh, zero, zero});
-        set(m, symbols[".anonymous"] + sizeof(v4float), frameTime);
+        set(m, symbols[".anonymous"], v3float{fw, fh, one});
+        set(m, symbols[".anonymous"] + sizeof(v3float), frameTime);
     }
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
 

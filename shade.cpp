@@ -575,7 +575,7 @@ void render(ShaderToyRenderPass* pass, int startRow, int skip, int frameNumber, 
     Interpreter interpreter(&pass->pgm);
     ImagePtr output = pass->outputs[0].sampledImage.image;
 
-    interpreter.set("iResolution", v2float {static_cast<float>(output->width), static_cast<float>(output->height)});
+    interpreter.set("iResolution", v3float {static_cast<float>(output->width), static_cast<float>(output->height), 1.0f});
 
     interpreter.set("iFrame", frameNumber);
 
