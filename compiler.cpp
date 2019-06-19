@@ -3,6 +3,7 @@
 
 #include "compiler.h"
 #include "risc-v.h"
+#include "pcopy.h"
 
 void Compiler::compile() {
     // Transform SPIR-V instructions to RISC-V instructions.
@@ -431,6 +432,22 @@ void Compiler::assignRegisters(Block *block,
     }
 }
 
+uint32_t Compiler::physicalRegisterFor(uint32_t id, bool required) const {
+    auto itr = registers.find(id);
+    if (itr == registers.end()) {
+        std::cerr << "Error: No register for ID " << id << "\n";
+        exit(EXIT_FAILURE);
+    }
+
+    uint32_t phy = itr->second.phy;
+    if (phy == NO_REGISTER && required) {
+        std::cerr << "Error: No physical register for ID " << id << "\n";
+        exit(EXIT_FAILURE);
+    }
+
+    return phy;
+}
+
 bool Compiler::isSamePhysicalRegister(uint32_t id1, uint32_t id2) const {
     auto r1 = registers.find(id1);
     if (r1 != registers.end()) {
@@ -630,30 +647,98 @@ void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
     RiscVPhi *phi = dynamic_cast<RiscVPhi *>(firstInstruction);
 
     // Find the block corresponding to ours.
-    bool found = false;
-    for (int labelIndex = 0; !found && labelIndex < phi->labelIds.size(); labelIndex++) {
-        if (phi->labelIds[labelIndex] == sourceBlockId) {
-            found = true;
-
-            // Copy each source to its result.
-            // XXX Must do this in parallel.
-            for (int resultIndex = 0; resultIndex < phi->resultIds.size(); resultIndex++) {
-                uint32_t resultId = phi->resultIds[resultIndex];
-                uint32_t sourceId = phi->operandIds[resultIndex][labelIndex];
-
-                std::ostringstream ss;
-                if (isSamePhysicalRegister(resultId, sourceId)) {
-                    ss << "; ";
-                }
-                ss << "mov " << reg(resultId) << ", " << reg(sourceId);
-                emit(ss.str(), "phi elimination");
-            }
-        }
-    }
-
-    if (!found) {
+    int labelIndex = phi->getLabelIndexForSource(sourceBlockId);
+    if (labelIndex == -1) {
         std::cerr << "Error: Can't find source block " << sourceBlockId
             << " in phi at start of block " << labelId << "\n";
+        exit(EXIT_FAILURE);
+    }
+
+    // Compute parallel copy steps.
+    std::vector<PCopyPair> pairs;
+    std::vector<PCopyInstruction> instructions;
+
+    // Set up our pairs.
+    for (int resultIndex = 0; resultIndex < phi->resultIds.size(); resultIndex++) {
+        uint32_t destId = phi->resultIds[resultIndex];
+        uint32_t sourceId = phi->operandIds[resultIndex][labelIndex];
+        uint32_t destReg = physicalRegisterFor(destId, true);
+        uint32_t sourceReg = physicalRegisterFor(sourceId, true);
+        
+        pairs.push_back({{sourceReg}, {destReg}});
+    }
+
+    // Compute necessary instructions.
+    parallel_copy(pairs, instructions);
+
+    // Execute the instructions.
+    for (auto &instruction : instructions) {
+        switch (instruction.mOperation) {
+            case PCOPY_OP_MOVE: {
+                std::ostringstream ss;
+                uint32_t sourceReg = instruction.mPair.mSource.mRegister;
+                uint32_t destReg = instruction.mPair.mDestination.mRegister;
+                if (sourceReg < 32) {
+                    ss << "add x" << destReg << ", x" << sourceReg << ", x0";
+                } else {
+                    destReg -= 32;
+                    sourceReg -= 32;
+                    ss << "fsgnj.s f" << destReg << ", f" << sourceReg << ", f" << sourceReg;
+                }
+                emit(ss.str(), "Phi elimination (move)");
+                break;
+            }
+
+            case PCOPY_OP_EXCHANGE: {
+                uint32_t sourceReg = instruction.mPair.mSource.mRegister;
+                uint32_t destReg = instruction.mPair.mDestination.mRegister;
+                if (sourceReg < 32) {
+                    // Use three XORs to swap. We could have an exchange operation.
+                    {
+                        std::ostringstream ss;
+                        ss << "xor x" << destReg << ", x" << sourceReg << ", x" << destReg;
+                        emit(ss.str(), "Phi elimination (swap)");
+                    }
+                    {
+                        std::ostringstream ss;
+                        ss << "xor x" << sourceReg << ", x" << sourceReg << ", x" << destReg;
+                        emit(ss.str(), "");
+                    }
+                    {
+                        std::ostringstream ss;
+                        ss << "xor x" << destReg << ", x" << sourceReg << ", x" << destReg;
+                        emit(ss.str(), "");
+                    }
+                } else {
+                    destReg -= 32;
+                    sourceReg -= 32;
+                    // We don't have any easy way to swap two floating point registers.
+                    // The XOR trick won't work. XXX For now just assume that f31 is free
+                    // (which we can't even assert on!).
+                    uint32_t tmpReg = 31;
+                    {
+                        std::ostringstream ss;
+                        ss << "fsgnj.s f" << tmpReg << ", f" << sourceReg << ", f" << sourceReg;
+                        emit(ss.str(), "Phi elimination (swap)");
+                    }
+                    {
+                        std::ostringstream ss;
+                        ss << "fsgnj.s f" << sourceReg << ", f" << destReg << ", f" << destReg;
+                        emit(ss.str(), "");
+                    }
+                    {
+                        std::ostringstream ss;
+                        ss << "fsgnj.s f" << destReg << ", f" << tmpReg << ", f" << tmpReg;
+                        emit(ss.str(), "");
+                    }
+                }
+                break;
+            }
+
+            default:
+                assert(false);
+                break;
+        }
     }
 }
 

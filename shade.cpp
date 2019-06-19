@@ -50,7 +50,7 @@ static const char *DEFAULT_ASSEMBLY_PATHNAME = "out.s";
 
 void RiscVPhi::emit(Compiler *compiler)
 {
-    compiler->emit("", "our phi instruction, nothing to do.");
+    // Nothing.
 }
 
 void RiscVAddi::emit(Compiler *compiler)

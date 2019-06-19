@@ -16,8 +16,7 @@ struct CompilerRegister {
     uint32_t phy;
 
     CompilerRegister()
-        // XXX why initialize type to NO_REGISTER?
-        : type(NO_REGISTER), count(0), phy(NO_REGISTER)
+        : type(0), count(0), phy(NO_REGISTER)
     {
         // Nothing.
     }
@@ -112,6 +111,11 @@ struct Compiler {
     void assignRegisters(Block *block,
             const std::set<uint32_t> &allIntPhy,
             const std::set<uint32_t> &allFloatPhy);
+
+    // Return the physical register for the virtual register, or NO_REGISTER
+    // if it hasn't been assigned yet. If required, the program fails if
+    // the ID has no physical register.
+    uint32_t physicalRegisterFor(uint32_t id, bool required = false) const;
 
     // Determine whether these two virtual register IDs are currently assigned
     // to the same physical register. Returns false if one or both aren't
