@@ -587,7 +587,10 @@ GPUCore::Status GPUCore::step(T& memory)
                             case SUBST_MOD: {
                                 float x = popf();
                                 float y = popf();
-                                pushf(fmodf(x, y));
+                                // fmodf() isn't right for us, it's the remainder after
+                                // rounding toward zero, but we need to floor.
+                                float q = floorf(x/y);
+                                pushf(x - q*y);
                                 break;
                             }
                             case SUBST_INVERSESQRT: {
