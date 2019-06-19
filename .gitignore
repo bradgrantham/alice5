@@ -41,3 +41,5 @@
 *.gif
 foo.s
 x.s
+out.s
+*.lst

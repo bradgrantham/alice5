@@ -147,8 +147,9 @@ struct Compiler {
     void emit(const std::string &op, const std::string &comment);
 
     // Just before a Branch or BranchConditional instruction, copy any
-    // registers that a target OpPhi instruction might need.
-    /// XXX delete void emitPhiCopy(Instruction *instruction, uint32_t labelId);
+    // registers that a target OpPhi instruction might need. Instruction
+    // is the branch; labelId is the target whose block has a phi.
+    void emitPhiCopy(Instruction *instruction, uint32_t labelId);
 
     // Assert that the block at the label ID does not start with a Phi instruction.
     void assertNoPhi(uint32_t labelId);

@@ -61,7 +61,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 x;
 
     if (inf < 123.45) {
-        x = inv1;
+        x = inv1.zyx;
     } else {
         x = inv2;
     }

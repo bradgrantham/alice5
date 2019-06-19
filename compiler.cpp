@@ -622,44 +622,53 @@ void Compiler::emit(const std::string &op, const std::string &comment) {
     outFile.copyfmt(oldState);
 }
 
-/* XXX delete
 void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
+    // Where we're coming from.
+    uint32_t sourceBlockId = instruction->blockId;
+
+    // Find block with phi.
     Block *block = pgm->blocks.at(labelId).get();
-    for (int pc = block->begin; pc < block->end; pc++) {
-        Instruction *nextInstruction = instructions[pc].get();
-        if (nextInstruction->opcode() != SpvOpPhi) {
-            // No more phi instructions for this block.
-            break;
-        }
+    int pc = block->begin;
+    if (pc >= block->end) {
+        // No instructions in block.
+        return;
+    }
 
-        InsnPhi *phi = dynamic_cast<InsnPhi *>(nextInstruction);
+    // Find the phi instruction.
+    Instruction *firstInstruction = instructions[pc].get();
+    if (firstInstruction->opcode() != RiscVOpPhi) {
+        // Block doesn't start with a phi.
+        return;
+    }
+    RiscVPhi *phi = dynamic_cast<RiscVPhi *>(firstInstruction);
 
-        // Find the block corresponding to ours.
-        bool found = false;
-        for (int i = 0; !found && i < phi->operandId.size(); i += 2) {
-            uint32_t srcId = phi->operandId[i];
-            uint32_t parentId = phi->operandId[i + 1];
+    // Find the block corresponding to ours.
+    bool found = false;
+    for (int labelIndex = 0; !found && labelIndex < phi->labelIds.size(); labelIndex++) {
+        if (phi->labelIds[labelIndex] == sourceBlockId) {
+            found = true;
 
-            if (parentId == instruction->blockId) {
-                found = true;
+            // Copy each source to its result.
+            // XXX Must do this in parallel.
+            for (int resultIndex = 0; resultIndex < phi->resultIds.size(); resultIndex++) {
+                uint32_t resultId = phi->resultIds[resultIndex];
+                uint32_t sourceId = phi->operandIds[resultIndex][labelIndex];
 
-                // XXX need to iterate over all registers of a vector.
                 std::ostringstream ss;
-                if (isSamePhysicalRegister(phi->resultId, srcId, 0)) {
+                if (isSamePhysicalRegister(resultId, sourceId, 0)) {
                     ss << "; ";
                 }
-                ss << "mov " << reg(phi->resultId)
-                    << ", " << reg(srcId);
+                ss << "mov " << reg(resultId) << ", " << reg(sourceId);
                 emit(ss.str(), "phi elimination");
             }
         }
-        if (!found) {
-            std::cerr << "Error: Can't find source block " << instruction->blockId
-                << " in phi assigning to " << phi->resultId << "\n";
-        }
+    }
+
+    if (!found) {
+        std::cerr << "Error: Can't find source block " << sourceBlockId
+            << " in phi at start of block " << labelId << "\n";
     }
 }
-*/
 
 void Compiler::assertNoPhi(uint32_t labelId) {
     Block *block = pgm->blocks.at(labelId).get();

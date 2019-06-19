@@ -363,7 +363,7 @@ void InsnStore::emit(Compiler *compiler)
 void InsnBranch::emit(Compiler *compiler)
 {
     // See if we need to emit any copies for Phis at our target.
-    /// XXX delete compiler->emitPhiCopy(this, targetLabelId);
+    compiler->emitPhiCopy(this, targetLabelId);
 
     std::ostringstream ss;
     ss << "jal x0, label" << targetLabelId;
@@ -406,13 +406,13 @@ void InsnBranchConditional::emit(Compiler *compiler)
     ssid << "r" << conditionId();
     compiler->emit(ss1.str(), ssid.str());
     // True path.
-    /// XXX delete compiler->emitPhiCopy(this, trueLabelId);
+    compiler->emitPhiCopy(this, trueLabelId);
     std::ostringstream ss2;
     ss2 << "jal x0, label" << trueLabelId;
     compiler->emit(ss2.str(), "");
     // False path.
     compiler->emitLabel(localLabel);
-    /// XXX delete compiler->emitPhiCopy(this, falseLabelId);
+    compiler->emitPhiCopy(this, falseLabelId);
     std::ostringstream ss3;
     ss3 << "jal x0, label" << falseLabelId;
     compiler->emit(ss3.str(), "");
