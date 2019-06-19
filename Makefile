@@ -23,7 +23,7 @@ SHADE_OBJS      =      $(SHADE_SRCS:.cpp=.o)
 DEPS            = $(SHADE_OBJS:.o=.d)
 
 .PHONY: all
-all: shade as gpuemu
+all: shade as gpuemu pcopy_test
 
 -include $(DEPS)
 
@@ -58,6 +58,7 @@ generate:
 clean:
 	if [ -f simple.spv ]; then rm simple.spv; fi
 	if [ -f shade ]; then rm shade; fi
+	if [ -f pcopy_test ]; then rm pcopy_test; fi
 	if [ -f $(DIS_OBJ) ]; then rm $(DIS_OBJ); fi
 	for i in $(SHADE_OBJS); do if [ -f "$$i" ]; then rm "$$i"; fi; done
 	for i in $(DEPS); do if [ -f "$$i" ]; then rm "$$i"; fi; done
