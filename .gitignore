@@ -37,6 +37,7 @@
 /shade
 /as
 /gpuemu
+/pcopy_test
 *.dSYM
 *.gif
 foo.s
