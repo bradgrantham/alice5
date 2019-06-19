@@ -332,7 +332,7 @@ int main(int argc, char **argv)
 
     float fw = imageWidth;
     float fh = imageHeight;
-    float zero = 0.0;
+    // float zero = 0.0;
     float one = 1.0;
     for(auto& s: { "gl_FragCoord", "color"}) {
         if (symbols.find(s) == symbols.end()) {

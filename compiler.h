@@ -12,17 +12,18 @@ struct CompilerRegister {
     // Number of words of data in this register.
     int count;
 
-    // Physical registers. XXX should just be uint32_t? We've scalarized, right?
-    std::vector<uint32_t> phy;
+    // Physical register, or NO_REGISTER if not yet assigned.
+    uint32_t phy;
 
     CompilerRegister()
-        : type(NO_REGISTER)
+        // XXX why initialize type to NO_REGISTER?
+        : type(NO_REGISTER), count(0), phy(NO_REGISTER)
     {
         // Nothing.
     }
 
     CompilerRegister(uint32_t type, int count)
-        : type(type), count(count)
+        : type(type), count(count), phy(NO_REGISTER)
     {
         // Nothing.
     }
@@ -114,15 +115,15 @@ struct Compiler {
 
     // Determine whether these two virtual register IDs are currently assigned
     // to the same physical register. Returns false if one or both aren't
-    // assigned at all. Index is the index into the vector, if it is one.
-    bool isSamePhysicalRegister(uint32_t id1, uint32_t id2, int index) const;
+    // assigned at all.
+    bool isSamePhysicalRegister(uint32_t id1, uint32_t id2) const;
 
     // Returns the SSA ID as a compiler register, or null if it's not stored
     // in a compiler register.
     const CompilerRegister *asRegister(uint32_t id) const;
 
     // String for a virtual register ("r12" or more).
-    std::string reg(uint32_t id, int index = 0) const;
+    std::string reg(uint32_t id) const;
     void emitNotImplemented(const std::string &op);
     void emitUnaryOp(const std::string &opName, int result, int op);
     void emitBinaryOp(const std::string &opName, int result, int op1, int op2);

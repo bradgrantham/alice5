@@ -32,12 +32,12 @@ void Compiler::compile() {
                 for (auto regId : pgm->instructions.at(function.second.start)->liveinAll) {
                     auto r = registers.find(regId);
                     assert(r != registers.end());
-                    assert(r->second.phy.size() == 1);
+                    assert(r->second.phy != NO_REGISTER);
                     std::ostringstream ss;
                     if (isRegFloat(regId)) {
-                        ss << "flw f" << (r->second.phy.at(0) - 32);
+                        ss << "flw f" << (r->second.phy - 32);
                     } else {
-                        ss << "lw x" << r->second.phy.at(0);
+                        ss << "lw x" << r->second.phy;
                     }
                     ss << ", .C" << regId << "(x0)";
 
@@ -326,7 +326,7 @@ void Compiler::assignRegisters() {
                 phy = *constIntRegs.begin();
                 constIntRegs.erase(phy);
             }
-            r.phy.push_back(phy);
+            r.phy = phy;
             registers[regId] = r;
         }
 
@@ -355,16 +355,15 @@ void Compiler::assignRegisters(Block *block,
         if (r == registers.end()) {
             std::cerr << "Warning: Initial virtual register "
                 << regId << " not found in block " << block->labelId << ".\n";
-        } else if (r->second.phy.empty()) {
+        } else if (r->second.phy == NO_REGISTER) {
             std::cerr << "Warning: Expected initial physical register for "
                 << regId << " in block " << block->labelId << ".\n";
         } else {
-            for (auto phy : r->second.phy) {
-                assigned.insert(phy);
-            }
+            assigned.insert(r->second.phy);
         }
     }
 
+    // Assign registers for each instruction in order.
     for (int pc = block->begin; pc < block->end; pc++) {
         Instruction *instruction = instructions.at(pc).get();
 
@@ -375,8 +374,12 @@ void Compiler::assignRegisters(Block *block,
             if (instruction->liveout.find(argId) == instruction->liveout.end()) {
                 auto r = registers.find(argId);
                 if (r != registers.end()) {
-                    for (auto phy : r->second.phy) {
-                        assigned.erase(phy);
+                    // Phi instruction's arg ID set includes parameters that aren't
+                    // in registers here, they were handled at the end of the previous
+                    // block.
+                    assert(r->second.phy != NO_REGISTER || instruction->opcode() == RiscVOpPhi);
+                    if (r->second.phy != NO_REGISTER) {
+                        assigned.erase(r->second.phy);
                     }
                 }
             }
@@ -401,7 +404,7 @@ void Compiler::assignRegisters(Block *block,
                 bool found = false;
                 for (uint32_t phy : allPhy) {
                     if (assigned.find(phy) == assigned.end()) {
-                        r->second.phy.push_back(phy);
+                        r->second.phy = phy;
                         // If the result lives past this instruction, consider its
                         // register assigned.
                         if (instruction->liveout.find(resId) != instruction->liveout.end()) {
@@ -428,12 +431,12 @@ void Compiler::assignRegisters(Block *block,
     }
 }
 
-bool Compiler::isSamePhysicalRegister(uint32_t id1, uint32_t id2, int index) const {
+bool Compiler::isSamePhysicalRegister(uint32_t id1, uint32_t id2) const {
     auto r1 = registers.find(id1);
-    if (r1 != registers.end() && index < r1->second.phy.size()) {
+    if (r1 != registers.end()) {
         auto r2 = registers.find(id2);
-        if (r2 != registers.end() && index < r2->second.phy.size()) {
-            return r1->second.phy[index] == r2->second.phy[index];
+        if (r2 != registers.end()) {
+            return r1->second.phy == r2->second.phy;
         }
     }
 
@@ -446,16 +449,15 @@ const CompilerRegister *Compiler::asRegister(uint32_t id) const {
     return r == registers.end() ? nullptr : &r->second;
 }
 
-std::string Compiler::reg(uint32_t id, int index) const {
+std::string Compiler::reg(uint32_t id) const {
     std::ostringstream ss;
 
     auto r = asRegister(id);
     if (r != nullptr) {
-        uint32_t phy = r->phy[index];
-        if (phy < 32) {
-            ss << "x" << phy;
+        if (r->phy < 32) {
+            ss << "x" << r->phy;
         } else {
-            ss << "f" << (phy - 32);
+            ss << "f" << (r->phy - 32);
         }
     } else {
         auto constant = pgm->constants.find(id);
@@ -488,42 +490,27 @@ void Compiler::emitNotImplemented(const std::string &op) {
 }
 
 void Compiler::emitUnaryOp(const std::string &opName, int result, int op) {
-    auto r = registers.find(result);
-    int count = r == registers.end() ? 1 : r->second.count;
-
-    for (int i = 0; i < count; i++) {
-        std::ostringstream ss1;
-        ss1 << opName << " " << reg(result, i) << ", " << reg(op, i);
-        std::ostringstream ss2;
-        ss2 << "r" << result << " = " << opName << " r" << op;
-        emit(ss1.str(), ss2.str());
-    }
+    std::ostringstream ss1;
+    ss1 << opName << " " << reg(result) << ", " << reg(op);
+    std::ostringstream ss2;
+    ss2 << "r" << result << " = " << opName << " r" << op;
+    emit(ss1.str(), ss2.str());
 }
 
 void Compiler::emitBinaryOp(const std::string &opName, int result, int op1, int op2) {
-    auto r = registers.find(result);
-    int count = r == registers.end() ? 1 : r->second.count;
-
-    for (int i = 0; i < count; i++) {
-        std::ostringstream ss1;
-        ss1 << opName << " " << reg(result, i) << ", " << reg(op1, i) << ", " << reg(op2, i);
-        std::ostringstream ss2;
-        ss2 << "r" << result << " = " << opName << " r" << op1 << " r" << op2;
-        emit(ss1.str(), ss2.str());
-    }
+    std::ostringstream ss1;
+    ss1 << opName << " " << reg(result) << ", " << reg(op1) << ", " << reg(op2);
+    std::ostringstream ss2;
+    ss2 << "r" << result << " = " << opName << " r" << op1 << " r" << op2;
+    emit(ss1.str(), ss2.str());
 }
 
 void Compiler::emitBinaryImmOp(const std::string &opName, int result, int op, uint32_t imm) {
-    auto r = registers.find(result);
-    int count = r == registers.end() ? 1 : r->second.count;
-
-    for (int i = 0; i < count; i++) {
-        std::ostringstream ss1;
-        ss1 << opName << " " << reg(result, i) << ", " << reg(op, i) << ", " << imm;
-        std::ostringstream ss2;
-        ss2 << "r" << result << " = " << opName << " r" << op << " " << imm;
-        emit(ss1.str(), ss2.str());
-    }
+    std::ostringstream ss1;
+    ss1 << opName << " " << reg(result) << ", " << reg(op) << ", " << imm;
+    std::ostringstream ss2;
+    ss2 << "r" << result << " = " << opName << " r" << op << " " << imm;
+    emit(ss1.str(), ss2.str());
 }
 
 void Compiler::emitLabel(const std::string &label) {
@@ -655,7 +642,7 @@ void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
                 uint32_t sourceId = phi->operandIds[resultIndex][labelIndex];
 
                 std::ostringstream ss;
-                if (isSamePhysicalRegister(resultId, sourceId, 0)) {
+                if (isSamePhysicalRegister(resultId, sourceId)) {
                     ss << "; ";
                 }
                 ss << "mov " << reg(resultId) << ", " << reg(sourceId);
