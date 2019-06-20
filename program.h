@@ -185,36 +185,10 @@ struct Program
     }
 
     // Returns the type of and byte offset to the member of "t" at
-    // index "i".
-    // For vectors, "i" is ignored and the type of any
-    // element is returned and the offset by type is returned.
-    // For matrices, "i" is ignored and the type of any column is
-    // returned and the offset by column type is returned.
-    // For structs, the type of field "i" (0-indexed) is returned
-    // and the offset is looked up in offset decorations.
+    // index "i". For structs, members are zero-indexed.
     ConstituentInfo getConstituentInfo(uint32_t t, int i) const
     {
-        const Type *type = types.at(t).get();
-        return type->getConstituentInfo(i);
-        /*
-        if(std::holds_alternative<TypeVector>(type)) {
-            uint32_t elementType = std::get<TypeVector>(type).type;
-            return std::make_tuple(elementType, typeSizes.at(elementType) * i);
-        } else if(std::holds_alternative<TypeArray>(type)) {
-            uint32_t elementType = std::get<TypeArray>(type).type;
-            return std::make_tuple(elementType, typeSizes.at(elementType) * i);
-        } else if(std::holds_alternative<TypeMatrix>(type)) {
-            uint32_t columnType = std::get<TypeMatrix>(type).columnType;
-            return std::make_tuple(columnType, typeSizes.at(columnType) * i);
-        } else if (std::holds_alternative<TypeStruct>(type)) {
-            uint32_t memberType = std::get<TypeStruct>(type).memberTypes[i];
-            return std::make_tuple(memberType, memberDecorations.at(t).at(i).at(SpvDecorationOffset)[0]);
-        } else {
-            std::cout << type.index() << "\n";
-            assert(false && "getConstituentType of invalid type?!");
-        }
-        return std::make_tuple(0, 0); // not reached
-        */
+        return types.at(t)->getConstituentInfo(i);
     }
 
     // If the type ID refers to a TypeVector, returns it. Otherwise returns null.

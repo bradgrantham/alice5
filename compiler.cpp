@@ -88,19 +88,16 @@ void Compiler::compile() {
 
     // Emit variables.
     for (auto &[id, var] : pgm->variables) {
-        auto name = pgm->names.find(id);
-        if (name != pgm->names.end()) {
-            // XXX Check storage class? (var.storageClass)
-            emitLabel(name->second);
-            size_t size = pgm->typeSizes.at(var.type);
-            for (size_t i = 0; i < size/4; i++) {
-                emit(".word 0", "");
-            }
-            for (size_t i = 0; i < size%4; i++) {
-                emit(".byte 0", "");
-            }
-        } else {
-            std::cerr << "Warning: Name of variable " << id << " not defined.\n";
+        std::string name = getVariableName(id);
+
+        // XXX Check storage class? (var.storageClass)
+        emitLabel(name);
+        size_t size = pgm->typeSizes.at(var.type);
+        for (size_t i = 0; i < size/4; i++) {
+            emit(".word 0", "");
+        }
+        for (size_t i = 0; i < size%4; i++) {
+            emit(".byte 0", "");
         }
     }
 
@@ -121,6 +118,17 @@ void Compiler::compile() {
 
     // Emit library.
     outFile << readFileContents("library.s");
+}
+
+std::string Compiler::getVariableName(uint32_t id) const {
+    auto nameItr = pgm->names.find(id);
+    if (nameItr == pgm->names.end()) {
+        std::ostringstream ss;
+        ss << ".V" << id;
+        return ss.str();
+    } else {
+        return nameItr->second;
+    }
 }
 
 void Compiler::emitConstant(uint32_t id, uint32_t typeId, unsigned char *data) {

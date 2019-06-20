@@ -67,10 +67,9 @@ void RiscVLoad::emit(Compiler *compiler)
         ss1 << "lw ";
     }
     ss1 << compiler->reg(resultId()) << ", ";
-    auto r = compiler->asRegister(pointerId);
-    if (r == nullptr) {
+    if (compiler->asRegister(pointerId) == nullptr) {
         // It's a variable reference.
-        ss1 << compiler->reg(pointerId);
+        ss1 << compiler->getVariableName(pointerId);
         if (offset != 0) {
             ss1 << "+" << offset;
         }
@@ -92,11 +91,18 @@ void RiscVStore::emit(Compiler *compiler)
     } else {
         ss1 << "sw ";
     }
-    ss1 << compiler->reg(objectId) << ", " << compiler->reg(pointerId);
-    if (offset != 0) {
-        ss1 << "+" << offset;
+    ss1 << compiler->reg(objectId) << ", ";
+    if (compiler->asRegister(pointerId) == nullptr) {
+        // It's a variable reference.
+        ss1 << compiler->getVariableName(pointerId);
+        if (offset != 0) {
+            ss1 << "+" << offset;
+        }
+        ss1 << "(x0)";
+    } else {
+        // It's a register reference.
+        ss1 << offset << "(" << compiler->reg(pointerId) << ")";
     }
-    ss1 << "(x0)";
     std::ostringstream ss2;
     ss2 << "(r" << pointerId << ") = r" << objectId;
     compiler->emit(ss1.str(), ss2.str());
@@ -424,6 +430,7 @@ void InsnAccessChain::emit(Compiler *compiler)
 
     const Variable &variable = compiler->pgm->variables.at(baseId());
     uint32_t type = variable.type;
+    bool variableIndex = false;
     for (int i = 0; i < indexesIdCount(); i++) {
         uint32_t id = indexesId(i);
         uint32_t intValue;
@@ -432,23 +439,66 @@ void InsnAccessChain::emit(Compiler *compiler)
             type = subtype;
             offset += subOffset;
         } else {
-            std::cerr << "Error: Don't yet handle non-constant offsets in AccessChain ("
-                << id << ").\n";
-            exit(EXIT_FAILURE);
+            variableIndex = true;
+            break;
         }
     }
 
-    auto name = compiler->pgm->names.find(baseId());
-    if (name == compiler->pgm->names.end()) {
-        std::cerr << "Error: Don't yet handle pointer reference in AccessChain ("
-            << baseId() << ").\n";
-        exit(EXIT_FAILURE);
-    }
+    // If we have a variable (non-constant) index, see if it meets some strict requirements
+    // for an easy solution.
+    if (variableIndex) {
+        // This will assert if the type doesn't have constant subtype size.
+        // I think this only happens for structs.
+        uint32_t subtypeSize = compiler->pgm->types.at(variable.type)->getSubtypeSize();
 
-    std::ostringstream ss;
-    ss << "addi " << compiler->reg(resultId()) << ", x0, "
-        << compiler->notEmptyLabel(name->second) << "+" << offset;
-    compiler->emit(ss.str(), "");
+        // Must be power of two.
+        if (indexesIdCount() != 1 || (subtypeSize & (subtypeSize - 1)) != 0) {
+            std::cerr << "Error: Don't yet handle non-constant offsets in AccessChain (at "
+                << resultId() << ").\n";
+            exit(EXIT_FAILURE);
+        }
+
+        // Figure out shift.
+        int shift = 0;
+        while (subtypeSize > 1) {
+            shift++;
+            subtypeSize >>= 1;
+        }
+        subtypeSize <<= shift;
+
+        // Emit shift to get offset from base of pointer.
+        {
+            uint32_t id = indexesId(0);
+            std::ostringstream ss;
+            ss << "slli " << compiler->reg(resultId()) << ", "
+                << compiler->reg(id) << ", " << shift;
+            std::ostringstream ssc;
+            ssc << "Multiply by " << subtypeSize;
+            compiler->emit(ss.str(), ssc.str());
+        }
+
+        // Add to base.
+        {
+            std::ostringstream ss;
+            ss << "addi " << compiler->reg(resultId()) << ", "
+                << compiler->reg(resultId()) << ", "
+                << compiler->getVariableName(baseId());
+            compiler->emit(ss.str(), "Add to variable location");
+        }
+    } else {
+        // All constants.
+        auto name = compiler->pgm->names.find(baseId());
+        if (name == compiler->pgm->names.end()) {
+            std::cerr << "Error: Don't yet handle pointer reference in AccessChain ("
+                << baseId() << ", at " << resultId() << ").\n";
+            exit(EXIT_FAILURE);
+        }
+
+        std::ostringstream ss;
+        ss << "addi " << compiler->reg(resultId()) << ", x0, "
+            << compiler->notEmptyLabel(name->second) << "+" << offset;
+        compiler->emit(ss.str(), "");
+    }
 }
 
 void InsnGLSLstd450Sin::emit(Compiler *compiler)

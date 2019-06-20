@@ -983,7 +983,10 @@ private:
 
     // Warning function.
     void warning(const std::string &message) {
-        showMessage(CAT_WARNING, message);
+        // Don't warn on pass 1, we've already warned on pass 0.
+        if (pass == 0) {
+            showMessage(CAT_WARNING, message);
+        }
     }
 
     // Error function.

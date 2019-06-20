@@ -100,44 +100,58 @@ void Program::postParse() {
 
     // Allocated variables 
     for(auto& [id, var]: variables) {
-        if(var.storageClass == SpvStorageClassUniformConstant) {
-            uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
-            var.address = memoryRegions[SpvStorageClassUniformConstant].base + binding * 16; // XXX magic number
-            storeNamedVariableInfo(names[id], var.type, var.address);
-
-        } else if(var.storageClass == SpvStorageClassUniform) {
-            uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
-            var.address = memoryRegions[SpvStorageClassUniform].base + binding * 256; // XXX magic number
-            storeNamedVariableInfo(names[id], var.type, var.address);
-        } else if(var.storageClass == SpvStorageClassOutput) {
-            uint32_t location;
-            if(decorations.at(id).find(SpvDecorationLocation) == decorations.at(id).end()) {
-                throw std::runtime_error("no Location decoration available for output " + std::to_string(id));
+        switch (var.storageClass) {
+            case SpvStorageClassUniformConstant: {
+                uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
+                var.address = memoryRegions[SpvStorageClassUniformConstant].base + binding * 16; // XXX magic number
+                storeNamedVariableInfo(names[id], var.type, var.address);
+                break;
             }
 
-            location = decorations.at(id).at(SpvDecorationLocation)[0];
-            var.address = memoryRegions[SpvStorageClassOutput].base + location * 256; // XXX magic number
-            storeNamedVariableInfo(names[id], var.type, var.address);
-        } else if(var.storageClass == SpvStorageClassInput) {
-            uint32_t location;
-            if(names[id] == "gl_FragCoord") {
-                location = 0;
-            } else if(names[id].find("gl_") == 0) {
-                throw std::runtime_error("builtin input variable " + names[id] + " specified with no location available");
-            } else {
-                if(decorations.find(id) == decorations.end()) {
-                    throw std::runtime_error("no decorations available for input " + std::to_string(id) + ", name \"" + names[id] + "\"");
-                }
+            case SpvStorageClassUniform: {
+                uint32_t binding = decorations.at(id).at(SpvDecorationBinding)[0];
+                var.address = memoryRegions[SpvStorageClassUniform].base + binding * 256; // XXX magic number
+                storeNamedVariableInfo(names[id], var.type, var.address);
+                break;
+            }
+
+            case SpvStorageClassOutput: {
+                uint32_t location;
                 if(decorations.at(id).find(SpvDecorationLocation) == decorations.at(id).end()) {
-                    throw std::runtime_error("no Location decoration available for input " + std::to_string(id));
+                    throw std::runtime_error("no Location decoration available for output " + std::to_string(id));
                 }
 
                 location = decorations.at(id).at(SpvDecorationLocation)[0];
+                var.address = memoryRegions[SpvStorageClassOutput].base + location * 256; // XXX magic number
+                storeNamedVariableInfo(names[id], var.type, var.address);
+                break;
             }
-            var.address = memoryRegions[SpvStorageClassInput].base + location * 256; // XXX magic number
-            storeNamedVariableInfo(names[id], var.type, var.address);
-        } else {
-            var.address = allocate(var.storageClass, var.type);
+
+            case SpvStorageClassInput: {
+                uint32_t location;
+                if(names[id] == "gl_FragCoord") {
+                    location = 0;
+                } else if(names[id].find("gl_") == 0) {
+                    throw std::runtime_error("builtin input variable " + names[id] + " specified with no location available");
+                } else {
+                    if(decorations.find(id) == decorations.end()) {
+                        throw std::runtime_error("no decorations available for input " + std::to_string(id) + ", name \"" + names[id] + "\"");
+                    }
+                    if(decorations.at(id).find(SpvDecorationLocation) == decorations.at(id).end()) {
+                        throw std::runtime_error("no Location decoration available for input " + std::to_string(id));
+                    }
+
+                    location = decorations.at(id).at(SpvDecorationLocation)[0];
+                }
+                var.address = memoryRegions[SpvStorageClassInput].base + location * 256; // XXX magic number
+                storeNamedVariableInfo(names[id], var.type, var.address);
+                break;
+            }
+
+            default: {
+                var.address = allocate(var.storageClass, var.type);
+                break;
+            }
         }
     }
     if(verbose) {

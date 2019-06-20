@@ -1,3 +1,7 @@
+
+; ------------------------------------------------------------------------
+; library.s
+;
 ; library of math functions
 
 ; some useful constants

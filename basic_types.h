@@ -149,6 +149,11 @@ struct Type {
         std::cerr << "No constituent info for op " << op() << "\n";
         assert(false);
     }
+    virtual uint32_t getSubtypeSize() const {
+        // Most types don't have this.
+        std::cerr << "No subtype size for op " << op() << "\n";
+        assert(false);
+    }
     virtual void dump(unsigned char *data) const = 0;
 };
 
@@ -225,6 +230,9 @@ struct TypeVector : public Type
     virtual ConstituentInfo getConstituentInfo(int i) const {
         return { type, i*subtype->size };
     }
+    virtual uint32_t getSubtypeSize() const {
+        return subtype->size;
+    }
     virtual void dump(unsigned char *data) const {
         std::cout << "<";
         for(int i = 0; i < count; i++) {
@@ -255,6 +263,9 @@ struct TypeArray : public Type
     virtual uint32_t op() const { return SpvOpTypeArray; }
     virtual ConstituentInfo getConstituentInfo(int i) const {
         return { type, i*subtype->size };
+    }
+    virtual uint32_t getSubtypeSize() const {
+        return subtype->size;
     }
     virtual void dump(unsigned char *data) const {
         std::cout << "[";
@@ -289,6 +300,9 @@ struct TypeMatrix : public Type
     virtual uint32_t op() const { return SpvOpTypeMatrix; }
     virtual ConstituentInfo getConstituentInfo(int i) const {
         return { columnType, subtype->size*i };
+    }
+    virtual uint32_t getSubtypeSize() const {
+        return subtype->size;
     }
     virtual void dump(unsigned char *data) const {
         std::cout << "<";

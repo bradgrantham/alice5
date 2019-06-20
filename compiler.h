@@ -85,6 +85,10 @@ struct Compiler {
     // otherwise asserts.
     bool isRegFloat(uint32_t id) const;
 
+    // Return the name of the variable with the specified ID. If no name was in
+    // the SPIR-V file, a unique name is generated based on the ID.
+    std::string getVariableName(uint32_t id) const;
+
     // Make a new label that can be used for local jumps.
     std::string makeLocalLabel();
 
