@@ -388,15 +388,32 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
         case SpvOpUndef: {
             uint32_t typeId = nextu();
             uint32_t id = nextu();
-            // Treat like a constant.
-            Register& r = pgm->allocConstantObject(id, typeId);
-            std::fill(r.data, r.data + pgm->typeSizes[typeId], 0);
-            // Arguably here we should set r.initialized to false, so we
-            // can figure out if it's ever used, but just the fact that
-            // it's defined here means it'll be used somewhere later.
-            if(pgm->verbose) {
-                std::cout << "Undef " << id << " type " << typeId << "\n";
-            }
+
+            do {
+                // Treat like a constant.
+                Register& r = pgm->allocConstantObject(id, typeId);
+                std::fill(r.data, r.data + pgm->typeSizes[typeId], 0);
+                // Arguably here we should set r.initialized to false, so we
+                // can figure out if it's ever used, but just the fact that
+                // it's defined here means it'll be used somewhere later.
+                if(pgm->verbose) {
+                    std::cout << "Undef " << id << " type " << typeId << "\n";
+                }
+
+                // We should fill out the subelements vector with pointers to
+                // members of the subtype, but we don't necessarily have any
+                // constants or undef of the subtype. So just make some up.
+                const TypeVector *typeVector = pgm->getTypeAsVector(typeId);
+                if (typeVector != nullptr) {
+                    // Loop to create sub-elements.
+                    typeId = typeVector->type;
+                    id = pgm->nextReg++;
+                    r.subelements = std::vector<uint32_t>(typeVector->count, id);
+                } else {
+                    // Done.
+                    typeId = 0;
+                }
+            } while (typeId != 0);
             break;
         }
 
