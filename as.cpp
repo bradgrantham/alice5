@@ -831,10 +831,10 @@ private:
                 if(op.needRounding) {
                     skipWhitespace();
                     if (atEndOfLine()) {
-                        emitRWithRounding(op, rd, rs1, op.r2, RM_RDN);
+                        emitRWithRounding(op, rd, rs1, rs2, RM_RDN);
                     } else if (foundChar(',')) {
                         int rounding = readRounding();
-                        emitRWithRounding(op, rd, rs1, op.r2, rounding);
+                        emitRWithRounding(op, rd, rs1, rs2, rounding);
                     } else {
                         error("expected comma");
                     }
