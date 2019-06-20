@@ -316,12 +316,12 @@ GPUCore::Status GPUCore::step(T& memory)
                 case 0x05: /* fmin or fmax */ regs.f[rd] = (funct3 == 0) ? fminf(regs.f[rs1], regs.f[rs2]) : fmaxf(regs.f[rs1], regs.f[rs2]); break;
                 case 0x0B: /* fsqrt */ regs.f[rd] = sqrtf(regs.f[rs1]); break;
                 case 0x14:  {
-                    if(rd > 0) {
-                        if(funct3 == 0x0) {
+                    if(rd > 0) { // fp comparison
+                        if(funct3 == 0x0) { // fle 
                             regs.x[rd] = (regs.f[rs1] <= regs.f[rs2]) ? 1 : 0;
-                        } else if(funct3 == 0x1) {
+                        } else if(funct3 == 0x1) { // flt
                             regs.x[rd] = (regs.f[rs1] < regs.f[rs2]) ? 1 : 0;
-                        } else {
+                        } else { // feq
                             regs.x[rd] = (regs.f[rs1] == regs.f[rs2]) ? 1 : 0;
                         }
                     }
