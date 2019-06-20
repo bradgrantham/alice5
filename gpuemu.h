@@ -296,15 +296,10 @@ GPUCore::Status GPUCore::step(T& memory)
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x10, 3)
         {
             if(dump) std::cout << "fmadd\n";
-            if(fmt == 0x0) { // always 0 for F extension
-                if(funct3 == 0x0) { // size
-                    // .s
-                    setrm();
-                    regs.f[rd] = regs.f[rs1] * regs.f[rs2] + regs.f[rs3];
-                    restorerm();
-                } else {
-                    unimpl();
-                }
+            if(fmt == 0x0) { // size = .s
+                setrm();
+                regs.f[rd] = regs.f[rs1] * regs.f[rs2] + regs.f[rs3];
+                restorerm();
             } else {
                 unimpl();
             }
@@ -326,116 +321,116 @@ GPUCore::Status GPUCore::step(T& memory)
         // fcvt.w.s  rd rs1 24..20=0 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
         // fcvt.wu.s rd rs1 24..20=1 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
 
-        // XXX ignoring the rounding-mode bits
         // XXX haven't implemented anything but "S" (single) size
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x14, 3)
         {
             if(dump) std::cout << "fadd etc\n";
-            if(fmt != 0x0) { // always 0 for F extension
-                unimpl();
-            }
-            switch(ffunct) {
-                case 0x00: /* fadd */ setrm(); regs.f[rd] = regs.f[rs1] + regs.f[rs2]; restorerm(); break;
-                case 0x01: /* fsub */ setrm(); regs.f[rd] = regs.f[rs1] - regs.f[rs2]; restorerm(); break;
-                case 0x02: /* fmul */ setrm(); regs.f[rd] = regs.f[rs1] * regs.f[rs2]; restorerm(); break;
-                case 0x03: /* fdiv */ setrm(); regs.f[rd] = regs.f[rs1] / regs.f[rs2]; restorerm(); break;
-                case 0x05: /* fmin or fmax */ regs.f[rd] = (funct3 == 0) ? fminf(regs.f[rs1], regs.f[rs2]) : fmaxf(regs.f[rs1], regs.f[rs2]); break;
-                case 0x0B: /* fsqrt */ setrm(); regs.f[rd] = sqrtf(regs.f[rs1]); restorerm(); break;
-                case 0x14:  { // fp comparison
-                    if(rd > 0) {
-                        if(funct3 == 0x0) { // fle 
-                            regs.x[rd] = (regs.f[rs1] <= regs.f[rs2]) ? 1 : 0;
-                        } else if(funct3 == 0x1) { // flt
-                            regs.x[rd] = (regs.f[rs1] < regs.f[rs2]) ? 1 : 0;
-                        } else { // feq
-                            regs.x[rd] = (regs.f[rs1] == regs.f[rs2]) ? 1 : 0;
+            if(fmt == 0x0) { // size = .s
+                switch(ffunct) {
+                    case 0x00: /* fadd */ setrm(); regs.f[rd] = regs.f[rs1] + regs.f[rs2]; restorerm(); break;
+                    case 0x01: /* fsub */ setrm(); regs.f[rd] = regs.f[rs1] - regs.f[rs2]; restorerm(); break;
+                    case 0x02: /* fmul */ setrm(); regs.f[rd] = regs.f[rs1] * regs.f[rs2]; restorerm(); break;
+                    case 0x03: /* fdiv */ setrm(); regs.f[rd] = regs.f[rs1] / regs.f[rs2]; restorerm(); break;
+                    case 0x05: /* fmin or fmax */ regs.f[rd] = (funct3 == 0) ? fminf(regs.f[rs1], regs.f[rs2]) : fmaxf(regs.f[rs1], regs.f[rs2]); break;
+                    case 0x0B: /* fsqrt */ setrm(); regs.f[rd] = sqrtf(regs.f[rs1]); restorerm(); break;
+                    case 0x14:  { // fp comparison
+                        if(rd > 0) {
+                            if(funct3 == 0x0) { // fle 
+                                regs.x[rd] = (regs.f[rs1] <= regs.f[rs2]) ? 1 : 0;
+                            } else if(funct3 == 0x1) { // flt
+                                regs.x[rd] = (regs.f[rs1] < regs.f[rs2]) ? 1 : 0;
+                            } else { // feq
+                                regs.x[rd] = (regs.f[rs1] == regs.f[rs2]) ? 1 : 0;
+                            }
                         }
+                        break;
                     }
-                    break;
-                }
-                case 0x18: {
-                // fcvt.w.s  rd rs1 24..20=0 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
-                // fcvt.wu.s rd rs1 24..20=1 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
-                    if(rd > 0) {
-                        // ignoring setting valid flags
+                    case 0x18: {
+                    // fcvt.w.s  rd rs1 24..20=0 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
+                    // fcvt.wu.s rd rs1 24..20=1 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
+                        if(rd > 0) {
+                            // ignoring setting valid flags
+                            if(rs2 == 0) {
+                                setrm();
+                                regs.x[rd] = std::clamp(regs.f[rs1], -2147483648.0f, 2147483647.0f);
+                                restorerm();
+                            } else if(rs2 == 1) {
+                                setrm();
+                                regs.x[rd] = std::clamp(regs.f[rs1], 0.0f, 4294967295.0f);
+                                restorerm();
+                            }
+                            restorerm();
+                        }
+                        break;
+                    }
+
+                    // 00000110:  f0000253          fmv.s.x       ft4,zero
+                    // unimplemented instruction f0000253 with 14..12=0 and 6..2=0x14
+                    // fmv.w.x   rd rs1 24..20=0 31..27=0x1E 14..12=0 26..25=0 6..2=0x14 1..0=3
+                    case 0x1E: {
+                        if(funct3 == 0) {
+                            if(fmt == 0) {
+                                regs.f[rd] = *reinterpret_cast<float*>(&regs.x[rs1]);
+                            } else {
+                                unimpl();
+                            }
+                        } else {
+                            unimpl();
+                        }
+                        break;
+                    }
+
+                    // unimplemented instruction d007f053 with 14..12=7 and 6..2=0x14
+                    // fcvt.s.w  rd rs1 24..20=0 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
+                    // fcvt.s.wu rd rs1 24..20=1 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
+                    case 0x1A: {
                         if(rs2 == 0) {
-                            setrm();
-                            regs.x[rd] = std::clamp(regs.f[rs1], -2147483648.0f, 2147483647.0f);
-                            restorerm();
+                            if(fmt == 0) {
+                                setrm();
+                                regs.f[rd] = *reinterpret_cast<int32_t*>(&regs.x[rs1]);
+                                restorerm();
+                            } else {
+                                printf("fmt = %d\n", fmt);
+                                unimpl();
+                            }
                         } else if(rs2 == 1) {
-                            setrm();
-                            regs.x[rd] = std::clamp(regs.f[rs1], 0.0f, 4294967295.0f);
-                            restorerm();
+                            if(fmt == 0) {
+                                setrm();
+                                regs.f[rd] = regs.x[rs1];
+                                restorerm();
+                            } else {
+                                printf("fmt = %d\n", fmt);
+                                unimpl();
+                            }
+                        } else {
+                            printf("rs2 = %d\n", rs2);
+                            unimpl();
                         }
-                        restorerm();
+                        break;
                     }
-                    break;
-                }
 
-                // 00000110:  f0000253          fmv.s.x       ft4,zero
-                // unimplemented instruction f0000253 with 14..12=0 and 6..2=0x14
-                // fmv.w.x   rd rs1 24..20=0 31..27=0x1E 14..12=0 26..25=0 6..2=0x14 1..0=3
-                case 0x1E: {
-                    if(funct3 == 0) {
-                        if(fmt == 0) {
-                            regs.f[rd] = *reinterpret_cast<float*>(&regs.x[rs1]);
+                    // fsgnj.s   rd rs1 rs2      31..27=0x04 14..12=0 26..25=0 6..2=0x14 1..0=3
+                    // fsgnjn.s  rd rs1 rs2      31..27=0x04 14..12=1 26..25=0 6..2=0x14 1..0=3
+                    // fsgnjx.s  rd rs1 rs2      31..27=0x04 14..12=2 26..25=0 6..2=0x14 1..0=3
+                    case 0x04: {
+                        uint32_t& fs1 = *reinterpret_cast<uint32_t*>(&regs.f[rs1]);
+                        uint32_t& fs2 = *reinterpret_cast<uint32_t*>(&regs.f[rs2]);
+                        uint32_t& fd = *reinterpret_cast<uint32_t*>(&regs.f[rd]);
+                        if(funct3 == 0) {
+                            fd = (fs1 & 0x7FFFFFFF) | (fs2 & 0x80000000);
+                        } else if(funct3 == 1) {
+                            fd = (fs1 & 0x7FFFFFFF) | ((fs2 & 0x80000000) ^ 0x80000000);
+                        } else if(funct3 == 2) {
+                            fd = (fs1 & 0x7FFFFFFF) | ((fs2 & 0x80000000) ^ (fs1 & 0x80000000));
                         } else {
                             unimpl();
                         }
-                    } else {
-                        unimpl();
+                        break;
                     }
-                    break;
+                    default: unimpl(); break;
                 }
-
-                // unimplemented instruction d007f053 with 14..12=7 and 6..2=0x14
-                // fcvt.s.w  rd rs1 24..20=0 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
-                // fcvt.s.wu rd rs1 24..20=1 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
-                case 0x1A: {
-                    if(rs2 == 0) {
-                        if(fmt == 0) {
-                            setrm();
-                            regs.f[rd] = *reinterpret_cast<int32_t*>(&regs.x[rs1]);
-                            restorerm();
-                        } else {
-                            printf("fmt = %d\n", fmt);
-                            unimpl();
-                        }
-                    } else if(rs2 == 1) {
-                        if(fmt == 0) {
-                            setrm();
-                            regs.f[rd] = regs.x[rs1];
-                            restorerm();
-                        } else {
-                            printf("fmt = %d\n", fmt);
-                            unimpl();
-                        }
-                    } else {
-                        printf("rs2 = %d\n", rs2);
-                        unimpl();
-                    }
-                    break;
-                }
-
-                // fsgnj.s   rd rs1 rs2      31..27=0x04 14..12=0 26..25=0 6..2=0x14 1..0=3
-                // fsgnjn.s  rd rs1 rs2      31..27=0x04 14..12=1 26..25=0 6..2=0x14 1..0=3
-                // fsgnjx.s  rd rs1 rs2      31..27=0x04 14..12=2 26..25=0 6..2=0x14 1..0=3
-                case 0x04: {
-                    uint32_t& fs1 = *reinterpret_cast<uint32_t*>(&regs.f[rs1]);
-                    uint32_t& fs2 = *reinterpret_cast<uint32_t*>(&regs.f[rs2]);
-                    uint32_t& fd = *reinterpret_cast<uint32_t*>(&regs.f[rd]);
-                    if(funct3 == 0) {
-                        fd = (fs1 & 0x7FFFFFFF) | (fs2 & 0x80000000);
-                    } else if(funct3 == 1) {
-                        fd = (fs1 & 0x7FFFFFFF) | ((fs2 & 0x80000000) ^ 0x80000000);
-                    } else if(funct3 == 2) {
-                        fd = (fs1 & 0x7FFFFFFF) | ((fs2 & 0x80000000) ^ (fs1 & 0x80000000));
-                    } else {
-                        unimpl();
-                    }
-                    break;
-                }
-                default: unimpl(); break;
+            } else {
+                unimpl();
             }
             regs.pc += 4;
             break;
