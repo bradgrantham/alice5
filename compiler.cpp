@@ -310,45 +310,65 @@ void Compiler::assignRegisters() {
         PHY_FLOAT_REGS.insert(i + 32);
     }
 
-    // Start with blocks at the start of functions.
     for (auto& [id, function] : pgm->functions) {
-        Block *block = pgm->blocks.at(function.labelId).get();
-
-        // Assign registers for constants.
-        std::set<uint32_t> constIntRegs = PHY_INT_REGS;
-        std::set<uint32_t> constFloatRegs = PHY_FLOAT_REGS;
-        for (auto regId : instructions.at(block->begin)->liveinAll) {
-            if (registers.find(regId) != registers.end()) {
-                std::cerr << "Error: Constant "
-                    << regId << " already assigned a register at head of function.\n";
-                exit(EXIT_FAILURE);
-            }
-            auto &c = pgm->constants.at(regId);
-            auto r = CompilerRegister {c.type, 1}; // XXX get real count.
-            uint32_t phy;
-            if (pgm->isTypeFloat(c.type)) {
-                assert(!constFloatRegs.empty());
-                phy = *constFloatRegs.begin();
-                constFloatRegs.erase(phy);
-            } else {
-                assert(!constIntRegs.empty());
-                phy = *constIntRegs.begin();
-                constIntRegs.erase(phy);
-            }
-            r.phy = phy;
-            registers[regId] = r;
-        }
-
-        assignRegisters(block, PHY_INT_REGS, PHY_FLOAT_REGS);
+        assignRegistersForFunction(function, PHY_INT_REGS, PHY_FLOAT_REGS);
     }
 }
 
-void Compiler::assignRegisters(Block *block,
+void Compiler::assignRegistersForFunction(const Function &function,
+        const std::set<uint32_t> &allIntPhy,
+        const std::set<uint32_t> &allFloatPhy) {
+
+    // Start with blocks at the start of functions.
+    Block *block = pgm->blocks.at(function.labelId).get();
+
+    if (pgm->verbose) {
+        std::cout << "Assigning registers for function \"" << pgm->names.at(function.id) << "\"\n";
+    }
+
+    // Assign registers for constants.
+    std::set<uint32_t> constIntRegs = allIntPhy;
+    std::set<uint32_t> constFloatRegs = allFloatPhy;
+    for (auto regId : instructions.at(block->begin)->liveinAll) {
+        if (registers.find(regId) != registers.end()) {
+            std::cerr << "Error: Constant "
+                << regId << " already assigned a register at head of function.\n";
+            exit(EXIT_FAILURE);
+        }
+        auto &c = pgm->constants.at(regId);
+        auto r = CompilerRegister {c.type, 1}; // XXX get real count.
+        uint32_t phy;
+        if (pgm->isTypeFloat(c.type)) {
+            assert(!constFloatRegs.empty());
+            phy = *constFloatRegs.begin();
+            constFloatRegs.erase(phy);
+        } else {
+            assert(!constIntRegs.empty());
+            phy = *constIntRegs.begin();
+            constIntRegs.erase(phy);
+        }
+        if (pgm->verbose) {
+            std::cout << "    Constant " << regId << " assigned to register " << phy << "\n";
+        }
+        r.phy = phy;
+        registers[regId] = r;
+    }
+
+    if (pgm->verbose) {
+        std::cout << "    Constants used up "
+            << (allIntPhy.size() - constIntRegs.size()) << " int and "
+            << (allFloatPhy.size() - constFloatRegs.size()) << " float registers.\n";
+    }
+
+    assignRegistersForBlock(block, allIntPhy, allFloatPhy);
+}
+
+void Compiler::assignRegistersForBlock(Block *block,
         const std::set<uint32_t> &allIntPhy,
         const std::set<uint32_t> &allFloatPhy) {
 
     if (pgm->verbose) {
-        std::cout << "assignRegisters(" << block->labelId << ")\n";
+        std::cout << "    Assigning registers for block " << block->labelId << "\n";
     }
 
     // Assigned physical registers.
@@ -403,31 +423,31 @@ void Compiler::assignRegisters(Block *block,
                 exit(EXIT_FAILURE);
             }
 
+            // Must have already scalarized.
+            assert(r->second.count == 1);
+
             // Register set to pick from for this register.
             const std::set<uint32_t> &allPhy =
                 pgm->isTypeFloat(r->second.type) ? allFloatPhy : allIntPhy;
 
-            // For each element in this virtual register...
-            for (int i = 0; i < r->second.count; i++) {
-                // Find an available physical register for this element.
-                bool found = false;
-                for (uint32_t phy : allPhy) {
-                    if (assigned.find(phy) == assigned.end()) {
-                        r->second.phy = phy;
-                        // If the result lives past this instruction, consider its
-                        // register assigned.
-                        if (instruction->liveout.find(resId) != instruction->liveout.end()) {
-                            assigned.insert(phy);
-                        }
-                        found = true;
-                        break;
+            // Find an available physical register.
+            bool found = false;
+            for (uint32_t phy : allPhy) {
+                if (assigned.find(phy) == assigned.end()) {
+                    r->second.phy = phy;
+                    // If the result lives past this instruction, consider its
+                    // register assigned.
+                    if (instruction->liveout.find(resId) != instruction->liveout.end()) {
+                        assigned.insert(phy);
                     }
+                    found = true;
+                    break;
                 }
-                if (!found) {
-                    std::cout << "Error: No physical register available for "
-                        << resId << "[" << i << "] on line " << pc << ".\n";
-                    exit(EXIT_FAILURE);
-                }
+            }
+            if (!found) {
+                std::cerr << "Error: No physical register available for "
+                    << resId << " on line " << pc << ".\n";
+                exit(EXIT_FAILURE);
             }
         }
     }
@@ -435,7 +455,7 @@ void Compiler::assignRegisters(Block *block,
     // Go down dominance tree.
     for (auto& [labelId, subBlock] : pgm->blocks) {
         if (subBlock->idom == block->labelId) {
-            assignRegisters(subBlock.get(), allIntPhy, allFloatPhy);
+            assignRegistersForBlock(subBlock.get(), allIntPhy, allFloatPhy);
         }
     }
 }

@@ -111,8 +111,13 @@ struct Compiler {
     // Assign all physical registers.
     void assignRegisters();
 
+    // Assigns registers for this function.
+    void assignRegistersForFunction(const Function &function,
+            const std::set<uint32_t> &allIntPhy,
+            const std::set<uint32_t> &allFloatPhy);
+
     // Assigns registers for this block.
-    void assignRegisters(Block *block,
+    void assignRegistersForBlock(Block *block,
             const std::set<uint32_t> &allIntPhy,
             const std::set<uint32_t> &allFloatPhy);
 

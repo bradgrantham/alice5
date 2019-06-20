@@ -481,6 +481,9 @@ struct Register
     unsigned char *data;
     bool initialized;
 
+    // For ConstantComposite, the IDs of the sub-elements.
+    std::vector<uint32_t> subelements;
+
     Register(const Register &other)
     {
         if(false)std::cout << "move ctor allocated to " << this << " as " << &data << "\n";
@@ -489,6 +492,7 @@ struct Register
         data = new unsigned char[size];
         std::copy(other.data, other.data + size, data);
         initialized = other.initialized;
+        subelements = other.subelements;
     }
 
     Register(uint32_t type_, size_t size_) :
@@ -527,6 +531,7 @@ struct Register
             if(false)std::cout << "op= allocated to " << this << " as " << &data << "\n";
             std::copy(other.data, other.data + size, data);
             initialized = other.initialized;
+            subelements = other.subelements;
         }
         return *this;
     }

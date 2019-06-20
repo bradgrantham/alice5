@@ -51,27 +51,21 @@ uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t sca
     auto regIndex = RegIndex{vreg, i};
     auto itr = vec2scalar.find(regIndex);
     if (itr == vec2scalar.end()) {
-        bool scalarRegWasSpecified = scalarReg > 0;
-        if (!scalarRegWasSpecified) {
-            scalarReg = nextReg++;
-        }
-        vec2scalar[regIndex] = scalarReg;
-
         // See if this was a constant vector.
         auto itr = constants.find(vreg);
         if (itr != constants.end()) {
-            // Extract new constant for this component.
-            Register &r = allocConstantObject(scalarReg, subtype);
-            auto [subtype2, offset] = getConstituentInfo(itr->second.type, i);
-            uint32_t size = typeSizes[subtype];
-            assert(subtype == subtype2);
-            std::copy(itr->second.data + offset, itr->second.data + offset + size, r.data);
+            // Just refer back to the original component.
+            // XXX This won't handle matrices, maybe?
+            scalarReg = itr->second.subelements.at(i);
         } else {
             // Not a constant, must be a variable.
-            if (!scalarRegWasSpecified) {
+            if (scalarReg == 0) {
+                scalarReg = nextReg++;
                 assert(this->resultTypes.find(scalarReg) == this->resultTypes.end());
                 this->resultTypes[scalarReg] = subtype;
             }
+
+            vec2scalar[regIndex] = scalarReg;
         }
     } else {
         if (scalarReg != 0) {

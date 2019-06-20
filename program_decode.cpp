@@ -434,6 +434,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             std::vector<uint32_t> operands = restv();
             Register& r = pgm->allocConstantObject(id, typeId);
+            r.subelements = operands;
             uint32_t offset = 0;
             for(uint32_t operand : operands) {
                 // Copy each operand from a constant into our new composite constant.
