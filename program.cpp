@@ -767,6 +767,10 @@ void Program::expandVectors() {
                  expandVectorsBinOp<InsnFOrdGreaterThan>(instruction, newList, replaced);
                  break;
 
+            case SpvOpFOrdGreaterThanEqual:
+                 expandVectorsBinOp<InsnFOrdGreaterThanEqual>(instruction, newList, replaced);
+                 break;
+
             case SpvOpIEqual:
                  expandVectorsBinOp<InsnIEqual>(instruction, newList, replaced);
                  break;
@@ -813,6 +817,14 @@ void Program::expandVectors() {
 
             case SpvOpLogicalNot:
                  expandVectorsUniOp<InsnLogicalNot>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpLogicalAnd:
+                 expandVectorsBinOp<InsnLogicalAnd>(instruction, newList, replaced);
+                 break;
+
+            case SpvOpLogicalOr:
+                 expandVectorsBinOp<InsnLogicalOr>(instruction, newList, replaced);
                  break;
 
             case SpvOpDot: {
