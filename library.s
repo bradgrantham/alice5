@@ -799,7 +799,35 @@ sinTable_f32:
         jalr x0, ra, 0
 
 .mod:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; save registers
+        fsw     fa0,-4(sp)
+        fsw     fa1,-8(sp)
+        fsw     fa2,-12(sp)
+        fsw     fa3,-16(sp)
+        fsw     fa4,-20(sp)
+        sw     a0,-24(sp)
+
+        flw     fa0, 0(sp)              ; fa0 = x = popf()
+        flw     fa1, 4(sp)              ; fa1 = y = popf()
+        fdiv.s  fa2, fa0, fa1, rdn      ; fa2 = t1 = x/y;
+	fcvt.w.s a0,fa2,rdn             ; a0 = i = floori(t1)
+        fcvt.s.w fa4,a0,rne             ; fa4 = q = floorf(i)
+        fmul.s  fa3, fa4, fa1           ; fa3 = t2 = q*y
+        fsub.s  fa1, fa0, fa3           ; fa1 = r = x - t2 = x - q*y
+
+        fsw     fa1, 4(sp)             ; pushf(r)
+
+        ; restore registers
+        flw     fa0,-4(sp)
+        flw     fa1,-8(sp)
+        flw     fa2,-12(sp)
+        flw     fa3,-16(sp)
+        flw     fa4,-20(sp)
+        lw     a0,-24(sp)
+
+        ; set stack pointer as if pops and pushes had occured
+        addi    sp, sp, 4
+
         jalr x0, ra, 0
 
 .inversesqrt:
