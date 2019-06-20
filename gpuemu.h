@@ -351,26 +351,21 @@ GPUCore::Status GPUCore::step(T& memory)
                         break;
                     }
                     case 0x18: {
-                    // fcvt.w.s  rd rs1 24..20=0 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
-                    // fcvt.wu.s rd rs1 24..20=1 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
                         if(rd > 0) {
                             // ignoring setting valid flags
-                            if(rs2 == 0) {
+                            if(rs2 == 0) {      // fcvt.w.s
                                 setrm();
-                                regs.x[rd] = std::clamp(regs.f[rs1], -2147483648.0f, 2147483647.0f);
+                                regs.x[rd] = std::rint(std::clamp(regs.f[rs1], -2147483648.0f, 2147483647.0f));
                                 restorerm();
-                            } else if(rs2 == 1) {
+                            } else if(rs2 == 1) {       // fcvt.wu.s
                                 setrm();
-                                regs.x[rd] = std::clamp(regs.f[rs1], 0.0f, 4294967295.0f);
+                                regs.x[rd] = std::rint(std::clamp(regs.f[rs1], 0.0f, 4294967295.0f));
                                 restorerm();
                             }
-                            restorerm();
                         }
                         break;
                     }
 
-                    // 00000110:  f0000253          fmv.s.x       ft4,zero
-                    // unimplemented instruction f0000253 with 14..12=0 and 6..2=0x14
                     // fmv.w.x   rd rs1 24..20=0 31..27=0x1E 14..12=0 26..25=0 6..2=0x14 1..0=3
                     case 0x1E: {
                         if(funct3 == 0) {
@@ -385,11 +380,8 @@ GPUCore::Status GPUCore::step(T& memory)
                         break;
                     }
 
-                    // unimplemented instruction d007f053 with 14..12=7 and 6..2=0x14
-                    // fcvt.s.w  rd rs1 24..20=0 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
-                    // fcvt.s.wu rd rs1 24..20=1 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
                     case 0x1A: {
-                        if(rs2 == 0) {
+                        if(rs2 == 0) {          // fcvt.s.w
                             if(fmt == 0) {
                                 setrm();
                                 regs.f[rd] = *reinterpret_cast<int32_t*>(&regs.x[rs1]);
@@ -398,7 +390,7 @@ GPUCore::Status GPUCore::step(T& memory)
                                 printf("fmt = %d\n", fmt);
                                 unimpl();
                             }
-                        } else if(rs2 == 1) {
+                        } else if(rs2 == 1) {   // fcvt.s.wu
                             if(fmt == 0) {
                                 setrm();
                                 regs.f[rd] = regs.x[rs1];
