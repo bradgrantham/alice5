@@ -310,7 +310,9 @@ void Program::prepareForCompile() {
             }
         }
     }
-    std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
+    if (PRINT_TIMER_RESULTS) {
+        std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
+    }
 
     // Compute the dominance tree for blocks. Use a worklist. Do all blocks
     // simultaneously (across functions).
@@ -373,7 +375,9 @@ void Program::prepareForCompile() {
     for (auto id : unreached) {
         blocks[id]->dom.clear();
     }
-    std::cerr << "Dominance tree took " << timer.elapsed() << " seconds.\n";
+    if (PRINT_TIMER_RESULTS) {
+        std::cerr << "Dominance tree took " << timer.elapsed() << " seconds.\n";
+    }
 
     // Compute immediate dom for each block.
     for (auto& [labelId, block] : blocks) {

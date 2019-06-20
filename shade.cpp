@@ -762,7 +762,9 @@ void optimizeSPIRV(spv_target_env targetEnv, std::vector<uint32_t>& spirv)
     if (!success) {
         std::cout << "Warning: Optimizer failed.\n";
     }
-    std::cerr << "Optimizing took " << timer.elapsed() << " seconds.\n";
+    if (PRINT_TIMER_RESULTS) {
+        std::cerr << "Optimizing took " << timer.elapsed() << " seconds.\n";
+    }
 }
 
 bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool optimize, bool disassemble, bool scalarize, Program& program)
@@ -810,7 +812,9 @@ bool createProgram(const std::vector<ShaderSource>& sources, bool debug, bool op
     {
         Timer timer;
         program.postParse();
-        std::cerr << "Post-parse took " << timer.elapsed() << " seconds.\n";
+        if (PRINT_TIMER_RESULTS) {
+            std::cerr << "Post-parse took " << timer.elapsed() << " seconds.\n";
+        }
     }
 
     return true;

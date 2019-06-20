@@ -342,7 +342,8 @@ int main(int argc, char **argv)
     }
     for(auto& s: { "iResolution", "iTime", "iMouse"}) {
         if (symbols.find(s) == symbols.end()) {
-            std::cerr << "Warning: No memory location for variable " << s << ".\n";
+            // Don't warn, these are in the anonymous params.
+            // std::cerr << "Warning: No memory location for variable " << s << ".\n";
         }
     }
 

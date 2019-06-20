@@ -22,6 +22,8 @@ typedef std::array<float,4> v4float;
 typedef std::array<uint32_t,4> v4uint;
 typedef std::array<int32_t,4> v4int;
 
+constexpr bool PRINT_TIMER_RESULTS = false;
+
 const uint32_t NO_LINE = 0xFFFFFFFF;
 const uint32_t NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_COLUMN = 0xFFFFFFFF;
