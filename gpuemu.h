@@ -7,11 +7,10 @@
 
 typedef std::map<std::string, uint32_t> SymbolTable;
 
-// Names echo the C floating point environment rounding values
-const int RM_TONEAREST_EVEN = 0b000;
-const int RM_TOWARDZERO = 0b001;
-const int RM_DOWNWARD = 0b010;
-const int RM_UPWARD = 0b011;
+const int RM_RNE = 0b000;
+const int RM_RTZ = 0b001;
+const int RM_RDN = 0b010;
+const int RM_RUP = 0b011;
 const int RM_TONEAREST_MAX = 0b100;
 
 struct GPUCore
@@ -264,10 +263,10 @@ GPUCore::Status GPUCore::step(T& memory)
     std::function<void(void)> setrm = [&]() {
         previous_rounding_mode = fegetround();
         switch(rm) {
-            case RM_DOWNWARD: fesetround(FE_DOWNWARD); break;
-            case RM_TONEAREST_EVEN: fesetround(FE_TONEAREST); break;
-            case RM_TOWARDZERO: fesetround(FE_TOWARDZERO); break;
-            case RM_UPWARD: fesetround(FE_UPWARD); break;
+            case RM_RDN: fesetround(FE_DOWNWARD); break;
+            case RM_RNE: fesetround(FE_TONEAREST); break;
+            case RM_RTZ: fesetround(FE_TOWARDZERO); break;
+            case RM_RUP: fesetround(FE_UPWARD); break;
             default:
                 std::cerr << "unimplemented rounding mode " << rm << " (ignored)\n";
                 break;
