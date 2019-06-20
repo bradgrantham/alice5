@@ -3,8 +3,16 @@
 #include <cmath>
 #include <map>
 #include <string>
+#include <cfenv>
 
 typedef std::map<std::string, uint32_t> SymbolTable;
+
+// Names echo the C floating point environment rounding values
+const int RM_TONEAREST_EVEN = 0b000;
+const int RM_TOWARDZERO = 0b001;
+const int RM_DOWNWARD = 0b010;
+const int RM_UPWARD = 0b011;
+const int RM_TONEAREST_MAX = 0b100;
 
 struct GPUCore
 {
@@ -216,6 +224,7 @@ GPUCore::Status GPUCore::step(T& memory)
     uint32_t rs1 = getBits(insn, 19, 15);
     uint32_t rs2 = getBits(insn, 24, 20);
     uint32_t rs3 = getBits(insn, 31, 27);
+    uint32_t rm = getBits(insn, 14, 12);
     uint32_t immI = extendSign(getBits(insn, 31, 20), 12);
     uint32_t shamt = getBits(insn, 34, 20);
     uint32_t immS = extendSign(
@@ -251,6 +260,23 @@ GPUCore::Status GPUCore::step(T& memory)
         status = UNIMPLEMENTED_OPCODE;
     };
 
+    int previous_rounding_mode;
+    std::function<void(void)> setrm = [&]() {
+        previous_rounding_mode = fegetround();
+        switch(rm) {
+            case RM_DOWNWARD: fesetround(FE_DOWNWARD); break;
+            case RM_TONEAREST_EVEN: fesetround(FE_TONEAREST); break;
+            case RM_TOWARDZERO: fesetround(FE_TOWARDZERO); break;
+            case RM_UPWARD: fesetround(FE_UPWARD); break;
+            default:
+                std::cerr << "unimplemented rounding mode " << rm << " (ignored)\n";
+                break;
+        }
+    };
+    std::function<void(void)> restorerm = [&]() {
+        fesetround(previous_rounding_mode);
+    };
+
     switch(insn & 0x707F) {
         // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
         case makeOpcode(2, 0x01, 3): {
@@ -271,11 +297,12 @@ GPUCore::Status GPUCore::step(T& memory)
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x10, 3)
         {
             if(dump) std::cout << "fmadd\n";
-            if(fmt == 0x0) { // rm
-                // our assembler always outputs rm = 0
+            if(fmt == 0x0) { // always 0 for F extension
                 if(funct3 == 0x0) { // size
                     // .s
+                    setrm();
                     regs.f[rd] = regs.f[rs1] * regs.f[rs2] + regs.f[rs3];
+                    restorerm();
                 } else {
                     unimpl();
                 }
@@ -305,18 +332,18 @@ GPUCore::Status GPUCore::step(T& memory)
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x14, 3)
         {
             if(dump) std::cout << "fadd etc\n";
-            if(fmt != 0x0) {
+            if(fmt != 0x0) { // always 0 for F extension
                 unimpl();
             }
             switch(ffunct) {
-                case 0x00: /* fadd */ regs.f[rd] = regs.f[rs1] + regs.f[rs2]; break;
-                case 0x01: /* fsub */ regs.f[rd] = regs.f[rs1] - regs.f[rs2]; break;
-                case 0x02: /* fmul */ regs.f[rd] = regs.f[rs1] * regs.f[rs2]; break;
-                case 0x03: /* fdiv */ regs.f[rd] = regs.f[rs1] / regs.f[rs2]; break;
+                case 0x00: /* fadd */ setrm(); regs.f[rd] = regs.f[rs1] + regs.f[rs2]; restorerm(); break;
+                case 0x01: /* fsub */ setrm(); regs.f[rd] = regs.f[rs1] - regs.f[rs2]; restorerm(); break;
+                case 0x02: /* fmul */ setrm(); regs.f[rd] = regs.f[rs1] * regs.f[rs2]; restorerm(); break;
+                case 0x03: /* fdiv */ setrm(); regs.f[rd] = regs.f[rs1] / regs.f[rs2]; restorerm(); break;
                 case 0x05: /* fmin or fmax */ regs.f[rd] = (funct3 == 0) ? fminf(regs.f[rs1], regs.f[rs2]) : fmaxf(regs.f[rs1], regs.f[rs2]); break;
-                case 0x0B: /* fsqrt */ regs.f[rd] = sqrtf(regs.f[rs1]); break;
-                case 0x14:  {
-                    if(rd > 0) { // fp comparison
+                case 0x0B: /* fsqrt */ setrm(); regs.f[rd] = sqrtf(regs.f[rs1]); restorerm(); break;
+                case 0x14:  { // fp comparison
+                    if(rd > 0) {
                         if(funct3 == 0x0) { // fle 
                             regs.x[rd] = (regs.f[rs1] <= regs.f[rs2]) ? 1 : 0;
                         } else if(funct3 == 0x1) { // flt
@@ -332,14 +359,16 @@ GPUCore::Status GPUCore::step(T& memory)
                 // fcvt.wu.s rd rs1 24..20=1 31..27=0x18 rm       26..25=0 6..2=0x14 1..0=3
                     if(rd > 0) {
                         // ignoring setting valid flags
-                        // Rounding flags are very important here but ignored
-                        // C behavior of (int)(a_float) is round-towards-zero, i.e. truncate
-                        // For now we assume round-towards-zero, or "rtz" in RISC-V
                         if(rs2 == 0) {
+                            setrm();
                             regs.x[rd] = std::clamp(regs.f[rs1], -2147483648.0f, 2147483647.0f);
+                            restorerm();
                         } else if(rs2 == 1) {
+                            setrm();
                             regs.x[rd] = std::clamp(regs.f[rs1], 0.0f, 4294967295.0f);
+                            restorerm();
                         }
+                        restorerm();
                     }
                     break;
                 }
@@ -366,14 +395,18 @@ GPUCore::Status GPUCore::step(T& memory)
                 case 0x1A: {
                     if(rs2 == 0) {
                         if(fmt == 0) {
+                            setrm();
                             regs.f[rd] = *reinterpret_cast<int32_t*>(&regs.x[rs1]);
+                            restorerm();
                         } else {
                             printf("fmt = %d\n", fmt);
                             unimpl();
                         }
                     } else if(rs2 == 1) {
                         if(fmt == 0) {
+                            setrm();
                             regs.f[rd] = regs.x[rs1];
+                            restorerm();
                         } else {
                             printf("fmt = %d\n", fmt);
                             unimpl();
@@ -410,8 +443,6 @@ GPUCore::Status GPUCore::step(T& memory)
         }
 
         // fmv.x.w   rd rs1 24..20=0 31..27=0x1C 14..12=0 26..25=0 6..2=0x14 1..0=3
-        // fcvt.s.w  rd rs1 24..20=0 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
-        // fcvt.s.wu rd rs1 24..20=1 31..27=0x1A rm       26..25=0 6..2=0x14 1..0=3
         // fmv.x.s
         // fclass.s
 
