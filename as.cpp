@@ -831,7 +831,7 @@ private:
                 if(op.needRounding) {
                     skipWhitespace();
                     if (atEndOfLine()) {
-                        emitRWithRounding(op, rd, rs1, rs2, RM_RDN);
+                        emitRWithRounding(op, rd, rs1, rs2, RM_RNE);
                     } else if (foundChar(',')) {
                         int rounding = readRounding();
                         emitRWithRounding(op, rd, rs1, rs2, rounding);
@@ -861,7 +861,7 @@ private:
                 if(op.needRounding) {
                     skipWhitespace();
                     if (atEndOfLine()) {
-                        emitR4WithRounding(op, rd, rs1, rs2, rs3, RM_RDN);
+                        emitR4WithRounding(op, rd, rs1, rs2, rs3, RM_RNE);
                     } else if (foundChar(',')) {
                         int rounding = readRounding();
                         emitR4WithRounding(op, rd, rs1, rs2, rs3, rounding);
@@ -883,7 +883,7 @@ private:
                 if(op.needRounding) {
                     skipWhitespace();
                     if (atEndOfLine()) {
-                        emitRWithRounding(op, rd, rs1, op.r2, RM_RDN);
+                        emitRWithRounding(op, rd, rs1, op.r2, RM_RNE);
                     } else if (foundChar(',')) {
                         int rounding = readRounding();
                         emitRWithRounding(op, rd, rs1, op.r2, rounding);
