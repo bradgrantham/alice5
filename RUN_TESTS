@@ -12,7 +12,7 @@ if [ "$1" == "" ]
 then
     shaders="creation define lk wavy wetrock flirt"
 else
-    shaders="$1"
+    shaders="$*"
 fi
 
 echo 
