@@ -815,16 +815,91 @@ sinTable_f32:
         jalr x0, ra, 0
 
 .length2:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; save registers
+        fsw     fa0,-4(sp)
+        fsw     fa1,-8(sp)
+        fsw     fa2,-12(sp)
+        fsw     fa3,-16(sp)
+
+        flw     fa0, 0(sp)              ; fa0 = x = popf()
+        fmul.s  fa1, fa0, fa0           ; fa1 = x * x
+        flw     fa3, 4(sp)              ; fa3 = y = popf()
+        fmadd.s fa2, fa3, fa3, fa1      ; fa2 = x * x + y * y
+
+        fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
+
+        fsw     fa0, 4(sp)             ; pushf(d) 
+
+        ; restore registers
+        flw     fa0,-4(sp)
+        flw     fa1,-8(sp)
+        flw     fa2,-12(sp)
+        flw     fa3,-16(sp)
+
+        ; set stack pointer as if pops and pushes had occured
+        addi    sp, sp, 4
+
         jalr x0, ra, 0
 
 .length3:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; save registers
+        fsw     fa0,-4(sp)
+        fsw     fa1,-8(sp)
+        fsw     fa2,-12(sp)
+        fsw     fa3,-16(sp)
+
+        flw     fa0, 0(sp)              ; fa0 = x = popf()
+        fmul.s  fa1, fa0, fa0           ; fa1 = x * x
+        flw     fa3, 4(sp)              ; fa3 = y = popf()
+        fmadd.s fa2, fa3, fa3, fa1      ; fa2 = x * x + y * y
+        flw     fa0, 8(sp)              ; fa0 = z = popf()
+        fmadd.s fa1, fa0, fa0, fa2      ; fa1 = x * x + y * y + z * z
+
+        fsqrt.s fa3, fa1                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
+
+        fsw     fa3, 8(sp)             ; pushf(d) 
+
+        ; restore registers
+        flw     fa0,-4(sp)
+        flw     fa1,-8(sp)
+        flw     fa2,-12(sp)
+        flw     fa3,-16(sp)
+
+        ; set stack pointer as if pops and pushes had occured
+        addi    sp, sp, 8
+
         jalr x0, ra, 0
 
 .length4:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; save registers
+        fsw     fa0,-4(sp)
+        fsw     fa1,-8(sp)
+        fsw     fa2,-12(sp)
+        fsw     fa3,-16(sp)
+
+        flw     fa0, 0(sp)              ; fa0 = x = popf()
+        fmul.s  fa1, fa0, fa0           ; fa1 = x * x
+        flw     fa3, 4(sp)              ; fa3 = y = popf()
+        fmadd.s fa2, fa3, fa3, fa1      ; fa2 = x * x + y * y
+        flw     fa0, 8(sp)              ; fa0 = z = popf()
+        fmadd.s fa1, fa0, fa0, fa2      ; fa1 = x * x + y * y + z * z
+        flw     fa3, 12(sp)             ; fa3 = w = popf()
+        fmadd.s fa2, fa3, fa3, fa1      ; fa2 = x * x + y * y + z * z + w * w
+
+        fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
+
+        fsw     fa0, 12(sp)             ; pushf(d) 
+
+        ; restore registers
+        flw     fa0,-4(sp)
+        flw     fa1,-8(sp)
+        flw     fa2,-12(sp)
+        flw     fa3,-16(sp)
+
+        ; set stack pointer as if pops and pushes had occured
+        addi    sp, sp, 12
+
+        jalr    x0, ra, 0                  ; return;
 
 .fract:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
