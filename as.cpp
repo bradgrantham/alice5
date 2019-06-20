@@ -309,13 +309,17 @@ public:
         operators["fsgnjx.s"]  = Operator{FORMAT_R,  0b1010011, 0b010, 0b0010000}.setAllFloat();
 
         // Floating point conversion.
-        operators["fcvt.w.s"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1100000}.setS1Float().setNeedRounding()
+        operators["fcvt.w.s"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1100000}.setS1Float()
+            .setNeedRounding()
             .setR2(0b00000);
         operators["fcvt.wu.s"] = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1100000}.setS1Float()
+            .setNeedRounding()
             .setR2(0b00001);
-        operators["fcvt.s.w"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1101000}.setDFloat().setNeedRounding()
+        operators["fcvt.s.w"]  = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1101000}.setDFloat()
+            .setNeedRounding()
             .setR2(0b00000);
         operators["fcvt.s.wu"] = Operator{FORMAT_R2, 0b1010011, 0b111, 0b1101000}.setDFloat()
+            .setNeedRounding()
             .setR2(0b00001);
 
         // Floating point comparison
@@ -328,13 +332,19 @@ public:
             .setR2(0b00000);
 
         // Floating point math.
-        operators["fadd.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0000000}.setAllFloat();
-        operators["fsub.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0000100}.setAllFloat();
-        operators["fmul.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0001000}.setAllFloat();
-        operators["fdiv.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0001100}.setAllFloat();
+        operators["fadd.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0000000}.setAllFloat()
+            .setNeedRounding();
+        operators["fsub.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0000100}.setAllFloat()
+            .setNeedRounding();
+        operators["fmul.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0001000}.setAllFloat()
+            .setNeedRounding();
+        operators["fdiv.s"]    = Operator{FORMAT_R,  0b1010011, 0b010, 0b0001100}.setAllFloat()
+            .setNeedRounding();
         operators["fsqrt.s"]   = Operator{FORMAT_R2, 0b1010011, 0b010, 0b0101100}.setAllFloat()
+            .setNeedRounding()
             .setR2(0b00000);
-        operators["fmadd.s"]   = Operator{FORMAT_R4, 0b1000011, 0b000, 0b0000000}.setAllFloat();
+        operators["fmadd.s"]   = Operator{FORMAT_R4, 0b1000011, 0b000, 0b0000000}.setAllFloat()
+            .setNeedRounding();
 
         // Environment.
         operators["ebreak"]    = Operator{FORMAT_IZ, 0b1110011, 0b000, 0b0000000}.
@@ -587,6 +597,11 @@ private:
         }
     }
 
+    // Returns whether we are at end of line, which could be the end of string or ';'.
+    bool atEndOfLine() {
+        return (*s == '\0') || (*s == ';');
+    }
+
     // Skips a character and subsequent whitespace. Returns whether it found the character.
     bool foundChar(char c) {
         if (*s == c) {
@@ -813,7 +828,19 @@ private:
                     error("expected comma");
                 }
                 int rs2 = readRegister(op.s2IsFloat, "source");
-                emitR(op, rd, rs1, rs2);
+                if(op.needRounding) {
+                    skipWhitespace();
+                    if (atEndOfLine()) {
+                        emitRWithRounding(op, rd, rs1, op.r2, RM_RDN);
+                    } else if (foundChar(',')) {
+                        int rounding = readRounding();
+                        emitRWithRounding(op, rd, rs1, op.r2, rounding);
+                    } else {
+                        error("expected comma");
+                    }
+                } else {
+                    emitR(op, rd, rs1, rs2);
+                }
                 break;
             }
 
@@ -831,7 +858,19 @@ private:
                     error("expected comma");
                 }
                 int rs3 = readRegister(true, "source");
-                emitR4(op, rd, rs1, rs2, rs3);
+                if(op.needRounding) {
+                    skipWhitespace();
+                    if (atEndOfLine()) {
+                        emitR4WithRounding(op, rd, rs1, rs2, rs3, RM_RDN);
+                    } else if (foundChar(',')) {
+                        int rounding = readRounding();
+                        emitR4WithRounding(op, rd, rs1, rs2, rs3, rounding);
+                    } else {
+                        error("expected comma");
+                    }
+                } else {
+                    emitR4(op, rd, rs1, rs2, rs3);
+                }
                 break;
             }
 
@@ -842,11 +881,15 @@ private:
                 }
                 int rs1 = readRegister(op.s1IsFloat, "source");
                 if(op.needRounding) {
-                    if (!foundChar(',')) {
+                    skipWhitespace();
+                    if (atEndOfLine()) {
+                        emitRWithRounding(op, rd, rs1, op.r2, RM_RDN);
+                    } else if (foundChar(',')) {
+                        int rounding = readRounding();
+                        emitRWithRounding(op, rd, rs1, op.r2, rounding);
+                    } else {
                         error("expected comma");
                     }
-                    int rounding = readRounding();
-                    emitRWithRounding(op, rd, rs1, op.r2, rounding);
                 } else {
                     emitR(op, rd, rs1, op.r2);
                 }
@@ -1070,6 +1113,15 @@ private:
         emit(op.opcode
                 | rd << 7
                 | op.funct3 << 12
+                | rs1 << 15
+                | rs2 << 20
+                | rs3 << 27);
+    }
+
+    void emitR4WithRounding(const Operator &op, int rd, int rs1, int rs2, int rs3, int rm) {
+        emit(op.opcode
+                | rd << 7
+                | rm << 12
                 | rs1 << 15
                 | rs2 << 20
                 | rs3 << 27);
