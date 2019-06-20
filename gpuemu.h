@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cmath>
 #include <map>
+#include <set>
 #include <string>
 #include <cfenv>
 
@@ -85,6 +86,9 @@ struct GPUCore
         SUBST_ALL4,
     };
     std::map<uint32_t, SubstituteFunction> substFunctions;
+    std::map<uint32_t, std::string> substFunctionNames;
+
+    std::set<std::string> substitutedFunctions;
 
     GPUCore(const SymbolTable& librarySymbols)
     {
@@ -153,6 +157,7 @@ struct GPUCore
         for(auto& [name, subst]: substitutions) {
             if(librarySymbols.find(name) != librarySymbols.end()) {
                 substFunctions[librarySymbols.at(name)] = subst;
+                substFunctionNames[librarySymbols.at(name)] = name;
             }
         }
     }
@@ -582,6 +587,7 @@ GPUCore::Status GPUCore::step(T& memory)
             } else {
                 if((funct3 == 0) && (rs1 == 0) && (immI == 0)) {
                     if(substFunctions.find(regs.pc) != substFunctions.end()) {
+                        substitutedFunctions.insert(substFunctionNames[regs.pc]);
                         switch(substFunctions[regs.pc]) {
                             case SUBST_SIN: {
                                 pushf(sinf(popf()));

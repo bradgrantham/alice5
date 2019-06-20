@@ -416,6 +416,10 @@ int main(int argc, char **argv)
     std::cout << dispatchedCount << " instructions executed.\n";
     std::cout << (50000000.0f / dispatchedCount) << " fps estimated at 50 MHz.\n";
 
+    for(auto& subst: core.substitutedFunctions) {
+        std::cout << "substituted for " << subst << '\n';
+    }
+
     FILE *fp = fopen("emulated.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", imageWidth, imageHeight);
     fwrite(img, 1, imageWidth * imageHeight * 3, fp);
