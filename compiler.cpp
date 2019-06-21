@@ -524,6 +524,24 @@ std::string Compiler::reg(uint32_t id) const {
     return ss.str();
 }
 
+void Compiler::emitCopyVariable(uint32_t dst, uint32_t src, const std::string &comment) {
+    emitCopyRegister(asRegister(dst)->phy, asRegister(src)->phy, comment);
+}
+
+void Compiler::emitCopyRegister(uint32_t dst, uint32_t src, const std::string &comment) {
+    std::ostringstream ss;
+
+    if (src < 32) {
+        ss << "add x" << dst << ", x" << src << ", x0";
+    } else {
+        dst -= 32;
+        src -= 32;
+        ss << "fsgnj.s f" << dst << ", f" << src << ", f" << src;
+    }
+
+    emit(ss.str(), comment);
+}
+
 void Compiler::emitNotImplemented(const std::string &op) {
     std::ostringstream ss;
 
@@ -584,7 +602,12 @@ void Compiler::emitCall(const std::string &functionName,
 
     for (int i = operandIds.size() - 1; i >= 0; i--) {
         std::ostringstream ss;
-        ss << "fsw " << reg(operandIds[i]) << ", " << i*4 << "(sp)";
+        uint32_t phy = asRegister(operandIds[i])->phy;
+        if (phy < 32) {
+            ss << "sw x" << phy << ", " << i*4 << "(sp)";
+        } else {
+            ss << "fsw f" << (phy - 32) << ", " << i*4 << "(sp)";
+        }
         emit(ss.str(), "Push parameter");
     }
 
@@ -598,7 +621,12 @@ void Compiler::emitCall(const std::string &functionName,
     // Pop parameters.
     for (int i = 0; i < resultIds.size(); i++) {
         std::ostringstream ss;
-        ss << "flw " << reg(resultIds[i]) << ", " << i*4 << "(sp)";
+        uint32_t phy = asRegister(resultIds[i])->phy;
+        if (phy < 32) {
+            ss << "lw x" << phy << ", " << i*4 << "(sp)";
+        } else {
+            ss << "flw f" << (phy - 32) << ", " << i*4 << "(sp)";
+        }
         emit(ss.str(), "Pop result");
     }
 
@@ -703,17 +731,9 @@ void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
     for (auto &instruction : instructions) {
         switch (instruction.mOperation) {
             case PCOPY_OP_MOVE: {
-                std::ostringstream ss;
                 uint32_t sourceReg = instruction.mPair.mSource.mRegister;
                 uint32_t destReg = instruction.mPair.mDestination.mRegister;
-                if (sourceReg < 32) {
-                    ss << "add x" << destReg << ", x" << sourceReg << ", x0";
-                } else {
-                    destReg -= 32;
-                    sourceReg -= 32;
-                    ss << "fsgnj.s f" << destReg << ", f" << sourceReg << ", f" << sourceReg;
-                }
-                emit(ss.str(), "Phi elimination (move)");
+                emitCopyRegister(destReg, sourceReg, "Phi elimination (move)");
                 break;
             }
 

@@ -137,11 +137,14 @@ struct Compiler {
 
     // String for a virtual register ("r12" or more).
     std::string reg(uint32_t id) const;
+
     void emitNotImplemented(const std::string &op);
     void emitUnaryOp(const std::string &opName, int result, int op);
     void emitBinaryOp(const std::string &opName, int result, int op1, int op2);
     void emitBinaryImmOp(const std::string &opName, int result, int op, uint32_t imm);
     void emitLabel(const std::string &label);
+    void emitCopyVariable(uint32_t dst, uint32_t src, const std::string &comment);
+    void emitCopyRegister(uint32_t dst, uint32_t src, const std::string &comment);
 
     // Return the label passed in, unless it's an empty string, in which case
     // it returns an appropriate non-empty string.

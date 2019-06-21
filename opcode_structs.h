@@ -546,6 +546,7 @@ struct InsnSelect : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepSelect(*this); }
     virtual uint32_t opcode() const { return SpvOpSelect; }
     virtual std::string name() const { return "OpSelect"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpIEqual instruction (code 170).

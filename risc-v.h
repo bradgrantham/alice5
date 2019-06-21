@@ -187,7 +187,7 @@ struct RiscVDot : public Instruction {
     virtual void emit(Compiler *compiler);
 };
 
-// All instruction.
+// All instruction. Like the InsnAll instruction, but lists each sub-element of the vector.
 struct RiscVAll : public Instruction {
     RiscVAll(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), operandIds(operandIds) {
         addResult(resultId);
@@ -204,7 +204,7 @@ struct RiscVAll : public Instruction {
     virtual void emit(Compiler *compiler);
 };
 
-// Any instruction.
+// Any instruction. Like the InsnAny instruction, but lists each sub-element of the vector.
 struct RiscVAny : public Instruction {
     RiscVAny(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), operandIds(operandIds) {
         addResult(resultId);

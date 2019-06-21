@@ -360,7 +360,38 @@ void InsnLogicalNot::emit(Compiler *compiler)
     // SPIR-V guarantees that the two operands are Bool type, but doesn't specify
     // the bit pattern. I believe our current code always generates 0 or 1 for
     // results of boolean ops (e.g., fle.s, flt.s).
-    compiler->emitBinaryOp("xori", resultId(), operandId(), 1);
+    compiler->emitBinaryImmOp("xori", resultId(), operandId(), 1);
+}
+
+void InsnSelect::emit(Compiler *compiler)
+{
+    // If conditionId() is true, pick object1Id(), else pick object2Id().
+    std::string falseLabel = compiler->makeLocalLabel();
+
+    // Copy false value to result.
+    {
+        std::ostringstream ssc;
+        ssc << "r" << resultId() << " <- r" << object2Id() << " (false result)";
+        compiler->emitCopyVariable(resultId(), object2Id(), ssc.str());
+    }
+
+    // Skip copying true value if condition is false.
+    {
+        std::ostringstream ss;
+        ss << "beq " << compiler->reg(conditionId()) << ", x0, " << falseLabel;
+        std::ostringstream ssc;
+        ssc << "r" << conditionId();
+        compiler->emit(ss.str(), ssc.str());
+    }
+
+    // Copy true value to result.
+    {
+        std::ostringstream ssc;
+        ssc << "r" << resultId() << " <- r" << object1Id() << " (true result)";
+        compiler->emitCopyVariable(resultId(), object1Id(), ssc.str());
+    }
+
+    compiler->emitLabel(falseLabel);
 }
 
 void InsnFunctionCall::emit(Compiler *compiler)
