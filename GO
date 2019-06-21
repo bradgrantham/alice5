@@ -1,0 +1,13 @@
+#!/bin/bash
+
+program="$1"
+if [ "$program" == "" ]; then
+    echo "Usage: GO program.frag"
+    exit 1
+fi
+
+make -j && \
+    ./shade -c -s -O -o out.s -v -S "$program" > out && \
+    ./as -v out.s > out.lst && \
+    ./gpuemu -f 90 --term out.o
+
