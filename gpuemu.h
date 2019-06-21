@@ -503,41 +503,43 @@ GPUCore::Status GPUCore::step(T& memory)
             break;
         }
 
-        case makeOpcode(0, 0x0C, 3): { // add
-            if(dump) std::cout << "add\n";
+        CASE_MAKE_OPCODE_ALL_FUNCT3(0x0C, 3)
+        {
+            if(dump) std::cout << "add etc\n";
             if(rd > 0) {
-                if(funct7 == 0) {
-                    regs.x[rd] = regs.x[rs1] + regs.x[rs2];
-                } else if(funct7 == 32) {
-                    regs.x[rd] = regs.x[rs1] - regs.x[rs2];
-                } else {
-                    unimpl();
-                }
-            }
-            regs.pc += 4;
-            break;
-        }
-
-        case makeOpcode(2, 0x0C, 3): { // slt
-            if(dump) std::cout << "slt\n";
-            if(rd > 0) {
-                if(funct7 == 0) {
-                    regs.x[rd] = (int32_t) regs.x[rs1] < (int32_t) regs.x[rs2];
-                } else {
-                    unimpl();
-                }
-            }
-            regs.pc += 4;
-            break;
-        }
-
-        case makeOpcode(3, 0x0C, 3): { // sltu
-            if(dump) std::cout << "sltu\n";
-            if(rd > 0) {
-                if(funct7 == 0) {
-                    regs.x[rd] = (uint32_t) regs.x[rs1] < (uint32_t) regs.x[rs2];
-                } else {
-                    unimpl();
+                switch(funct3) {
+                    case 0: {
+                        if(funct7 == 0) {
+                            regs.x[rd] = regs.x[rs1] + regs.x[rs2]; // add
+                        } else if(funct7 == 32) {
+                            regs.x[rd] = regs.x[rs1] - regs.x[rs2]; // sub
+                        } else {
+                            unimpl();
+                        }
+                        break;
+                    }
+                    case 1: regs.x[rd] = regs.x[rs1] << (regs.x[rs2] & 0x1F); break;        // sll
+                    case 5: {
+                        if(funct7 == 0) {
+                            regs.x[rd] = regs.x[rs1] >> (regs.x[rs2] & 0x1F); break;        // srl
+                        } else if(funct7 == 32) {
+                            // whether right-shifting a negative signed
+                            // int extends the sign bit is implementation
+                            // defined in C but I'll risk it.
+                            regs.x[rd] = ((int32_t)regs.x[rs1]) >> (regs.x[rs2] & 0x1F); break;     // sra
+                        } else {
+                            unimpl();
+                        }
+                        break;
+                    }
+                    case 2: regs.x[rd] = ((int32_t)regs.x[rs1] < (int32_t)regs.x[rs2]); break;      // sltu
+                    case 3: regs.x[rd] = (regs.x[rs1] < regs.x[rs2]); break;        // slt
+                    case 4: regs.x[rd] = regs.x[rs1] ^ regs.x[rs2]; break;  // xor
+                    case 6: regs.x[rd] = regs.x[rs1] | regs.x[rs2]; break;  // or
+                    case 7: regs.x[rd] = regs.x[rs1] & regs.x[rs2]; break;  // and
+                    default: {
+                        unimpl();
+                    }
                 }
             }
             regs.pc += 4;
@@ -566,7 +568,7 @@ GPUCore::Status GPUCore::step(T& memory)
 
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x04, 3)
         { // addi
-            if(dump) std::cout << "addi\n";
+            if(dump) std::cout << "addi etc\n";
             if(rd > 0) {
                 switch(funct3) {
                     case 0: regs.x[rd] = regs.x[rs1] + immI; break;     // addi
@@ -712,6 +714,7 @@ GPUCore::Status GPUCore::step(T& memory)
                                 float x2 = popf();
                                 float v = x1 * x2;
                                 pushf(v);
+                                break;
                             }
                             case SUBST_DOT2: {
                                 float x1 = popf();
@@ -720,6 +723,7 @@ GPUCore::Status GPUCore::step(T& memory)
                                 float y2 = popf();
                                 float v = x1 * x2 + y1 * y2;
                                 pushf(v);
+                                break;
                             }
                             case SUBST_DOT3: {
                                 float x1 = popf();
@@ -730,6 +734,7 @@ GPUCore::Status GPUCore::step(T& memory)
                                 float z2 = popf();
                                 float v = x1 * x2 + y1 * y2 + z1 * z2;
                                 pushf(v);
+                                break;
                             }
                             case SUBST_DOT4: {
                                 float x1 = popf();
@@ -742,21 +747,25 @@ GPUCore::Status GPUCore::step(T& memory)
                                 float w2 = popf();
                                 float v = x1 * x2 + y1 * y2 + z1 * z2 + w1 * w2;
                                 pushf(v);
+                                break;
                             }
                             case SUBST_ALL1: {
                                 uint32_t x = pop32();
                                 push32(x);
+                                break;
                             }
                             case SUBST_ALL2: {
                                 uint32_t x = pop32();
                                 uint32_t y = pop32();
                                 push32(x && y);
+                                break;
                             }
                             case SUBST_ALL3: {
                                 uint32_t x = pop32();
                                 uint32_t y = pop32();
                                 uint32_t z = pop32();
                                 push32(x && y && z);
+                                break;
                             }
                             case SUBST_ALL4: {
                                 uint32_t x = pop32();
@@ -764,21 +773,25 @@ GPUCore::Status GPUCore::step(T& memory)
                                 uint32_t z = pop32();
                                 uint32_t w = pop32();
                                 push32(x && y && z && w);
+                                break;
                             }
                             case SUBST_ANY1: {
                                 uint32_t x = pop32();
                                 push32(x);
+                                break;
                             }
                             case SUBST_ANY2: {
                                 uint32_t x = pop32();
                                 uint32_t y = pop32();
                                 push32(x || y);
+                                break;
                             }
                             case SUBST_ANY3: {
                                 uint32_t x = pop32();
                                 uint32_t y = pop32();
                                 uint32_t z = pop32();
                                 push32(x || y || z);
+                                break;
                             }
                             case SUBST_ANY4: {
                                 uint32_t x = pop32();
@@ -786,6 +799,7 @@ GPUCore::Status GPUCore::step(T& memory)
                                 uint32_t z = pop32();
                                 uint32_t w = pop32();
                                 push32(x || y || z || w);
+                                break;
                             }
                             case SUBST_STEP: {
                                 float edge = popf();
