@@ -495,6 +495,7 @@ struct InsnLogicalOr : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepLogicalOr(*this); }
     virtual uint32_t opcode() const { return SpvOpLogicalOr; }
     virtual std::string name() const { return "OpLogicalOr"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpLogicalAnd instruction (code 167).
@@ -511,6 +512,7 @@ struct InsnLogicalAnd : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepLogicalAnd(*this); }
     virtual uint32_t opcode() const { return SpvOpLogicalAnd; }
     virtual std::string name() const { return "OpLogicalAnd"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpLogicalNot instruction (code 168).
@@ -525,6 +527,7 @@ struct InsnLogicalNot : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepLogicalNot(*this); }
     virtual uint32_t opcode() const { return SpvOpLogicalNot; }
     virtual std::string name() const { return "OpLogicalNot"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpSelect instruction (code 169).
@@ -641,6 +644,7 @@ struct InsnFOrdLessThan : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdLessThan(*this); }
     virtual uint32_t opcode() const { return SpvOpFOrdLessThan; }
     virtual std::string name() const { return "OpFOrdLessThan"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFOrdGreaterThan instruction (code 186).
@@ -657,6 +661,7 @@ struct InsnFOrdGreaterThan : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdGreaterThan(*this); }
     virtual uint32_t opcode() const { return SpvOpFOrdGreaterThan; }
     virtual std::string name() const { return "OpFOrdGreaterThan"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFOrdLessThanEqual instruction (code 188).
@@ -690,6 +695,7 @@ struct InsnFOrdGreaterThanEqual : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdGreaterThanEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpFOrdGreaterThanEqual; }
     virtual std::string name() const { return "OpFOrdGreaterThanEqual"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpPhi instruction (code 245).

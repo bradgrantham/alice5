@@ -339,6 +339,30 @@ void InsnSLessThan::emit(Compiler *compiler)
     compiler->emitBinaryOp("slt", resultId(), operand1Id(), operand2Id());
 }
 
+void InsnLogicalAnd::emit(Compiler *compiler)
+{
+    // SPIR-V guarantees that the two operands are Bool type, but doesn't specify
+    // the bit pattern. I believe our current code always generates 0 or 1 for
+    // results of boolean ops (e.g., fle.s, flt.s).
+    compiler->emitBinaryOp("and", resultId(), operand1Id(), operand2Id());
+}
+
+void InsnLogicalOr::emit(Compiler *compiler)
+{
+    // SPIR-V guarantees that the two operands are Bool type, but doesn't specify
+    // the bit pattern. I believe our current code always generates 0 or 1 for
+    // results of boolean ops (e.g., fle.s, flt.s).
+    compiler->emitBinaryOp("or", resultId(), operand1Id(), operand2Id());
+}
+
+void InsnLogicalNot::emit(Compiler *compiler)
+{
+    // SPIR-V guarantees that the two operands are Bool type, but doesn't specify
+    // the bit pattern. I believe our current code always generates 0 or 1 for
+    // results of boolean ops (e.g., fle.s, flt.s).
+    compiler->emitBinaryOp("xori", resultId(), operandId(), 1);
+}
+
 void InsnFunctionCall::emit(Compiler *compiler)
 {
     compiler->emit("push pc", "");
@@ -398,7 +422,22 @@ void InsnPhi::emit(Compiler *compiler)
 
 void InsnFOrdLessThanEqual::emit(Compiler *compiler)
 {
-    compiler->emitBinaryOp("lte", resultId(), operand1Id(), operand2Id());
+    compiler->emitBinaryOp("fle.s", resultId(), operand1Id(), operand2Id());
+}
+
+void InsnFOrdLessThan::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("flt.s", resultId(), operand1Id(), operand2Id());
+}
+
+void InsnFOrdGreaterThanEqual::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("fle.s", resultId(), operand2Id(), operand1Id());
+}
+
+void InsnFOrdGreaterThan::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("flt.s", resultId(), operand2Id(), operand1Id());
 }
 
 void InsnBranchConditional::emit(Compiler *compiler)
