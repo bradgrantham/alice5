@@ -414,7 +414,9 @@ int main(int argc, char **argv)
         }
     std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";
     std::cout << dispatchedCount << " instructions executed.\n";
-    std::cout << (50000000.0f / dispatchedCount) << " fps estimated at 50 MHz.\n";
+    float fps = 50000000.0f / dispatchedCount;
+    std::cout << fps << " fps estimated at 50 MHz.\n";
+    std::cout << (int)ceilf(5.0 / fps) << " cores or more required at 50 MHz for 5 fps.\n";
 
     for(auto& subst: core.substitutedFunctions) {
         std::cout << "substituted for " << subst << '\n';
