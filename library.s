@@ -21,6 +21,9 @@
 .halfPi:
         .word   1070141403      ; 0x3fc90fdb = pi / 2
 
+.pi:
+        .word   1078530011      ; 0x40490fdb = pi
+
 .sin:
         ; save registers here, e.g.
         sw      a0,-4(sp)
@@ -978,7 +981,76 @@ sinTable_f32:
         jalr x0, ra, 0
 
 .atan2:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; save registers
+        fsw     fa0, -4(sp)
+        fsw     fa1, -8(sp)
+        fsw     fa2, -12(sp)
+        fsw     fa3, -16(sp)
+        fsw     fa4, -20(sp)
+        fsw     fa5, -24(sp)
+        sw      a0, -28(sp)
+        sw      a1, -32(sp)
+
+        flw     fa1, 0(sp)       ; fa1 = y
+        flw     fa0, 4(sp)       ; fa0 = x
+
+        fdiv.s          fa3, fa1, fa0   ; z = y / x
+
+        fcvt.s.w        fa2,zero,rtz    ; fa2 = 0.0
+        flt.s           a1,fa0,fa2      ; a1 = (x < 0)
+        bne             a1,zero, .atan2_neg_x     ; if(x < 0) goto .atan2_neg_x;
+
+        addi    sp, sp, -8      ; Make room on stack
+        sw      ra, 4(sp)       ; Save return address
+        fsw     fa3, 0(sp)      ; Store parameter
+
+        jal     ra, .atan       ; fa0 = a = atan(z)
+
+        flw     fa0, 0(sp)      ; Pop result
+        lw      ra, 4(sp)       ; Restore return address
+        addi    sp, sp, 8       ; Restore stack
+
+        jal zero, .atan2_finish   ; goto .atan2_finish
+
+.atan2_neg_x:
+        ; x < 0
+
+        fsgnjn.s fa4, fa3, fa1  ; float z2 = copysign(z, -y);
+
+        addi    sp, sp, -8      ; Make room on stack
+        sw      ra, 4(sp)       ; Save return address
+        fsw     fa4, 0(sp)      ; Store parameter
+
+        jal     ra, .atan       ; fa0 = a = atan(z2)
+
+        flw     fa4, 0(sp)      ; Pop result
+        lw      ra, 4(sp)       ; Restore return address
+        addi    sp, sp, 8       ; Restore stack
+
+        fsgnjn.s fa2, fa4, fa1  ; float a = copysign(brad_atan(z2), -y);
+
+	lui	a0,%hi(.pi)
+	flw	fa5,%lo(.pi)(a0)        ; float pi = 3.14159
+
+        fsgnj.s fa3, fa5, fa1   ; sign_y_pi = copysign(pi, y)
+        fadd.s  fa0, fa6, fa2   ; v = copysign(M_PI, y) + a;
+
+.atan2_finish:
+
+        fsw     fa0, 4(sp)      ; store return value ("x"), doesn't have to be fa0
+
+        ; restore registers
+        flw     fa0, -4(sp)
+        flw     fa1, -8(sp)
+        flw     fa2, -12(sp)
+        flw     fa3, -16(sp)
+        flw     fa4, -20(sp)
+        flw     fa5, -24(sp)
+        lw      a0, -28(sp)
+        lw      a1, -32(sp)
+
+        addi    sp, sp, 4       ; We took two parameters and return one
+
         jalr x0, ra, 0
 
 .refract1:
