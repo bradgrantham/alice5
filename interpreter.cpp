@@ -770,6 +770,7 @@ void Interpreter::stepMatrixTimesVector(const InsnMatrixTimesVector& insn)
     int rn = resultType->count;
     int vn = vectorType->count;
 
+    // Vectors are columns.
     for(int i = 0; i < rn; i++) {
         float dot = 0.0;
 

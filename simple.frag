@@ -50,7 +50,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         float c = cos(a);
         mat2 m = mat2(c, s, -s, c);
 
-        uv = uv*m;
+        uv = m*uv;
 
         // Checkerboard.
         uv = floor(mod(uv*vec2(10.0), 2.0));

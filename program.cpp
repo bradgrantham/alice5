@@ -693,8 +693,8 @@ void Program::expandVectors() {
                 // Vectors are rows.
                 const TypeMatrix *typeMatrix = getTypeAsMatrix(resultTypes.at(insn->matrixId()));
                 assert(typeMatrix != nullptr);
-                const TypeVector *typeVector = getTypeAsVector(typeMatrix->columnType);
-                assert(typeVector != nullptr);
+                const TypeVector *matVector = getTypeAsVector(typeMatrix->columnType);
+                assert(matVector != nullptr);
                 assert(typeMatrix->columnType == resultTypes.at(insn->vectorId()));
                 const TypeVector *resVector = getTypeAsVector(insn->type);
                 assert(resVector != nullptr);
@@ -704,14 +704,49 @@ void Program::expandVectors() {
                 for (int col = 0; col < typeMatrix->columnCount; col++) {
                     std::vector<uint32_t> vector1Ids;
                     std::vector<uint32_t> vector2Ids;
-                    for (int row = 0; row < typeVector->count; row++) {
-                        int index = typeMatrix->getIndex(row, col, typeVector);
-                        vector1Ids.push_back(scalarize(insn->vectorId(), row, typeVector->type));
-                        vector2Ids.push_back(scalarize(insn->matrixId(), index, typeVector->type));
+                    for (int row = 0; row < matVector->count; row++) {
+                        int index = typeMatrix->getIndex(row, col, matVector);
+                        vector1Ids.push_back(scalarize(insn->vectorId(), row, matVector->type));
+                        vector2Ids.push_back(scalarize(insn->matrixId(), index, matVector->type));
                     }
                     newList.push_back(std::make_shared<RiscVDot>(insn->lineInfo,
                                 resVector->type,
                                 scalarize(insn->resultId(), col, resVector->type),
+                                vector1Ids,
+                                vector2Ids));
+                }
+
+                replaced = true;
+                break;
+            }
+
+            case SpvOpMatrixTimesVector: {
+                InsnMatrixTimesVector *insn = dynamic_cast<InsnMatrixTimesVector *>(instruction);
+
+                // Vectors are columns.
+                const TypeMatrix *typeMatrix = getTypeAsMatrix(resultTypes.at(insn->matrixId()));
+                assert(typeMatrix != nullptr);
+                const TypeVector *matVector = getTypeAsVector(typeMatrix->columnType);
+                assert(matVector != nullptr);
+                const TypeVector *opVector = getTypeAsVector(resultTypes.at(insn->vectorId()));
+                assert(opVector != nullptr);
+                assert(opVector->count == typeMatrix->columnCount);
+                const TypeVector *resVector = getTypeAsVector(insn->type);
+                assert(resVector != nullptr);
+                assert(matVector == resVector);
+
+                // Dot the source vector with each row vector of the matrix.
+                for (int row = 0; row < matVector->count; row++) {
+                    std::vector<uint32_t> vector1Ids;
+                    std::vector<uint32_t> vector2Ids;
+                    for (int col = 0; col < typeMatrix->columnCount; col++) {
+                        int index = typeMatrix->getIndex(row, col, matVector);
+                        vector1Ids.push_back(scalarize(insn->vectorId(), col, matVector->type));
+                        vector2Ids.push_back(scalarize(insn->matrixId(), index, matVector->type));
+                    }
+                    newList.push_back(std::make_shared<RiscVDot>(insn->lineInfo,
+                                resVector->type,
+                                scalarize(insn->resultId(), row, resVector->type),
                                 vector1Ids,
                                 vector2Ids));
                 }
