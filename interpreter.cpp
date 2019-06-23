@@ -795,6 +795,7 @@ void Interpreter::stepVectorTimesMatrix(const InsnVectorTimesMatrix& insn)
     int rn = resultType->count;
     int vn = vectorType->count;
 
+    // Vectors are rows.
     for(int i = 0; i < rn; i++) {
         result[i] = dotProduct(vector, matrix + vn*i, vn);
     }

@@ -197,6 +197,12 @@ struct Program
         return type->op() == SpvOpTypeVector ? dynamic_cast<const TypeVector *>(type) : nullptr;
     }
 
+    // If the type ID refers to a TypeMatrix, returns it. Otherwise returns null.
+    const TypeMatrix *getTypeAsMatrix(int typeId) const {
+        const Type *type = types.at(typeId).get();
+        return type->op() == SpvOpTypeMatrix ? dynamic_cast<const TypeMatrix *>(type) : nullptr;
+    }
+
     // Return the SPIR-V operator for the type (SpvOpTypeInt, SpvOpTypePointer, SpvOpTypeBool,
     // SpvOpTypeFloat, etc.).
     uint32_t getTypeOp(uint32_t typeId) const {
@@ -277,7 +283,8 @@ struct Program
     void prepareForCompile();
 
     // Return the scalar for the vector register's index.
-    uint32_t scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg = 0);
+    uint32_t scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg = 0,
+            bool mustExist = false);
 
     // If typeVector is null, just returns vreg. Else calls scalarize() with the
     // typeVector's subtype.

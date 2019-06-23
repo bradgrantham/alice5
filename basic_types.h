@@ -317,6 +317,12 @@ struct TypeMatrix : public Type
         }
         std::cout << ">";
     }
+
+    // Converts a row,col pair to a single index of the element.
+    int getIndex(int row, int col, const TypeVector *typeVector) const {
+        // The math here is arbitrary, we just need to do it consistently throughout.
+        return col*typeVector->count + row;
+    }
 };
 
 // Represents a function type.

@@ -47,10 +47,14 @@ spv_result_t Program::handleHeader(void* user_data, spv_endianness_t endian,
 }
 
 // Return the scalar for the vector register's index.
-uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg) {
+uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg,
+        bool mustExist) {
+
     auto regIndex = RegIndex{vreg, i};
     auto itr = vec2scalar.find(regIndex);
     if (itr == vec2scalar.end()) {
+        assert(!mustExist);
+
         // See if this was a constant vector.
         auto itr = constants.find(vreg);
         if (itr != constants.end()) {
@@ -636,16 +640,29 @@ void Program::expandVectors() {
             case SpvOpCompositeConstruct: {
                 InsnCompositeConstruct *insn =
                     dynamic_cast<InsnCompositeConstruct *>(instruction);
-                if (getTypeOp(insn->type) == SpvOpTypeMatrix) {
-                    std::cerr << "SpvOpCompositeConstruct doesn't handle matrices.\n";
-                    exit(1);
-                }
-                const TypeVector *typeVector = getTypeAsVector(insn->type);
-                assert(typeVector != nullptr);
-                for (int i = 0; i < typeVector->count; i++) {
-                    auto [subtype, offset] = getConstituentInfo(insn->type, i);
-                    // Re-use existing SSA register.
-                    scalarize(insn->resultId(), i, subtype, insn->constituentsId(i));
+                const TypeMatrix *typeMatrix = getTypeAsMatrix(insn->type);
+                if (typeMatrix != nullptr) {
+                    const TypeVector *typeVector = getTypeAsVector(typeMatrix->columnType);
+                    assert(typeVector != nullptr);
+
+                    for (int col = 0; col < typeMatrix->columnCount; col++) {
+                        uint32_t vectorId = insn->constituentsId(col);
+
+                        for (int row = 0; row < typeVector->count; row++) {
+                            int index = typeMatrix->getIndex(row, col, typeVector);
+
+                            // Re-use existing SSA register.
+                            uint32_t id = scalarize(vectorId, row, typeVector->type, 0, true);
+                            scalarize(insn->resultId(), index, typeVector->type, id);
+                        }
+                    }
+                } else {
+                    const TypeVector *typeVector = getTypeAsVector(insn->type);
+                    assert(typeVector != nullptr);
+                    for (int i = 0; i < typeVector->count; i++) {
+                        // Re-use existing SSA register.
+                        scalarize(insn->resultId(), i, typeVector->type, insn->constituentsId(i));
+                    }
                 }
                 replaced = true;
                 break;
@@ -665,6 +682,39 @@ void Program::expandVectors() {
                 // to "oldId".
                 newList.push_back(std::make_shared<RiscVMove>(insn->lineInfo,
                             insn->type, insn->resultId(), oldId));
+
+                replaced = true;
+                break;
+            }
+
+            case SpvOpVectorTimesMatrix: {
+                InsnVectorTimesMatrix *insn = dynamic_cast<InsnVectorTimesMatrix *>(instruction);
+
+                // Vectors are rows.
+                const TypeMatrix *typeMatrix = getTypeAsMatrix(resultTypes.at(insn->matrixId()));
+                assert(typeMatrix != nullptr);
+                const TypeVector *typeVector = getTypeAsVector(typeMatrix->columnType);
+                assert(typeVector != nullptr);
+                assert(typeMatrix->columnType == resultTypes.at(insn->vectorId()));
+                const TypeVector *resVector = getTypeAsVector(insn->type);
+                assert(resVector != nullptr);
+                assert(resVector->count == typeMatrix->columnCount);
+
+                // Dot the source vector with each column vector of the matrix.
+                for (int col = 0; col < typeMatrix->columnCount; col++) {
+                    std::vector<uint32_t> vector1Ids;
+                    std::vector<uint32_t> vector2Ids;
+                    for (int row = 0; row < typeVector->count; row++) {
+                        int index = typeMatrix->getIndex(row, col, typeVector);
+                        vector1Ids.push_back(scalarize(insn->vectorId(), row, typeVector->type));
+                        vector2Ids.push_back(scalarize(insn->matrixId(), index, typeVector->type));
+                    }
+                    newList.push_back(std::make_shared<RiscVDot>(insn->lineInfo,
+                                resVector->type,
+                                scalarize(insn->resultId(), col, resVector->type),
+                                vector1Ids,
+                                vector2Ids));
+                }
 
                 replaced = true;
                 break;

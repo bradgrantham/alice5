@@ -237,6 +237,7 @@ struct InsnFNegate : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepFNegate(*this); }
     virtual uint32_t opcode() const { return SpvOpFNegate; }
     virtual std::string name() const { return "OpFNegate"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpIAdd instruction (code 128).

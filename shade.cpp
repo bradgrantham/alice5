@@ -290,6 +290,11 @@ void InsnFMod::emit(Compiler *compiler)
     compiler->emitBinCall(".mod", resultId(), operand1Id(), operand2Id());
 }
 
+void InsnFNegate::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("fsgnjn.s", resultId(), operandId(), operandId());
+}
+
 void InsnIAdd::emit(Compiler *compiler)
 {
     uint32_t intValue;

@@ -21,9 +21,9 @@ float foo(float n) {
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-    /*
     vec2 uv = (fragCoord - iResolution.xy/2.0)/iResolution.y;
 
+    /*
     // Plot a function.
     if (false) {
         // -1 to 1.
@@ -41,9 +41,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         vec2 n = vec2(0.0, 1.0);
         uv = reflect(uv, n);
     }
+    */
 
     // Matrix test.
-    if (false) {
+    if (true) {
         float a = 10.0*3.14159/180.0;
         float s = sin(a);
         float c = cos(a);
@@ -55,9 +56,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         uv = floor(mod(uv*vec2(10.0), 2.0));
     }
 
-    // fragColor = vec4(uv, 0.0, 1.0);
-    */
+    fragColor = vec4(uv, 0.0, 1.0);
 
+    /*
+    // This generates a phi instruction.
     vec3 x;
 
     if (inf < 123.45) {
@@ -67,4 +69,5 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
 
     outv = x;
+    */
 }
