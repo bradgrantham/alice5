@@ -66,3 +66,8 @@ clean:
 .PHONY: dis
 dis: simple.spv
 	$(GLSLANG_SOURCE_DIR)/build/External/spirv-tools/tools/spirv-dis simple.spv | cat
+
+
+.PHONY: tags
+tags:
+	ctags -R
