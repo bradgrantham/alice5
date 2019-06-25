@@ -998,7 +998,7 @@ sinTable_f32:
 
         fcvt.s.w        fa2,zero,rtz    ; fa2 = 0.0
         flt.s           a1,fa0,fa2      ; a1 = (x < 0)
-        bne             a1,zero, .atan2_neg_x     ; if(x < 0) goto .atan2_neg_x;
+        bne             a1,zero,.atan2_neg_x     ; if(x < 0) goto .atan2_neg_x;
 
         addi    sp, sp, -8      ; Make room on stack
         sw      ra, 4(sp)       ; Save return address
@@ -1033,11 +1033,11 @@ sinTable_f32:
 	flw	fa5,%lo(.pi)(a0)        ; float pi = 3.14159
 
         fsgnj.s fa3, fa5, fa1   ; sign_y_pi = copysign(pi, y)
-        fadd.s  fa0, fa6, fa2   ; v = copysign(M_PI, y) + a;
+        fadd.s  fa0, fa3, fa2   ; v = copysign(M_PI, y) + a;
 
 .atan2_finish:
 
-        fsw     fa0, 4(sp)      ; store return value ("x"), doesn't have to be fa0
+        fsw     fa0, 4(sp)      ; store return value ("x")
 
         ; restore registers
         flw     fa0, -4(sp)
@@ -1049,7 +1049,7 @@ sinTable_f32:
         lw      a0, -28(sp)
         lw      a1, -32(sp)
 
-        addi    sp, sp, 4       ; We took two parameters and return one
+        addi    sp, sp, 4       ; We took two parameters and return one, so fix up stack
 
         jalr x0, ra, 0
 
