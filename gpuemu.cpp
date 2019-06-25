@@ -416,7 +416,7 @@ int main(int argc, char **argv)
     std::cout << dispatchedCount << " instructions executed.\n";
     float fps = 50000000.0f / dispatchedCount;
     std::cout << fps << " fps estimated at 50 MHz.\n";
-    std::cout << (int)ceilf(5.0 / fps) << " cores or more required at 50 MHz for 5 fps.\n";
+    std::cout << "at least " << (int)ceilf(5.0 / fps) << " cores required at 50 MHz for 5 fps.\n";
 
     for(auto& subst: core.substitutedFunctions) {
         std::cout << "substituted for " << subst << '\n';
