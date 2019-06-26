@@ -991,8 +991,9 @@ sinTable_f32:
         sw      a0, -28(sp)
         sw      a1, -32(sp)
 
-        flw     fa1, 0(sp)       ; fa1 = y
-        flw     fa0, 4(sp)       ; fa0 = x
+        flw     fa1, 0(sp)      ; fa1 = y
+        flw     fa0, 4(sp)      ; fa0 = x
+        addi    sp,sp,-32        ; push saved registers
 
         fdiv.s          fa3, fa1, fa0   ; z = y / x
 
@@ -1004,7 +1005,7 @@ sinTable_f32:
         sw      ra, 4(sp)       ; Save return address
         fsw     fa3, 0(sp)      ; Store parameter
 
-        jal     ra, .atan       ; fa0 = a = atan(z)
+        jal     ra, .atan       ; fa0 = a = atan(z)     ; XXX OPT could restore regs and jump to .atan
 
         flw     fa0, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
@@ -1037,6 +1038,7 @@ sinTable_f32:
 
 .atan2_finish:
 
+        addi    sp,sp,32        ; pop saved registers
         fsw     fa0, 4(sp)      ; store return value ("x")
 
         ; restore registers
