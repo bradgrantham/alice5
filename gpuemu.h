@@ -927,7 +927,7 @@ GPUCore::Status GPUCore::step(T& memory)
 struct RunHeader
 {
     // Little-endian
-    uint32_t magic = 0x30354c41;        // 'AL50', version 0 of Alice 5 header
+    uint32_t magic = 0x30354c41;        // 'AL51', version 1 of Alice 5 header
     uint32_t initialPC;                 // Initial value PC is set to
     uint32_t gl_FragCoordAddress;       // address of vec4 gl_FragCoord input
     uint32_t colorAddress;              // address of vec4 color output
