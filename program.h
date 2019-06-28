@@ -30,7 +30,6 @@ const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
 const uint32_t SOURCE_NO_FILE = 0xFFFFFFFF;
 const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
-const uint32_t EXECUTION_ENDED = 0xFFFFFFFF;
 const uint32_t NO_RETURN_REGISTER = 0xFFFFFFFF;
 const uint32_t NO_FUNCTION = 0xFFFFFFFF;
 
@@ -292,6 +291,8 @@ struct Program
 
     // Transform vector instructions to scalar instructions.
     void expandVectors();
+    void expandVectors(Function *function);
+    void expandVectors(Block *block);
 
     // Expand a unary operator, such as FNegate, from vector to scalar if necessary.
     template <class T>

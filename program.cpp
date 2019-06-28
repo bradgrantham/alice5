@@ -271,9 +271,19 @@ void Program::prepareForCompile() {
 }
 
 void Program::expandVectors() {
-    // Map from instruction index before and after, for remapping other data structures.
-    std::vector<uint32_t> lineMap;
-    InstructionList newList;
+    for (auto &[_, function] : functions) {
+        expandVectors(function.get());
+    }
+}
+
+void Program::expandVectors(Function *function) {
+    for (auto &[_, block] : function->blocks) {
+        expandVectors(block.get());
+    }
+}
+
+void Program::expandVectors(Block *block) {
+    InstructionList newList(block);
 
     /* XXX delete
     // Expand variables.
@@ -300,13 +310,9 @@ void Program::expandVectors() {
     }
     */
 
-    for (uint32_t pc = 0; pc < instructions.size(); pc++) {
+    for (auto inst = block->instructions.head; inst; inst = inst->next) {
+        Instruction *instruction = inst.get();
         bool replaced = false;
-        const std::shared_ptr<Instruction> &instructionPtr = instructions[pc];
-        Instruction *instruction = instructionPtr.get();
-
-        // Keep track of where this instruction ends up.
-        lineMap.push_back(newList.size());
 
         switch (instruction->opcode()) {
             case SpvOpLoad: {
@@ -710,18 +716,13 @@ void Program::expandVectors() {
                 // the consecutive phi instructions into our own.
                 std::shared_ptr<RiscVPhi> newPhi = std::make_shared<RiscVPhi>(
                         instruction->lineInfo);
-                uint32_t newPc = newList.size();
                 newList.push_back(newPhi);
 
                 // Eat up all consecutive phis.
                 bool first = true;
-                while (pc < instructions.size() && instructions[pc]->opcode() == SpvOpPhi) {
-                    InsnPhi *oldPhi = dynamic_cast<InsnPhi *>(instructions[pc].get());
-
-                    if (!first) {
-                        // We did the first at the top of the loop.
-                        lineMap.push_back(newPc);
-                    }
+                std::shared_ptr<Instruction> prevInst = inst;
+                while (inst && inst->opcode() == SpvOpPhi) {
+                    InsnPhi *oldPhi = dynamic_cast<InsnPhi *>(inst.get());
 
                     // See if we should expand a vector.
                     const TypeVector *typeVector = getTypeAsVector(typeIdOf(oldPhi->resultId()));
@@ -752,9 +753,9 @@ void Program::expandVectors() {
                         first = false;
                     }
 
-                    pc++;
+                    inst = inst->next;
                 }
-                pc--; // Compensate for loop increment.
+                inst = prevInst; // Compensate for loop increment.
 
                 replaced = true;
                 break;
@@ -931,15 +932,10 @@ void Program::expandVectors() {
         }
 
         if (!replaced) {
-            newList.push_back(instructionPtr);
+            newList.push_back(inst);
         }
     }
 
-    // Remap other data structures.
-    for (auto &itr : labels) {
-        itr.second = lineMap[itr.second];
-    }
-
-    std::swap(newList, instructions);
+    std::swap(newList, block->instructions);
 }
 

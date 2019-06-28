@@ -14,7 +14,7 @@ struct UninitializedMemoryReadException : std::runtime_error
 };
 
 Interpreter::Interpreter(const Program *pgm)
-    : pgm(pgm)
+    : instruction(nullptr), pgm(pgm)
 {
     memory = new unsigned char[pgm->memorySize];
     memoryInitialized = new bool[pgm->memorySize];
@@ -887,7 +887,7 @@ void Interpreter::stepAccessChain(const InsnAccessChain& insn)
 
 void Interpreter::stepFunctionParameter(const InsnFunctionParameter& insn)
 {
-    uint32_t sourceId = callstack.back(); callstack.pop_back();
+    uint32_t sourceId = parameterStack.back(); parameterStack.pop_back();
     // XXX is this ever a register?
     pointers[insn.resultId()] = pointers[sourceId];
     if(false) std::cout << "function parameter " << insn.resultId() << " receives " << sourceId << "\n";
@@ -895,19 +895,19 @@ void Interpreter::stepFunctionParameter(const InsnFunctionParameter& insn)
 
 void Interpreter::stepKill(const InsnKill& insn)
 {
-    pc = EXECUTION_ENDED;
+    instruction = nullptr;
 }
 
 void Interpreter::stepReturn(const InsnReturn& insn)
 {
-    callstack.pop_back(); // return parameter not used.
-    pc = callstack.back(); callstack.pop_back();
+    parameterStack.pop_back(); // return parameter not used.
+    instruction = returnStack.back(); returnStack.pop_back();
 }
 
 void Interpreter::stepReturnValue(const InsnReturnValue& insn)
 {
     // Return value.
-    uint32_t returnId = callstack.back(); callstack.pop_back();
+    uint32_t returnId = parameterStack.back(); parameterStack.pop_back();
 
     Register &value = registers.at(insn.valueId());
 #ifdef CHECK_REGISTER_ACCESS
@@ -918,19 +918,20 @@ void Interpreter::stepReturnValue(const InsnReturnValue& insn)
 
     registers[returnId] = value;
 
-    pc = callstack.back(); callstack.pop_back();
+    instruction = returnStack.back(); returnStack.pop_back();
 }
 
 void Interpreter::stepFunctionCall(const InsnFunctionCall& insn)
 {
-    const Function& function = pgm->functions.at(insn.functionId);
+    const Function *function = pgm->functions.at(insn.functionId).get();
 
-    callstack.push_back(pc);
-    callstack.push_back(insn.resultId());
+    returnStack.push_back(instruction);
+    parameterStack.push_back(insn.resultId());
     for (int i = insn.operandIdCount() - 1; i >= 0; i--) {
-        callstack.push_back(insn.operandId(i));
+        parameterStack.push_back(insn.operandId(i));
     }
-    pc = function.start;
+
+    jumpToFunction(function);
 }
 
 void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
@@ -1471,13 +1472,13 @@ void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
 
 void Interpreter::stepBranch(const InsnBranch& insn)
 {
-    pc = pgm->labels.at(insn.targetLabelId);
+    jumpToBlock(insn.targetLabelId);
 }
 
 void Interpreter::stepBranchConditional(const InsnBranchConditional& insn)
 {
     bool condition = fromRegister<bool>(insn.conditionId());
-    pc = pgm->labels.at(condition ? insn.trueLabelId : insn.falseLabelId);
+    jumpToBlock(condition ? insn.trueLabelId : insn.falseLabelId);
 }
 
 void Interpreter::stepPhi(const InsnPhi& insn)
@@ -1663,10 +1664,6 @@ void Interpreter::stepImageSampleExplicitLod(const InsnImageSampleExplicitLod& i
 
 void Interpreter::step()
 {
-    if(false) std::cout << "address " << pc << "\n";
-
-    Instruction *instruction = pgm->instructions.at(pc++).get();
-
     // Update our idea of what block we're in. If we just switched blocks,
     // remember the previous one (for Phi).
     uint32_t thisBlockId = instruction->blockId;
@@ -1707,12 +1704,13 @@ void Interpreter::run()
         }
     }
 
-    callstack.clear();
-    callstack.push_back(EXECUTION_ENDED); // caller PC
-    callstack.push_back(NO_RETURN_REGISTER); // return register
-    pc = pgm->mainFunction->start;
+    parameterStack.clear();
+    returnStack.clear();
+    returnStack.push_back(nullptr); // caller PC
+    parameterStack.push_back(NO_RETURN_REGISTER); // return register
+    jumpToFunction(pgm->functions.at(pgm->mainFunctionId).get());
 
     do {
         step();
-    } while(pc != EXECUTION_ENDED);
+    } while (instruction != nullptr);
 }

@@ -628,6 +628,10 @@ struct InstructionList {
         // Nothing.
     }
 
+    ~InstructionList() {
+        // XXX delete the instructions. Be sure to avoid circular references.
+    }
+
     // Add an instruction to the end of this list.
     void push_back(std::shared_ptr<Instruction> instruction) {
         if (head) {
@@ -647,7 +651,29 @@ struct InstructionList {
         // Set up back pointer.
         instruction->list = this;
     }
+
+    // Swap the two instruction lists.
+    void swap(InstructionList &other) {
+        std::swap(block, other.block);
+        std::swap(head, other.head);
+        std::swap(tail, other.tail);
+
+        fixUpBackPointers();
+        other.fixUpBackPointers();
+    }
+
+    // Set the instructions' "list" pointer back to us.
+    void fixUpBackPointers() {
+        for (auto inst = head; inst; inst = inst->next) {
+            inst->list = this;
+        }
+    }
 };
+
+// Swap the two instruction lists.
+void swap(InstructionList &a, InstructionList &b) {
+    a.swap(b);
+}
 
 // A block is a sequence of instructions that has one entry point
 // (the first instruction) and one exit point (the last instruction).

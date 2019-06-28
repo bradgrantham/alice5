@@ -11,8 +11,9 @@ const size_t MEMORY_CHECK_OKAY = 0xFFFFFFFF;
 // Dynamic state of the program (registers, call stack, ...).
 struct Interpreter
 {
-    uint32_t pc;
-    std::vector<size_t> callstack;
+    Instruction *instruction;
+    std::vector<Instruction *> returnStack;
+    std::vector<uint32_t> parameterStack;
     std::map<uint32_t, Register> registers;
     std::map<uint32_t, Pointer> pointers;
 
@@ -64,6 +65,19 @@ struct Interpreter
     void set(const std::string& name, const T& v);
 
     void clearPrivateVariables();
+
+    // Jump to the specified block in the specified function, or in the current
+    // function if "function" is nullptr.
+    void jumpToBlock(uint32_t blockId) {
+        assert (instruction != nullptr);
+
+        Function *function = instruction->list->block->function;
+        instruction = function->blocks.at(blockId)->instructions.head.get();
+    }
+
+    void jumpToFunction(const Function *function) {
+        instruction = function->blocks.at(function->startBlockId)->instructions.head.get();
+    }
 
     void step();
     void run();
