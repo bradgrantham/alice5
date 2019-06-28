@@ -512,9 +512,12 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             uint32_t functionControl = nextu(); // bitfield hints for inlining, pure, etc.
             uint32_t functionType = nextu();
-            uint32_t start = pgm->instructions.size();
-            pgm->functions[id] = Function {id, resultType, functionControl, functionType, start , NO_BLOCK_ID};
-            pgm->currentFunction = &pgm->functions[id];
+            string name = pgm->names.at(id);
+            std::shared_ptr<Function> function = std::make_shared<Function>(id, name,
+                    resultType, functionControl, functionType);
+            pgm->functions[id] = function;
+            pgm->currentFunction = function;
+            pgm->currentBlock.reset();
             if(pgm->verbose) {
                 std::cout << "Function " << id
                     << " resultType " << resultType
@@ -527,21 +530,28 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
 
         case SpvOpLabel: {
             uint32_t id = nextu();
-            pgm->labels[id] = pgm->instructions.size();
+
+            // Must be inside a function.
+            assert(pgm->currentFunction);
+
+            // Make new block for this label.
+            std::shared_ptr<Block> block = std::make_shared<Block>(id, pgm->currentFunction.get());
+            pgm->currentFunction->blocks[id] = block;
+            pgm->currentBlock = block;
+
             // The first label we run into after a function definition is its start block.
-            if(pgm->currentFunction->labelId == NO_BLOCK_ID) {
-                pgm->currentFunction->labelId = id;
+            if(pgm->currentFunction->startBlockId == NO_BLOCK_ID) {
+                pgm->currentFunction->startBlockId = id;
             }
             if(pgm->verbose) {
-                std::cout << "Label " << id
-                    << " at " << pgm->labels[id]
-                    << "\n";
+                std::cout << "Label " << id << "\n";
             }
             break;
         }
 
         case SpvOpFunctionEnd: {
-            pgm->currentFunction = NULL;
+            pgm->currentFunction.reset();
+            pgm->currentBlock.reset();
             if(pgm->verbose) {
                 std::cout << "FunctionEnd\n";
             }

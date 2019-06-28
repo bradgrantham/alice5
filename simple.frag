@@ -43,6 +43,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
     */
 
+    /*
     // Matrix test.
     if (true) {
         float a = 10.0*3.14159/180.0;
@@ -57,6 +58,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
 
     fragColor = vec4(uv, 0.0, 1.0);
+    */
 
     /*
     // This generates a phi instruction.
@@ -70,4 +72,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
     outv = x;
     */
+
+    vec3 v = inv1;
+    for (int i = 0; i < 2; i++) {
+        v = v.yzx;
+    }
+    outv = v;
 }

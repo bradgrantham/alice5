@@ -457,21 +457,6 @@ struct FunctionParameter
     uint32_t id;
 };
 
-struct Function
-{
-    uint32_t id;
-    uint32_t resultType;
-    uint32_t functionControl;
-    uint32_t functionType;
-
-    // Index into the "instructions" array.
-    uint32_t start;
-
-    // ID of the start label. Don't jump here, this is for block dominance calculations.
-    // This is NO_BLOCK_ID if it's not yet been set.
-    uint32_t labelId;
-};
-
 struct Pointer
 {
     uint32_t type;
@@ -545,10 +530,26 @@ struct Register
 
 struct Interpreter;
 struct Compiler;
+struct InstructionList;
+struct Block;
+struct Program;
+struct Function;
 
+// Base class for individual instructions.
 struct Instruction {
-    Instruction(const LineInfo& lineInfo);
-    virtual ~Instruction() {};
+    Instruction(const LineInfo& lineInfo)
+        : list(nullptr), lineInfo(lineInfo), blockId(NO_BLOCK_ID) {
+
+        // Nothing.
+    }
+    virtual ~Instruction() {}
+
+    // Back pointer.
+    InstructionList *list;
+
+    // Linked list pointers.
+    std::shared_ptr<Instruction> next;
+    std::shared_ptr<Instruction> prev;
 
     // Source line information
     LineInfo lineInfo;
@@ -570,12 +571,6 @@ struct Instruction {
 
     // Label IDs we might branch to.
     std::set<uint32_t> targetLabelIds;
-
-    // Predecessor instructions. This is only empty for the first instruction in each function.
-    std::set<uint32_t> pred;
-
-    // Successor instructions.
-    std::set<uint32_t> succ;
 
     // Registers that are live going into this instruction. The key is
     // the block it's coming from, or 0 to mean "any".
@@ -618,25 +613,59 @@ struct Instruction {
         argIdSet.insert(id);
         argIdList.push_back(id);
     }
+
+    std::vector<Instruction *> succ() const;
+    std::vector<Instruction *> pred() const;
+};
+
+// A doubly-linked list of Instruction objects.
+struct InstructionList {
+    Block *block;
+    std::shared_ptr<Instruction> head;
+    std::shared_ptr<Instruction> tail;
+
+    InstructionList(Block *block) : block(block) {
+        // Nothing.
+    }
+
+    // Add an instruction to the end of this list.
+    void push_back(std::shared_ptr<Instruction> instruction) {
+        if (head) {
+            // Add to end of list.
+            tail->next = instruction;
+            instruction->prev = tail;
+            instruction->next.reset();
+            tail = instruction;
+        } else {
+            // Starting with empty list.
+            head = instruction;
+            tail = instruction;
+            instruction->prev.reset();
+            instruction->next.reset();
+        }
+
+        // Set up back pointer.
+        instruction->list = this;
+    }
 };
 
 // A block is a sequence of instructions that has one entry point
 // (the first instruction) and one exit point (the last instruction).
 // The last instruction must be a variant of a branch.
 struct Block {
-    Block(uint32_t labelId, uint32_t begin, uint32_t end)
-        : labelId(labelId), begin(begin), end(end), idom(NO_BLOCK_ID) {
+    Block(uint32_t blockId, Function *function)
+        : instructions(this), function(function), blockId(blockId), idom(NO_BLOCK_ID) {
         // Nothing.
     }
 
+    // Instructions in this block.
+    InstructionList instructions;
+
+    // Back pointer.
+    Function *function;
+
     // ID of label that points to first instruction.
-    uint32_t labelId;
-
-    // Index into "instructions" array of first instruction.
-    uint32_t begin;
-
-    // Index into "instructions" array of one past last instruction.
-    uint32_t end;
+    uint32_t blockId;
 
     // Predecessor blocks. This is only empty for the first block in each function.
     std::set<uint32_t> pred;
@@ -654,6 +683,41 @@ struct Block {
     bool isDominatedBy(uint32_t other) const {
         return dom.find(other) != dom.end();
     }
+};
+
+// Info and blocks in a function.
+struct Function {
+    // ID of the function.
+    uint32_t id;
+    uint32_t resultType;
+    uint32_t functionControl;
+    uint32_t functionType;
+
+    // Original and clean (assembly-friendly) name.
+    std::string name;
+    std::string cleanName;
+
+    // ID of the start block.
+    uint32_t startBlockId;
+
+    // Map from label ID to Block object.
+    std::map<uint32_t, std::shared_ptr<Block>> blocks;
+
+    Function(uint32_t id, const std::string &name, uint32_t resultType,
+            uint32_t functionControl, uint32_t functionType) :
+
+        id(id), resultType(resultType), functionControl(functionControl),
+        functionType(functionType), name(name), cleanName(cleanUpName(name)),
+        startBlockId(NO_BLOCK_ID) {
+
+        // Nothing.
+    }
+
+    // Compute the dominance graph and immediate dominance tree.
+    void computeDomTree(bool verbose);
+
+    // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
+    static std::string cleanUpName(std::string name);
 };
 
 struct CommandLineParameters

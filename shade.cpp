@@ -253,13 +253,6 @@ void RiscVAny::emit(Compiler *compiler)
 
 // -----------------------------------------------------------------------------------
 
-Instruction::Instruction(const LineInfo& lineInfo)
-    : lineInfo(lineInfo),
-      blockId(NO_BLOCK_ID)
-{
-    // Nothing.
-}
-
 void Instruction::emit(Compiler *compiler)
 {
     compiler->emitNotImplemented(name());
@@ -405,7 +398,7 @@ void InsnFunctionCall::emit(Compiler *compiler)
     for(int i = operandIdCount() - 1; i >= 0; i--) {
         compiler->emit(std::string("push ") + compiler->reg(operandId(i)), "");
     }
-    compiler->emit(std::string("call ") + compiler->pgm->cleanUpFunctionName(functionId), "");
+    compiler->emit(std::string("call ") + compiler->pgm->functions.at(functionId)->cleanName, "");
     compiler->emit(std::string("pop ") + compiler->reg(resultId()), "");
 }
 

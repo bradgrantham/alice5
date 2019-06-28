@@ -18,7 +18,7 @@ Program::Program(bool throwOnUnimplemented_, bool verbose_) :
     throwOnUnimplemented(throwOnUnimplemented_),
     hasUnimplemented(false),
     verbose(verbose_),
-    currentFunction(nullptr)
+    mainFunctionId(NO_FUNCTION)
 {
     memorySize = 0;
     auto anotherRegion = [this](size_t size){MemoryRegion r(memorySize, size); memorySize += size; return r;};
@@ -89,10 +89,10 @@ uint32_t Program::scalarize(uint32_t vreg, int i, const TypeVector *typeVector) 
 // Post-parsing work.
 void Program::postParse() {
     // Find the main function.
-    mainFunction = nullptr;
+    mainFunctionId = NO_FUNCTION;
     for(auto& e: entryPoints) {
         if(e.second.name == "main") {
-            mainFunction = &functions[e.first];
+            mainFunctionId = e.first;
         }
     }
 
@@ -159,64 +159,15 @@ void Program::postParse() {
         }
     }
 
-    // Figure out our basic blocks. These start on an OpLabel and end on
-    // a terminating instruction.
-    for (auto [labelId, codeIndex] : labels) {
-        bool found = false;
-        for (int i = codeIndex; i < instructions.size(); i++) {
-            if (instructions[i]->isTermination()) {
-                blocks[labelId] = std::make_unique<Block>(labelId, codeIndex, uint32_t(i + 1));
-                found = true;
-                break;
+    for (auto& [functionId, function] : functions) {
+        // Compute successor and predecessor blocks.
+        for (auto& [blockId, block] : function->blocks) {
+            Instruction *instruction = block->instructions.tail.get();
+            assert(instruction->isTermination());
+            block->succ = instruction->targetLabelIds;
+            for (uint32_t blockId : block->succ) {
+                function->blocks[blockId]->pred.insert(block->blockId);
             }
-        }
-        if (!found) {
-            std::cout << "Error: Terminating instruction for label "
-                << labelId << " not found.\n";
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    // Compute successor and predecessor blocks.
-    for (auto& [labelId, block] : blocks) {
-        Instruction *instruction = instructions[block->end - 1].get();
-        assert(instruction->isTermination());
-        block->succ = instruction->targetLabelIds;
-        for (uint32_t labelId : block->succ) {
-            blocks[labelId]->pred.insert(block->labelId);
-        }
-    }
-
-    // Record the block ID for each instruction. Note a problem
-    // here is that the OpFunctionParameter instruction gets put into the
-    // block at the end of the previous function. I don't think this
-    // matters in practice because there's never a Phi at the top of a
-    // function.
-    for (auto& [labelId, block] : blocks) {
-        for (int pc = block->begin; pc < block->end; pc++) {
-            instructions[pc]->blockId = block->labelId;
-        }
-    }
-
-    // Compute predecessor and successor instructions for each instruction.
-    // For most instructions this is just the previous or next line, except
-    // for the ones at the beginning or end of each block.
-    for (auto& [labelId, block] : blocks) {
-        for (auto predBlockId : block->pred) {
-            instructions[block->begin]->pred.insert(blocks[predBlockId]->end - 1);
-        }
-        if (block->begin != block->end - 1) {
-            instructions[block->begin]->succ.insert(block->begin + 1);
-        }
-        for (int pc = block->begin + 1; pc < block->end - 1; pc++) {
-            instructions[pc]->pred.insert(pc - 1);
-            instructions[pc]->succ.insert(pc + 1);
-        }
-        if (block->begin != block->end - 1) {
-            instructions[block->end - 1]->pred.insert(block->end - 2);
-        }
-        for (auto succBlockId : block->succ) {
-            instructions[block->end - 1]->succ.insert(blocks[succBlockId]->begin);
         }
     }
 }
@@ -224,26 +175,27 @@ void Program::postParse() {
 void Program::prepareForCompile() {
     // Compute livein and liveout registers for each line.
     Timer timer;
-    std::set<uint32_t> pc_worklist; // PCs left to work on.
-    for (int pc = 0; pc < instructions.size(); pc++) {
-        pc_worklist.insert(pc);
+    std::set<Instruction *> inst_worklist; // Instructions left to work on.
+    for (auto &[_, function] : functions) {
+        for (auto &[_, block] : function->blocks) {
+            for (auto inst = block->instructions.head; inst; inst = inst->next) {
+                inst_worklist.insert(inst.get());
+            }
+        }
     }
-    while (!pc_worklist.empty()) {
+    while (!inst_worklist.empty()) {
         // Pick any PC to start with. Starting at the end is more efficient
         // since our predecessor depends on us.
-        uint32_t pc = *pc_worklist.rbegin();
-        pc_worklist.erase(pc);
+        Instruction *instruction = *inst_worklist.rbegin();
+        inst_worklist.erase(instruction);
 
         // Keep track of old livein/liveout for comparison.
-        Instruction *instruction = instructions[pc].get();
         std::map<uint32_t,std::set<uint32_t>> oldLivein = instruction->livein;
         std::set<uint32_t> oldLiveout = instruction->liveout;
 
         // Compute liveout as union of next instructions' liveins.
         instruction->liveout.clear();
-        for (uint32_t succPc : instruction->succ) {
-            Instruction *succInstruction = instructions[succPc++].get();
-
+        for (Instruction *succInstruction : instruction->succ()) {
             // Add livein from any branch (0).
             instruction->liveout.insert(
                     succInstruction->livein[0].begin(),
@@ -297,8 +249,8 @@ void Program::prepareForCompile() {
         // depend on us.
         if (oldLivein != instruction->livein || oldLiveout != instruction->liveout) {
             // Our predecessors depend on us.
-            for (uint32_t predPc : instruction->pred) {
-                pc_worklist.insert(predPc);
+            for (Instruction *predInstruction : instruction->pred()) {
+                inst_worklist.insert(predInstruction);
             }
 
             // Compute union of livein.
@@ -312,228 +264,9 @@ void Program::prepareForCompile() {
         std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
     }
 
-    // Compute the dominance tree for blocks. Use a worklist. Do all blocks
-    // simultaneously (across functions).
-    timer.reset();
-    std::vector<uint32_t> worklist; // block IDs.
-    // Make set of all label IDs.
-    std::set<uint32_t> allLabelIds;
-    for (auto& [labelId, block] : blocks) {
-        allLabelIds.insert(labelId);
-    }
-    std::set<uint32_t> unreached = allLabelIds;
-    // Prepare every block.
-    for (auto& [labelId, block] : blocks) {
-        block->dom = allLabelIds;
-    }
-    // Insert every function's start block.
-    for (auto& [_, function] : functions) {
-        assert(function.labelId != NO_BLOCK_ID);
-        worklist.push_back(function.labelId);
-    }
-    while (!worklist.empty()) {
-        // Take any item from worklist.
-        uint32_t labelId = worklist.back();
-        worklist.pop_back();
-
-        // We can reach this from the start node.
-        unreached.erase(labelId);
-
-        Block *block = blocks.at(labelId).get();
-
-        // Intersection of all predecessor doms.
-        std::set<uint32_t> dom;
-        bool first = true;
-        for (auto predBlockId : block->pred) {
-            Block *pred = blocks.at(predBlockId).get();
-
-            if (first) {
-                dom = pred->dom;
-                first = false;
-            } else {
-                // I love C++.
-                std::set<uint32_t> intersection;
-                std::set_intersection(dom.begin(), dom.end(),
-                        pred->dom.begin(), pred->dom.end(),
-                        std::inserter(intersection, intersection.begin()));
-                std::swap(intersection, dom);
-            }
-        }
-        // Add ourselves.
-        dom.insert(labelId);
-
-        // If the set changed, update it and put the
-        // successors in the work queue.
-        if (dom != block->dom) {
-            block->dom = dom;
-            worklist.insert(worklist.end(), block->succ.begin(), block->succ.end());
-        }
-    }
-    // Unreached blocks don't actually have any doms.
-    for (auto id : unreached) {
-        blocks[id]->dom.clear();
-    }
-    if (PRINT_TIMER_RESULTS) {
-        std::cerr << "Dominance tree took " << timer.elapsed() << " seconds.\n";
-    }
-
-    // Compute immediate dom for each block.
-    for (auto& [labelId, block] : blocks) {
-        block->idom = NO_BLOCK_ID;
-
-        // Try each block in the block's dom.
-        for (auto idomCandidate : block->dom) {
-            bool valid = idomCandidate != labelId;
-
-            // Can't be the idom if it's dominated by another dom.
-            for (auto otherDom : block->dom) {
-                if (otherDom != idomCandidate &&
-                        otherDom != labelId &&
-                        blocks[otherDom]->isDominatedBy(idomCandidate)) {
-
-                    valid = false;
-                    break;
-                }
-            }
-
-            if (valid) {
-                block->idom = idomCandidate;
-                break;
-            }
-        }
-    }
-
-    // Dump block info.
-    if (verbose) {
-        std::cout << "----------------------- Block info\n";
-        for (auto& [labelId, block] : blocks) {
-            std::cout << "Block " << labelId << ", instructions "
-                << block->begin << "-" << block->end << ":\n";
-            std::cout << "    Pred:";
-            for (auto labelId : block->pred) {
-                std::cout << " " << labelId;
-            }
-            std::cout << "\n";
-            std::cout << "    Succ:";
-            for (auto labelId : block->succ) {
-                std::cout << " " << labelId;
-            }
-            std::cout << "\n";
-            std::cout << "    Dom:";
-            for (auto labelId : block->dom) {
-                std::cout << " " << labelId;
-            }
-            std::cout << "\n";
-            if (block->idom != NO_BLOCK_ID) {
-                std::cout << "    Immediate Dom: " << block->idom << "\n";
-            }
-        }
-        std::cout << "-----------------------\n";
-        // http://www.webgraphviz.com/
-        std::cout << "digraph CFG {\n  rankdir=TB;\n";
-        for (auto& [labelId, block] : blocks) {
-            if (unreached.find(labelId) == unreached.end()) {
-                for (auto pred : block->pred) {
-                    // XXX this is laid out much better if the function's start
-                    // block is mentioned first.
-                    if (unreached.find(pred) == unreached.end()) {
-                        std::cout << "  \"" << pred << "\" -> \"" << labelId << "\"";
-                        std::cout << ";\n";
-                    }
-                }
-                if (block->idom != NO_BLOCK_ID) {
-                    std::cout << "  \"" << labelId << "\" -> \"" << block->idom << "\"";
-                    std::cout << " [color=\"0.000, 0.999, 0.999\"]";
-                    std::cout << ";\n";
-                }
-            }
-        }
-        std::cout << "}\n";
-        std::cout << "-----------------------\n";
-    }
-
-    // Dump instruction info.
-    if (verbose) {
-        std::cout << "----------------------- Instruction info\n";
-        for (int pc = 0; pc < instructions.size(); pc++) {
-            Instruction *instruction = instructions[pc].get();
-
-            for(auto &function : functions) {
-                if(pc == function.second.start) {
-                    std::string name = cleanUpFunctionName(function.first);
-                    std::cout << name << ":\n";
-                }
-            }
-
-            for(auto &label : labels) {
-                if(pc == label.second) {
-                    std::cout << label.first << ":\n";
-                }
-            }
-
-            std::ios oldState(nullptr);
-            oldState.copyfmt(std::cout);
-
-            std::cout
-                << std::setw(5) << pc;
-            if (instruction->blockId == NO_BLOCK_ID) {
-                std::cout << "  ---";
-            } else {
-                std::cout << std::setw(5) << instruction->blockId;
-            }
-            if (instruction->resIdSet.empty()) {
-                std::cout << "         ";
-            } else {
-                for (uint32_t resId : instruction->resIdList) {
-                    std::cout << std::setw(6) << resId;
-                }
-                std::cout << " <-";
-            }
-
-            std::cout << std::setw(0) << " " << instruction->name();
-
-            for (auto argId : instruction->argIdList) {
-                std::cout << " " << argId;
-            }
-
-            std::cout << " (pred";
-            for (auto line : instruction->pred) {
-                std::cout << " " << line;
-            }
-            std::cout << ", succ";
-            for (auto line : instruction->succ) {
-                std::cout << " " << line;
-            }
-            std::cout << ", livein";
-            for (auto &[label,liveinSet] : instruction->livein) {
-                std::cout << " " << label << "(";
-                for (auto regId : liveinSet) {
-                    std::cout << " " << regId;
-                }
-                std::cout << ")";
-            }
-            std::cout << ", liveout";
-            for (auto regId : instruction->liveout) {
-                std::cout << " " << regId;
-            }
-
-            std::cout << ")\n";
-
-            std::cout.copyfmt(oldState);
-        }
-        std::cout << "-----------------------\n";
-    }
-
-    // Check that all blocks were assigned properly.
-    for (auto& [labelId, block] : blocks) {
-        // It's okay to have no idom as long as you're the first block in the function.
-        if ((block->idom == NO_BLOCK_ID) != block->pred.empty()) {
-            std::cout << "----\n"
-                << labelId << "\n"
-                << block->idom << "\n"
-                << block->pred.size() << "\n";
-        }
-        assert((block->idom == NO_BLOCK_ID) == block->pred.empty());
+    // Compute the dominance tree for blocks. Use a worklist.
+    for (auto &[_, function] : functions) {
+        function->computeDomTree(verbose);
     }
 }
 

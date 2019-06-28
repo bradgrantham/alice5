@@ -23,7 +23,6 @@
 #include "timer.h"
 
 // List of shared instruction pointers.
-using InstructionList = std::vector<std::shared_ptr<Instruction>>;
 #include "opcode_structs.h"
 
 const uint32_t NO_MEMORY_ACCESS_SEMANTIC = 0xFFFFFFFF;
@@ -33,6 +32,7 @@ const uint32_t NO_INITIALIZER = 0xFFFFFFFF;
 const uint32_t NO_ACCESS_QUALIFIER = 0xFFFFFFFF;
 const uint32_t EXECUTION_ENDED = 0xFFFFFFFF;
 const uint32_t NO_RETURN_REGISTER = 0xFFFFFFFF;
+const uint32_t NO_FUNCTION = 0xFFFFFFFF;
 
 extern std::map<uint32_t, std::string> OpcodeToString;
 
@@ -107,10 +107,8 @@ struct Program
     std::map<uint32_t, std::shared_ptr<Type>> types;
     std::map<uint32_t, size_t> typeSizes; // XXX put into Type
     std::map<uint32_t, Variable> variables;
-    std::map<uint32_t, Function> functions;
-    InstructionList instructions;
-    // Map from label ID to block object.
-    std::map<uint32_t, std::unique_ptr<Block>> blocks;
+    // Map from function ID to Function object.
+    std::map<uint32_t, std::shared_ptr<Function>> functions;
     // Map from virtual register ID to its type. Only used for results of instructions.
     std::map<uint32_t, uint32_t> resultTypes;
     std::map<uint32_t, Register> constants;
@@ -123,10 +121,12 @@ struct Program
 
     SampledImage sampledImages[16];
 
-    Function* currentFunction;
-    // Map from label ID to index into instructions vector.
-    std::map<uint32_t, uint32_t> labels;
-    Function* mainFunction; 
+    // Only valid while parsing:
+    std::shared_ptr<Function> currentFunction;
+    std::shared_ptr<Block> currentBlock;
+
+    // ID of main function, or NO_FUNCTION if not set.
+    uint32_t mainFunctionId;
 
     size_t memorySize;
 
@@ -350,25 +350,6 @@ struct Program
             }
             replaced = true;
         }
-    }
-
-    // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
-    std::string cleanUpFunctionName(int nameId) const {
-        std::string name = names.at(nameId);
-
-        // Replace "mainImage(vf4;vf2;" with "mainImage$v4f$vf2$"
-        for (int i = 0; i < name.length(); i++) {
-            if (name[i] == '(' || name[i] == ';') {
-                name[i] = '$';
-            }
-        }
-
-        // Strip trailing dollar sign.
-        if (name.length() > 0 && name[name.length() - 1] == '$') {
-            name = name.substr(0, name.length() - 1);
-        }
-
-        return name;
     }
 };
 

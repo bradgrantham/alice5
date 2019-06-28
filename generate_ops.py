@@ -293,7 +293,7 @@ def generate_instruction(instruction, opname_prefix, opcode_prefix, clip_prefix,
                 opcode_decode_f.write("    %s %s = %s(%s);\n" %
                         (operand.cpp_type, operand.cpp_name,
                             operand.decode_function, operand.default_value))
-        opcode_decode_f.write("    pgm->instructions.push_back(std::make_shared<%s>(%s));\n" %
+        opcode_decode_f.write("    pgm->currentBlock->instructions.push_back(std::make_shared<%s>(%s));\n" %
                 (struct_opname, ", ".join(["pgm->currentLine"]+[operand.cpp_name for operand in all_operands])))
         if 'IdResultType' in [op.kind for op in all_operands] and 'IdResult' in [op.kind for op in all_operands]:
             opcode_decode_f.write("    pgm->resultTypes[resultId] = type;\n")

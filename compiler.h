@@ -48,7 +48,7 @@ struct Compiler {
     uint32_t localLabelCounter;
 
     // Compiler's own list of instructions, with its modifications.
-    InstructionList instructions;
+    /// InstructionList instructions; // XXX delete
 
     // Map from each register to the class that it's in. There's only an
     // entry here if the register participates in a phi instruction.
