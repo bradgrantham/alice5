@@ -615,18 +615,6 @@ void InsnGLSLstd450Step::emit(Compiler *compiler)
 
 // -----------------------------------------------------------------------------------
 
-// Returns whether successful.
-bool compileProgram(const Program &pgm, const std::string &outputAssemblyPathname)
-{
-    Compiler compiler(&pgm, outputAssemblyPathname);
-
-    compiler.compile();
-
-    return true;
-}
-
-// -----------------------------------------------------------------------------------
-
 void eval(Interpreter &interpreter, float x, float y, v4float& color)
 {
     interpreter.clearPrivateVariables();
@@ -1097,8 +1085,9 @@ int main(int argc, char **argv)
 
         if (compile) {
             pass->pgm.prepareForCompile();
-            bool success = compileProgram(pass->pgm, outputAssemblyPathname);
-            exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
+            Compiler compiler(&pass->pgm, outputAssemblyPathname);
+            compiler.compile();
+            exit(EXIT_SUCCESS);
         }
 
         if (doNotShade) {

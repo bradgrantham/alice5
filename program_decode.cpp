@@ -512,12 +512,13 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             uint32_t functionControl = nextu(); // bitfield hints for inlining, pure, etc.
             uint32_t functionType = nextu();
-            string name = pgm->names.at(id);
+            std::string name = pgm->names.at(id);
             std::shared_ptr<Function> function = std::make_shared<Function>(id, name,
                     resultType, functionControl, functionType);
             pgm->functions[id] = function;
             pgm->currentFunction = function;
-            pgm->currentBlock.reset();
+            // Fake block so we can capture the SpvOpFunctionParameter instructions.
+            pgm->currentBlock = std::make_shared<Block>(0, function.get());
             if(pgm->verbose) {
                 std::cout << "Function " << id
                     << " resultType " << resultType
@@ -537,12 +538,18 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             // Make new block for this label.
             std::shared_ptr<Block> block = std::make_shared<Block>(id, pgm->currentFunction.get());
             pgm->currentFunction->blocks[id] = block;
-            pgm->currentBlock = block;
 
             // The first label we run into after a function definition is its start block.
             if(pgm->currentFunction->startBlockId == NO_BLOCK_ID) {
                 pgm->currentFunction->startBlockId = id;
+
+                // Start with instructions from fake block. These will be
+                // the SpvOpFunctionParameter instructions between the function
+                // definition and the first label.
+                /// std::swap(block->instructions, pgm->currentBlock->instructions);
+                block->instructions.swap(pgm->currentBlock->instructions);
             }
+            pgm->currentBlock = block;
             if(pgm->verbose) {
                 std::cout << "Label " << id << "\n";
             }

@@ -538,7 +538,7 @@ struct Function;
 // Base class for individual instructions.
 struct Instruction {
     Instruction(const LineInfo& lineInfo)
-        : list(nullptr), lineInfo(lineInfo), blockId(NO_BLOCK_ID) {
+        : list(nullptr), lineInfo(lineInfo) {
 
         // Nothing.
     }
@@ -553,9 +553,6 @@ struct Instruction {
 
     // Source line information
     LineInfo lineInfo;
-
-    // Which block this instruction is in.
-    uint32_t blockId;
 
     // Set of registers affected by instruction.
     std::set<uint32_t> resIdSet;
@@ -602,6 +599,9 @@ struct Instruction {
     // OpUnreachable).
     virtual bool isTermination() const { return false; }
 
+    // Which block this instruction is in.
+    uint32_t blockId() const;
+
     // Add a result to the instruction.
     void addResult(uint32_t id) {
         resIdSet.insert(id);
@@ -629,6 +629,7 @@ struct InstructionList {
     }
 
     ~InstructionList() {
+        assert(!head);
         // XXX delete the instructions. Be sure to avoid circular references.
     }
 
@@ -654,7 +655,8 @@ struct InstructionList {
 
     // Swap the two instruction lists.
     void swap(InstructionList &other) {
-        std::swap(block, other.block);
+        // Don't swap the "block" pointer, that stays fixed with whatever
+        // block we're a part of.
         std::swap(head, other.head);
         std::swap(tail, other.tail);
 
@@ -669,11 +671,6 @@ struct InstructionList {
         }
     }
 };
-
-// Swap the two instruction lists.
-void swap(InstructionList &a, InstructionList &b) {
-    a.swap(b);
-}
 
 // A block is a sequence of instructions that has one entry point
 // (the first instruction) and one exit point (the last instruction).
@@ -704,6 +701,9 @@ struct Block {
 
     // Immediate dominator of this block, or NO_BLOCK_ID if this is the start block.
     uint32_t idom;
+
+    // Children in idom tree.
+    std::vector<std::shared_ptr<Block>> idomChildren;
 
     // Whether this block is dominated by the other block.
     bool isDominatedBy(uint32_t other) const {

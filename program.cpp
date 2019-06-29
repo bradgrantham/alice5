@@ -202,7 +202,7 @@ void Program::prepareForCompile() {
                     succInstruction->livein[0].end());
 
             // Add livein specifically from this branch (if phi).
-            auto itr = succInstruction->livein.find(instruction->blockId);
+            auto itr = succInstruction->livein.find(instruction->blockId());
             if (itr != succInstruction->livein.end()) {
                 instruction->liveout.insert(itr->second.begin(), itr->second.end());
             }

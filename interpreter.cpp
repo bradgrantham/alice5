@@ -1472,13 +1472,13 @@ void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
 
 void Interpreter::stepBranch(const InsnBranch& insn)
 {
-    jumpToBlock(insn.targetLabelId);
+    jumpToBlock(&insn, insn.targetLabelId);
 }
 
 void Interpreter::stepBranchConditional(const InsnBranchConditional& insn)
 {
     bool condition = fromRegister<bool>(insn.conditionId());
-    jumpToBlock(condition ? insn.trueLabelId : insn.falseLabelId);
+    jumpToBlock(&insn, condition ? insn.trueLabelId : insn.falseLabelId);
 }
 
 void Interpreter::stepPhi(const InsnPhi& insn)
@@ -1664,9 +1664,12 @@ void Interpreter::stepImageSampleExplicitLod(const InsnImageSampleExplicitLod& i
 
 void Interpreter::step()
 {
+    Instruction *thisInstruction = instruction;
+    instruction = instruction->next.get();
+
     // Update our idea of what block we're in. If we just switched blocks,
     // remember the previous one (for Phi).
-    uint32_t thisBlockId = instruction->blockId;
+    uint32_t thisBlockId = thisInstruction->blockId();
     if (thisBlockId != currentBlockId) {
         // I'm not sure this is fully correct. For example, when returning
         // from a function this will set previousBlockId to a block in
@@ -1682,7 +1685,7 @@ void Interpreter::step()
         currentBlockId = thisBlockId;
     }
 
-    instruction->step(this);
+    thisInstruction->step(this);
 }
 
 void Interpreter::run()

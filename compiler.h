@@ -42,13 +42,10 @@ struct PhiClass {
 
 // Compiles a Program to our ISA.
 struct Compiler {
-    const Program *pgm;
+    Program *pgm;
     // Map from virtual register to our own info about the register.
     std::map<uint32_t, CompilerRegister> registers;
     uint32_t localLabelCounter;
-
-    // Compiler's own list of instructions, with its modifications.
-    /// InstructionList instructions; // XXX delete
 
     // Map from each register to the class that it's in. There's only an
     // entry here if the register participates in a phi instruction.
@@ -56,7 +53,7 @@ struct Compiler {
 
     std::ofstream outFile;
 
-    Compiler(const Program *pgm, const std::string &outputAssemblyPathname)
+    Compiler(Program *pgm, const std::string &outputAssemblyPathname)
         : pgm(pgm),
           localLabelCounter(1),
           outFile(outputAssemblyPathname, std::ios::out)
@@ -72,6 +69,13 @@ struct Compiler {
     }
 
     void compile();
+    void emitInstructions();
+    void emitInstructionsForFunction(Function *function);
+    void emitInstructionsForBlockTree(Block *block);
+    void emitInstructionsForBlock(Block *block);
+    void emitVariables();
+    void emitConstants();
+    void emitLibrary();
 
     // Emit constant value for the specified constant ID.
     void emitConstant(uint32_t id, uint32_t typeId, unsigned char *data);
@@ -92,11 +96,8 @@ struct Compiler {
     // Make a new label that can be used for local jumps.
     std::string makeLocalLabel();
 
-    // Transform SPIR-V instructions to RISC-V instructions. Creates a new
-    // "instructions" array that's local to the compiler and is closer to
-    // machine instructions, but still using SSA. inList and outList
-    // may be the same list.
-    void transformInstructions(const InstructionList &inList, InstructionList &outList);
+    // Transform SPIR-V instructions to RISC-V instructions.
+    void transformInstructions(InstructionList &inList);
 
     // Get rid of phi instructions.
     void translateOutOfSsa();
@@ -112,7 +113,12 @@ struct Compiler {
     void assignRegisters();
 
     // Assigns registers for this function.
-    void assignRegistersForFunction(const Function &function,
+    void assignRegistersForFunction(const Function *function,
+            const std::set<uint32_t> &allIntPhy,
+            const std::set<uint32_t> &allFloatPhy);
+
+    // Assigns registers for this block tree.
+    void assignRegistersForBlockTree(Block *block,
             const std::set<uint32_t> &allIntPhy,
             const std::set<uint32_t> &allFloatPhy);
 
@@ -167,9 +173,6 @@ struct Compiler {
     // registers that a target OpPhi instruction might need. Instruction
     // is the branch; labelId is the target whose block has a phi.
     void emitPhiCopy(Instruction *instruction, uint32_t labelId);
-
-    // Assert that the block at the label ID does not start with a Phi instruction.
-    void assertNoPhi(uint32_t labelId);
 };
 
 #endif // COMPILER_H

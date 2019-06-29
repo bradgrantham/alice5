@@ -7,7 +7,11 @@
 
 void Compiler::compile() {
     // Transform SPIR-V instructions to RISC-V instructions.
-    transformInstructions(pgm->instructions, instructions);
+    for (auto &[_, function] : pgm->functions) {
+        for (auto &[_, block] : function->blocks) {
+            transformInstructions(block->instructions);
+        }
+    }
 
     // Translate out of SSA by eliminating phi instructions.
     translateOutOfSsa();
@@ -20,73 +24,94 @@ void Compiler::compile() {
     emit("ebreak", "");
 
     // Emit instructions.
-    for(int pc = 0; pc < instructions.size(); pc++) {
-        // Label the function if we're at its start.
-        // XXX Make a map of functions by start instruction index, don't loop.
-        for(auto &function : pgm->functions) {
-            if(pc == function.second.start) {
-                std::string name = pgm->cleanUpFunctionName(function.first);
-                outFile << "; ---------------------------- function \"" << name << "\"\n";
-                emitLabel(name);
+    emitInstructions();
+    emitVariables();
+    emitConstants();
+    emitLibrary();
+}
 
-                // Emit instructions to fill constants.
-                for (auto regId : pgm->instructions.at(function.second.start)->liveinAll) {
-                    auto r = registers.find(regId);
-                    assert(r != registers.end());
-                    assert(r->second.phy != NO_REGISTER);
-                    std::ostringstream ss;
-                    if (isRegFloat(regId)) {
-                        ss << "flw f" << (r->second.phy - 32);
-                    } else {
-                        ss << "lw x" << r->second.phy;
-                    }
-                    ss << ", .C" << regId << "(x0)";
+void Compiler::emitInstructions() {
+    for (auto &[_, function] : pgm->functions) {
+        emitInstructionsForFunction(function.get());
+    }
+}
 
-                    // Build comment with constant value.
-                    std::ostringstream ssc;
-                    ssc << "Load constant (";
-                    Register const &pr = pgm->constants.at(regId);
-                    uint32_t typeOp = pgm->getTypeOp(r->second.type);
-                    switch (typeOp) {
-                        case SpvOpTypeInt:
-                            ssc << *reinterpret_cast<uint32_t *>(pr.data);
-                            break;
+void Compiler::emitInstructionsForFunction(Function *function) {
+    outFile << "; ---------------------------- function \"" << function->cleanName << "\"\n";
+    emitLabel(function->cleanName);
 
-                        case SpvOpTypeFloat:
-                            ssc << *reinterpret_cast<float *>(pr.data);
-                            break;
-
-                        case SpvOpTypePointer:
-                            // Do we get constant pointers?
-                            ssc << "pointer";
-                            break;
-
-                        case SpvOpTypeBool:
-                            ssc << (*reinterpret_cast<uint32_t *>(pr.data) ? "true" : "false");
-                            break;
-
-                        default:
-                            ssc << "unknown type " << r->second.type << ", op " << typeOp;
-                    }
-                    ssc << ")";
-
-                    emit(ss.str(), ssc.str());
-                }
-            }
+    // Emit instructions to fill constants.
+    for (auto regId : function->blocks.at(function->startBlockId)->instructions.head->liveinAll) {
+        auto r = registers.find(regId);
+        assert(r != registers.end());
+        assert(r->second.phy != NO_REGISTER);
+        std::ostringstream ss;
+        if (isRegFloat(regId)) {
+            ss << "flw f" << (r->second.phy - 32);
+        } else {
+            ss << "lw x" << r->second.phy;
         }
+        ss << ", .C" << regId << "(x0)";
 
-        for(auto &label : pgm->labels) {
-            if(pc == label.second) {
-                std::ostringstream ss;
-                ss << "label" << label.first;
-                emitLabel(ss.str());
-            }
+        // Build comment with constant value.
+        std::ostringstream ssc;
+        ssc << "Load constant (";
+        Register const &pr = pgm->constants.at(regId);
+        uint32_t typeOp = pgm->getTypeOp(r->second.type);
+        switch (typeOp) {
+            case SpvOpTypeInt:
+                ssc << *reinterpret_cast<uint32_t *>(pr.data);
+                break;
+
+            case SpvOpTypeFloat:
+                ssc << *reinterpret_cast<float *>(pr.data);
+                break;
+
+            case SpvOpTypePointer:
+                // Do we get constant pointers?
+                ssc << "pointer";
+                break;
+
+            case SpvOpTypeBool:
+                ssc << (*reinterpret_cast<uint32_t *>(pr.data) ? "true" : "false");
+                break;
+
+            default:
+                ssc << "unknown type " << r->second.type << ", op " << typeOp;
         }
+        ssc << ")";
 
-        instructions.at(pc)->emit(this);
+        emit(ss.str(), ssc.str());
     }
 
-    // Emit variables.
+    // Start with start block.
+    emitInstructionsForBlockTree(function->blocks.at(function->startBlockId).get());
+}
+
+void Compiler::emitInstructionsForBlockTree(Block *block) {
+    // Do block.
+    emitInstructionsForBlock(block);
+
+    // Descend down idom tree. We could be more clever about this, maybe looking for
+    // block that only have one successor, and trying to put those back-to-back
+    // to avoid needless jumps.
+    for (auto subBlock : block->idomChildren) {
+        emitInstructionsForBlockTree(subBlock.get());
+    }
+}
+
+void Compiler::emitInstructionsForBlock(Block *block) {
+    // Emit block's label.
+    std::ostringstream ss;
+    ss << "label" << block->blockId;
+    emitLabel(ss.str());
+
+    for (auto inst = block->instructions.head; inst; inst = inst->next) {
+        inst->emit(this);
+    }
+}
+
+void Compiler::emitVariables() {
     for (auto &[id, var] : pgm->variables) {
         std::string name = getVariableName(id);
 
@@ -100,8 +125,9 @@ void Compiler::compile() {
             emit(".byte 0", "");
         }
     }
+}
 
-    // Emit constants.
+void Compiler::emitConstants() {
     for (auto &[id, reg] : pgm->constants) {
         std::string name;
         auto nameItr = pgm->names.find(id);
@@ -115,8 +141,9 @@ void Compiler::compile() {
         emitLabel(name);
         emitConstant(id, reg.type, reg.data);
     }
+}
 
-    // Emit library.
+void Compiler::emitLibrary() {
     outFile << readFileContents("library.s");
 }
 
@@ -196,13 +223,12 @@ std::string Compiler::makeLocalLabel() {
     return ss.str();
 }
 
-void Compiler::transformInstructions(const InstructionList &inList, InstructionList &outList) {
-    InstructionList newList;
+void Compiler::transformInstructions(InstructionList &inList) {
+    InstructionList newList(inList.block);
 
-    for (uint32_t pc = 0; pc < inList.size(); pc++) {
+    for (auto inst = inList.head; inst; inst = inst->next) {
         bool replaced = false;
-        const std::shared_ptr<Instruction> &instructionPtr = inList[pc];
-        Instruction *instruction = instructionPtr.get();
+        Instruction *instruction = inst.get();
         if (instruction->opcode() == SpvOpIAdd) {
             InsnIAdd *insnIAdd = dynamic_cast<InsnIAdd *>(instruction);
 
@@ -221,11 +247,12 @@ void Compiler::transformInstructions(const InstructionList &inList, InstructionL
         }
 
         if (!replaced) {
-            newList.push_back(instructionPtr);
+            newList.push_back(inst);
         }
     }
 
-    std::swap(newList, outList);
+    /// std::swap(newList, inList); // XXX
+    newList.swap(inList);
 }
 
 void Compiler::translateOutOfSsa() {
@@ -236,6 +263,7 @@ void Compiler::translateOutOfSsa() {
 }
 
 void Compiler::computePhiClassMap() {
+#if 0 // Disabled until we need it.
     phiClassMap.clear();
 
     // Go through all instructions look for phi.
@@ -268,6 +296,7 @@ void Compiler::computePhiClassMap() {
     // We've created all the phi classes. We must make sure that
     // no pair of registers in a class is ever live at the same time.
     // XXX to do!
+#endif
 }
 
 void Compiler::processPhiRegister(uint32_t regId, std::shared_ptr<PhiClass> &phiClass) {
@@ -311,25 +340,25 @@ void Compiler::assignRegisters() {
     }
 
     for (auto& [id, function] : pgm->functions) {
-        assignRegistersForFunction(function, PHY_INT_REGS, PHY_FLOAT_REGS);
+        assignRegistersForFunction(function.get(), PHY_INT_REGS, PHY_FLOAT_REGS);
     }
 }
 
-void Compiler::assignRegistersForFunction(const Function &function,
+void Compiler::assignRegistersForFunction(const Function *function,
         const std::set<uint32_t> &allIntPhy,
         const std::set<uint32_t> &allFloatPhy) {
 
     // Start with blocks at the start of functions.
-    Block *block = pgm->blocks.at(function.labelId).get();
+    Block *block = function->blocks.at(function->startBlockId).get();
 
     if (pgm->verbose) {
-        std::cout << "Assigning registers for function \"" << pgm->names.at(function.id) << "\"\n";
+        std::cout << "Assigning registers for function \"" << function->name << "\"\n";
     }
 
     // Assign registers for constants.
     std::set<uint32_t> constIntRegs = allIntPhy;
     std::set<uint32_t> constFloatRegs = allFloatPhy;
-    for (auto regId : instructions.at(block->begin)->liveinAll) {
+    for (auto regId : block->instructions.head->liveinAll) {
         if (registers.find(regId) != registers.end()) {
             std::cerr << "Error: Constant "
                 << regId << " already assigned a register at head of function.\n";
@@ -360,7 +389,19 @@ void Compiler::assignRegistersForFunction(const Function &function,
             << (allFloatPhy.size() - constFloatRegs.size()) << " float registers.\n";
     }
 
+    assignRegistersForBlockTree(block, allIntPhy, allFloatPhy);
+}
+
+void Compiler::assignRegistersForBlockTree(Block *block,
+        const std::set<uint32_t> &allIntPhy,
+        const std::set<uint32_t> &allFloatPhy) {
+
     assignRegistersForBlock(block, allIntPhy, allFloatPhy);
+
+    // Go down dominance tree.
+    for (auto subBlock : block->idomChildren) {
+        assignRegistersForBlockTree(subBlock.get(), allIntPhy, allFloatPhy);
+    }
 }
 
 void Compiler::assignRegistersForBlock(Block *block,
@@ -368,7 +409,7 @@ void Compiler::assignRegistersForBlock(Block *block,
         const std::set<uint32_t> &allFloatPhy) {
 
     if (pgm->verbose) {
-        std::cout << "    Assigning registers for block " << block->labelId << "\n";
+        std::cout << "    Assigning registers for block " << block->blockId << "\n";
     }
 
     // Assigned physical registers.
@@ -379,22 +420,22 @@ void Compiler::assignRegistersForBlock(Block *block,
     // we want to ignore parameters to phi instructions. They're not
     // considered live here, we'll add copy instructions on the edge
     // between the block and here.
-    for (auto regId : instructions.at(block->begin)->livein.at(0)) {
+    for (auto regId : block->instructions.head->livein.at(0)) {
         auto r = registers.find(regId);
         if (r == registers.end()) {
             std::cerr << "Warning: Initial virtual register "
-                << regId << " not found in block " << block->labelId << ".\n";
+                << regId << " not found in block " << block->blockId << ".\n";
         } else if (r->second.phy == NO_REGISTER) {
             std::cerr << "Warning: Expected initial physical register for "
-                << regId << " in block " << block->labelId << ".\n";
+                << regId << " in block " << block->blockId << ".\n";
         } else {
             assigned.insert(r->second.phy);
         }
     }
 
     // Assign registers for each instruction in order.
-    for (int pc = block->begin; pc < block->end; pc++) {
-        Instruction *instruction = instructions.at(pc).get();
+    for (auto inst = block->instructions.head; inst; inst = inst->next) {
+        Instruction *instruction = inst.get();
 
         // Free up now-unused physical registers.
         for (auto argId : instruction->argIdSet) {
@@ -419,7 +460,7 @@ void Compiler::assignRegistersForBlock(Block *block,
             auto r = registers.find(resId);
             if (r == registers.end()) {
                 std::cout << "Error: Virtual register "
-                    << resId << " not found in block " << block->labelId << ".\n";
+                    << resId << " not found in block " << block->blockId << ".\n";
                 exit(EXIT_FAILURE);
             }
 
@@ -445,17 +486,9 @@ void Compiler::assignRegistersForBlock(Block *block,
                 }
             }
             if (!found) {
-                std::cerr << "Error: No physical register available for "
-                    << resId << " on line " << pc << ".\n";
+                std::cerr << "Error: No physical register available for " << resId << ".\n";
                 exit(EXIT_FAILURE);
             }
-        }
-    }
-
-    // Go down dominance tree.
-    for (auto& [labelId, subBlock] : pgm->blocks) {
-        if (subBlock->idom == block->labelId) {
-            assignRegistersForBlock(subBlock.get(), allIntPhy, allFloatPhy);
         }
     }
 }
@@ -682,20 +715,18 @@ void Compiler::emit(const std::string &op, const std::string &comment) {
     outFile.copyfmt(oldState);
 }
 
-void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
+void Compiler::emitPhiCopy(Instruction *instruction, uint32_t blockId) {
+    // Find the function we're in.
+    Function *function = instruction->list->block->function;
+
     // Where we're coming from.
-    uint32_t sourceBlockId = instruction->blockId;
+    uint32_t sourceBlockId = instruction->blockId();
 
     // Find block with phi.
-    Block *block = pgm->blocks.at(labelId).get();
-    int pc = block->begin;
-    if (pc >= block->end) {
-        // No instructions in block.
-        return;
-    }
+    Block *block = function->blocks.at(blockId).get();
 
     // Find the phi instruction.
-    Instruction *firstInstruction = instructions[pc].get();
+    Instruction *firstInstruction = block->instructions.head.get();
     if (firstInstruction->opcode() != RiscVOpPhi) {
         // Block doesn't start with a phi.
         return;
@@ -706,7 +737,7 @@ void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
     int labelIndex = phi->getLabelIndexForSource(sourceBlockId);
     if (labelIndex == -1) {
         std::cerr << "Error: Can't find source block " << sourceBlockId
-            << " in phi at start of block " << labelId << "\n";
+            << " in phi at start of block " << blockId << "\n";
         exit(EXIT_FAILURE);
     }
 
@@ -788,11 +819,4 @@ void Compiler::emitPhiCopy(Instruction *instruction, uint32_t labelId) {
                 break;
         }
     }
-}
-
-void Compiler::assertNoPhi(uint32_t labelId) {
-    Block *block = pgm->blocks.at(labelId).get();
-    uint32_t opcode = instructions[block->begin]->opcode();
-    assert(opcode != SpvOpPhi);
-    assert(opcode != RiscVOpPhi);
 }

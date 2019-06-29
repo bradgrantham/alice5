@@ -47,6 +47,10 @@ std::vector<Instruction *> Instruction::pred() const {
     return instructions;
 }
 
+uint32_t Instruction::blockId() const {
+    return list->block->blockId;
+}
+
 std::string Function::cleanUpName(std::string name) {
     // Replace "mainImage(vf4;vf2;" with "mainImage$v4f$vf2$"
     for (int i = 0; i < name.length(); i++) {
@@ -145,6 +149,9 @@ void Function::computeDomTree(bool verbose) {
 
             if (valid) {
                 block->idom = idomCandidate;
+
+                // Add ourselves to parent's children.
+                blocks.at(idomCandidate)->idomChildren.push_back(block);
                 break;
             }
         }
@@ -218,10 +225,11 @@ void Function::computeDomTree(bool verbose) {
                 std::ios oldState(nullptr);
                 oldState.copyfmt(std::cout);
 
-                if (instruction->blockId == NO_BLOCK_ID) {
+                uint32_t blockId = instruction->blockId();
+                if (blockId == NO_BLOCK_ID) {
                     std::cout << "  ---";
                 } else {
-                    std::cout << std::setw(5) << instruction->blockId;
+                    std::cout << std::setw(5) << blockId;
                 }
                 if (instruction->resIdSet.empty()) {
                     std::cout << "         ";
@@ -268,3 +276,7 @@ void Function::computeDomTree(bool verbose) {
     }
 }
 
+// Swap the two instruction lists.
+void swap(InstructionList &a, InstructionList &b) {
+    a.swap(b);
+}
