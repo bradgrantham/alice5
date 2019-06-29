@@ -629,12 +629,40 @@ struct InstructionList {
     }
 
     ~InstructionList() {
-        assert(!head);
-        // XXX delete the instructions. Be sure to avoid circular references.
+        while (head) {
+            erase(head);
+        }
+    }
+
+    // The number of instructions in the list. Takes O(n).
+    // XXX Not tested.
+    size_t size() const {
+        size_t s = 0;
+
+        for (auto inst = head; inst; inst = inst->next) {
+            s++;
+        }
+
+        // Sanity check.
+        size_t s_backward = 0;
+        for (auto inst = tail; inst; inst = inst->prev) {
+            s_backward++;
+        }
+        assert(s == s_backward);
+
+        return s;
     }
 
     // Add an instruction to the end of this list.
     void push_back(std::shared_ptr<Instruction> instruction) {
+        if (instruction->list != nullptr) {
+            instruction->list->erase(instruction);
+        }
+
+        assert(instruction->list == nullptr);
+        assert(!instruction->prev);
+        assert(!instruction->next);
+
         if (head) {
             // Add to end of list.
             tail->next = instruction;
@@ -651,6 +679,25 @@ struct InstructionList {
 
         // Set up back pointer.
         instruction->list = this;
+    }
+
+    void erase(std::shared_ptr<Instruction> instruction) {
+        assert(instruction->list == this);
+        if (instruction->prev) {
+            instruction->prev->next = instruction->next;
+        } else {
+            assert(head == instruction);
+            head = instruction->next;
+        }
+        if (instruction->next) {
+            instruction->next->prev = instruction->prev;
+        } else {
+            assert(tail == instruction);
+            tail = instruction->prev;
+        }
+        instruction->prev.reset();
+        instruction->next.reset();
+        instruction->list = nullptr;
     }
 
     // Swap the two instruction lists.

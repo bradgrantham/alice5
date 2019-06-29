@@ -64,10 +64,6 @@ struct Compiler {
         }
     }
 
-    virtual ~Compiler() {
-        outFile.close();
-    }
-
     void compile();
     void emitInstructions();
     void emitInstructionsForFunction(Function *function);

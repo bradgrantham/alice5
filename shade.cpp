@@ -425,7 +425,7 @@ void InsnBranch::emit(Compiler *compiler)
     compiler->emitPhiCopy(this, targetLabelId);
 
     std::ostringstream ss;
-    ss << "jal x0, label" << targetLabelId;
+    ss << "jal x0, block" << targetLabelId;
     compiler->emit(ss.str(), "");
 }
 
@@ -482,13 +482,13 @@ void InsnBranchConditional::emit(Compiler *compiler)
     // True path.
     compiler->emitPhiCopy(this, trueLabelId);
     std::ostringstream ss2;
-    ss2 << "jal x0, label" << trueLabelId;
+    ss2 << "jal x0, block" << trueLabelId;
     compiler->emit(ss2.str(), "");
     // False path.
     compiler->emitLabel(localLabel);
     compiler->emitPhiCopy(this, falseLabelId);
     std::ostringstream ss3;
-    ss3 << "jal x0, label" << falseLabelId;
+    ss3 << "jal x0, block" << falseLabelId;
     compiler->emit(ss3.str(), "");
 }
 

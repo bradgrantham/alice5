@@ -310,7 +310,12 @@ void Program::expandVectors(Block *block) {
     }
     */
 
-    for (auto inst = block->instructions.head; inst; inst = inst->next) {
+    std::shared_ptr<Instruction> nextInst;
+    for (auto inst = block->instructions.head; inst; inst = nextInst) {
+        // Save this because if we move the instruction to another list, its next
+        // pointer will be wrong.
+        nextInst = inst->next;
+
         Instruction *instruction = inst.get();
         bool replaced = false;
 
@@ -720,7 +725,6 @@ void Program::expandVectors(Block *block) {
 
                 // Eat up all consecutive phis.
                 bool first = true;
-                std::shared_ptr<Instruction> prevInst = inst;
                 while (inst && inst->opcode() == SpvOpPhi) {
                     InsnPhi *oldPhi = dynamic_cast<InsnPhi *>(inst.get());
 
@@ -755,7 +759,7 @@ void Program::expandVectors(Block *block) {
 
                     inst = inst->next;
                 }
-                inst = prevInst; // Compensate for loop increment.
+                nextInst = inst;
 
                 replaced = true;
                 break;
@@ -936,6 +940,6 @@ void Program::expandVectors(Block *block) {
         }
     }
 
-    std::swap(newList, block->instructions);
+    newList.swap(block->instructions);
 }
 

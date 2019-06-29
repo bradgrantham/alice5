@@ -28,6 +28,8 @@ void Compiler::compile() {
     emitVariables();
     emitConstants();
     emitLibrary();
+
+    outFile.close();
 }
 
 void Compiler::emitInstructions() {
@@ -103,7 +105,7 @@ void Compiler::emitInstructionsForBlockTree(Block *block) {
 void Compiler::emitInstructionsForBlock(Block *block) {
     // Emit block's label.
     std::ostringstream ss;
-    ss << "label" << block->blockId;
+    ss << "block" << block->blockId;
     emitLabel(ss.str());
 
     for (auto inst = block->instructions.head; inst; inst = inst->next) {
@@ -226,7 +228,10 @@ std::string Compiler::makeLocalLabel() {
 void Compiler::transformInstructions(InstructionList &inList) {
     InstructionList newList(inList.block);
 
-    for (auto inst = inList.head; inst; inst = inst->next) {
+    std::shared_ptr<Instruction> nextInst;
+    for (auto inst = inList.head; inst; inst = nextInst) {
+        nextInst = inst->next;
+
         bool replaced = false;
         Instruction *instruction = inst.get();
         if (instruction->opcode() == SpvOpIAdd) {
