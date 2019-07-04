@@ -933,7 +933,29 @@ sinTable_f32:
         jalr    x0, ra, 0                  ; return;
 
 .fract:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; save registers
+        sw      a0, -4(sp)
+        fsw     fa0, -8(sp)
+        fsw     fa1, -12(sp)
+        fsw     fa2, -16(sp)
+
+        flw      fa0, 0(sp)      ; a0 = x
+
+        ; a0<wholei> = ifloorf(fa0<x>)
+	fcvt.w.s a0,fa0,rdn
+
+        ; fa1<fract> = fa0<x> - fa1<float(wholei)>
+        fcvt.s.w fa1,a0,rtz
+	fsub.s	fa2,fa0,fa1
+
+        fsw      fa2, 0(sp)     ; return(x)
+
+        ; restore registers
+        lw      a0, -4(sp)
+        flw     fa0, -8(sp)
+        flw     fa1, -12(sp)
+        flw     fa2, -16(sp)
+
         jalr x0, ra, 0
 
 .cross:
