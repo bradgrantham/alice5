@@ -1189,17 +1189,79 @@ sinTable_f32:
         jalr x0, ra, 0
 
 .all1:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; all(a) = a so just return
         jalr x0, ra, 0
 
 .all2:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        sw      a0, -4(sp)
+        sw      a1, -8(sp)
+        sw      a2, -12(sp)
+
+        lw a0, 0(sp)    ; a
+        lw a1, 4(sp)    ; b
+        and a2, a0, a1  ; c = a && b
+        sw a2, 4(sp)    ; return(c)
+
+        ; restore registers
+        lw      a0, -4(sp)
+        lw      a1, -8(sp)
+        lw      a2, -12(sp)
+
+        addi    sp, sp, 4       ; We took two parameters and return one, so fix up stack
         jalr x0, ra, 0
 
 .all3:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; save registers
+        sw      a0, -4(sp)
+        sw      a1, -8(sp)
+        sw      a2, -12(sp)
+        sw      a3, -16(sp)
+        sw      a4, -20(sp)
+
+        lw a0, 0(sp)    ; a
+        lw a1, 4(sp)    ; b
+        lw a2, 8(sp)    ; c
+        and a4, a0, a1  ; e = a && b
+        and a0, a2, a4  ; f = c && e
+        sw a0, 8(sp)    ; return(f)
+
+        ; restore registers
+        lw      a0, -4(sp)
+        lw      a1, -8(sp)
+        lw      a2, -12(sp)
+        lw      a3, -16(sp)
+        lw      a4, -20(sp)
+
+        addi    sp, sp, 8       ; We took three parameters and return one, so fix up stack
         jalr x0, ra, 0
 
 .all4:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; save registers
+        sw      a0, -4(sp)
+        sw      a1, -8(sp)
+        sw      a2, -12(sp)
+        sw      a3, -16(sp)
+        sw      a4, -20(sp)
+        sw      a5, -24(sp)
+
+        lw a0, 0(sp)    ; a
+        lw a1, 4(sp)    ; b
+        lw a2, 8(sp)    ; c
+        lw a3, 12(sp)   ; d
+        and a4, a0, a1  ; e = a && b
+        and a5, a2, a3  ; f = c && d
+        and a0, a4, a5  ; g = e && f
+        sw a0, 12(sp)   ; return(g)
+
+        ; restore registers
+        lw      a0, -4(sp)
+        lw      a1, -8(sp)
+        lw      a2, -12(sp)
+        lw      a3, -16(sp)
+        lw      a4, -20(sp)
+        lw      a5, -24(sp)
+
+        addi    sp, sp, 12      ; We took four parameters and return one, so fix up stack
         jalr x0, ra, 0
+
