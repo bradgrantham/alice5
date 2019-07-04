@@ -1133,7 +1133,32 @@ sinTable_f32:
         jalr x0, ra, 0
 
 .step:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        sw      a0, -4(sp)
+        fsw     fa0, -8(sp)
+        fsw     fa1, -12(sp)
+        fsw     fa2, -16(sp)
+
+        ; float edge = popf();
+        flw      fa0, 0(sp)      ; fa0 = edge = pop()
+
+        ; float x = popf();
+        flw      fa1, 4(sp)      ; fa1 = x = pop()
+
+        ; float y = (x < edge) ? 0.0f : 1.0f;
+        fle.s     a0, fa0, fa1
+
+        fcvt.s.w fa2,a0,rtz
+
+        ; pushf(y);
+        fsw     fa2, 4(sp)
+
+        lw      a0, -4(sp)
+        flw     fa0, -8(sp)
+        flw     fa1, -12(sp)
+        flw     fa2, -16(sp)
+
+        addi    sp, sp, 4       ; We took two parameters and return one, so fix up stack
+
         jalr x0, ra, 0
 
 .dot1:
