@@ -328,11 +328,6 @@ void Interpreter::stepVectorInsertDynamic(const InsnVectorInsertDynamic& insn)
     std::cerr << "stepVectorInsertDynamic() not implemented\n";
 }
 
-void Interpreter::stepCopyObject(const InsnCopyObject& insn)
-{
-    std::cerr << "stepCopyObject() not implemented\n";
-}
-
 void Interpreter::stepTranspose(const InsnTranspose& insn)
 {
     std::cerr << "stepTranspose() not implemented\n";

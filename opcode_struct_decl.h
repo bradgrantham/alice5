@@ -13,6 +13,7 @@ struct InsnVectorShuffle;
 struct InsnCompositeConstruct;
 struct InsnCompositeExtract;
 struct InsnCompositeInsert;
+struct InsnCopyObject;
 struct InsnImageSampleImplicitLod;
 struct InsnImageSampleExplicitLod;
 struct InsnConvertFToS;

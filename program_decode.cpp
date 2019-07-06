@@ -514,7 +514,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t functionType = nextu();
             std::string name = pgm->names.at(id);
             std::shared_ptr<Function> function = std::make_shared<Function>(id, name,
-                    resultType, functionControl, functionType);
+                    resultType, functionControl, functionType, pgm);
             pgm->functions[id] = function;
             pgm->currentFunction = function;
             // Fake block so we can capture the SpvOpFunctionParameter instructions.

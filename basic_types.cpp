@@ -2,6 +2,8 @@
 #include <iomanip>
 
 #include "basic_types.h"
+#include "risc-v.h"
+#include "program.h"
 
 // Compute successor instructions.
 std::vector<Instruction *> Instruction::succ() const {
@@ -273,6 +275,41 @@ void Function::computeDomTree(bool verbose) {
             }
         }
         std::cout << "-----------------------\n";
+    }
+}
+
+// From "The Design and Implementation of a SSA-based Register Allocator" by
+// Pereira (2007), section 4.2.
+void Function::phiLifting() {
+    // For each block that has a phi instruction, break up its parameters.
+    for (auto &[_, block] : blocks) {
+        Instruction *instruction = block->instructions.head.get();
+        if (instruction->opcode() == RiscVOpPhi) {
+            phiLiftingForBlock(block.get(), dynamic_cast<RiscVPhi *>(instruction));
+        }
+    }
+}
+
+void Function::phiLiftingForBlock(Block *block, RiscVPhi *phi) {
+    // For each result.
+    for (int res = 0; res < phi->resultIds.size(); res++) {
+        // For each label.
+        for (int blockId = 0; blockId < phi->labelIds.size(); blockId++) {
+            uint32_t operandId = phi->operandIds[res][blockId];
+
+            // Generate a new ID.
+            uint32_t newId = program->nextReg++;
+
+            // Replace the ID in the phi, in-place.
+            phi->operandIds[res][blockId] = newId;
+
+            // Insert a move instruction at the end of the source block.
+            Block *sourceBlock = blocks.at(blockId).get();
+            uint32_t type = program->typeIdOf(operandId);
+            LineInfo lineInfo;
+            sourceBlock->instructions.push_back(std::make_shared<InsnCopyObject>(
+                        lineInfo, type, newId, operandId));
+        }
     }
 }
 

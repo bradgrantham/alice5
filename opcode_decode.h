@@ -209,6 +209,25 @@ case SpvOpCompositeInsert: {
     break;
 }
 
+case SpvOpCopyObject: {
+    uint32_t type = nextu();
+    uint32_t resultId = nextu();
+    uint32_t operandId = nextu();
+    pgm->currentBlock->instructions.push_back(std::make_shared<InsnCopyObject>(pgm->currentLine, type, resultId, operandId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "CopyObject";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " operandId ";
+        std::cout << operandId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case SpvOpImageSampleImplicitLod: {
     uint32_t type = nextu();
     uint32_t resultId = nextu();

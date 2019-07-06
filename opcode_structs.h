@@ -163,6 +163,20 @@ struct InsnCompositeInsert : public Instruction {
     virtual std::string name() const { return "OpCompositeInsert"; }
 };
 
+// OpCopyObject instruction (code 83).
+struct InsnCopyObject : public Instruction {
+    InsnCopyObject(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t operandId) : Instruction(lineInfo), type(type) {
+        addResult(resultId);
+        addParameter(operandId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t operandId() const { return argIdList[0]; } // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepCopyObject(*this); }
+    virtual uint32_t opcode() const { return SpvOpCopyObject; }
+    virtual std::string name() const { return "OpCopyObject"; }
+};
+
 // OpImageSampleImplicitLod instruction (code 87).
 struct InsnImageSampleImplicitLod : public Instruction {
     InsnImageSampleImplicitLod(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t sampledImageId, uint32_t coordinateId, uint32_t imageOperands) : Instruction(lineInfo), type(type), imageOperands(imageOperands) {

@@ -934,6 +934,12 @@ void Interpreter::stepFunctionCall(const InsnFunctionCall& insn)
     jumpToFunction(function);
 }
 
+void Interpreter::stepCopyObject(const InsnCopyObject& insn)
+{
+    // Not used in the interpreter.
+    assert(false);
+}
+
 void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
 {
     const Type *type = pgm->types.at(registers[insn.p0Id()].type).get();

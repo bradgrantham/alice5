@@ -534,6 +534,7 @@ struct InstructionList;
 struct Block;
 struct Program;
 struct Function;
+struct RiscVPhi;
 
 // Base class for individual instructions.
 struct Instruction {
@@ -766,6 +767,9 @@ struct Function {
     uint32_t functionControl;
     uint32_t functionType;
 
+    // Back pointer.
+    Program *program;
+
     // Original and clean (assembly-friendly) name.
     std::string name;
     std::string cleanName;
@@ -777,10 +781,10 @@ struct Function {
     std::map<uint32_t, std::shared_ptr<Block>> blocks;
 
     Function(uint32_t id, const std::string &name, uint32_t resultType,
-            uint32_t functionControl, uint32_t functionType) :
+            uint32_t functionControl, uint32_t functionType, Program *program) :
 
         id(id), resultType(resultType), functionControl(functionControl),
-        functionType(functionType), name(name), cleanName(cleanUpName(name)),
+        functionType(functionType), program(program), name(name), cleanName(cleanUpName(name)),
         startBlockId(NO_BLOCK_ID) {
 
         // Nothing.
@@ -788,6 +792,10 @@ struct Function {
 
     // Compute the dominance graph and immediate dominance tree.
     void computeDomTree(bool verbose);
+
+    // Break up phi loops.
+    void phiLifting();
+    void phiLiftingForBlock(Block *block, RiscVPhi *phi);
 
     // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
     static std::string cleanUpName(std::string name);

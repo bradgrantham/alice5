@@ -173,6 +173,11 @@ void Program::postParse() {
 }
 
 void Program::prepareForCompile() {
+    // Break loops by renaming variables in phi instructions.
+    for (auto &[_, function] : functions) {
+        function->phiLifting();
+    }
+
     // Compute livein and liveout registers for each line.
     Timer timer;
     std::set<Instruction *> inst_worklist; // Instructions left to work on.
