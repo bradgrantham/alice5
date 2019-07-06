@@ -289,6 +289,11 @@ struct Program
     // typeVector's subtype.
     uint32_t scalarize(uint32_t vreg, int i, const TypeVector *typeVector);
 
+    // Replace the SPIR-V Phi instructions with ours.
+    void replacePhi();
+    void replacePhiInFunction(Function *function);
+    void replacePhiInBlock(Block *block);
+
     // Transform vector instructions to scalar instructions.
     void expandVectors();
     void expandVectorsInFunction(Function *function);

@@ -198,7 +198,7 @@ void Function::computeDomTree(bool verbose) {
     if (verbose) {
         dumpBlockInfo();
         dumpGraph(unreached);
-        dumpInstructions();
+        dumpInstructions("after dom tree");
     }
 }
 
@@ -252,8 +252,8 @@ void Function::dumpGraph(const std::set<uint32_t> &unreached) const {
     std::cout << "-----------------------\n";
 }
 
-void Function::dumpInstructions() const {
-    std::cout << "----------------------- Instruction info\n";
+void Function::dumpInstructions(const std::string &description) const {
+    std::cout << "----------------------- Instruction info (" << description << ")\n";
     std::cout << cleanName << ":\n";
     for (auto& [blockId, block] : blocks) {
         std::cout << "Block " << blockId << ":\n";
@@ -324,7 +324,7 @@ void Function::phiLifting() {
         }
     }
 
-    dumpInstructions();
+    dumpInstructions("after phi lifting");
 }
 
 void Function::phiLiftingForBlock(Block *block, RiscVPhi *phi) {
@@ -351,6 +351,9 @@ void Function::phiLiftingForBlock(Block *block, RiscVPhi *phi) {
                         lineInfo, type, newId, operandId), sourceBlock->instructions.tail);
         }
     }
+
+    // We've changed the operandIds array in-place, so recompute the args.
+    phi->recomputeArgs();
 }
 
 // Swap the two instruction lists.

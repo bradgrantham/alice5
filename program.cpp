@@ -161,6 +161,9 @@ void Program::postParse() {
 }
 
 void Program::prepareForCompile() {
+    // Replace phis with ours.
+    replacePhi();
+
     // Compute successor and predecessor blocks.
     for (auto& [functionId, function] : functions) {
         for (auto& [_, block] : function->blocks) {
@@ -222,11 +225,8 @@ void Program::prepareForCompile() {
             instruction->livein[0].erase(resId);
         }
         // ... plus what we need.
-        if (instruction->opcode() == SpvOpPhi) {
-            // This should have been replaced.
-            std::cerr << "Error: Use the -s flag for programs with OpPhi instructions.\n";
-            assert(false);
-        } else if (instruction->opcode() == RiscVOpPhi) {
+        assert(instruction->opcode() != SpvOpPhi); // Should have been replaced.
+        if (instruction->opcode() == RiscVOpPhi) {
             // Special handling of Phi instruction, because we must specify
             // which branch our livein is from. Otherwise all branches will
             // think they need all inputs, which is incorrect.
@@ -276,6 +276,87 @@ void Program::prepareForCompile() {
     for (auto &[_, function] : functions) {
         function->computeDomTree(verbose);
     }
+}
+
+void Program::replacePhi() {
+    for (auto &[_, function] : functions) {
+        replacePhiInFunction(function.get());
+    }
+}
+
+void Program::replacePhiInFunction(Function *function) {
+    for (auto &[_, block] : function->blocks) {
+        replacePhiInBlock(block.get());
+    }
+}
+
+void Program::replacePhiInBlock(Block *block) {
+    InstructionList newList(block);
+
+    std::shared_ptr<Instruction> nextInst;
+    for (auto inst = block->instructions.head; inst; inst = nextInst) {
+        // Save this because if we move the instruction to another list, its next
+        // pointer will be wrong.
+        nextInst = inst->next;
+
+        Instruction *instruction = inst.get();
+        bool replaced;
+
+        switch (instruction->opcode()) {
+            case SpvOpPhi: {
+                // Here we collapse all the consecutive phi instructions into our own.
+                std::shared_ptr<RiscVPhi> newPhi = std::make_shared<RiscVPhi>(
+                        instruction->lineInfo);
+                newList.push_back(newPhi);
+
+                // Eat up all consecutive phis.
+                bool first = true;
+                while (inst && inst->opcode() == SpvOpPhi) {
+                    InsnPhi *oldPhi = dynamic_cast<InsnPhi *>(inst.get());
+
+                    uint32_t resultId = oldPhi->resultId();
+                    newPhi->resultIds.push_back(resultId);
+                    newPhi->addResult(resultId);
+
+                    std::vector<uint32_t> operandIds;
+                    for (int i = 0; i < oldPhi->operandIdCount(); i++) {
+                        // Deal with label.
+                        uint32_t labelId = oldPhi->labelId[i];
+                        if (first) {
+                            newPhi->labelIds.push_back(labelId);
+                        } else {
+                            // Make sure labels are consistent across phi instructions.
+                            assert(newPhi->labelIds[i] == labelId);
+                        }
+
+                        // Deal with operand.
+                        uint32_t operandId = oldPhi->operandId(i);
+                        operandIds.push_back(operandId);
+                        newPhi->addParameter(operandId);
+                    }
+                    newPhi->operandIds.push_back(operandIds);
+
+                    first = false;
+                    inst = inst->next;
+                }
+                nextInst = inst;
+
+                replaced = true;
+                break;
+            }
+
+            default:
+                // Leave as-is.
+                replaced = false;
+                break;
+        }
+
+        if (!replaced) {
+            newList.push_back(inst);
+        }
+    }
+
+    newList.swap(block->instructions);
 }
 
 void Program::expandVectors() {
@@ -436,6 +517,11 @@ void Program::expandVectorsInBlock(Block *block) {
                             insn->type, insn->resultId(), oldId));
 
                 replaced = true;
+                break;
+            }
+
+            case SpvOpCopyObject: {
+                expandVectorsUniOp<InsnCopyObject>(instruction, newList, replaced);
                 break;
             }
 
@@ -725,49 +811,44 @@ void Program::expandVectorsInBlock(Block *block) {
             }
 
             case SpvOpPhi: {
-                // Here we not only expand the vectors, but we collapse all
-                // the consecutive phi instructions into our own.
-                std::shared_ptr<RiscVPhi> newPhi = std::make_shared<RiscVPhi>(
-                        instruction->lineInfo);
+                // Should have been replaced.
+                assert(false);
+            }
+
+            case RiscVOpPhi: {
+                RiscVPhi *oldPhi = dynamic_cast<RiscVPhi *>(instruction);
+                std::shared_ptr<RiscVPhi> newPhi = std::make_shared<RiscVPhi>(oldPhi->lineInfo);
                 newList.push_back(newPhi);
 
-                // Eat up all consecutive phis.
-                bool first = true;
-                while (inst && inst->opcode() == SpvOpPhi) {
-                    InsnPhi *oldPhi = dynamic_cast<InsnPhi *>(inst.get());
+                // Can just copy these, they won't change.
+                newPhi->labelIds = oldPhi->labelIds;
 
+                for (int resIndex = 0; resIndex < oldPhi->resultIds.size(); resIndex++) {
                     // See if we should expand a vector.
-                    const TypeVector *typeVector = getTypeAsVector(typeIdOf(oldPhi->resultId()));
+                    const TypeVector *typeVector = getTypeAsVector(typeIdOf(
+                                oldPhi->resultIds[resIndex]));
 
-                    // Expand vectors in this loop.
-                    for (int j = 0; j < vectorCount(typeVector); j++) {
-                        uint32_t regId = scalarize(oldPhi->resultId(), j, typeVector);
+                    // Expand vectors.
+                    for (int elIndex = 0; elIndex < vectorCount(typeVector); elIndex++) {
+                        uint32_t regId = scalarize(oldPhi->resultIds[resIndex],
+                                elIndex, typeVector);
                         newPhi->resultIds.push_back(regId);
                         newPhi->addResult(regId);
 
+                        // Source labels.
                         std::vector<uint32_t> operandIds;
-                        for (int i = 0; i < oldPhi->operandIdCount(); i++) {
-                            uint32_t operandId = oldPhi->operandId(i);
-                            uint32_t labelId = oldPhi->labelId[i];
-                            if (first) {
-                                newPhi->labelIds.push_back(labelId);
-                            } else {
-                                // Make sure labels are consistent across phi instructions.
-                                assert(newPhi->labelIds[i] == labelId);
-                            }
+                        for (int labelIndex = 0; labelIndex < oldPhi->labelIds.size();
+                                labelIndex++) {
 
-                            uint32_t regId = scalarize(operandId, j, typeVector);
+                            uint32_t operandId = oldPhi->operandIds[resIndex][labelIndex];
+
+                            uint32_t regId = scalarize(operandId, elIndex, typeVector);
                             operandIds.push_back(regId);
                             newPhi->addParameter(regId);
                         }
                         newPhi->operandIds.push_back(operandIds);
-
-                        first = false;
                     }
-
-                    inst = inst->next;
                 }
-                nextInst = inst;
 
                 replaced = true;
                 break;

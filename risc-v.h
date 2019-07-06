@@ -250,4 +250,17 @@ struct RiscVPhi : public Instruction {
         }
         return -1;
     }
+
+    // Recompute the arg set based on our operands. Call this if you change
+    // the operandIds vector in-place.
+    void recomputeArgs() {
+        argIdSet.clear();
+        argIdList.clear();
+
+        for (auto &x : operandIds) {
+            for (auto regId : x) {
+                addParameter(regId);
+            }
+        }
+    }
 };

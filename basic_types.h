@@ -845,7 +845,7 @@ struct Function {
     // Debug dump.
     void dumpBlockInfo() const;
     void dumpGraph(const std::set<uint32_t> &unreached) const;
-    void dumpInstructions() const;
+    void dumpInstructions(const std::string &description) const;
 };
 
 struct CommandLineParameters

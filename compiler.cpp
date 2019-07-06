@@ -9,7 +9,11 @@ void Compiler::compile() {
     // Transform SPIR-V instructions to RISC-V instructions.
     for (auto &[_, function] : pgm->functions) {
         for (auto &[_, block] : function->blocks) {
-            transformInstructions(block->instructions);
+            // XXX disable this because the code is broken. This is done after
+            // liveness analysis, and the liveness info isn't copied to the new
+            // instructions. Maybe we can do this before liveness analysis, especially
+            // since this is likely to need new registers anyway.
+            /// transformInstructions(block->instructions);
         }
     }
 
@@ -353,6 +357,8 @@ void Compiler::assignRegistersForFunction(const Function *function,
         const std::set<uint32_t> &allIntPhy,
         const std::set<uint32_t> &allFloatPhy) {
 
+    function->dumpInstructions("before register assignment");
+
     // Start with blocks at the start of functions.
     Block *block = function->blocks.at(function->startBlockId).get();
 
@@ -425,6 +431,7 @@ void Compiler::assignRegistersForBlock(Block *block,
     // we want to ignore parameters to phi instructions. They're not
     // considered live here, we'll add copy instructions on the edge
     // between the block and here.
+    std::cerr << "==== " << block->blockId << "\n";
     for (auto regId : block->instructions.head->livein.at(0)) {
         auto r = registers.find(regId);
         if (r == registers.end()) {
