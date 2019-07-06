@@ -27,7 +27,9 @@ void Compiler::compile() {
     assignRegisters();
 
     // Emit our header.
-    emit("jal ra, main", "");
+    std::ostringstream ss;
+    ss << "jal ra, " << pgm->functions.at(pgm->mainFunctionId)->cleanName;
+    emit(ss.str(), "");
     emit("ebreak", "");
 
     // Emit instructions.
