@@ -324,7 +324,7 @@ void Function::phiLifting() {
         }
     }
 
-    dumpInstructions("after phi lifting");
+    /// dumpInstructions("after phi lifting");
 }
 
 void Function::phiLiftingForBlock(Block *block, RiscVPhi *phi) {

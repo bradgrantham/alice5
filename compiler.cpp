@@ -362,7 +362,7 @@ void Compiler::assignRegistersForFunction(const Function *function,
         const std::set<uint32_t> &allIntPhy,
         const std::set<uint32_t> &allFloatPhy) {
 
-    function->dumpInstructions("before register assignment");
+    /// function->dumpInstructions("before register assignment");
 
     // Start with blocks at the start of functions.
     Block *block = function->blocks.at(function->startBlockId).get();

@@ -874,6 +874,10 @@ void Program::expandVectorsInBlock(Block *block) {
                 expandVectorsUniOp<InsnGLSLstd450FAbs>(instruction, newList, replaced);
                 break;
 
+            case 0x10000 | GLSLstd450Exp2:
+                expandVectorsUniOp<InsnGLSLstd450Exp2>(instruction, newList, replaced);
+                break;
+
             case 0x10000 | GLSLstd450Fract:
                 expandVectorsUniOp<InsnGLSLstd450Fract>(instruction, newList, replaced);
                 break;
@@ -884,6 +888,10 @@ void Program::expandVectorsInBlock(Block *block) {
 
             case 0x10000 | GLSLstd450FClamp:
                  expandVectorsTerOp<InsnGLSLstd450FClamp>(instruction, newList, replaced);
+                 break;
+
+            case 0x10000 | GLSLstd450SmoothStep:
+                 expandVectorsTerOp<InsnGLSLstd450SmoothStep>(instruction, newList, replaced);
                  break;
 
             case 0x10000 | GLSLstd450FMix:
