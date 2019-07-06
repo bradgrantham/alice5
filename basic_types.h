@@ -656,20 +656,47 @@ struct InstructionList {
 
     // Add an instruction to the end of this list.
     void push_back(std::shared_ptr<Instruction> instruction) {
-        if (instruction->list != nullptr) {
-            instruction->list->erase(instruction);
-        }
-
-        assert(instruction->list == nullptr);
-        assert(!instruction->prev);
-        assert(!instruction->next);
+        prepareForAdd(instruction);
 
         if (head) {
             // Add to end of list.
             tail->next = instruction;
             instruction->prev = tail;
-            instruction->next.reset();
-            tail = instruction;
+        } else {
+            // Starting with empty list.
+            head = instruction;
+        }
+
+        tail = instruction;
+    }
+
+    // Add an instruction before the other instruction.
+    void insert(std::shared_ptr<Instruction> instruction, std::shared_ptr<Instruction> other) {
+        prepareForAdd(instruction);
+
+        // If the list is not empty, must specify item to insert in front of. Otherwise
+        // it's okay to pass an empty element (like head to insert at the front).
+        assert(!other == !head);
+
+        if (other) {
+            // Other item must be in this list.
+            assert(other->list == this);
+
+            // Keep track of previous item.
+            std::shared_ptr<Instruction> prevItem = other->prev;
+
+            // Pair between instruction and other.
+            other->prev = instruction;
+            instruction->next = other;
+
+            // Pair between instruction and previous.
+            instruction->prev = prevItem;
+            if (prevItem) {
+                prevItem->next = instruction;
+            } else {
+                assert(head == other);
+                head = instruction;
+            }
         } else {
             // Starting with empty list.
             head = instruction;
@@ -677,9 +704,6 @@ struct InstructionList {
             instruction->prev.reset();
             instruction->next.reset();
         }
-
-        // Set up back pointer.
-        instruction->list = this;
     }
 
     void erase(std::shared_ptr<Instruction> instruction) {
@@ -717,6 +741,21 @@ struct InstructionList {
         for (auto inst = head; inst; inst = inst->next) {
             inst->list = this;
         }
+    }
+
+private:
+    // Prepare an item for adding (insertion or appending).
+    void prepareForAdd(std::shared_ptr<Instruction> instruction) {
+        if (instruction->list != nullptr) {
+            instruction->list->erase(instruction);
+        }
+
+        assert(instruction->list == nullptr);
+        assert(!instruction->prev);
+        assert(!instruction->next);
+
+        // Set up back pointer.
+        instruction->list = this;
     }
 };
 

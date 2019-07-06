@@ -175,6 +175,7 @@ struct InsnCopyObject : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepCopyObject(*this); }
     virtual uint32_t opcode() const { return SpvOpCopyObject; }
     virtual std::string name() const { return "OpCopyObject"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpImageSampleImplicitLod instruction (code 87).

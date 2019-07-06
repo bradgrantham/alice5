@@ -291,8 +291,8 @@ struct Program
 
     // Transform vector instructions to scalar instructions.
     void expandVectors();
-    void expandVectors(Function *function);
-    void expandVectors(Block *block);
+    void expandVectorsInFunction(Function *function);
+    void expandVectorsInBlock(Block *block);
 
     // Expand a unary operator, such as FNegate, from vector to scalar if necessary.
     template <class T>

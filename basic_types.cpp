@@ -294,21 +294,24 @@ void Function::phiLiftingForBlock(Block *block, RiscVPhi *phi) {
     // For each result.
     for (int res = 0; res < phi->resultIds.size(); res++) {
         // For each label.
-        for (int blockId = 0; blockId < phi->labelIds.size(); blockId++) {
-            uint32_t operandId = phi->operandIds[res][blockId];
+        for (int blockIndex = 0; blockIndex < phi->labelIds.size(); blockIndex++) {
+            uint32_t operandId = phi->operandIds[res][blockIndex];
+            uint32_t blockId = phi->labelIds.at(blockIndex);
 
             // Generate a new ID.
             uint32_t newId = program->nextReg++;
+            uint32_t type = program->typeIdOf(operandId);
+            program->resultTypes[newId] = type;
 
             // Replace the ID in the phi, in-place.
-            phi->operandIds[res][blockId] = newId;
+            phi->operandIds[res][blockIndex] = newId;
 
-            // Insert a move instruction at the end of the source block.
+            // Insert a move instruction at the end of the source block, just before the
+            // terminating instruction.
             Block *sourceBlock = blocks.at(blockId).get();
-            uint32_t type = program->typeIdOf(operandId);
             LineInfo lineInfo;
-            sourceBlock->instructions.push_back(std::make_shared<InsnCopyObject>(
-                        lineInfo, type, newId, operandId));
+            sourceBlock->instructions.insert(std::make_shared<InsnCopyObject>(
+                        lineInfo, type, newId, operandId), sourceBlock->instructions.tail);
         }
     }
 }

@@ -158,10 +158,12 @@ void Program::postParse() {
             std::cout << "variable " << name << " is at " << info.address << '\n';
         }
     }
+}
 
+void Program::prepareForCompile() {
+    // Compute successor and predecessor blocks.
     for (auto& [functionId, function] : functions) {
-        // Compute successor and predecessor blocks.
-        for (auto& [blockId, block] : function->blocks) {
+        for (auto& [_, block] : function->blocks) {
             Instruction *instruction = block->instructions.tail.get();
             assert(instruction->isTermination());
             block->succ = instruction->targetLabelIds;
@@ -170,9 +172,7 @@ void Program::postParse() {
             }
         }
     }
-}
 
-void Program::prepareForCompile() {
     // Break loops by renaming variables in phi instructions.
     for (auto &[_, function] : functions) {
         function->phiLifting();
@@ -277,17 +277,17 @@ void Program::prepareForCompile() {
 
 void Program::expandVectors() {
     for (auto &[_, function] : functions) {
-        expandVectors(function.get());
+        expandVectorsInFunction(function.get());
     }
 }
 
-void Program::expandVectors(Function *function) {
+void Program::expandVectorsInFunction(Function *function) {
     for (auto &[_, block] : function->blocks) {
-        expandVectors(block.get());
+        expandVectorsInBlock(block.get());
     }
 }
 
-void Program::expandVectors(Block *block) {
+void Program::expandVectorsInBlock(Block *block) {
     InstructionList newList(block);
 
     /* XXX delete
@@ -429,7 +429,7 @@ void Program::expandVectors(Block *block) {
 
                 // XXX We could avoid this move by renaming the result register throughout
                 // to "oldId".
-                newList.push_back(std::make_shared<RiscVMove>(insn->lineInfo,
+                newList.push_back(std::make_shared<InsnCopyObject>(insn->lineInfo,
                             insn->type, insn->resultId(), oldId));
 
                 replaced = true;

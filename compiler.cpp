@@ -464,7 +464,7 @@ void Compiler::assignRegistersForBlock(Block *block,
         for (uint32_t resId : instruction->resIdSet) {
             auto r = registers.find(resId);
             if (r == registers.end()) {
-                std::cout << "Error: Virtual register "
+                std::cerr << "Error: Virtual register "
                     << resId << " not found in block " << block->blockId << ".\n";
                 exit(EXIT_FAILURE);
             }

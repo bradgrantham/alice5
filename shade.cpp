@@ -131,29 +131,6 @@ void RiscVCross::emit(Compiler *compiler)
     compiler->emit("addi sp, sp, 16", "Restore stack");
 }
 
-void RiscVMove::emit(Compiler *compiler)
-{
-    const CompilerRegister *r1 = compiler->asRegister(resultId());
-    const CompilerRegister *r2 = compiler->asRegister(rs);
-    assert(r1 != nullptr);
-    assert(r2 != nullptr);
-
-    std::ostringstream ss1;
-    if (r1->phy != r2->phy) {
-        if (compiler->isRegFloat(resultId())) {
-            ss1 << "fsgnj.s ";
-        } else {
-            ss1 << "and ";
-        }
-        ss1 << compiler->reg(resultId()) << ", "
-            << compiler->reg(rs) << ", "
-            << compiler->reg(rs);
-    }
-    std::ostringstream ss2;
-    ss2 << "r" << resultId() << " = r" << rs;
-    compiler->emit(ss1.str(), ss2.str());
-}
-
 void RiscVLength::emit(Compiler *compiler)
 {
     size_t n = operandIds.size();
@@ -567,6 +544,29 @@ void InsnAccessChain::emit(Compiler *compiler)
             << compiler->notEmptyLabel(name->second) << "+" << offset;
         compiler->emit(ss.str(), "");
     }
+}
+
+void InsnCopyObject::emit(Compiler *compiler)
+{
+    const CompilerRegister *r1 = compiler->asRegister(resultId());
+    const CompilerRegister *r2 = compiler->asRegister(operandId());
+    assert(r1 != nullptr);
+    assert(r2 != nullptr);
+
+    std::ostringstream ss1;
+    if (r1->phy != r2->phy) {
+        if (compiler->isRegFloat(resultId())) {
+            ss1 << "fsgnj.s ";
+        } else {
+            ss1 << "and ";
+        }
+        ss1 << compiler->reg(resultId()) << ", "
+            << compiler->reg(operandId()) << ", "
+            << compiler->reg(operandId());
+    }
+    std::ostringstream ss2;
+    ss2 << "r" << resultId() << " = r" << operandId();
+    compiler->emit(ss1.str(), ss2.str());
 }
 
 void InsnGLSLstd450Sin::emit(Compiler *compiler)
