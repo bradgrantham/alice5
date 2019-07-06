@@ -6,16 +6,19 @@
 #include "pcopy.h"
 
 void Compiler::compile() {
+#if 0
+    // XXX disable this because the code is broken. This is done after liveness
+    // analysis, and the liveness info isn't copied to the new instructions.
+    // Maybe we can do this before liveness analysis, especially since this is
+    // likely to need new registers anyway.
+
     // Transform SPIR-V instructions to RISC-V instructions.
     for (auto &[_, function] : pgm->functions) {
         for (auto &[_, block] : function->blocks) {
-            // XXX disable this because the code is broken. This is done after
-            // liveness analysis, and the liveness info isn't copied to the new
-            // instructions. Maybe we can do this before liveness analysis, especially
-            // since this is likely to need new registers anyway.
-            /// transformInstructions(block->instructions);
+            transformInstructions(block->instructions);
         }
     }
+#endif
 
     // Translate out of SSA by eliminating phi instructions.
     translateOutOfSsa();
@@ -431,7 +434,6 @@ void Compiler::assignRegistersForBlock(Block *block,
     // we want to ignore parameters to phi instructions. They're not
     // considered live here, we'll add copy instructions on the edge
     // between the block and here.
-    std::cerr << "==== " << block->blockId << "\n";
     for (auto regId : block->instructions.head->livein.at(0)) {
         auto r = registers.find(regId);
         if (r == registers.end()) {
