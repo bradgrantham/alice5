@@ -617,6 +617,9 @@ struct Instruction {
 
     std::vector<Instruction *> succ() const;
     std::vector<Instruction *> pred() const;
+
+    // String representation of this instruction (block and offset).
+    std::string pos() const;
 };
 
 // A doubly-linked list of Instruction objects.
@@ -838,6 +841,11 @@ struct Function {
 
     // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
     static std::string cleanUpName(std::string name);
+
+    // Debug dump.
+    void dumpBlockInfo() const;
+    void dumpGraph(const std::set<uint32_t> &unreached) const;
+    void dumpInstructions() const;
 };
 
 struct CommandLineParameters

@@ -53,6 +53,30 @@ uint32_t Instruction::blockId() const {
     return list->block->blockId;
 }
 
+std::string Instruction::pos() const {
+    std::ostringstream ss;
+
+    if (list == nullptr) {
+        ss << "not in a block";
+    } else {
+        ss << list->block->blockId << "@";
+
+        // Find the index in the block.
+        bool found = false;
+        int index;
+        std::shared_ptr<Instruction> other;
+        for (index = 0, other = list->head; other && !found; index++, other = other->next) {
+            if (other.get() == this) {
+                ss << index;
+                found = true;
+            }
+        }
+        assert(found);
+    }
+
+    return ss.str();
+}
+
 std::string Function::cleanUpName(std::string name) {
     // Replace "mainImage(vf4;vf2;" with "mainImage$v4f$vf2$"
     for (int i = 0; i < name.length(); i++) {
@@ -172,110 +196,121 @@ void Function::computeDomTree(bool verbose) {
     }
 
     if (verbose) {
-        std::cout << "----------------------- Block info\n";
-        for (auto& [blockId, block] : blocks) {
-            std::cout << "Block " << blockId << ":\n";
-            std::cout << "    Pred:";
-            for (auto blockId : block->pred) {
-                std::cout << " " << blockId;
-            }
-            std::cout << "\n";
-            std::cout << "    Succ:";
-            for (auto blockId : block->succ) {
-                std::cout << " " << blockId;
-            }
-            std::cout << "\n";
-            std::cout << "    Dom:";
-            for (auto blockId : block->dom) {
-                std::cout << " " << blockId;
-            }
-            std::cout << "\n";
-            if (block->idom != NO_BLOCK_ID) {
-                std::cout << "    Immediate Dom: " << block->idom << "\n";
-            }
+        dumpBlockInfo();
+        dumpGraph(unreached);
+        dumpInstructions();
+    }
+}
+
+void Function::dumpBlockInfo() const {
+    std::cout << "----------------------- Block info\n";
+    for (auto& [blockId, block] : blocks) {
+        std::cout << "Block " << blockId << ":\n";
+        std::cout << "    Pred:";
+        for (auto blockId : block->pred) {
+            std::cout << " " << blockId;
         }
-        std::cout << "-----------------------\n";
-        // http://www.webgraphviz.com/
-        std::cout << "digraph CFG {\n  rankdir=TB;\n";
-        for (auto& [blockId, block] : blocks) {
-            if (unreached.find(blockId) == unreached.end()) {
-                for (auto pred : block->pred) {
-                    // XXX this is laid out much better if the function's start
-                    // block is mentioned first.
-                    if (unreached.find(pred) == unreached.end()) {
-                        std::cout << "  \"" << pred << "\" -> \"" << blockId << "\"";
-                        std::cout << ";\n";
-                    }
-                }
-                if (block->idom != NO_BLOCK_ID) {
-                    std::cout << "  \"" << blockId << "\" -> \"" << block->idom << "\"";
-                    std::cout << " [color=\"0.000, 0.999, 0.999\"]";
+        std::cout << "\n";
+        std::cout << "    Succ:";
+        for (auto blockId : block->succ) {
+            std::cout << " " << blockId;
+        }
+        std::cout << "\n";
+        std::cout << "    Dom:";
+        for (auto blockId : block->dom) {
+            std::cout << " " << blockId;
+        }
+        std::cout << "\n";
+        if (block->idom != NO_BLOCK_ID) {
+            std::cout << "    Immediate Dom: " << block->idom << "\n";
+        }
+    }
+    std::cout << "-----------------------\n";
+}
+
+void Function::dumpGraph(const std::set<uint32_t> &unreached) const {
+    // http://www.webgraphviz.com/
+    std::cout << "digraph CFG {\n  rankdir=TB;\n";
+    for (auto& [blockId, block] : blocks) {
+        if (unreached.find(blockId) == unreached.end()) {
+            for (auto pred : block->pred) {
+                // XXX this is laid out much better if the function's start
+                // block is mentioned first.
+                if (unreached.find(pred) == unreached.end()) {
+                    std::cout << "  \"" << pred << "\" -> \"" << blockId << "\"";
                     std::cout << ";\n";
                 }
             }
-        }
-        std::cout << "}\n";
-        std::cout << "-----------------------\n";
-
-        std::cout << "----------------------- Instruction info\n";
-        std::cout << cleanName << ":\n";
-        for (auto& [blockId, block] : blocks) {
-            std::cout << "Block " << blockId << ":\n";
-
-            for (auto instruction = block->instructions.head; instruction;
-                    instruction = instruction->next) {
-                std::ios oldState(nullptr);
-                oldState.copyfmt(std::cout);
-
-                uint32_t blockId = instruction->blockId();
-                if (blockId == NO_BLOCK_ID) {
-                    std::cout << "  ---";
-                } else {
-                    std::cout << std::setw(5) << blockId;
-                }
-                if (instruction->resIdSet.empty()) {
-                    std::cout << "         ";
-                } else {
-                    for (uint32_t resId : instruction->resIdList) {
-                        std::cout << std::setw(6) << resId;
-                    }
-                    std::cout << " <-";
-                }
-
-                std::cout << std::setw(0) << " " << instruction->name();
-
-                for (auto argId : instruction->argIdList) {
-                    std::cout << " " << argId;
-                }
-
-                std::cout << " (pred";
-                for (auto line : instruction->pred()) {
-                    std::cout << " " << line;
-                }
-                std::cout << ", succ";
-                for (auto line : instruction->succ()) {
-                    std::cout << " " << line;
-                }
-                std::cout << ", livein";
-                for (auto &[label,liveinSet] : instruction->livein) {
-                    std::cout << " " << label << "(";
-                    for (auto regId : liveinSet) {
-                        std::cout << " " << regId;
-                    }
-                    std::cout << ")";
-                }
-                std::cout << ", liveout";
-                for (auto regId : instruction->liveout) {
-                    std::cout << " " << regId;
-                }
-
-                std::cout << ")\n";
-
-                std::cout.copyfmt(oldState);
+            if (block->idom != NO_BLOCK_ID) {
+                std::cout << "  \"" << blockId << "\" -> \"" << block->idom << "\"";
+                std::cout << " [color=\"0.000, 0.999, 0.999\"]";
+                std::cout << ";\n";
             }
         }
-        std::cout << "-----------------------\n";
     }
+    std::cout << "}\n";
+    std::cout << "-----------------------\n";
+}
+
+void Function::dumpInstructions() const {
+    std::cout << "----------------------- Instruction info\n";
+    std::cout << cleanName << ":\n";
+    for (auto& [blockId, block] : blocks) {
+        std::cout << "Block " << blockId << ":\n";
+
+        for (auto instruction = block->instructions.head; instruction;
+                instruction = instruction->next) {
+            std::ios oldState(nullptr);
+            oldState.copyfmt(std::cout);
+
+            uint32_t blockId = instruction->blockId();
+            if (blockId == NO_BLOCK_ID) {
+                std::cout << "  ---";
+            } else {
+                std::cout << std::setw(5) << blockId;
+            }
+            if (instruction->resIdSet.empty()) {
+                std::cout << "         ";
+            } else {
+                for (uint32_t resId : instruction->resIdList) {
+                    std::cout << std::setw(6) << resId;
+                }
+                std::cout << " <-";
+            }
+
+            std::cout << std::setw(0) << " " << instruction->name();
+
+            for (auto argId : instruction->argIdList) {
+                std::cout << " " << argId;
+            }
+
+            std::cout << " (pred";
+            for (auto pred : instruction->pred()) {
+                std::cout << " " << pred->pos();
+            }
+            std::cout << ", succ";
+            for (auto succ : instruction->succ()) {
+                std::cout << " " << succ->pos();
+            }
+            std::cout << ", livein";
+            for (auto &[label,liveinSet] : instruction->livein) {
+                std::cout << " " << label << "(";
+                for (auto regId : liveinSet) {
+                    std::cout << " " << regId;
+                }
+                std::cout << ")";
+            }
+            std::cout << ", liveout";
+            for (auto regId : instruction->liveout) {
+                std::cout << " " << regId;
+            }
+
+            std::cout << ")\n";
+
+            std::cout.copyfmt(oldState);
+        }
+    }
+    std::cout << "-----------------------\n";
 }
 
 // From "The Design and Implementation of a SSA-based Register Allocator" by
@@ -288,6 +323,8 @@ void Function::phiLifting() {
             phiLiftingForBlock(block.get(), dynamic_cast<RiscVPhi *>(instruction));
         }
     }
+
+    dumpInstructions();
 }
 
 void Function::phiLiftingForBlock(Block *block, RiscVPhi *phi) {

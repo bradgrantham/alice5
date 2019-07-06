@@ -178,6 +178,9 @@ void Program::prepareForCompile() {
         function->phiLifting();
     }
 
+    // Convert vector instructions to scalar instructions.
+    expandVectors();
+
     // Compute livein and liveout registers for each line.
     Timer timer;
     std::set<Instruction *> inst_worklist; // Instructions left to work on.
