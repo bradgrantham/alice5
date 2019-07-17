@@ -2,7 +2,7 @@
 
 program="$1"
 if [ "$program" == "" ]; then
-    echo "Usage: GO program.frag"
+    echo "Usage: $0 program.frag"
     exit 1
 fi
 
