@@ -392,7 +392,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             do {
                 // Treat like a constant.
                 Register& r = pgm->allocConstantObject(id, typeId);
-                std::fill(r.data, r.data + pgm->typeSizes[typeId], 0);
+                std::fill(r.data, r.data + pgm->typeSizes.at(typeId), 0);
                 // Arguably here we should set r.initialized to false, so we
                 // can figure out if it's ever used, but just the fact that
                 // it's defined here means it'll be used somewhere later.
@@ -403,15 +403,23 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
                 // We should fill out the subelements vector with pointers to
                 // members of the subtype, but we don't necessarily have any
                 // constants or undef of the subtype. So just make some up.
-                const TypeVector *typeVector = pgm->getTypeAsVector(typeId);
-                if (typeVector != nullptr) {
-                    // Loop to create sub-elements.
-                    typeId = typeVector->type;
+                const TypeMatrix *typeMatrix = pgm->getTypeAsMatrix(typeId);
+                if (typeMatrix != nullptr) {
+                    // Loop to create sub-vectors.
+                    typeId = typeMatrix->columnType;
                     id = pgm->nextReg++;
-                    r.subelements = std::vector<uint32_t>(typeVector->count, id);
+                    r.subelements = std::vector<uint32_t>(typeMatrix->columnCount, id);
                 } else {
-                    // Done.
-                    typeId = 0;
+                    const TypeVector *typeVector = pgm->getTypeAsVector(typeId);
+                    if (typeVector != nullptr) {
+                        // Loop to create sub-elements.
+                        typeId = typeVector->type;
+                        id = pgm->nextReg++;
+                        r.subelements = std::vector<uint32_t>(typeVector->count, id);
+                    } else {
+                        // Done.
+                        typeId = 0;
+                    }
                 }
             } while (typeId != 0);
             break;
@@ -451,6 +459,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
             uint32_t id = nextu();
             std::vector<uint32_t> operands = restv();
             Register& r = pgm->allocConstantObject(id, typeId);
+            pgm->resultTypes[id] = typeId;
             r.subelements = operands;
             uint32_t offset = 0;
             for(uint32_t operand : operands) {

@@ -323,6 +323,13 @@ struct TypeMatrix : public Type
         // The math here is arbitrary, we just need to do it consistently throughout.
         return col*typeVector->count + row;
     }
+
+    // Converts an index to a row,col pair.
+    void getRowAndCol(int index, int &row, int &col, const TypeVector *typeVector) const {
+        // The math here is arbitrary, we just need to do it consistently throughout.
+        row = index % typeVector->count;
+        col = index / typeVector->count;
+    }
 };
 
 // Represents a function type.

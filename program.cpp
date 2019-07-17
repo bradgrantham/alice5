@@ -46,24 +46,38 @@ spv_result_t Program::handleHeader(void* user_data, spv_endianness_t endian,
     return SPV_SUCCESS;
 }
 
-// Return the scalar for the vector register's index.
+// Return the scalar for the vector/matrix register's index.
 uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t scalarReg,
         bool mustExist) {
 
     auto regIndex = RegIndex{vreg, i};
     auto itr = vec2scalar.find(regIndex);
     if (itr == vec2scalar.end()) {
+        // Never assigned, make a new assignment.
         assert(!mustExist);
 
-        // See if this was a constant vector.
+        // See if this was a constant vector/matrix.
         auto itr = constants.find(vreg);
         if (itr != constants.end()) {
             // Just refer back to the original component.
-            // XXX This won't handle matrices, maybe?
-            scalarReg = itr->second.subelements.at(i);
+
+            // See if it's a matrix.
+            const TypeMatrix *typeMatrix = getTypeAsMatrix(itr->second.type);
+            if (typeMatrix != nullptr) {
+                // Recurse to vector.
+                int row, col;
+                const TypeVector *typeVector = getTypeAsVector(typeMatrix->columnType);
+                typeMatrix->getRowAndCol(i, row, col, typeVector);
+                uint32_t vectorId = itr->second.subelements.at(col);
+                scalarReg = scalarize(vectorId, row, subtype, scalarReg, mustExist);
+            } else {
+                // It's a vector, just grab the element.
+                scalarReg = itr->second.subelements.at(i);
+            }
         } else {
             // Not a constant, must be a variable.
             if (scalarReg == 0) {
+                // Caller has no preferred register. Make a new one.
                 scalarReg = nextReg++;
                 assert(this->resultTypes.find(scalarReg) == this->resultTypes.end());
                 this->resultTypes[scalarReg] = subtype;
@@ -72,9 +86,12 @@ uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t sca
             vec2scalar[regIndex] = scalarReg;
         }
     } else {
+        // Already assigned.
         if (scalarReg != 0) {
+            // Must match what was specified.
             assert(scalarReg == itr->second);
         } else {
+            // Wasn't specified, just return what was previously assigned.
             scalarReg = itr->second;
         }
     }
@@ -593,30 +610,54 @@ void Program::expandVectorsInBlock(Block *block) {
                 break;
             }
 
-            case SpvOpCompositeInsert: { // XXX not tested.
+            case SpvOpCompositeInsert: {
                 InsnCompositeInsert *insn = dynamic_cast<InsnCompositeInsert *>(instruction);
 
-                // Only handle the simple case.
-                if (getTypeOp(insn->type) == SpvOpTypeMatrix) {
-                    std::cerr << "SpvOpCompositeInsert doesn't handle matrices.\n";
-                    exit(1);
-                }
-                const TypeVector *typeVector = getTypeAsVector(insn->type);
-                assert(typeVector != nullptr);
+                // Only handle the simple cases.
                 assert(insn->indexesId.size() == 1);
                 uint32_t index = insn->indexesId[0];
 
-                for (int i = 0; i < typeVector->count; i++) {
-                    uint32_t newId;
+                // See if it's a vector.
+                const TypeVector *typeVector = getTypeAsVector(insn->type);
+                if (typeVector != nullptr) {
+                    for (int i = 0; i < typeVector->count; i++) {
+                        uint32_t newId;
 
-                    if (i == index) {
-                        // Use new value.
-                        newId = insn->objectId();
-                    } else {
-                        // Use old value.
-                        newId = scalarize(insn->compositeId(), i, typeVector->type);
+                        if (i == index) {
+                            // Use new value.
+                            newId = insn->objectId();
+                        } else {
+                            // Use old value.
+                            newId = scalarize(insn->compositeId(), i, typeVector->type);
+                        }
+                        scalarize(insn->resultId(), i, typeVector->type, newId);
                     }
-                    scalarize(insn->resultId(), i, typeVector->type, newId);
+                } else {
+                    // See if it's a matrix.
+                    const TypeMatrix *typeMatrix = getTypeAsMatrix(insn->type);
+                    if (typeMatrix != nullptr) {
+                        typeVector = getTypeAsVector(typeMatrix->columnType);
+                        assert(typeVector != nullptr);
+
+                        for (int col = 0; col < typeMatrix->columnCount; col++) {
+                            for (int row = 0; row < typeVector->count; row++) {
+                                int matrixIndex = typeMatrix->getIndex(row, col, typeVector);
+                                uint32_t newId;
+                                if (col == index) {
+                                    newId = scalarize(insn->objectId(), row, typeVector->type);
+                                } else {
+                                    newId = scalarize(insn->compositeId(), matrixIndex,
+                                            typeVector->type);
+                                }
+
+                                scalarize(insn->resultId(), matrixIndex, typeVector->type, newId);
+                            }
+                        }
+                    } else {
+                        // Only handle the simple cases.
+                        std::cerr << "SpvOpCompositeInsert only handles vectors and matrices.\n";
+                        exit(1);
+                    }
                 }
 
                 replaced = true;
