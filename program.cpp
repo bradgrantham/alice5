@@ -89,7 +89,12 @@ uint32_t Program::scalarize(uint32_t vreg, int i, uint32_t subtype, uint32_t sca
         // Already assigned.
         if (scalarReg != 0) {
             // Must match what was specified.
-            assert(scalarReg == itr->second);
+            if (scalarReg != itr->second) {
+                std::cerr << "Error: Virtual register " << vreg << " element " << i
+                    << " was already scalarized to " << itr->second
+                    << " but we're trying to force it to " << scalarReg << "\n";
+                assert(false);
+            }
         } else {
             // Wasn't specified, just return what was previously assigned.
             scalarReg = itr->second;
@@ -198,6 +203,11 @@ void Program::prepareForCompile() {
         function->phiLifting();
     }
 
+    // Compute the dominance tree for blocks.
+    for (auto &[_, function] : functions) {
+        function->computeDomTree(verbose);
+    }
+
     // Convert vector instructions to scalar instructions.
     expandVectors();
 
@@ -287,11 +297,6 @@ void Program::prepareForCompile() {
     }
     if (PRINT_TIMER_RESULTS) {
         std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
-    }
-
-    // Compute the dominance tree for blocks. Use a worklist.
-    for (auto &[_, function] : functions) {
-        function->computeDomTree(verbose);
     }
 }
 
@@ -383,8 +388,16 @@ void Program::expandVectors() {
 }
 
 void Program::expandVectorsInFunction(Function *function) {
-    for (auto &[_, block] : function->blocks) {
-        expandVectorsInBlock(block.get());
+    // Start with start block.
+    expandVectorsInBlockTree(function->blocks.at(function->startBlockId).get());
+}
+
+void Program::expandVectorsInBlockTree(Block *block) {
+    expandVectorsInBlock(block);
+
+    // Go down dominance tree.
+    for (auto subBlock : block->idomChildren) {
+        expandVectorsInBlockTree(subBlock.get());
     }
 }
 
