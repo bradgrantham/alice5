@@ -581,9 +581,6 @@ struct Instruction {
     // the block it's coming from, or 0 to mean "any".
     std::map<uint32_t,std::set<uint32_t>> livein;
 
-    // Union of all livein sets.
-    std::set<uint32_t> liveinAll;
-
     // Registers that are live leaving this instruction.
     std::set<uint32_t> liveout;
 

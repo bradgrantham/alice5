@@ -212,8 +212,14 @@ void Program::prepareForCompile() {
     expandVectors();
 
     // Compute livein and liveout registers for each line.
+    computeLiveness();
+}
+
+void Program::computeLiveness() {
     Timer timer;
     std::set<Instruction *> inst_worklist; // Instructions left to work on.
+
+    // Insert all instructions of all blocks in all functions.
     for (auto &[_, function] : functions) {
         for (auto &[_, block] : function->blocks) {
             for (auto inst = block->instructions.head; inst; inst = inst->next) {
@@ -221,6 +227,7 @@ void Program::prepareForCompile() {
             }
         }
     }
+
     while (!inst_worklist.empty()) {
         // Pick any PC to start with. Starting at the end is more efficient
         // since our predecessor depends on us.
@@ -286,12 +293,6 @@ void Program::prepareForCompile() {
             // Our predecessors depend on us.
             for (Instruction *predInstruction : instruction->pred()) {
                 inst_worklist.insert(predInstruction);
-            }
-
-            // Compute union of livein.
-            instruction->liveinAll.clear();
-            for (auto &[label,liveinSet] : instruction->livein) {
-                instruction->liveinAll.insert(liveinSet.begin(), liveinSet.end());
             }
         }
     }

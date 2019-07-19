@@ -300,6 +300,9 @@ struct Program
     void expandVectorsInBlockTree(Block *block);
     void expandVectorsInBlock(Block *block);
 
+    // Compute livein and liveout registers for each line.
+    void computeLiveness();
+
     // Expand a unary operator, such as FNegate, from vector to scalar if necessary.
     template <class T>
     void expandVectorsUniOp(Instruction *instruction, InstructionList &newList, bool &replaced) {

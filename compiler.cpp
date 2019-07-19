@@ -52,7 +52,7 @@ void Compiler::emitInstructionsForFunction(Function *function) {
     emitLabel(function->cleanName);
 
     // Emit instructions to fill constants.
-    for (auto regId : function->blocks.at(function->startBlockId)->instructions.head->liveinAll) {
+    for (auto regId : function->blocks.at(function->startBlockId)->instructions.head->livein.at(0)) {
         auto r = registers.find(regId);
         assert(r != registers.end());
         assert(r->second.phy != NO_REGISTER);
@@ -374,7 +374,7 @@ void Compiler::assignRegistersForFunction(const Function *function,
     // Assign registers for constants.
     std::set<uint32_t> constIntRegs = allIntPhy;
     std::set<uint32_t> constFloatRegs = allFloatPhy;
-    for (auto regId : block->instructions.head->liveinAll) {
+    for (auto regId : block->instructions.head->livein.at(0)) {
         if (registers.find(regId) != registers.end()) {
             std::cerr << "Error: Constant "
                 << regId << " already assigned a register at head of function.\n";
@@ -387,6 +387,11 @@ void Compiler::assignRegistersForFunction(const Function *function,
             assert(!constFloatRegs.empty());
             phy = *constFloatRegs.begin();
             constFloatRegs.erase(phy);
+            if (false) {
+                // Print allocated constants.
+                const float *f = reinterpret_cast<float *>(c.data);
+                std::cerr << "Allocating phy " << phy << " for value " << *f << "\n";
+            }
         } else {
             assert(!constIntRegs.empty());
             phy = *constIntRegs.begin();
@@ -432,7 +437,7 @@ void Compiler::assignRegistersForBlock(Block *block,
     std::set<uint32_t> assigned;
 
     // Registers that are live going into this block have already been
-    // assigned. Note that we use livein[0] here, not liveinAll, because
+    // assigned. Note that we use livein[0] here, because
     // we want to ignore parameters to phi instructions. They're not
     // considered live here, we'll add copy instructions on the edge
     // between the block and here.
