@@ -228,6 +228,8 @@ void Program::computeLiveness() {
         }
     }
 
+    int maxIntLiveness = 0;
+    int maxFloatLiveness = 0;
     while (!inst_worklist.empty()) {
         // Pick any PC to start with. Starting at the end is more efficient
         // since our predecessor depends on us.
@@ -294,11 +296,46 @@ void Program::computeLiveness() {
             for (Instruction *predInstruction : instruction->pred()) {
                 inst_worklist.insert(predInstruction);
             }
+
+            int intLiveness = 0;
+            int floatLiveness = 0;
+            for (uint32_t reg : instruction->livein.at(0)) {
+                uint32_t typeId = typeIdOf(reg);
+                if (typeId == 0) {
+                    std::cerr << "Error: Can't find type ID of virtual register " << reg << ".\n";
+                    exit(1);
+                }
+                uint32_t typeOp = getTypeOp(typeId);
+                switch (typeOp) {
+                    case SpvOpTypeInt:
+                    case SpvOpTypePointer:
+                    case SpvOpTypeBool:
+                        intLiveness += 1;
+                        break;
+
+                    case SpvOpTypeFloat:
+                        floatLiveness += 1;
+                        break;
+
+                    default:
+                        std::cerr << "Error: Can't have type " << typeId
+                            << " of type op " << typeOp << " when computing liveness.\n";
+                        exit(1);
+                }
+            }
+            if (intLiveness > maxIntLiveness) {
+                maxIntLiveness = intLiveness;
+            }
+            if (floatLiveness > maxFloatLiveness) {
+                maxFloatLiveness = floatLiveness;
+            }
         }
     }
     if (PRINT_TIMER_RESULTS) {
         std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
     }
+    std::cerr << "Max int liveness is " << maxIntLiveness << "\n";
+    std::cerr << "Max float liveness is " << maxFloatLiveness << "\n";
 }
 
 void Program::replacePhi() {
