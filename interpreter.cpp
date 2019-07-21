@@ -6,6 +6,7 @@
 #include "program.h"
 #include "interpreter.h"
 #include "interpreter_tmpl.h"
+#include "function.h"
 
 const bool throwOnUninitializedMemoryRead = false;
 struct UninitializedMemoryReadException : std::runtime_error
@@ -1666,6 +1667,17 @@ void Interpreter::stepImageSampleExplicitLod(const InsnImageSampleExplicitLod& i
     } else {
         std::cout << "Unhandled type for ImageSampleExplicitLod result\n";
     }
+}
+
+void Interpreter::jumpToBlock(const Instruction *thisInstruction, uint32_t blockId) {
+    assert(thisInstruction != nullptr);
+
+    Function *function = thisInstruction->list->block->function;
+    instruction = function->blocks.at(blockId)->instructions.head.get();
+}
+
+void Interpreter::jumpToFunction(const Function *function) {
+    instruction = function->blocks.at(function->startBlockId)->instructions.head.get();
 }
 
 void Interpreter::step()

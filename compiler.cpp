@@ -4,6 +4,7 @@
 #include "compiler.h"
 #include "risc-v.h"
 #include "pcopy.h"
+#include "function.h"
 
 void Compiler::compile() {
 #if 0

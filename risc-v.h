@@ -1,3 +1,5 @@
+#ifndef RISC_V_H
+#define RISC_V_H
 
 // Instructions that map to the RISC-V ISA.
 
@@ -264,3 +266,5 @@ struct RiscVPhi : public Instruction {
         }
     }
 };
+
+#endif // RISC_V_H

@@ -67,16 +67,8 @@ struct Interpreter
     void clearPrivateVariables();
 
     // Jump to the specified block in the same function as the specified instruction.
-    void jumpToBlock(const Instruction *thisInstruction, uint32_t blockId) {
-        assert(thisInstruction != nullptr);
-
-        Function *function = thisInstruction->list->block->function;
-        instruction = function->blocks.at(blockId)->instructions.head.get();
-    }
-
-    void jumpToFunction(const Function *function) {
-        instruction = function->blocks.at(function->startBlockId)->instructions.head.get();
-    }
+    void jumpToBlock(const Instruction *thisInstruction, uint32_t blockId);
+    void jumpToFunction(const Function *function);
 
     void step();
     void run();

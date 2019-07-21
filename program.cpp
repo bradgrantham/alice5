@@ -2,7 +2,7 @@
 
 #include "program.h"
 #include "risc-v.h"
-
+#include "function.h"
 
 std::map<uint32_t, std::string> OpcodeToString = {
 #include "opcode_to_string.h"
@@ -211,131 +211,10 @@ void Program::prepareForCompile() {
     // Convert vector instructions to scalar instructions.
     expandVectors();
 
-    // Compute livein and liveout registers for each line.
-    computeLiveness();
-}
-
-void Program::computeLiveness() {
-    Timer timer;
-    std::set<Instruction *> inst_worklist; // Instructions left to work on.
-
-    // Insert all instructions of all blocks in all functions.
+    // Compute liveness and spill variables.
     for (auto &[_, function] : functions) {
-        for (auto &[_, block] : function->blocks) {
-            for (auto inst = block->instructions.head; inst; inst = inst->next) {
-                inst_worklist.insert(inst.get());
-            }
-        }
+        function->spill();
     }
-
-    int maxIntLiveness = 0;
-    int maxFloatLiveness = 0;
-    while (!inst_worklist.empty()) {
-        // Pick any PC to start with. Starting at the end is more efficient
-        // since our predecessor depends on us.
-        Instruction *instruction = *inst_worklist.rbegin();
-        inst_worklist.erase(instruction);
-
-        // Keep track of old livein/liveout for comparison.
-        std::map<uint32_t,std::set<uint32_t>> oldLivein = instruction->livein;
-        std::set<uint32_t> oldLiveout = instruction->liveout;
-
-        // Compute liveout as union of next instructions' liveins.
-        instruction->liveout.clear();
-        for (Instruction *succInstruction : instruction->succ()) {
-            // Add livein from any branch (0).
-            instruction->liveout.insert(
-                    succInstruction->livein[0].begin(),
-                    succInstruction->livein[0].end());
-
-            // Add livein specifically from this branch (if phi).
-            auto itr = succInstruction->livein.find(instruction->blockId());
-            if (itr != succInstruction->livein.end()) {
-                instruction->liveout.insert(itr->second.begin(), itr->second.end());
-            }
-        }
-
-        // Livein is liveout minus what we generate ...
-        instruction->livein[0] = instruction->liveout;
-        for (uint32_t resId : instruction->resIdSet) {
-            instruction->livein[0].erase(resId);
-        }
-        // ... plus what we need.
-        assert(instruction->opcode() != SpvOpPhi); // Should have been replaced.
-        if (instruction->opcode() == RiscVOpPhi) {
-            // Special handling of Phi instruction, because we must specify
-            // which branch our livein is from. Otherwise all branches will
-            // think they need all inputs, which is incorrect.
-            RiscVPhi *phi = dynamic_cast<RiscVPhi *>(instruction);
-            assert(phi->operandIds.size() == phi->resultIds.size());
-            for (int i = 0; i < phi->operandIds.size(); i++) {
-                // Operands for a specific result.
-                const std::vector<uint32_t> &operandIds = phi->operandIds[i];
-                assert(phi->labelIds.size() == operandIds.size());
-
-                for (int j = 0; j < operandIds.size(); j++) {
-                    instruction->livein[phi->labelIds[j]].insert(operandIds[j]);
-                }
-            }
-        } else {
-            // Non-phi instruction, all parameters are livein.
-            for (uint32_t argId : instruction->argIdSet) {
-                // Don't consider /*constants or*/ variables, they're never in registers.
-                if (/*constants.find(argId) == constants.end() &&*/
-                        variables.find(argId) == variables.end()) {
-
-                    instruction->livein[0].insert(argId);
-                }
-            }
-        }
-
-        // If we changed, then our predecessors need to update since they
-        // depend on us.
-        if (oldLivein != instruction->livein || oldLiveout != instruction->liveout) {
-            // Our predecessors depend on us.
-            for (Instruction *predInstruction : instruction->pred()) {
-                inst_worklist.insert(predInstruction);
-            }
-
-            int intLiveness = 0;
-            int floatLiveness = 0;
-            for (uint32_t reg : instruction->livein.at(0)) {
-                uint32_t typeId = typeIdOf(reg);
-                if (typeId == 0) {
-                    std::cerr << "Error: Can't find type ID of virtual register " << reg << ".\n";
-                    exit(1);
-                }
-                uint32_t typeOp = getTypeOp(typeId);
-                switch (typeOp) {
-                    case SpvOpTypeInt:
-                    case SpvOpTypePointer:
-                    case SpvOpTypeBool:
-                        intLiveness += 1;
-                        break;
-
-                    case SpvOpTypeFloat:
-                        floatLiveness += 1;
-                        break;
-
-                    default:
-                        std::cerr << "Error: Can't have type " << typeId
-                            << " of type op " << typeOp << " when computing liveness.\n";
-                        exit(1);
-                }
-            }
-            if (intLiveness > maxIntLiveness) {
-                maxIntLiveness = intLiveness;
-            }
-            if (floatLiveness > maxFloatLiveness) {
-                maxFloatLiveness = floatLiveness;
-            }
-        }
-    }
-    if (PRINT_TIMER_RESULTS) {
-        std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
-    }
-    std::cerr << "Max int liveness is " << maxIntLiveness << "\n";
-    std::cerr << "Max float liveness is " << maxFloatLiveness << "\n";
 }
 
 void Program::replacePhi() {

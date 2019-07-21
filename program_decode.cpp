@@ -1,5 +1,6 @@
 
 #include "program.h"
+#include "function.h"
 
 spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instruction_t* insn)
 {

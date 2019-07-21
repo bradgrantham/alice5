@@ -27,6 +27,7 @@
 #include "GLSL.std.450.h"
 
 #include "basic_types.h"
+#include "function.h"
 #include "risc-v.h"
 #include "image.h"
 #include "interpreter.h"
