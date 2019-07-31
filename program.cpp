@@ -213,7 +213,7 @@ void Program::prepareForCompile() {
 
     // Compute liveness and spill variables.
     for (auto &[_, function] : functions) {
-        function->spill();
+        function->ensureMaxRegisters();
     }
 }
 

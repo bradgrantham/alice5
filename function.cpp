@@ -283,7 +283,19 @@ void Function::phiLiftingForBlock(Block *block, RiscVPhi *phi) {
     phi->recomputeArgs();
 }
 
-void Function::spill() {
+void Function::ensureMaxRegisters() {
+    bool spilled;
+
+    do {
+        computeLiveness();
+        dumpInstructions("After liveness");
+        spilled = spillIfNecessary();
+    } while (spilled);
+}
+
+int ___count = 0; // XXX
+
+void Function::computeLiveness() {
     Timer timer;
     std::set<Instruction *> inst_worklist; // Instructions left to work on.
 
@@ -294,8 +306,6 @@ void Function::spill() {
         }
     }
 
-    int maxIntLiveness = 0;
-    int maxFloatLiveness = 0;
     while (!inst_worklist.empty()) {
         // Pick any PC to start with.
         Instruction *instruction = *inst_worklist.begin();
@@ -361,44 +371,152 @@ void Function::spill() {
             for (Instruction *predInstruction : instruction->pred()) {
                 inst_worklist.insert(predInstruction);
             }
-
-            int intLiveness = 0;
-            int floatLiveness = 0;
-            for (uint32_t reg : instruction->livein.at(0)) {
-                uint32_t typeId = program->typeIdOf(reg);
-                if (typeId == 0) {
-                    std::cerr << "Error: Can't find type ID of virtual register " << reg << ".\n";
-                    exit(1);
-                }
-                uint32_t typeOp = program->getTypeOp(typeId);
-                switch (typeOp) {
-                    case SpvOpTypeInt:
-                    case SpvOpTypePointer:
-                    case SpvOpTypeBool:
-                        intLiveness += 1;
-                        break;
-
-                    case SpvOpTypeFloat:
-                        floatLiveness += 1;
-                        break;
-
-                    default:
-                        std::cerr << "Error: Can't have type " << typeId
-                            << " of type op " << typeOp << " when computing liveness.\n";
-                        exit(1);
-                }
-            }
-            if (intLiveness > maxIntLiveness) {
-                maxIntLiveness = intLiveness;
-            }
-            if (floatLiveness > maxFloatLiveness) {
-                maxFloatLiveness = floatLiveness;
-            }
         }
     }
     if (PRINT_TIMER_RESULTS) {
         std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
     }
-    std::cerr << "Max int liveness is " << maxIntLiveness << "\n";
+}
+
+bool Function::spillIfNecessary() {
+    int maxFloatLiveness = 0;
+    Instruction *heaviestInstruction = nullptr;
+
+    for (auto &[_, block] : blocks) {
+        for (auto inst = block->instructions.head; inst; inst = inst->next) {
+            std::set<uint32_t> liveInts;
+            std::set<uint32_t> liveFloats;
+            computeLiveSets(inst.get(), liveInts, liveFloats);
+            int floatLiveness = liveFloats.size();
+            if (floatLiveness > maxFloatLiveness) {
+                maxFloatLiveness = floatLiveness;
+                heaviestInstruction = inst.get();
+            }
+            // We don't currently have a problem with too many ints, so ignore
+            // them for now.
+        }
+    }
+
     std::cerr << "Max float liveness is " << maxFloatLiveness << "\n";
+
+    bool spilled = false;
+    if (heaviestInstruction != nullptr) {
+        // Recompute these.
+        std::set<uint32_t> liveInts;
+        std::set<uint32_t> liveFloats;
+        computeLiveSets(heaviestInstruction, liveInts, liveFloats);
+        ___count++;
+        if (liveFloats.size() > 32 || ___count < 2) {
+            spillVariable(heaviestInstruction, liveFloats);
+            spilled = true;
+        }
+    }
+
+    return spilled;
+}
+
+void Function::computeLiveSets(Instruction *instruction,
+        std::set<uint32_t> &liveInts,
+        std::set<uint32_t> &liveFloats) {
+
+    for (uint32_t regId : instruction->livein.at(0)) {
+        uint32_t typeId = program->typeIdOf(regId);
+        if (typeId == 0) {
+            std::cerr << "Error: Can't find type ID of virtual register " << regId << ".\n";
+            exit(1);
+        }
+
+        uint32_t typeOp = program->getTypeOp(typeId);
+        switch (typeOp) {
+            case SpvOpTypeInt:
+            case SpvOpTypePointer:
+            case SpvOpTypeBool:
+                liveInts.insert(regId);
+                break;
+
+            case SpvOpTypeFloat:
+                liveFloats.insert(regId);
+                break;
+
+            default:
+                std::cerr << "Error: Can't have type " << typeId
+                    << " of type op " << typeOp << " when computing liveness.\n";
+                exit(1);
+        }
+    }
+}
+
+void Function::spillVariable(Instruction *instruction, const std::set<uint32_t> &liveFloats) {
+    // Pick one randomly. Can later use ComputeWeight or similar to pick a good one.
+    uint32_t regId = *liveFloats.begin();
+    regId = 76;
+    uint32_t typeId = program->typeIdOf(regId);
+    std::cerr << "Spilling variable " << regId << " of type " << typeId << "\n";
+
+    // We may not have a type for the "pointer to variable" that we need, so create one.
+    // It's probably okay if one already exists, I don't think we ever compare types
+    // by ID.
+    uint32_t pointerTypeId = program->nextReg++;
+    program->types[pointerTypeId] = std::make_shared<TypePointer>(program->types[typeId],
+            typeId, SpvStorageClassFunction);
+    program->typeSizes[pointerTypeId] = sizeof(uint32_t);
+
+    // Create a new local (function) variable.
+    uint32_t varId = program->nextReg++;
+    program->variables[varId] = {pointerTypeId, SpvStorageClassFunction,
+        NO_INITIALIZER, 0xFFFFFFFF};
+
+    // Pick a memory location. XXX do we do this here or is it done later anyway?
+    uint32_t address = program->allocate(SpvStorageClassFunction, typeId);
+
+    // Find every use.
+    bool found = false;
+    for (auto &[_, block] : blocks) {
+        for (auto inst = block->instructions.head; inst; inst = inst->next) {
+            if (inst->usesRegister(regId)) {
+                found = true;
+
+                // Find a new register name for the use.
+                uint32_t newRegId = program->nextReg++;
+                program->resultTypes[newRegId] = typeId;
+
+                // Add a load instruction before the use.
+                LineInfo lineInfo;
+                std::shared_ptr<Instruction> loadInstruction = std::make_shared<RiscVLoad>(
+                        lineInfo, typeId, newRegId, varId, NO_MEMORY_ACCESS_SEMANTIC, 0);
+
+                // Insert before this instruction.
+                block->instructions.insert(loadInstruction, inst);
+
+                // Rename the use.
+                inst->changeArg(regId, newRegId);
+                // XXX do we need to call recomputeArgs() if this is a RiscVPhi?
+            }
+        }
+    }
+    assert(found);
+
+    // Find the definition.
+    found = false;
+    for (auto &[_, block] : blocks) {
+        for (auto inst = block->instructions.head; inst; inst = inst->next) {
+            if (inst->affectsRegister(regId)) {
+                // There can only be one definition.
+                assert(!found);
+                found = true;
+
+                // Add a save instruction after the definition.
+                LineInfo lineInfo;
+                std::shared_ptr<Instruction> saveInstruction = std::make_shared<RiscVStore>(
+                        lineInfo, varId, regId, NO_MEMORY_ACCESS_SEMANTIC, 0);
+
+                // Insert before next instruction. This won't be the last instruction,
+                // because the last instruction of a block is always a terminating
+                // instructions, and they don't affect variables.
+                assert(inst->next);
+                block->instructions.insert(saveInstruction, inst->next);
+            }
+        }
+    }
+    assert(found);
 }

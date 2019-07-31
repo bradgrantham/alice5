@@ -48,8 +48,23 @@ struct Function {
     void phiLifting();
     void phiLiftingForBlock(Block *block, RiscVPhi *phi);
 
-    // Compute liveness and spill variables.
-    void spill();
+    // Make sure that we don't use more registers than we have in hardware.
+    void ensureMaxRegisters();
+
+    // Compute live in and live out registers for each instruction.
+    void computeLiveness();
+
+    // Spill registers if they won't fit in our hardware registers. Returns
+    // whether any register was spilled.
+    bool spillIfNecessary();
+
+    // Compute set of live ints and floats at this instruction.
+    void computeLiveSets(Instruction *instruction,
+            std::set<uint32_t> &liveInts,
+            std::set<uint32_t> &liveFloats);
+
+    // Spill one of the variables in the set of live floats at this instruction.
+    void spillVariable(Instruction *instruction, const std::set<uint32_t> &liveFloats);
 
     // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
     static std::string cleanUpName(std::string name);

@@ -73,9 +73,13 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     outv = x;
     */
 
+    /*
     vec3 v = inv1;
     for (int i = 0; i < 2; i++) {
         v = v.yzx;
     }
     outv = v;
+    */
+
+    outf = inf + 2.0;
 }

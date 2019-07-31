@@ -624,6 +624,28 @@ struct Instruction {
 
     // String representation of this instruction (block and offset).
     std::string pos() const;
+
+    // Whether the instruction modifies the register.
+    bool affectsRegister(uint32_t regId) const {
+        return resIdSet.find(regId) != resIdSet.end();
+    }
+
+    // Whether the instruction uses the register as a parameter.
+    bool usesRegister(uint32_t regId) const {
+        return argIdSet.find(regId) != argIdSet.end();
+    }
+
+    // Change the use of the argument. Asserts if the oldRegId
+    // isn't currently being used.
+    void changeArg(uint32_t oldRegId, uint32_t newRegId) {
+        assert(usesRegister(oldRegId));
+        argIdSet.erase(oldRegId);
+        argIdSet.insert(newRegId);
+
+        auto itr = std::find(argIdList.begin(), argIdList.end(), oldRegId);
+        assert(itr != argIdList.end());
+        *itr = newRegId;
+    }
 };
 
 // A doubly-linked list of Instruction objects.
