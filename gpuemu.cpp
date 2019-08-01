@@ -238,6 +238,8 @@ int main(int argc, char **argv)
     bool imageToTerminal = false;
     bool printSymbols = false;
     float frameTime = 1.5f;
+    int specificPixelX = -1;
+    int specificPixelY = -1;
 
     char *progname = argv[0];
     argv++; argc--;
@@ -247,6 +249,17 @@ int main(int argc, char **argv)
 
             verboseMemory = true;
             argv++; argc--;
+
+        } else if(strcmp(argv[0], "--pixel") == 0) {
+
+            if(argc < 2) {
+                std::cerr << "Expected pixel X and Y for \"--pixel\"\n";
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            specificPixelX = atoi(argv[1]);
+            specificPixelY = atoi(argv[2]);
+            argv+=3; argc-=3;
 
         } else if(strcmp(argv[0], "--diff") == 0) {
 
@@ -359,8 +372,21 @@ int main(int argc, char **argv)
 
     Timer frameElapsed;
     uint64_t dispatchedCount = 0;
-    for(int j = 0; j < imageHeight; j++)
-        for(int i = 0; i < imageWidth; i++) {
+
+    int startX = 0;
+    int afterlastX = imageWidth;
+    int startY = 0;
+    int afterlastY = imageHeight;
+
+    if(specificPixelX != -1) {
+        startX = specificPixelX;
+        afterlastX = startX + 1;
+        startY = specificPixelY;
+        afterlastY = startY + 1;
+    }
+
+    for(int j = startY; j < afterlastY; j++)
+        for(int i = startX; i < afterlastX; i++) {
 
             set(m, gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
             set(m, colorAddress, v4float{1, 1, 1, 1});
