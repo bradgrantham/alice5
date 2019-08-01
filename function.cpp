@@ -187,54 +187,8 @@ void Function::dumpInstructions(const std::string &description) const {
 
         for (auto instruction = block->instructions.head; instruction;
                 instruction = instruction->next) {
-            std::ios oldState(nullptr);
-            oldState.copyfmt(std::cout);
 
-            uint32_t blockId = instruction->blockId();
-            if (blockId == NO_BLOCK_ID) {
-                std::cout << "  ---";
-            } else {
-                std::cout << std::setw(5) << blockId;
-            }
-            if (instruction->resIdSet.empty()) {
-                std::cout << "         ";
-            } else {
-                for (uint32_t resId : instruction->resIdList) {
-                    std::cout << std::setw(6) << resId;
-                }
-                std::cout << " <-";
-            }
-
-            std::cout << std::setw(0) << " " << instruction->name();
-
-            for (auto argId : instruction->argIdList) {
-                std::cout << " " << argId;
-            }
-
-            std::cout << " (pred";
-            for (auto pred : instruction->pred()) {
-                std::cout << " " << pred->pos();
-            }
-            std::cout << ", succ";
-            for (auto succ : instruction->succ()) {
-                std::cout << " " << succ->pos();
-            }
-            std::cout << ", livein";
-            for (auto &[label,liveinSet] : instruction->livein) {
-                std::cout << " " << label << "(";
-                for (auto regId : liveinSet) {
-                    std::cout << " " << regId;
-                }
-                std::cout << ")";
-            }
-            std::cout << ", liveout";
-            for (auto regId : instruction->liveout) {
-                std::cout << " " << regId;
-            }
-
-            std::cout << ")\n";
-
-            std::cout.copyfmt(oldState);
+            instruction->dump(std::cout);
         }
     }
     std::cout << "-----------------------\n";
@@ -284,13 +238,20 @@ void Function::phiLiftingForBlock(Block *block, RiscVPhi *phi) {
 }
 
 void Function::ensureMaxRegisters() {
-    bool spilled;
+    // Set of registers that have already been spilled, so we don't spill them
+    // again.
+    std::set<uint32_t> alreadySpilled;
+    uint32_t spilledRegId;
 
     do {
         computeLiveness();
         dumpInstructions("After liveness");
-        spilled = spillIfNecessary();
-    } while (spilled);
+        spilledRegId = spillIfNecessary(alreadySpilled);
+        if (spilledRegId != NO_REGISTER) {
+            alreadySpilled.insert(spilledRegId);
+        }
+        // Keep going as long as we're spilling.
+    } while (spilledRegId != NO_REGISTER);
 }
 
 int ___count = 0; // XXX
@@ -373,12 +334,13 @@ void Function::computeLiveness() {
             }
         }
     }
-    if (PRINT_TIMER_RESULTS) {
+    if (PRINT_TIMER_RESULTS || true) {
         std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
     }
 }
 
-bool Function::spillIfNecessary() {
+uint32_t Function::spillIfNecessary(const std::set<uint32_t> &alreadySpilled) {
+    Timer timer;
     int maxFloatLiveness = 0;
     Instruction *heaviestInstruction = nullptr;
 
@@ -399,20 +361,24 @@ bool Function::spillIfNecessary() {
 
     std::cerr << "Max float liveness is " << maxFloatLiveness << "\n";
 
-    bool spilled = false;
+    uint32_t spilledRegId = NO_REGISTER;
     if (heaviestInstruction != nullptr) {
         // Recompute these.
         std::set<uint32_t> liveInts;
         std::set<uint32_t> liveFloats;
         computeLiveSets(heaviestInstruction, liveInts, liveFloats);
-        ___count++;
-        if (liveFloats.size() > 32 || ___count < 2) {
-            spillVariable(heaviestInstruction, liveFloats);
-            spilled = true;
+        ___count++; // XXX remove.
+        // XXX this is 31 because my swap routine assumes f31 is free.
+        if (liveFloats.size() > 31 && ___count < 200) {
+            spilledRegId = spillVariable(heaviestInstruction, liveFloats, alreadySpilled);
         }
     }
 
-    return spilled;
+    if (PRINT_TIMER_RESULTS) {
+        std::cerr << "Spilling took " << timer.elapsed() << " seconds.\n";
+    }
+
+    return spilledRegId;
 }
 
 void Function::computeLiveSets(Instruction *instruction,
@@ -446,9 +412,32 @@ void Function::computeLiveSets(Instruction *instruction,
     }
 }
 
-void Function::spillVariable(Instruction *instruction, const std::set<uint32_t> &liveFloats) {
+uint32_t Function::spillVariable(Instruction *instruction, const std::set<uint32_t> &liveFloats,
+        const std::set<uint32_t> &alreadySpilled) {
+
     // Pick one randomly. Can later use ComputeWeight or similar to pick a good one.
-    uint32_t regId = *liveFloats.begin();
+    uint32_t regId = NO_REGISTER;
+    for (uint32_t liveRegId : liveFloats) {
+        if (alreadySpilled.find(liveRegId) == alreadySpilled.end()) {
+            regId = liveRegId;
+            break;
+        }
+    }
+    if (regId == NO_REGISTER) {
+        std::cerr << "Have already spilled everything.\n";
+        std::cerr << "Live registers:";
+        for (uint32_t regId : liveFloats) {
+            std::cerr << " " << regId;
+        }
+        std::cerr << "\n";
+        std::cerr << "Already spilled registers:";
+        for (uint32_t regId : alreadySpilled) {
+            std::cerr << " " << regId;
+        }
+        std::cerr << "\n";
+        instruction->dump(std::cerr);
+    }
+    assert(regId != NO_REGISTER);
     uint32_t typeId = program->typeIdOf(regId);
     bool isConstant = program->isConstant(regId);
     std::cout << "Spilling " << (isConstant ? "constant" : "variable")
@@ -526,4 +515,6 @@ void Function::spillVariable(Instruction *instruction, const std::set<uint32_t> 
         }
         assert(found);
     }
+
+    return regId;
 }

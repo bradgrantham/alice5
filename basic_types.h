@@ -646,6 +646,9 @@ struct Instruction {
         assert(itr != argIdList.end());
         *itr = newRegId;
     }
+
+    // Dump a rough disassembly to stdout.
+    void dump(std::ostream &out) const;
 };
 
 // A doubly-linked list of Instruction objects.

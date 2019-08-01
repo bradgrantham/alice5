@@ -78,6 +78,56 @@ std::string Instruction::pos() const {
     return ss.str();
 }
 
+void Instruction::dump(std::ostream &out) const {
+    std::ios oldState(nullptr);
+    oldState.copyfmt(out);
+
+    if (blockId() == NO_BLOCK_ID) {
+        out << "  ---";
+    } else {
+        out << std::setw(5) << blockId();
+    }
+    if (resIdSet.empty()) {
+        out << "         ";
+    } else {
+        for (uint32_t resId : resIdList) {
+            out << std::setw(6) << resId;
+        }
+        out << " <-";
+    }
+
+    out << std::setw(0) << " " << name();
+
+    for (auto argId : argIdList) {
+        out << " " << argId;
+    }
+
+    out << " (pred";
+    for (auto pred : pred()) {
+        out << " " << pred->pos();
+    }
+    out << ", succ";
+    for (auto succ : succ()) {
+        out << " " << succ->pos();
+    }
+    out << ", livein";
+    for (auto &[label,liveinSet] : livein) {
+        out << " " << label << "(";
+        for (auto regId : liveinSet) {
+            out << " " << regId;
+        }
+        out << ")";
+    }
+    out << ", liveout";
+    for (auto regId : liveout) {
+        out << " " << regId;
+    }
+
+    out << ")\n";
+
+    out.copyfmt(oldState);
+}
+
 // Swap the two instruction lists.
 void swap(InstructionList &a, InstructionList &b) {
     a.swap(b);

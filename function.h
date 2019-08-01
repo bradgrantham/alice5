@@ -55,8 +55,8 @@ struct Function {
     void computeLiveness();
 
     // Spill registers if they won't fit in our hardware registers. Returns
-    // whether any register was spilled.
-    bool spillIfNecessary();
+    // the ID of the spilled register, or NO_REGISTER if nothing was spilled.
+    uint32_t spillIfNecessary(const std::set<uint32_t> &alreadySpilled);
 
     // Compute set of live ints and floats at this instruction.
     void computeLiveSets(Instruction *instruction,
@@ -64,7 +64,9 @@ struct Function {
             std::set<uint32_t> &liveFloats);
 
     // Spill one of the variables in the set of live floats at this instruction.
-    void spillVariable(Instruction *instruction, const std::set<uint32_t> &liveFloats);
+    // Returns the ID of the spilled variable.
+    uint32_t spillVariable(Instruction *instruction, const std::set<uint32_t> &liveFloats,
+            const std::set<uint32_t> &alreadySpilled);
 
     // Take "mainImage(vf4;vf2;" and return "mainImage$v4f$vf2".
     static std::string cleanUpName(std::string name);
