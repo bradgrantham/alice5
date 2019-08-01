@@ -55,9 +55,9 @@ float brad_atan_0_1(float z)
 
 float brad_atan(float y_x)
 {
-#if 0
+#if 1
     if(fabsf(y_x) > 1.0) {
-        return copysign(M_PI / 2.0, y_x) + brad_atan_0_1(1.0 / fabs(y_x));
+        return copysign(M_PI / 2.0, y_x) + -copysign(brad_atan_0_1(1.0 / fabs(y_x)), y_x);
     } else {
         return copysign(brad_atan_0_1(fabs(y_x)), y_x);
     }
