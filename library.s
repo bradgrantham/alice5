@@ -641,8 +641,311 @@ sinTable_f32:
         .word   3158904466
         .word   2147483648
         
+.atanTableSize:
+        .word   1124073472      ; 0x43000000 = 128.0
+
+atanTable_f32:
+        .word   0 ; 0x00000000 = 0.000000
+        .word   1006632619 ; 0x3BFFFEAB = 0.007812
+        .word   1015020203 ; 0x3C7FFAAB = 0.015624
+        .word   1019213569 ; 0x3CBFF701 = 0.023433
+        .word   1023404718 ; 0x3CFFEAAE = 0.031240
+        .word   1025502000 ; 0x3D1FEB30 = 0.039043
+        .word   1027595276 ; 0x3D3FDC0C = 0.046841
+        .word   1029687024 ; 0x3D5FC6F0 = 0.054633
+        .word   1031776990 ; 0x3D7FAADE = 0.062419
+        .word   1032831854 ; 0x3D8FC36E = 0.070197
+        .word   1033874681 ; 0x3D9FACF9 = 0.077967
+        .word   1034916243 ; 0x3DAF9193 = 0.085727
+        .word   1035956417 ; 0x3DBF70C1 = 0.093477
+        .word   1036995083 ; 0x3DCF4A0B = 0.101215
+        .word   1038032118 ; 0x3DDF1CF6 = 0.108942
+        .word   1039067404 ; 0x3DEEE90C = 0.116655
+        .word   1040100821 ; 0x3DFEADD5 = 0.124355
+        .word   1040659823 ; 0x3E07356F = 0.132040
+        .word   1041174488 ; 0x3E0F0FD8 = 0.139709
+        .word   1041688046 ; 0x3E16E5EE = 0.147361
+        .word   1042200439 ; 0x3E1EB777 = 0.154997
+        .word   1042711613 ; 0x3E26843D = 0.162614
+        .word   1043221513 ; 0x3E2E4C09 = 0.170212
+        .word   1043730084 ; 0x3E360EA4 = 0.177790
+        .word   1044237274 ; 0x3E3DCBDA = 0.185348
+        .word   1044743031 ; 0x3E458377 = 0.192884
+        .word   1045247303 ; 0x3E4D3547 = 0.200399
+        .word   1045750041 ; 0x3E54E119 = 0.207890
+        .word   1046251195 ; 0x3E5C86BB = 0.215358
+        .word   1046750716 ; 0x3E6425FC = 0.222801
+        .word   1047248559 ; 0x3E6BBEAF = 0.230220
+        .word   1047744676 ; 0x3E7350A4 = 0.237612
+        .word   1048239024 ; 0x3E7ADBB0 = 0.244979
+        .word   1048653778 ; 0x3E812FD2 = 0.252318
+        .word   1048899117 ; 0x3E84EE2D = 0.259630
+        .word   1049143506 ; 0x3E88A8D2 = 0.266913
+        .word   1049386925 ; 0x3E8C5FAD = 0.274167
+        .word   1049629355 ; 0x3E9012AB = 0.281392
+        .word   1049870777 ; 0x3E93C1B9 = 0.288587
+        .word   1050111172 ; 0x3E976CC4 = 0.295752
+        .word   1050350522 ; 0x3E9B13BA = 0.302885
+        .word   1050588809 ; 0x3E9EB689 = 0.309986
+        .word   1050826018 ; 0x3EA25522 = 0.317056
+        .word   1051062131 ; 0x3EA5EF73 = 0.324092
+        .word   1051297133 ; 0x3EA9856D = 0.331096
+        .word   1051531009 ; 0x3EAD1701 = 0.338066
+        .word   1051763744 ; 0x3EB0A420 = 0.345002
+        .word   1051995325 ; 0x3EB42CBD = 0.351904
+        .word   1052225738 ; 0x3EB7B0CA = 0.358771
+        .word   1052454970 ; 0x3EBB303A = 0.365602
+        .word   1052683010 ; 0x3EBEAB02 = 0.372398
+        .word   1052909846 ; 0x3EC22116 = 0.379159
+        .word   1053135466 ; 0x3EC5926A = 0.385883
+        .word   1053359860 ; 0x3EC8FEF4 = 0.392570
+        .word   1053583018 ; 0x3ECC66AA = 0.399221
+        .word   1053804931 ; 0x3ECFC983 = 0.405834
+        .word   1054025590 ; 0x3ED32776 = 0.412410
+        .word   1054244987 ; 0x3ED6807B = 0.418949
+        .word   1054463113 ; 0x3ED9D489 = 0.425450
+        .word   1054679962 ; 0x3EDD239A = 0.431912
+        .word   1054895526 ; 0x3EE06DA6 = 0.438337
+        .word   1055109801 ; 0x3EE3B2A9 = 0.444722
+        .word   1055322778 ; 0x3EE6F29A = 0.451070
+        .word   1055534455 ; 0x3EEA2D77 = 0.457378
+        .word   1055744824 ; 0x3EED6338 = 0.463648
+        .word   1055953884 ; 0x3EF093DC = 0.469878
+        .word   1056161628 ; 0x3EF3BF5C = 0.476069
+        .word   1056368055 ; 0x3EF6E5B7 = 0.482221
+        .word   1056573160 ; 0x3EFA06E8 = 0.488334
+        .word   1056776943 ; 0x3EFD22EF = 0.494407
+        .word   1056972004 ; 0x3F001CE4 = 0.500441
+        .word   1057072568 ; 0x3F01A5B8 = 0.506435
+        .word   1057172469 ; 0x3F032BF5 = 0.512389
+        .word   1057271704 ; 0x3F04AF98 = 0.518304
+        .word   1057370275 ; 0x3F0630A3 = 0.524180
+        .word   1057468180 ; 0x3F07AF14 = 0.530015
+        .word   1057565421 ; 0x3F092AED = 0.535811
+        .word   1057661997 ; 0x3F0AA42D = 0.541568
+        .word   1057757908 ; 0x3F0C1AD4 = 0.547284
+        .word   1057853156 ; 0x3F0D8EE4 = 0.552962
+        .word   1057947741 ; 0x3F0F005D = 0.558599
+        .word   1058041664 ; 0x3F106F40 = 0.564198
+        .word   1058134927 ; 0x3F11DB8F = 0.569756
+        .word   1058227530 ; 0x3F13454A = 0.575276
+        .word   1058319475 ; 0x3F14AC73 = 0.580756
+        .word   1058410763 ; 0x3F16110B = 0.586198
+        .word   1058501396 ; 0x3F177314 = 0.591600
+        .word   1058591376 ; 0x3F18D290 = 0.596963
+        .word   1058680705 ; 0x3F1A2F81 = 0.602287
+        .word   1058769384 ; 0x3F1B89E8 = 0.607573
+        .word   1058857417 ; 0x3F1CE1C9 = 0.612820
+        .word   1058944805 ; 0x3F1E3725 = 0.618029
+        .word   1059031550 ; 0x3F1F89FE = 0.623199
+        .word   1059117655 ; 0x3F20DA57 = 0.628332
+        .word   1059203123 ; 0x3F222833 = 0.633426
+        .word   1059287956 ; 0x3F237394 = 0.638482
+        .word   1059372157 ; 0x3F24BC7D = 0.643501
+        .word   1059455729 ; 0x3F2602F1 = 0.648482
+        .word   1059538675 ; 0x3F2746F3 = 0.653426
+        .word   1059620998 ; 0x3F288886 = 0.658333
+        .word   1059702700 ; 0x3F29C7AC = 0.663203
+        .word   1059783785 ; 0x3F2B0469 = 0.668036
+        .word   1059864257 ; 0x3F2C3EC1 = 0.672833
+        .word   1059944118 ; 0x3F2D76B6 = 0.677593
+        .word   1060023372 ; 0x3F2EAC4C = 0.682317
+        .word   1060102022 ; 0x3F2FDF86 = 0.687004
+        .word   1060180072 ; 0x3F311068 = 0.691657
+        .word   1060257526 ; 0x3F323EF6 = 0.696273
+        .word   1060334386 ; 0x3F336B32 = 0.700854
+        .word   1060410656 ; 0x3F349520 = 0.705400
+        .word   1060486340 ; 0x3F35BCC4 = 0.709912
+        .word   1060561442 ; 0x3F36E222 = 0.714388
+        .word   1060635966 ; 0x3F38053E = 0.718830
+        .word   1060709915 ; 0x3F39261B = 0.723238
+        .word   1060783292 ; 0x3F3A44BC = 0.727611
+        .word   1060856103 ; 0x3F3B6127 = 0.731951
+        .word   1060928350 ; 0x3F3C7B5E = 0.736257
+        .word   1061000037 ; 0x3F3D9365 = 0.740530
+        .word   1061071169 ; 0x3F3EA941 = 0.744770
+        .word   1061141750 ; 0x3F3FBCF6 = 0.748977
+        .word   1061211782 ; 0x3F40CE86 = 0.753151
+        .word   1061281270 ; 0x3F41DDF6 = 0.757293
+        .word   1061350219 ; 0x3F42EB4B = 0.761403
+        .word   1061418631 ; 0x3F43F687 = 0.765480
+        .word   1061486512 ; 0x3F44FFB0 = 0.769526
+        .word   1061553864 ; 0x3F4606C8 = 0.773541
+        .word   1061620693 ; 0x3F470BD5 = 0.777524
+        .word   1061687002 ; 0x3F480EDA = 0.781477
+        .word   1061752795 ; 0x3F490FDB = 0.785398
+
+.atan_0_1:
+
+        fsw     fa0, -4(sp)
+        fsw     fa1, -8(sp)
+        fsw     fa2, -12(sp)
+        fsw     fa3, -16(sp)
+        fsw     fa4, -20(sp)
+        fsw     fa5, -24(sp)
+        sw     a0, -28(sp)
+        sw     a1, -32(sp)
+        sw     a2, -36(sp)
+
+        ; atan_0_1(float z) { }
+        flw     fa0, 0(sp)              ; fa0 = z
+
+        ; int i = z * TABLE_POW2;
+	lui	a1,%hi(.atanTableSize)  ; a1 = hi part of address of TABLE_POW2
+	flw	fa1,%lo(.atanTableSize)(a1)      ; fa1 = TABLE_POW2
+        ; a1 is available after this line
+        fmul.s    fa2, fa0, fa1         ; fa2 = z * TABLE_POW2
+	fcvt.w.s        a0,fa2,rdn      ; a0 = ifloor(z * TABLE_POW2)
+        ; fa1 is available after this line
+        ; fa0 is available after this line
+
+        ; float a = z * TABLE_POW2 - i;
+        ; fa3 = a
+        fcvt.s.w fa0,a0,rne             ; fa0 = float(a0)
+        fsub.s fa3,fa2,fa0            ; fa3 = z * TABLE_POW2 - float(floori(z * TABLE_POW2))
+        ; fa0 is available after this line
+        ; fa2 is available after this line
+
+        ; float lower = atanTable[i];
+        lui     a1,%hi(atanTable_f32)   ; a1 = hi part of address of atanTable
+        addi    a2,a1,%lo(atanTable_f32); a2 = atanTable
+        ; a1 is available after this line
+
+        slli    a1, a0, 2               ; a1 = ifloor(z * TABLE_POW2) * 4
+        ; a0 is available after this line
+        add     a0, a1, a2              ; a0 = ifloor(z * TABLE_POW2) * 4 + atanTable
+        ; a1 is available after this line
+        flw     fa4, 0(a0)              ; fa4 = lower = atanTable[z * TABLE_POW2]
+        ; float higher = atanTable[i + 1];
+        flw     fa5, 4(a0)              ; fa5 = higher = atanTable[z * TABLE_POW2 + 1]
+        ; a0 is available after this line
+
+        ; float f = lower * (1 - a) + higher * a;
+	lui	a0,%hi(.one)            ; a0 = hi part of .one
+	flw	fa0,%lo(.one)(a0)       ; fa0 = 1.0
+        fsub.s  fa1,fa0,fa3             ; fa1 = 1.0 - a
+        fmul.s  fa0,fa4,fa1             ; fa0 = lower * (1.0 - a)
+        fmadd.s fa1,fa5,fa3,fa0         ; fa1 = higher * a + lower * (1.0 - a)
+
+        ; return f;
+        fsw     fa1, 0(sp)
+
+        ; restore registers
+        flw     fa0, -4(sp)
+        flw     fa1, -8(sp)
+        flw     fa2, -12(sp)
+        flw     fa3, -16(sp)
+        flw     fa4, -20(sp)
+        flw     fa5, -24(sp)
+        lw     a0, -28(sp)
+        lw     a1, -32(sp)
+        lw     a2, -36(sp)
+
+        jalr x0, ra, 0
+
 .atan:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; save registers
+        sw      a0, -4(sp)
+        sw      a1, -8(sp)
+        fsw     fa0, -12(sp)
+        fsw     fa1, -16(sp)
+        fsw     fa2, -20(sp)
+        fsw     fa3, -24(sp)
+        fsw     fa4, -28(sp)
+        fsw     fa5, -32(sp)
+        fsw     fa6, -36(sp)
+
+        ; load parameter
+        ; begin using fa0
+        flw     fa0, 0(sp)      ; float atan(float y_x) {}
+
+        addi    sp,sp,-32        ; push saved registers
+
+        ; begin using fa2
+        fsgnjx.s fa2, fa0, fa0     ; float fa2 = fabs_y_x = fabs(y_x)
+
+        ; if(fabsf(y_x) > 1.0) {
+	lui	a0,%hi(.one)
+	flw	fa1,%lo(.one)(a0)       ; fa1 = 1.0
+        ; begin using a1
+        fle.s   a1,fa2,fa1              ; a1 = (fabs_y_x <= 1.0)
+        bne     a1,zero,.atan_small_y_x ; if(fabs_y_x <= 1.0) goto atan_small_y_x
+        ; a1 is available after this line
+
+        ;     return copysign(M_PI / 2, y_x) + brad_atan_0_1(1.0 / fabs_y_x);
+        ;     return copysign(M_PI / 2.0, y_x) + -copysign(brad_atan_0_1(1.0 / fabs(y_x)), y_x);
+        ; begin using fa3
+        fdiv.s  fa3, fa1, fa2
+
+        addi    sp, sp, -8      ; Make room on stack
+        sw      ra, 4(sp)       ; Save return address
+        fsw     fa3, 0(sp)      ; Store parameter
+        ; fa3 is available after this line
+
+        jal     ra, .atan_0_1   
+
+        ; begin using fa3
+        flw     fa3, 0(sp)      ; Pop result
+        lw      ra, 4(sp)       ; Restore return address
+        addi    sp, sp, 8       ; Restore stack
+
+	lui	a0,%hi(.halfPi)
+        ; begin using fa4
+	flw	fa4,%lo(.halfPi)(a0)
+        ; begin using fa5
+        fsgnj.s   fa5, fa4, fa0
+        ; fa4 is available after this line
+
+        ; begin using fa6
+        fsgnjn.s fa6, fa3, fa0
+        ; fa3 is available after this line
+
+        ; begin using fa4
+        fadd.s  fa4, fa5, fa6
+        ; fa6 is available after this line
+        ; fa5 is available after this line
+
+        jal zero, .atan_finish   ; goto .atan_finish
+
+.atan_small_y_x: ; } else {
+
+        addi    sp, sp, -8      ; Make room on stack
+        sw      ra, 4(sp)       ; Save return address
+        fsw     fa2, 0(sp)      ; Store parameter
+        ; fa2 is available after this line
+
+        jal     ra, .atan_0_1   
+
+        ; begin using fa2
+        flw     fa2, 0(sp)      ; Pop result
+        lw      ra, 4(sp)       ; Restore return address
+        addi    sp, sp, 8       ; Restore stack
+
+        ; begin using fa4
+        fsgnj.s   fa4, fa2, fa0
+        ; fa2 is available after this line
+        ; fa0 is available after this line
+        
+.atan_finish:
+
+        addi    sp,sp,32        ; pop saved registers
+
+        ; store return value
+        fsw     fa4, 0(sp)
+        ; fa4 is available after this line
+
+        ; restore registers
+        lw      a0, -4(sp)
+        lw      a1, -8(sp)
+        flw     fa0, -12(sp)
+        flw     fa1, -16(sp)
+        flw     fa2, -20(sp)
+        flw     fa3, -24(sp)
+        flw     fa4, -28(sp)
+        flw     fa5, -32(sp)
+        flw     fa6, -36(sp)
+
+        ; return
         jalr x0, ra, 0
 
 .reflect1:
