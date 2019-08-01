@@ -57,7 +57,7 @@ float brad_atan(float y_x)
 {
 #if 0
     if(fabsf(y_x) > 1.0) {
-        return copysign(M_PI, y_x) / 2 + brad_atan_0_1(1.0 / fabs(y_x));
+        return copysign(M_PI / 2.0, y_x) + brad_atan_0_1(1.0 / fabs(y_x));
     } else {
         return copysign(brad_atan_0_1(fabs(y_x)), y_x);
     }
@@ -111,6 +111,9 @@ int main()
     for(float a = -M_PI; a <= M_PI; a += .001) {
         float x = cos(a);
         float y = sin(a);
-        printf("%f %f %f %f%%\n", atan2(y, x), brad_atan2(y, x), fabs(atan2(y, x) - brad_atan2(y, x)), fabs(atan2(y, x) - brad_atan2(y, x)) / atan2(y, x) * 100);
+        if(fabs(atan2(y, x) - brad_atan2(y, x)) / atan2(y, x) * 100.0 > .01)
+        {
+            printf("%f %f %f %f%%\n", atan2(y, x), brad_atan2(y, x), fabs(atan2(y, x) - brad_atan2(y, x)), fabs(atan2(y, x) - brad_atan2(y, x)) / atan2(y, x) * 100);
+        }
     }
 }
