@@ -449,9 +449,10 @@ void Function::computeLiveSets(Instruction *instruction,
 void Function::spillVariable(Instruction *instruction, const std::set<uint32_t> &liveFloats) {
     // Pick one randomly. Can later use ComputeWeight or similar to pick a good one.
     uint32_t regId = *liveFloats.begin();
-    regId = 76;
     uint32_t typeId = program->typeIdOf(regId);
-    std::cerr << "Spilling variable " << regId << " of type " << typeId << "\n";
+    bool isConstant = program->isConstant(regId);
+    std::cout << "Spilling " << (isConstant ? "constant" : "variable")
+        << " " << regId << " of type " << typeId << "\n";
 
     // We may not have a type for the "pointer to variable" that we need, so create one.
     // It's probably okay if one already exists, I don't think we ever compare types
@@ -465,9 +466,6 @@ void Function::spillVariable(Instruction *instruction, const std::set<uint32_t> 
     uint32_t varId = program->nextReg++;
     program->variables[varId] = {pointerTypeId, SpvStorageClassFunction,
         NO_INITIALIZER, 0xFFFFFFFF};
-
-    // Pick a memory location. XXX do we do this here or is it done later anyway?
-    uint32_t address = program->allocate(SpvStorageClassFunction, typeId);
 
     // Find every use.
     bool found = false;
@@ -496,27 +494,36 @@ void Function::spillVariable(Instruction *instruction, const std::set<uint32_t> 
     }
     assert(found);
 
-    // Find the definition.
-    found = false;
-    for (auto &[_, block] : blocks) {
-        for (auto inst = block->instructions.head; inst; inst = inst->next) {
-            if (inst->affectsRegister(regId)) {
-                // There can only be one definition.
-                assert(!found);
-                found = true;
+    // Create the store instruction.
+    LineInfo lineInfo;
+    std::shared_ptr<Instruction> saveInstruction = std::make_shared<RiscVStore>(
+            lineInfo, varId, regId, NO_MEMORY_ACCESS_SEMANTIC, 0);
 
-                // Add a save instruction after the definition.
-                LineInfo lineInfo;
-                std::shared_ptr<Instruction> saveInstruction = std::make_shared<RiscVStore>(
-                        lineInfo, varId, regId, NO_MEMORY_ACCESS_SEMANTIC, 0);
+    if (isConstant) {
+        // Insert store at the very beginning of the function.
+        // XXX this is wasteful. We could just load from the constant directly
+        // each time, but we don't have an effective way to represent that load
+        // above.
+        Block *block = blocks.at(startBlockId).get();
+        block->instructions.insert(saveInstruction, block->instructions.head);
+    } else {
+        // Find the definition.
+        found = false;
+        for (auto &[_, block] : blocks) {
+            for (auto inst = block->instructions.head; inst; inst = inst->next) {
+                if (inst->affectsRegister(regId)) {
+                    // There can only be one definition.
+                    assert(!found);
+                    found = true;
 
-                // Insert before next instruction. This won't be the last instruction,
-                // because the last instruction of a block is always a terminating
-                // instructions, and they don't affect variables.
-                assert(inst->next);
-                block->instructions.insert(saveInstruction, inst->next);
+                    // Insert before next instruction. This won't be the last instruction,
+                    // because the last instruction of a block is always a terminating
+                    // instructions, and they don't affect variables.
+                    assert(inst->next);
+                    block->instructions.insert(saveInstruction, inst->next);
+                }
             }
         }
+        assert(found);
     }
-    assert(found);
 }

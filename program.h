@@ -165,6 +165,11 @@ struct Program
         return 0;
     }
 
+    // Returns whether this register is a constant.
+    bool isConstant(uint32_t regId) const {
+        return constants.find(regId) != constants.end();
+    }
+
     size_t allocate(SpvStorageClass clss, uint32_t type)
     {
         MemoryRegion& reg = memoryRegions[clss];
