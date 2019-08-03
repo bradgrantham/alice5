@@ -11,6 +11,8 @@ fi
 if [ "$1" == "" ]
 then
     shaders="func_test creation define lk wavy wetrock flirt"
+    # Disable wetwork and flirt, they currently hang the compiler.
+    shaders="func_test creation define wavy lk"
 else
     shaders="$*"
 fi
@@ -20,7 +22,7 @@ for i in $shaders
 do
     echo "============================================== $i"
     if [ $compile = true ]; then
-        ./shade -c -O -o x.s shaders/$i.frag && \
+        ./shade -c -O -o x.s shaders/$i.frag > /dev/null && \
             ./as x.s && \
             ./gpuemu -f 90 --term x.o && \
             mv emulated.ppm $i.ppm

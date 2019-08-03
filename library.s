@@ -968,6 +968,14 @@ atanTable_f32:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
 
+.max:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
+.min:
+        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        jalr x0, ra, 0
+
 .normalize1:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0

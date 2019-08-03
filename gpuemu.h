@@ -35,6 +35,8 @@ struct GPUCore
         SUBST_REFLECT3,
         SUBST_REFLECT4,
         SUBST_POW,
+        SUBST_MAX,
+        SUBST_MIN,
         SUBST_NORMALIZE1,
         SUBST_NORMALIZE2,
         SUBST_NORMALIZE3,
@@ -104,6 +106,8 @@ struct GPUCore
             { ".reflect3", SUBST_REFLECT3 },
             { ".reflect4", SUBST_REFLECT4 },
             { ".pow", SUBST_POW },
+            { ".max", SUBST_MAX },
+            { ".min", SUBST_MIN },
             { ".normalize1", SUBST_NORMALIZE1 },
             { ".normalize2", SUBST_NORMALIZE2 },
             { ".normalize3", SUBST_NORMALIZE3 },
@@ -595,6 +599,18 @@ GPUCore::Status GPUCore::step(T& memory)
                                 float x = popf();
                                 float y = popf();
                                 pushf(powf(x, y));
+                                break;
+                            }
+                            case SUBST_MAX: {
+                                float x = popf();
+                                float y = popf();
+                                pushf(x > y ? x : y);
+                                break;
+                            }
+                            case SUBST_MIN: {
+                                float x = popf();
+                                float y = popf();
+                                pushf(x < y ? x : y);
                                 break;
                             }
                             case SUBST_COS: {
