@@ -427,6 +427,16 @@ void InsnPhi::emit(Compiler *compiler)
     compiler->emit("", "phi instruction, nothing to do.");
 }
 
+void InsnConvertFToS::emit(Compiler *compiler)
+{
+    compiler->emitUnaryOp("fcvt.w.s", resultId(), floatValueId());
+}
+
+void InsnFOrdEqual::emit(Compiler *compiler)
+{
+    compiler->emitBinaryOp("feq.s", resultId(), operand1Id(), operand2Id());
+}
+
 void InsnFOrdLessThanEqual::emit(Compiler *compiler)
 {
     compiler->emitBinaryOp("fle.s", resultId(), operand1Id(), operand2Id());
@@ -612,6 +622,21 @@ void InsnGLSLstd450Floor::emit(Compiler *compiler)
 void InsnGLSLstd450Step::emit(Compiler *compiler)
 {
     compiler->emitBinCall(".step", resultId(), edgeId(), xId());
+}
+
+void InsnGLSLstd450FMin::emit(Compiler *compiler)
+{
+    compiler->emitBinCall(".min", resultId(), xId(), yId());
+}
+
+void InsnGLSLstd450FMax::emit(Compiler *compiler)
+{
+    compiler->emitBinCall(".max", resultId(), xId(), yId());
+}
+
+void InsnGLSLstd450Pow::emit(Compiler *compiler)
+{
+    compiler->emitBinCall(".pow", resultId(), xId(), yId());
 }
 
 // -----------------------------------------------------------------------------------

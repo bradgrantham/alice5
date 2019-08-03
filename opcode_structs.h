@@ -224,6 +224,7 @@ struct InsnConvertFToS : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepConvertFToS(*this); }
     virtual uint32_t opcode() const { return SpvOpConvertFToS; }
     virtual std::string name() const { return "OpConvertFToS"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpConvertSToF instruction (code 111).
@@ -645,6 +646,7 @@ struct InsnFOrdEqual : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepFOrdEqual(*this); }
     virtual uint32_t opcode() const { return SpvOpFOrdEqual; }
     virtual std::string name() const { return "OpFOrdEqual"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFOrdLessThan instruction (code 184).
@@ -951,6 +953,7 @@ struct InsnGLSLstd450Pow : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Pow(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Pow; }
     virtual std::string name() const { return "GLSLstd450Pow"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Exp instruction (code 27).
@@ -1009,6 +1012,7 @@ struct InsnGLSLstd450FMin : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMin(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FMin; }
     virtual std::string name() const { return "GLSLstd450FMin"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450FMax instruction (code 40).
@@ -1025,6 +1029,7 @@ struct InsnGLSLstd450FMax : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMax(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FMax; }
     virtual std::string name() const { return "GLSLstd450FMax"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450FClamp instruction (code 43).
