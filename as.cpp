@@ -701,10 +701,12 @@ private:
     // then the %hi() value is incremented by one to account for the fact that
     // the %lo() value will later be sign-extended and added to the %hi() value.
     // - The sum of two expressions.
-    int32_t readExpression(int bits) {
+    //
+    // The base is subtracted from the expression before the size is checked.
+    int32_t readExpression(int bits, uint32_t base = 0) {
         const char *expressionStart = s;
 
-        int64_t value = readSum();
+        int64_t value = readSum() - base;
 
         // Make sure we fit.
         if (bits != 32) {
@@ -739,6 +741,7 @@ private:
         return value;
     }
 
+    // Read an atom (immediate, identifier, %hi, %lo).
     int64_t readAtom() {
         if (foundChar('%')) {
             const char *functionStart = s;
@@ -959,9 +962,8 @@ private:
                 if (!foundChar(',')) {
                     error("expected comma");
                 }
-                int32_t imm = readExpression(op.bits);
                 // Jump labels are PC-relative.
-                imm -= pc();
+                int32_t imm = readExpression(op.bits, pc());
                 emitSB(op, rs1, rs2, imm);
                 break;
             }
@@ -981,9 +983,8 @@ private:
                 if (!foundChar(',')) {
                     error("expected comma");
                 }
-                int32_t imm = readExpression(op.bits);
                 // Jump labels are PC-relative.
-                imm -= pc();
+                int32_t imm = readExpression(op.bits, pc());
                 emitUJ(op, rd, imm);
                 break;
             }
