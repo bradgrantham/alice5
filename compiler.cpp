@@ -174,6 +174,14 @@ void Compiler::emitConstant(uint32_t id, uint32_t typeId, unsigned char *data) {
     const Type *type = pgm->types.at(typeId).get();
 
     switch (type->op()) {
+        case SpvOpTypeBool: {
+            bool value = *reinterpret_cast<bool *>(data);
+            std::ostringstream ss;
+            ss << ".word " << (value ? 1 : 0);
+            emit(ss.str(), value ? "true" : "false");
+            break;
+        }
+
         case SpvOpTypeInt: {
             uint32_t value = *reinterpret_cast<uint32_t *>(data);
             std::ostringstream ss;
