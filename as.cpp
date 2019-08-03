@@ -706,10 +706,18 @@ private:
     int32_t readExpression(int bits, uint32_t base = 0) {
         const char *expressionStart = s;
 
-        int64_t value = readSum() - base;
+        bool loUsed = false;
+        int64_t value = readSum(loUsed) - base;
+
+        // If %lo was used in the expression, then we expand the number of bits
+        // by one because it's okay to use all bits. (The sign bit is sign-extended
+        // and this is taken into account when computing %hi.)
+        if (loUsed) {
+            bits += 1;
+        }
 
         // Make sure we fit.
-        if (bits != 32) {
+        if (bits < 32) {
             int32_t limit = 1 << (bits - 1);
             if (value < 0 ? -value > limit : value >= limit) {
                 // Back up over expression.
@@ -728,11 +736,14 @@ private:
     }
 
     // Read an expression, not checking resulting size.
-    int64_t readSum() {
+    //
+    // The loUsed parameter is set to true if the %lo() function
+    // is used in the sum. Otherwise it's untouched.
+    int64_t readSum(bool &loUsed) {
         int64_t value = 0;
 
         while (true) {
-            value += readAtom();
+            value += readAtom(loUsed);
             if (!foundChar('+')) {
                 break;
             }
@@ -742,7 +753,10 @@ private:
     }
 
     // Read an atom (immediate, identifier, %hi, %lo).
-    int64_t readAtom() {
+    //
+    // The loUsed parameter is set to true if the %lo() function
+    // is used in the atom. Otherwise it's untouched.
+    int64_t readAtom(bool &loUsed) {
         if (foundChar('%')) {
             const char *functionStart = s;
             std::string func = readIdentifier();
@@ -751,7 +765,7 @@ private:
                 error("expected open parenthesis");
             }
 
-            int64_t value = readSum();
+            int64_t value = readSum(loUsed);
 
             if (!foundChar(')')) {
                 error("expected close parenthesis");
@@ -759,6 +773,7 @@ private:
 
             if (func == "lo") {
                 // Lower 12 bits.
+                loUsed = true;
                 return value & 0x00000FFF;
             } else if (func == "hi") {
                 // Upper 20 bits.
