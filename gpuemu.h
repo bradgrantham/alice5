@@ -674,16 +674,19 @@ GPUCore::Status GPUCore::step(T& memory)
                                 break;
                             }
                             case SUBST_CROSS: {
-                                float x[3], y[3];
+                                float x[3], y[3], z[3];
                                 x[0] = popf();
                                 x[1] = popf();
                                 x[2] = popf();
-                                y[0] = x[1] * y[2] - y[1] * x[2];
-                                y[1] = x[2] * y[0] - y[2] * x[0];
-                                y[2] = x[0] * y[1] - y[0] * x[1];
-                                pushf(y[2]);
-                                pushf(y[1]);
-                                pushf(y[0]);
+                                y[0] = popf();
+                                y[1] = popf();
+                                y[2] = popf();
+                                z[0] = x[1] * y[2] - y[1] * x[2];
+                                z[1] = x[2] * y[0] - y[2] * x[0];
+                                z[2] = x[0] * y[1] - y[0] * x[1];
+                                pushf(z[2]);
+                                pushf(z[1]);
+                                pushf(z[0]);
                                 break;
                             }
                             case SUBST_NORMALIZE1: {
