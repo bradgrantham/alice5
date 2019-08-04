@@ -1,5 +1,6 @@
 // Test for the parallel_copy() function in pcopy.cpp.
 
+#include <assert.h>
 #include <iostream>
 #include "pcopy.h"
 
