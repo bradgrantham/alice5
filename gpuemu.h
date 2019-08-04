@@ -15,6 +15,26 @@ const int RM_RDN = 0b010;
 const int RM_RUP = 0b011;
 const int RM_TONEAREST_MAX = 0b100;
 
+// Union for converting from float to int and back.
+union FloatUint32 {
+    float f;
+    uint32_t i;
+};
+
+// Bit-wise conversion from int to float.
+float intToFloat(uint32_t i) {
+    FloatUint32 u;
+    u.i = i;
+    return u.f;
+}
+
+// Bit-wise conversion from float to int.
+uint32_t floatToInt(float f) {
+    FloatUint32 u;
+    u.f = f;
+    return u.i;
+}
+
 struct GPUCore
 {
     // Loosely modeled on RISC-V RVI, RVA, RVM, RVF
@@ -375,7 +395,7 @@ GPUCore::Status GPUCore::step(T& memory)
                     case 0x1E: {
                         if(funct3 == 0) {
                             if(fmt == 0) {
-                                regs.f[rd] = *reinterpret_cast<float*>(&regs.x[rs1]);
+                                regs.f[rd] = intToFloat(regs.x[rs1]);
                             } else {
                                 unimpl();
                             }
@@ -415,9 +435,9 @@ GPUCore::Status GPUCore::step(T& memory)
                     // fsgnjn.s  rd rs1 rs2      31..27=0x04 14..12=1 26..25=0 6..2=0x14 1..0=3
                     // fsgnjx.s  rd rs1 rs2      31..27=0x04 14..12=2 26..25=0 6..2=0x14 1..0=3
                     case 0x04: {
-                        uint32_t& fs1 = *reinterpret_cast<uint32_t*>(&regs.f[rs1]);
-                        uint32_t& fs2 = *reinterpret_cast<uint32_t*>(&regs.f[rs2]);
-                        uint32_t& fd = *reinterpret_cast<uint32_t*>(&regs.f[rd]);
+                        uint32_t fs1 = floatToInt(regs.f[rs1]);
+                        uint32_t fs2 = floatToInt(regs.f[rs2]);
+                        uint32_t fd;
                         if(funct3 == 0) {
                             fd = (fs1 & 0x7FFFFFFF) | (fs2 & 0x80000000);
                         } else if(funct3 == 1) {
@@ -425,8 +445,10 @@ GPUCore::Status GPUCore::step(T& memory)
                         } else if(funct3 == 2) {
                             fd = (fs1 & 0x7FFFFFFF) | ((fs2 & 0x80000000) ^ (fs1 & 0x80000000));
                         } else {
+                            fd = 0;
                             unimpl();
                         }
+                        regs.f[rd] = intToFloat(fd);
                         break;
                     }
                     default: unimpl(); break;

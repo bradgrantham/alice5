@@ -55,7 +55,7 @@ void dumpRegsDiff(const GPUCore::Registers& prev, const GPUCore::Registers& cur)
     for(int i = 0; i < 32; i++) {
         bool bothnan = std::isnan(cur.f[i]) && std::isnan(prev.f[i]);
         if((prev.f[i] != cur.f[i]) && !bothnan) { // if both NaN, equality test still fails)
-            uint32_t x = *reinterpret_cast<const uint32_t*>(&cur.f[i]);
+            uint32_t x = floatToInt(cur.f[i]);
             std::cout << "f" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << x << std::dec << "(" << cur.f[i] << ")\n";
         }
     }
@@ -431,9 +431,9 @@ int main(int argc, char **argv)
             uint32_t ig = m.read32(symbols["color"] +  4);
             uint32_t ib = m.read32(symbols["color"] +  8);
             // uint32_t ia = m.read32(symbols["color"] + 12);
-            float r = *reinterpret_cast<float*>(&ir);
-            float g = *reinterpret_cast<float*>(&ig);
-            float b = *reinterpret_cast<float*>(&ib);
+            float r = intToFloat(ir);
+            float g = intToFloat(ig);
+            float b = intToFloat(ib);
             // float a = *reinterpret_cast<float*>(&ia);
             img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 0] = std::clamp(int(r * 255.99), 0, 255);
             img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 1] = std::clamp(int(g * 255.99), 0, 255);
