@@ -1,4 +1,5 @@
 
+#include <cmath>
 #include <vector>
 #include <map>
 #include <set>
@@ -175,7 +176,7 @@ void Interpreter::stepCompositeConstruct(const InsnCompositeConstruct& insn)
 {
     Register& obj = registers.at(insn.resultId());
     size_t offset = 0;
-    for (int i = 0; i < insn.constituentsIdCount(); i++) {
+    for (size_t i = 0; i < insn.constituentsIdCount(); i++) {
         uint32_t id = insn.constituentsId(i);
         Register& src = registers.at(id);
 #ifdef CHECK_REGISTER_ACCESS
@@ -204,7 +205,7 @@ void Interpreter::stepIAdd(const InsnIAdd& insn)
         const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id());
         const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id());
         uint32_t* result = &toRegister<uint32_t>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] + operand2[i];
         }
     } else {
@@ -225,7 +226,7 @@ void Interpreter::stepISub(const InsnISub& insn)
         const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id());
         const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id());
         uint32_t* result = &toRegister<uint32_t>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] - operand2[i];
         }
     } else {
@@ -246,7 +247,7 @@ void Interpreter::stepFAdd(const InsnFAdd& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] + operand2[i];
         }
     } else {
@@ -267,7 +268,7 @@ void Interpreter::stepFSub(const InsnFSub& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] - operand2[i];
         }
     } else {
@@ -288,7 +289,7 @@ void Interpreter::stepFMul(const InsnFMul& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] * operand2[i];
         }
     } else {
@@ -309,7 +310,7 @@ void Interpreter::stepFDiv(const InsnFDiv& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] / operand2[i];
         }
     } else {
@@ -330,7 +331,7 @@ void Interpreter::stepFMod(const InsnFMod& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] - floor(operand1[i]/operand2[i])*operand2[i];
         }
     } else {
@@ -351,7 +352,7 @@ void Interpreter::stepFOrdLessThan(const InsnFOrdLessThan& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] < operand2[i];
         }
     } else {
@@ -372,7 +373,7 @@ void Interpreter::stepFOrdGreaterThan(const InsnFOrdGreaterThan& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] > operand2[i];
         }
     } else {
@@ -393,7 +394,7 @@ void Interpreter::stepFOrdLessThanEqual(const InsnFOrdLessThanEqual& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] <= operand2[i];
         }
     } else {
@@ -414,7 +415,7 @@ void Interpreter::stepFOrdEqual(const InsnFOrdEqual& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] == operand2[i];
         }
     } else {
@@ -436,7 +437,7 @@ void Interpreter::stepFNegate(const InsnFNegate& insn)
 
         const float* operand = &fromRegister<float>(insn.operandId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = -operand[i];
         }
     } else {
@@ -476,7 +477,7 @@ void Interpreter::stepFOrdGreaterThanEqual(const InsnFOrdGreaterThanEqual& insn)
         const float* operand1 = &fromRegister<float>(insn.operand1Id());
         const float* operand2 = &fromRegister<float>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] >= operand2[i];
         }
     } else {
@@ -497,7 +498,7 @@ void Interpreter::stepSLessThanEqual(const InsnSLessThanEqual& insn)
         const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id());
         const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] <= operand2[i];
         }
     } else {
@@ -518,7 +519,7 @@ void Interpreter::stepSLessThan(const InsnSLessThan& insn)
         const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id());
         const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] < operand2[i];
         }
     } else {
@@ -539,7 +540,7 @@ void Interpreter::stepSDiv(const InsnSDiv& insn)
         const int32_t* operand1 = &fromRegister<int32_t>(insn.operand1Id());
         const int32_t* operand2 = &fromRegister<int32_t>(insn.operand2Id());
         int32_t* result = &toRegister<int32_t>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] / operand2[i];
         }
     } else {
@@ -560,7 +561,7 @@ void Interpreter::stepINotEqual(const InsnINotEqual& insn)
         const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id());
         const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] != operand2[i];
         }
     } else {
@@ -581,7 +582,7 @@ void Interpreter::stepIEqual(const InsnIEqual& insn)
         const uint32_t* operand1 = &fromRegister<uint32_t>(insn.operand1Id());
         const uint32_t* operand2 = &fromRegister<uint32_t>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] == operand2[i];
         }
     } else {
@@ -601,7 +602,7 @@ void Interpreter::stepLogicalNot(const InsnLogicalNot& insn)
 
         const bool* operand = &fromRegister<bool>(insn.operandId());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = !operand[i];
         }
     } else {
@@ -619,7 +620,7 @@ void Interpreter::stepLogicalAnd(const InsnLogicalAnd& insn)
         const bool* operand1 = &fromRegister<bool>(insn.operand1Id());
         const bool* operand2 = &fromRegister<bool>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] && operand2[i];
         }
     } else {
@@ -637,7 +638,7 @@ void Interpreter::stepAll(const InsnAll& insn)
     const bool* operand = &fromRegister<bool>(insn.vectorId());
 
     bool result = true;
-    for(int i = 0; i < typeVector->count; i++) {
+    for(uint32_t i = 0; i < typeVector->count; i++) {
         result = result && operand[i];
         if (!result) {
             break;
@@ -655,7 +656,7 @@ void Interpreter::stepAny(const InsnAny& insn)
     const bool* operand = &fromRegister<bool>(insn.vectorId());
 
     bool result = false;
-    for(int i = 0; i < typeVector->count; i++) {
+    for(uint32_t i = 0; i < typeVector->count; i++) {
         result = result || operand[i];
         if (result) {
             break;
@@ -675,7 +676,7 @@ void Interpreter::stepLogicalOr(const InsnLogicalOr& insn)
         const bool* operand1 = &fromRegister<bool>(insn.operand1Id());
         const bool* operand2 = &fromRegister<bool>(insn.operand2Id());
         bool* result = &toRegister<bool>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = operand1[i] || operand2[i];
         }
     } else {
@@ -697,7 +698,7 @@ void Interpreter::stepSelect(const InsnSelect& insn)
         const float* object1 = &fromRegister<float>(insn.object1Id());
         const float* object2 = &fromRegister<float>(insn.object2Id());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = condition[i] ? object1[i] : object2[i];
         }
     } else {
@@ -717,7 +718,7 @@ void Interpreter::stepVectorTimesScalar(const InsnVectorTimesScalar& insn)
 
     const TypeVector *typeVector = pgm->type<TypeVector>(insn.type);
 
-    for(int i = 0; i < typeVector->count; i++) {
+    for(uint32_t i = 0; i < typeVector->count; i++) {
         result[i] = vector[i] * scalar;
     }
 }
@@ -821,7 +822,7 @@ void Interpreter::stepVectorShuffle(const InsnVectorShuffle& insn)
     }
 #endif
 
-    for(int i = 0; i < insn.componentsId.size(); i++) {
+    for(size_t i = 0; i < insn.componentsId.size(); i++) {
         uint32_t component = insn.componentsId[i];
         unsigned char *src = component < n1
             ? r1.data + component*elementSize
@@ -840,7 +841,7 @@ void Interpreter::stepConvertSToF(const InsnConvertSToF& insn)
 
         const int32_t* src = &fromRegister<int32_t>(insn.signedValueId());
         float* dst = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             dst[i] = src[i];
         }
     } else {
@@ -858,7 +859,7 @@ void Interpreter::stepConvertFToS(const InsnConvertFToS& insn)
 
         const float* src = &fromRegister<float>(insn.floatValueId());
         uint32_t* dst = &toRegister<uint32_t>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             dst[i] = src[i];
         }
     } else {
@@ -872,7 +873,7 @@ void Interpreter::stepAccessChain(const InsnAccessChain& insn)
     Pointer& basePointer = pointers.at(insn.baseId());
     uint32_t type = basePointer.type;
     size_t address = basePointer.address;
-    for (int i = 0; i < insn.indexesIdCount(); i++) {
+    for (size_t i = 0; i < insn.indexesIdCount(); i++) {
         uint32_t id = insn.indexesId(i);
         int32_t j = fromRegister<int32_t>(id);
         ConstituentInfo info = pgm->getConstituentInfo(type, j);
@@ -951,7 +952,7 @@ void Interpreter::stepGLSLstd450Distance(const InsnGLSLstd450Distance& insn)
         const float* p0 = &fromRegister<float>(insn.p0Id());
         const float* p1 = &fromRegister<float>(insn.p1Id());
         float radicand = 0;
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             radicand += (p1[i] - p0[i]) * (p1[i] - p0[i]);
         }
         toRegister<float>(insn.resultId()) = sqrtf(radicand);
@@ -972,7 +973,7 @@ void Interpreter::stepGLSLstd450Length(const InsnGLSLstd450Length& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float length = 0;
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             length += x[i]*x[i];
         }
         toRegister<float>(insn.resultId()) = sqrtf(length);
@@ -992,7 +993,7 @@ void Interpreter::stepGLSLstd450FMax(const InsnGLSLstd450FMax& insn)
         const float* x = &fromRegister<float>(insn.xId());
         const float* y = &fromRegister<float>(insn.yId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = fmaxf(x[i], y[i]);
         }
     } else {
@@ -1012,7 +1013,7 @@ void Interpreter::stepGLSLstd450FMin(const InsnGLSLstd450FMin& insn)
         const float* x = &fromRegister<float>(insn.xId());
         const float* y = &fromRegister<float>(insn.yId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = fminf(x[i], y[i]);
         }
     } else {
@@ -1032,7 +1033,7 @@ void Interpreter::stepGLSLstd450Pow(const InsnGLSLstd450Pow& insn)
         const float* x = &fromRegister<float>(insn.xId());
         const float* y = &fromRegister<float>(insn.yId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = powf(x[i], y[i]);
         }
     } else {
@@ -1051,13 +1052,13 @@ void Interpreter::stepGLSLstd450Normalize(const InsnGLSLstd450Normalize& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float length = 0;
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             length += x[i]*x[i];
         }
         length = sqrtf(length);
 
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = length == 0 ? 0 : x[i]/length;
         }
     } else {
@@ -1075,7 +1076,7 @@ void Interpreter::stepGLSLstd450Radians(const InsnGLSLstd450Radians& insn)
 
         const float* degrees = &fromRegister<float>(insn.degreesId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = degrees[i] / 180.0 * M_PI;
         }
     } else {
@@ -1093,7 +1094,7 @@ void Interpreter::stepGLSLstd450Sin(const InsnGLSLstd450Sin& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = sin(x[i]);
         }
     } else {
@@ -1111,7 +1112,7 @@ void Interpreter::stepGLSLstd450Cos(const InsnGLSLstd450Cos& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = cos(x[i]);
         }
     } else {
@@ -1129,7 +1130,7 @@ void Interpreter::stepGLSLstd450Atan(const InsnGLSLstd450Atan& insn)
 
         const float* y_over_x = &fromRegister<float>(insn.y_over_xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = atanf(y_over_x[i]);
         }
     } else {
@@ -1148,7 +1149,7 @@ void Interpreter::stepGLSLstd450Atan2(const InsnGLSLstd450Atan2& insn)
         const float* y = &fromRegister<float>(insn.yId());
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = atan2f(y[i], x[i]);
         }
     } else {
@@ -1167,7 +1168,7 @@ void Interpreter::stepGLSLstd450FSign(const InsnGLSLstd450FSign& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = x[i] < 0.0f ? -1.0f : ((x[i] == 0.0f) ? 0.0f : 1.0f);
         }
     } else {
@@ -1185,7 +1186,7 @@ void Interpreter::stepGLSLstd450Sqrt(const InsnGLSLstd450Sqrt& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = sqrtf(x[i]);
         }
     } else {
@@ -1203,7 +1204,7 @@ void Interpreter::stepGLSLstd450FAbs(const InsnGLSLstd450FAbs& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = fabsf(x[i]);
         }
     } else {
@@ -1221,7 +1222,7 @@ void Interpreter::stepGLSLstd450Exp(const InsnGLSLstd450Exp& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = expf(x[i]);
         }
     } else {
@@ -1239,7 +1240,7 @@ void Interpreter::stepGLSLstd450Exp2(const InsnGLSLstd450Exp2& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = exp2f(x[i]);
         }
     } else {
@@ -1257,7 +1258,7 @@ void Interpreter::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = floor(x[i]);
         }
     } else {
@@ -1275,7 +1276,7 @@ void Interpreter::stepGLSLstd450Fract(const InsnGLSLstd450Fract& insn)
 
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = x[i] - floor(x[i]);
         }
     } else {
@@ -1320,7 +1321,7 @@ void Interpreter::stepGLSLstd450FClamp(const InsnGLSLstd450FClamp& insn)
         const float* minVal = &fromRegister<float>(insn.minValId());
         const float* maxVal = &fromRegister<float>(insn.maxValId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = fclamp(x[i], minVal[i], maxVal[i]);
         }
     } else {
@@ -1342,7 +1343,7 @@ void Interpreter::stepGLSLstd450FMix(const InsnGLSLstd450FMix& insn)
         const float* y = &fromRegister<float>(insn.yId());
         const float* a = &fromRegister<float>(insn.aId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = fmix(x[i], y[i], a[i]);
         }
     } else {
@@ -1364,7 +1365,7 @@ void Interpreter::stepGLSLstd450SmoothStep(const InsnGLSLstd450SmoothStep& insn)
         const float* edge1 = &fromRegister<float>(insn.edge1Id());
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = smoothstep(edge0[i], edge1[i], x[i]);
         }
     } else {
@@ -1385,7 +1386,7 @@ void Interpreter::stepGLSLstd450Step(const InsnGLSLstd450Step& insn)
         const float* edge = &fromRegister<float>(insn.edgeId());
         const float* x = &fromRegister<float>(insn.xId());
         float* result = &toRegister<float>(insn.resultId());
-        for(int i = 0; i < typeVector->count; i++) {
+        for(uint32_t i = 0; i < typeVector->count; i++) {
             result[i] = x[i] < edge[i] ? 0.0 : 1.0;
         }
     } else {
@@ -1423,7 +1424,7 @@ void Interpreter::stepGLSLstd450Reflect(const InsnGLSLstd450Reflect& insn)
 
         float dot = dotProduct(n, i, typeVector->count);
 
-        for (int k = 0; k < typeVector->count; k++) {
+        for (uint32_t k = 0; k < typeVector->count; k++) {
             result[k] = i[k] - 2.0*dot*n[k];
         }
     } else {
@@ -1453,11 +1454,11 @@ void Interpreter::stepGLSLstd450Refract(const InsnGLSLstd450Refract& insn)
         float k = 1.0 - eta * eta * (1.0 - dot * dot);
 
         if(k < 0.0) {
-            for (int m = 0; m < typeVector->count; m++) {
+            for (uint32_t m = 0; m < typeVector->count; m++) {
                 result[m] = 0.0;
             }
         } else {
-            for (int m = 0; m < typeVector->count; m++) {
+            for (uint32_t m = 0; m < typeVector->count; m++) {
                 result[m] = eta * i[m] - (eta * dot + sqrtf(k)) * n[m];
             }
         }
@@ -1494,7 +1495,7 @@ void Interpreter::stepPhi(const InsnPhi& insn)
     uint32_t size = pgm->typeSizes.at(obj.type);
 
     bool found = false;
-    for(int i = 0; !found && i < insn.operandIdCount(); i++) {
+    for(size_t i = 0; !found && i < insn.operandIdCount(); i++) {
         uint32_t srcId = insn.operandId(i);
         uint32_t parentId = insn.labelId[i];
 

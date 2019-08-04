@@ -1,6 +1,7 @@
 
 // RISC-V assembler.
 
+#include <assert.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>

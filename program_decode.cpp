@@ -268,7 +268,7 @@ spv_result_t Program::handleInstruction(void* user_data, const spv_parsed_instru
                 std::cout << "TypeFunction " << id << " returning " << returnType;
                 if(params.size() > 1) {
                     std::cout << " with parameter types"; 
-                    for(int i = 0; i < params.size(); i++)
+                    for(size_t i = 0; i < params.size(); i++)
                         std::cout << " " << params[i];
                 }
                 std::cout << "\n";

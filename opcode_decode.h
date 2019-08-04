@@ -44,7 +44,7 @@ case SpvOpFunctionCall: {
         std::cout << " functionId ";
         std::cout << functionId;
         std::cout << " operandId ";
-        for(int i = 0; i < operandId.size(); i++)
+        for(size_t i = 0; i < operandId.size(); i++)
             std::cout << operandId[i] << " ";
         std::cout << "\n";
     }
@@ -107,7 +107,7 @@ case SpvOpAccessChain: {
         std::cout << " baseId ";
         std::cout << baseId;
         std::cout << " indexesId ";
-        for(int i = 0; i < indexesId.size(); i++)
+        for(size_t i = 0; i < indexesId.size(); i++)
             std::cout << indexesId[i] << " ";
         std::cout << "\n";
     }
@@ -133,7 +133,7 @@ case SpvOpVectorShuffle: {
         std::cout << " vector2Id ";
         std::cout << vector2Id;
         std::cout << " componentsId ";
-        for(int i = 0; i < componentsId.size(); i++)
+        for(size_t i = 0; i < componentsId.size(); i++)
             std::cout << componentsId[i] << " ";
         std::cout << "\n";
     }
@@ -153,7 +153,7 @@ case SpvOpCompositeConstruct: {
         std::cout << " resultId ";
         std::cout << resultId;
         std::cout << " constituentsId ";
-        for(int i = 0; i < constituentsId.size(); i++)
+        for(size_t i = 0; i < constituentsId.size(); i++)
             std::cout << constituentsId[i] << " ";
         std::cout << "\n";
     }
@@ -176,7 +176,7 @@ case SpvOpCompositeExtract: {
         std::cout << " compositeId ";
         std::cout << compositeId;
         std::cout << " indexesId ";
-        for(int i = 0; i < indexesId.size(); i++)
+        for(size_t i = 0; i < indexesId.size(); i++)
             std::cout << indexesId[i] << " ";
         std::cout << "\n";
     }
@@ -202,7 +202,7 @@ case SpvOpCompositeInsert: {
         std::cout << " compositeId ";
         std::cout << compositeId;
         std::cout << " indexesId ";
-        for(int i = 0; i < indexesId.size(); i++)
+        for(size_t i = 0; i < indexesId.size(); i++)
             std::cout << indexesId[i] << " ";
         std::cout << "\n";
     }
@@ -951,7 +951,7 @@ case SpvOpPhi: {
     std::vector<uint32_t> pairs = restv();
     std::vector<uint32_t> operandId;
     std::vector<uint32_t> labelId;
-    for (int i = 0; i < pairs.size(); i += 2) {
+    for (size_t i = 0; i < pairs.size(); i += 2) {
         operandId.push_back(pairs[i]);
         labelId.push_back(pairs[i + 1]);
     }
@@ -964,10 +964,10 @@ case SpvOpPhi: {
         std::cout << " resultId ";
         std::cout << resultId;
         std::cout << " operandId ";
-        for(int i = 0; i < operandId.size(); i++)
+        for(size_t i = 0; i < operandId.size(); i++)
             std::cout << operandId[i] << " ";
         std::cout << " labelId ";
-        for(int i = 0; i < labelId.size(); i++)
+        for(size_t i = 0; i < labelId.size(); i++)
             std::cout << labelId[i] << " ";
         std::cout << "\n";
     }
@@ -1001,7 +1001,7 @@ case SpvOpBranchConditional: {
         std::cout << " falseLabelId ";
         std::cout << falseLabelId;
         std::cout << " branchweightsId ";
-        for(int i = 0; i < branchweightsId.size(); i++)
+        for(size_t i = 0; i < branchweightsId.size(); i++)
             std::cout << branchweightsId[i] << " ";
         std::cout << "\n";
     }

@@ -216,7 +216,7 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Sha
 
     // Hook up outputs to inputs
     for(auto& pass: renderPasses) {
-        for(int i = 0; i < pass->inputs.size(); i++) {
+        for(size_t i = 0; i < pass->inputs.size(); i++) {
             ShaderToyImage& input = pass->inputs[i];
             if(!input.sampledImage.image) {
                 int channelId = input.id;

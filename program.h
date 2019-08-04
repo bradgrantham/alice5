@@ -245,7 +245,7 @@ struct Program
             case SpvOpTypeStruct: {
                 const TypeStruct *typeStruct = dynamic_cast<const TypeStruct *>(type);
 
-                for(int i = 0; i < typeStruct->memberTypes.size(); i++) {
+                for(size_t i = 0; i < typeStruct->memberTypes.size(); i++) {
                     uint32_t membertype = typeStruct->memberTypeIds[i];
                     std::string fullname = ((name == "") ? "" : (name + ".")) + memberNames[typeId][i];
                     storeNamedVariableInfo(fullname, membertype, address + memberDecorations[typeId][i][SpvDecorationOffset][0]);
@@ -256,7 +256,7 @@ struct Program
             case SpvOpTypeArray: {
                 const TypeArray *typeArray = dynamic_cast<const TypeArray *>(type);
 
-                for(int i = 0; i < typeArray->count; i++) {
+                for(size_t i = 0; i < typeArray->count; i++) {
                     uint32_t membertype = typeArray->type;
                     std::string fullname = name + "[" + std::to_string(i) + "]";
                     storeNamedVariableInfo(fullname, membertype, address + i * typeSizes.at(membertype));
@@ -314,7 +314,7 @@ struct Program
         T *insn = dynamic_cast<T *>(instruction);
         const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId()));
         if (typeVector != nullptr) {
-            for (int i = 0; i < typeVector->count; i++) {
+            for (uint32_t i = 0; i < typeVector->count; i++) {
                 auto [subtype, offset] = getConstituentInfo(insn->type, i);
                 newList.push_back(std::make_shared<T>(insn->lineInfo,
                             subtype,
@@ -336,7 +336,7 @@ struct Program
             uint32_t arg0Subtype = typeVector0->type;
             uint32_t arg1Subtype = typeVector1->type;
 
-            for (int i = 0; i < typeVector->count; i++) {
+            for (uint32_t i = 0; i < typeVector->count; i++) {
                 auto [subtype, offset] = getConstituentInfo(insn->type, i);
                 newList.push_back(std::make_shared<T>(insn->lineInfo,
                             subtype,
@@ -354,7 +354,7 @@ struct Program
         T *insn = dynamic_cast<T *>(instruction);
         const TypeVector *typeVector = getTypeAsVector(typeIdOf(insn->resultId()));
         if (typeVector != nullptr) {
-            for (int i = 0; i < typeVector->count; i++) {
+            for (uint32_t i = 0; i < typeVector->count; i++) {
                 auto [subtype, offset] = getConstituentInfo(insn->type, i);
                 newList.push_back(std::make_shared<T>(insn->lineInfo,
                             subtype,

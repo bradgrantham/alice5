@@ -203,7 +203,7 @@ void Compiler::emitConstant(uint32_t id, uint32_t typeId, unsigned char *data) {
 
         case SpvOpTypeVector: {
             const TypeVector *typeVector = pgm->getTypeAsVector(typeId);
-            for (int i = 0; i < typeVector->count; i++) {
+            for (uint32_t i = 0; i < typeVector->count; i++) {
                 auto [subtype, offset] = pgm->getConstituentInfo(typeId, i);
                 emitConstant(id, subtype, data + offset);
             }
@@ -682,7 +682,7 @@ void Compiler::emitCall(const std::string &functionName,
     }
 
     // Pop parameters.
-    for (int i = 0; i < resultIds.size(); i++) {
+    for (size_t i = 0; i < resultIds.size(); i++) {
         std::ostringstream ss;
         uint32_t phy = asRegister(resultIds[i])->phy;
         if (phy < 32) {
@@ -776,7 +776,7 @@ void Compiler::emitPhiCopy(Instruction *instruction, uint32_t blockId) {
     std::vector<PCopyInstruction> instructions;
 
     // Set up our pairs.
-    for (int resultIndex = 0; resultIndex < phi->resultIds.size(); resultIndex++) {
+    for (size_t resultIndex = 0; resultIndex < phi->resultIds.size(); resultIndex++) {
         uint32_t destId = phi->resultIds[resultIndex];
         uint32_t sourceId = phi->operandIds[resultIndex][labelIndex];
         uint32_t destReg = physicalRegisterFor(destId, true);

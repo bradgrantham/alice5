@@ -284,7 +284,7 @@ def generate_instruction(instruction, opname_prefix, opcode_prefix, clip_prefix,
             opcode_decode_f.write("    std::vector<uint32_t> pairs = restv();\n")
             opcode_decode_f.write("    std::vector<uint32_t> operandId;\n")
             opcode_decode_f.write("    std::vector<uint32_t> labelId;\n")
-            opcode_decode_f.write("    for (int i = 0; i < pairs.size(); i += 2) {\n")
+            opcode_decode_f.write("    for (size_t i = 0; i < pairs.size(); i += 2) {\n")
             opcode_decode_f.write("        operandId.push_back(pairs[i]);\n")
             opcode_decode_f.write("        labelId.push_back(pairs[i + 1]);\n")
             opcode_decode_f.write("    }\n")
@@ -302,7 +302,7 @@ def generate_instruction(instruction, opname_prefix, opcode_prefix, clip_prefix,
         for operand in all_operands:
             opcode_decode_f.write("        std::cout << \" %s \";\n" % operand.cpp_name)
             if operand.quantifier == "*":
-                opcode_decode_f.write("        for(int i = 0; i < %s.size(); i++)\n"
+                opcode_decode_f.write("        for(size_t i = 0; i < %s.size(); i++)\n"
                         % operand.cpp_name)
                 opcode_decode_f.write("            std::cout << %s[i] << \" \";\n" % operand.cpp_name)
             else:

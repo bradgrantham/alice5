@@ -258,7 +258,7 @@ void Program::replacePhiInBlock(Block *block) {
                     newPhi->addResult(resultId);
 
                     std::vector<uint32_t> operandIds;
-                    for (int i = 0; i < oldPhi->operandIdCount(); i++) {
+                    for (size_t i = 0; i < oldPhi->operandIdCount(); i++) {
                         // Deal with label.
                         uint32_t labelId = oldPhi->labelId[i];
                         if (first) {
@@ -361,7 +361,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 const TypeVector *typeVector = getTypeAsVector(
                         resultTypes.at(insn->resultId()));
                 if (typeVector != nullptr) {
-                    for (int i = 0; i < typeVector->count; i++) {
+                    for (size_t i = 0; i < typeVector->count; i++) {
                         auto [subtype, offset] = getConstituentInfo(insn->type, i);
                         newList.push_back(std::make_shared<RiscVLoad>(insn->lineInfo,
                                     subtype,
@@ -398,7 +398,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 }
                 const TypeVector *typeVector = type == 0 ? nullptr : getTypeAsVector(type);
                 if (typeVector != nullptr) {
-                    for (int i = 0; i < typeVector->count; i++) {
+                    for (size_t i = 0; i < typeVector->count; i++) {
                         auto [subtype, offset] = getConstituentInfo(type, i);
                         newList.push_back(std::make_shared<RiscVStore>(insn->lineInfo,
                                     insn->pointerId(),
@@ -425,10 +425,10 @@ void Program::expandVectorsInBlock(Block *block) {
                     const TypeVector *typeVector = getTypeAsVector(typeMatrix->columnType);
                     assert(typeVector != nullptr);
 
-                    for (int col = 0; col < typeMatrix->columnCount; col++) {
+                    for (uint32_t col = 0; col < typeMatrix->columnCount; col++) {
                         uint32_t vectorId = insn->constituentsId(col);
 
-                        for (int row = 0; row < typeVector->count; row++) {
+                        for (uint32_t row = 0; row < typeVector->count; row++) {
                             int index = typeMatrix->getIndex(row, col, typeVector);
 
                             // Re-use existing SSA register.
@@ -439,7 +439,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 } else {
                     const TypeVector *typeVector = getTypeAsVector(insn->type);
                     assert(typeVector != nullptr);
-                    for (int i = 0; i < typeVector->count; i++) {
+                    for (uint32_t i = 0; i < typeVector->count; i++) {
                         // Re-use existing SSA register.
                         scalarize(insn->resultId(), i, typeVector->type, insn->constituentsId(i));
                     }
@@ -486,10 +486,10 @@ void Program::expandVectorsInBlock(Block *block) {
                 assert(resVector->count == typeMatrix->columnCount);
 
                 // Dot the source vector with each column vector of the matrix.
-                for (int col = 0; col < typeMatrix->columnCount; col++) {
+                for (uint32_t col = 0; col < typeMatrix->columnCount; col++) {
                     std::vector<uint32_t> vector1Ids;
                     std::vector<uint32_t> vector2Ids;
-                    for (int row = 0; row < matVector->count; row++) {
+                    for (uint32_t row = 0; row < matVector->count; row++) {
                         int index = typeMatrix->getIndex(row, col, matVector);
                         vector1Ids.push_back(scalarize(insn->vectorId(), row, matVector->type));
                         vector2Ids.push_back(scalarize(insn->matrixId(), index, matVector->type));
@@ -521,10 +521,10 @@ void Program::expandVectorsInBlock(Block *block) {
                 assert(matVector == resVector);
 
                 // Dot the source vector with each row vector of the matrix.
-                for (int row = 0; row < matVector->count; row++) {
+                for (uint32_t row = 0; row < matVector->count; row++) {
                     std::vector<uint32_t> vector1Ids;
                     std::vector<uint32_t> vector2Ids;
-                    for (int col = 0; col < typeMatrix->columnCount; col++) {
+                    for (uint32_t col = 0; col < typeMatrix->columnCount; col++) {
                         int index = typeMatrix->getIndex(row, col, matVector);
                         vector1Ids.push_back(scalarize(insn->vectorId(), col, matVector->type));
                         vector2Ids.push_back(scalarize(insn->matrixId(), index, matVector->type));
@@ -550,7 +550,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 // See if it's a vector.
                 const TypeVector *typeVector = getTypeAsVector(insn->type);
                 if (typeVector != nullptr) {
-                    for (int i = 0; i < typeVector->count; i++) {
+                    for (uint32_t i = 0; i < typeVector->count; i++) {
                         uint32_t newId;
 
                         if (i == index) {
@@ -569,8 +569,8 @@ void Program::expandVectorsInBlock(Block *block) {
                         typeVector = getTypeAsVector(typeMatrix->columnType);
                         assert(typeVector != nullptr);
 
-                        for (int col = 0; col < typeMatrix->columnCount; col++) {
-                            for (int row = 0; row < typeVector->count; row++) {
+                        for (uint32_t col = 0; col < typeMatrix->columnCount; col++) {
+                            for (uint32_t row = 0; row < typeVector->count; row++) {
                                 int matrixIndex = typeMatrix->getIndex(row, col, typeVector);
                                 uint32_t newId;
                                 if (col == index) {
@@ -601,7 +601,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 assert(typeVector != nullptr);
 
                 // Break into individual floating point multiplies.
-                for (int i = 0; i < typeVector->count; i++) {
+                for (uint32_t i = 0; i < typeVector->count; i++) {
                     newList.push_back(std::make_shared<InsnFMul>(insn->lineInfo,
                                 typeVector->type,
                                 scalarize(insn->resultId(), i, typeVector->type),
@@ -623,7 +623,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 assert(typeVector1 != nullptr);
                 size_t n1 = typeVector1->count;
 
-                for (int i = 0; i < insn->componentsId.size(); i++) {
+                for (size_t i = 0; i < insn->componentsId.size(); i++) {
                     uint32_t component = insn->componentsId[i];
                     uint32_t vectorId;
 
@@ -724,7 +724,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 std::vector<uint32_t> vector2Ids;
                 if (typeVector != nullptr) {
                     // Operand is vector.
-                    for (int i = 0; i < typeVector->count; i++) {
+                    for (uint32_t i = 0; i < typeVector->count; i++) {
                         vector1Ids.push_back(scalarize(insn->vector1Id(), i, typeVector->type));
                         vector2Ids.push_back(scalarize(insn->vector2Id(), i, typeVector->type));
                     }
@@ -750,7 +750,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 assert(typeVector != nullptr);
 
                 std::vector<uint32_t> operandIds;
-                for (int i = 0; i < typeVector->count; i++) {
+                for (uint32_t i = 0; i < typeVector->count; i++) {
                     operandIds.push_back(scalarize(insn->vectorId(), i, typeVector->type));
                 }
                 newList.push_back(std::make_shared<RiscVAll>(insn->lineInfo,
@@ -769,7 +769,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 assert(typeVector != nullptr);
 
                 std::vector<uint32_t> operandIds;
-                for (int i = 0; i < typeVector->count; i++) {
+                for (uint32_t i = 0; i < typeVector->count; i++) {
                     operandIds.push_back(scalarize(insn->vectorId(), i, typeVector->type));
                 }
                 newList.push_back(std::make_shared<RiscVAny>(insn->lineInfo,
@@ -794,7 +794,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 // Can just copy these, they won't change.
                 newPhi->labelIds = oldPhi->labelIds;
 
-                for (int resIndex = 0; resIndex < oldPhi->resultIds.size(); resIndex++) {
+                for (size_t resIndex = 0; resIndex < oldPhi->resultIds.size(); resIndex++) {
                     // See if we should expand a vector.
                     const TypeVector *typeVector = getTypeAsVector(typeIdOf(
                                 oldPhi->resultIds[resIndex]));
@@ -808,7 +808,7 @@ void Program::expandVectorsInBlock(Block *block) {
 
                         // Source labels.
                         std::vector<uint32_t> operandIds;
-                        for (int labelIndex = 0; labelIndex < oldPhi->labelIds.size();
+                        for (size_t labelIndex = 0; labelIndex < oldPhi->labelIds.size();
                                 labelIndex++) {
 
                             uint32_t operandId = oldPhi->operandIds[resIndex][labelIndex];
@@ -901,7 +901,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 std::vector<uint32_t> operandIds;
                 if (typeVector != nullptr) {
                     // Operand is vector.
-                    for (int i = 0; i < typeVector->count; i++) {
+                    for (uint32_t i = 0; i < typeVector->count; i++) {
                         operandIds.push_back(scalarize(insn->xId(), i, typeVector->type));
                     }
                 } else {
@@ -927,7 +927,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 std::vector<uint32_t> operandIds;
                 if (typeVector != nullptr) {
                     // Operand is vector.
-                    for (int i = 0; i < typeVector->count; i++) {
+                    for (uint32_t i = 0; i < typeVector->count; i++) {
                         resultIds.push_back(scalarize(insn->resultId(), i, typeVector->type));
                         operandIds.push_back(scalarize(insn->xId(), i, typeVector->type));
                     }
@@ -972,7 +972,7 @@ void Program::expandVectorsInBlock(Block *block) {
                 std::vector<uint32_t> p1Id;
                 if (typeVector != nullptr) {
                     // Operand is vector.
-                    for (int i = 0; i < typeVector->count; i++) {
+                    for (uint32_t i = 0; i < typeVector->count; i++) {
                         p0Id.push_back(scalarize(insn->p0Id(), i, typeVector->type));
                         p1Id.push_back(scalarize(insn->p1Id(), i, typeVector->type));
                     }

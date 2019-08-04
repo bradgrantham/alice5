@@ -114,7 +114,7 @@ void RiscVCross::emit(Compiler *compiler)
     compiler->emit("addi sp, sp, -28", "Make room on stack");
     compiler->emit("sw ra, 24(sp)", "Save return address");
 
-    for (int i = argIdList.size() - 1; i >= 0; i--) {
+    for (size_t i = argIdList.size() - 1; i >= 0; i--) {
         std::ostringstream ss;
         ss << "fsw " << compiler->reg(argIdList[i]) << ", " << (i*4) << "(sp)";
         compiler->emit(ss.str(), "Push parameter");
@@ -122,7 +122,7 @@ void RiscVCross::emit(Compiler *compiler)
 
     compiler->emit("jal ra, .cross", "Call routine");
 
-    for (int i = 0; i < resIdList.size(); i++) {
+    for (size_t i = 0; i < resIdList.size(); i++) {
         std::ostringstream ss;
         ss << "flw " << compiler->reg(resIdList[i]) << ", " << (i*4) << "(sp)";
         compiler->emit(ss.str(), "Pop result");
@@ -487,7 +487,7 @@ void InsnAccessChain::emit(Compiler *compiler)
     const Variable &variable = compiler->pgm->variables.at(baseId());
     uint32_t type = variable.type;
     bool variableIndex = false;
-    for (int i = 0; i < indexesIdCount(); i++) {
+    for (size_t i = 0; i < indexesIdCount(); i++) {
         uint32_t id = indexesId(i);
         uint32_t intValue;
         if (compiler->asIntegerConstant(id, intValue)) {
@@ -714,7 +714,7 @@ void render(ShaderToyRenderPass* pass, int startRow, int skip, int frameNumber, 
 
     interpreter.set("iMouse", v4float {0, 0, 0, 0});
 
-    for(int i = 0; i < pass->inputs.size(); i++) {
+    for(size_t i = 0; i < pass->inputs.size(); i++) {
         auto& input = pass->inputs[i];
         interpreter.set("iChannel" + std::to_string(input.channelNumber), i);
         ImagePtr image = input.sampledImage.image;
@@ -725,8 +725,8 @@ void render(ShaderToyRenderPass* pass, int startRow, int skip, int frameNumber, 
 
     // This loop acts like a rasterizer fixed function block.  Maybe it should
     // set inputs and read outputs also.
-    for(int y = startRow; y < output->height; y += skip) {
-        for(int x = 0; x < output->width; x++) {
+    for(uint32_t y = startRow; y < output->height; y += skip) {
+        for(uint32_t x = 0; x < output->width; x++) {
             v4float color;
             output->get(x, output->height - 1 - y, color);
             eval(interpreter, x + 0.5f, y + 0.5f, color);
@@ -1108,7 +1108,7 @@ int main(int argc, char **argv)
             exit(EXIT_SUCCESS);
         }
 
-        for(int i = 0; i < pass->inputs.size(); i++) {
+        for(size_t i = 0; i < pass->inputs.size(); i++) {
             auto& toyImage = pass->inputs[i];
             pass->pgm.sampledImages[i] = toyImage.sampledImage;
         }
@@ -1139,7 +1139,7 @@ int main(int argc, char **argv)
             thread.push_back(new std::thread(showProgress, image->height, timer.startTime()));
 
             // Wait for worker threads to quit.
-            for (int t = 0; t < thread.size(); t++) {
+            for (size_t t = 0; t < thread.size(); t++) {
                 std::thread* td = thread.back();
                 thread.pop_back();
                 td->join();

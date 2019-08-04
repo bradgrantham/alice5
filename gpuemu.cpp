@@ -1,3 +1,4 @@
+#include <cmath>
 #include <vector>
 #include <array>
 #include <fstream>
@@ -52,7 +53,7 @@ void dumpRegsDiff(const GPUCore::Registers& prev, const GPUCore::Registers& cur)
         }
     }
     for(int i = 0; i < 32; i++) {
-        bool bothnan = isnan(cur.f[i]) && isnan(prev.f[i]);
+        bool bothnan = std::isnan(cur.f[i]) && std::isnan(prev.f[i]);
         if((prev.f[i] != cur.f[i]) && !bothnan) { // if both NaN, equality test still fails)
             uint32_t x = *reinterpret_cast<const uint32_t*>(&cur.f[i]);
             std::cout << "f" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << x << std::dec << "(" << cur.f[i] << ")\n";
@@ -135,7 +136,7 @@ bool ReadBinary(std::ifstream& binaryFile, RunHeader1& header, SymbolTable& symb
         return false;
     }
 
-    for(int i = 0; i < header.symbolCount; i++) {
+    for(uint32_t i = 0; i < header.symbolCount; i++) {
         uint32_t addressAndLength[2];
 
         binaryFile.read(reinterpret_cast<char*>(addressAndLength), sizeof(addressAndLength));
@@ -177,7 +178,7 @@ template <class MEMORY, class TYPE, unsigned long N>
 void set(MEMORY& memory, uint32_t address, const std::array<TYPE, N>& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
-    for(int i = 0; i < N; i++)
+    for(unsigned long i = 0; i < N; i++)
         memory.write32(address + i * sizeof(uint32_t), *reinterpret_cast<const uint32_t*>(&value[i]));
 }
 

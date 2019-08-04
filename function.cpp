@@ -6,7 +6,7 @@
 
 std::string Function::cleanUpName(std::string name) {
     // Replace "mainImage(vf4;vf2;" with "mainImage$v4f$vf2$"
-    for (int i = 0; i < name.length(); i++) {
+    for (size_t i = 0; i < name.length(); i++) {
         if (name[i] == '(' || name[i] == ';') {
             name[i] = '$';
         }
@@ -210,9 +210,9 @@ void Function::phiLifting() {
 
 void Function::phiLiftingForBlock(Block *block, RiscVPhi *phi) {
     // For each result.
-    for (int res = 0; res < phi->resultIds.size(); res++) {
+    for (size_t res = 0; res < phi->resultIds.size(); res++) {
         // For each label.
-        for (int blockIndex = 0; blockIndex < phi->labelIds.size(); blockIndex++) {
+        for (size_t blockIndex = 0; blockIndex < phi->labelIds.size(); blockIndex++) {
             uint32_t operandId = phi->operandIds[res][blockIndex];
             uint32_t blockId = phi->labelIds.at(blockIndex);
 
@@ -304,12 +304,12 @@ void Function::computeLiveness() {
             // think they need all inputs, which is incorrect.
             RiscVPhi *phi = dynamic_cast<RiscVPhi *>(instruction);
             assert(phi->operandIds.size() == phi->resultIds.size());
-            for (int i = 0; i < phi->operandIds.size(); i++) {
+            for (size_t i = 0; i < phi->operandIds.size(); i++) {
                 // Operands for a specific result.
                 const std::vector<uint32_t> &operandIds = phi->operandIds[i];
                 assert(phi->labelIds.size() == operandIds.size());
 
-                for (int j = 0; j < operandIds.size(); j++) {
+                for (size_t j = 0; j < operandIds.size(); j++) {
                     instruction->livein[phi->labelIds[j]].insert(operandIds[j]);
                 }
             }
