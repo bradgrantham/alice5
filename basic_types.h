@@ -1,6 +1,9 @@
 #ifndef BASIC_TYPES_H
 #define BASIC_TYPES_H
 
+#include <assert.h>
+#include <memory>
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <array>
@@ -237,7 +240,7 @@ struct TypeVector : public Type
     }
     virtual void dump(unsigned char *data) const {
         std::cout << "<";
-        for(int i = 0; i < count; i++) {
+        for(uint32_t i = 0; i < count; i++) {
             subtype->dump(data);
             data += subtype->size;
             if(i < count - 1) {
@@ -271,7 +274,7 @@ struct TypeArray : public Type
     }
     virtual void dump(unsigned char *data) const {
         std::cout << "[";
-        for(int i = 0; i < count; i++) {
+        for(uint32_t i = 0; i < count; i++) {
             subtype->dump(data);
             data += subtype->size;
             if(i < count - 1) {
@@ -308,7 +311,7 @@ struct TypeMatrix : public Type
     }
     virtual void dump(unsigned char *data) const {
         std::cout << "<";
-        for(int i = 0; i < columnCount; i++) {
+        for(uint32_t i = 0; i < columnCount; i++) {
             subtype->dump(data);
             data += subtype->size;
             if(i < columnCount - 1) {
@@ -371,7 +374,7 @@ struct TypeStruct : public Type
     }
     virtual void dump(unsigned char *data) const {
         std::cout << "{";
-        for(int i = 0; i < memberTypes.size(); i++) {
+        for(size_t i = 0; i < memberTypes.size(); i++) {
             memberTypes[i]->dump(data);
             data += memberTypes[i]->size;
             if(i < memberTypes.size() - 1) {

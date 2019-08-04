@@ -244,8 +244,8 @@ struct RiscVPhi : public Instruction {
     virtual void emit(Compiler *compiler);
 
     // Return the label index for the specified source block ID, or -1 if not found.
-    int getLabelIndexForSource(int sourceBlockId) const {
-        for (int labelIndex = 0; labelIndex < labelIds.size(); labelIndex++) {
+    int getLabelIndexForSource(uint32_t sourceBlockId) const {
+        for (size_t labelIndex = 0; labelIndex < labelIds.size(); labelIndex++) {
             if (labelIds[labelIndex] == sourceBlockId) {
                 return labelIndex;
             }

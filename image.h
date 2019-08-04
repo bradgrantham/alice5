@@ -1,6 +1,7 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
+#include <algorithm>
 #include <ostream>
 #include <cstdint>
 #include "basic_types.h"
@@ -86,7 +87,7 @@ struct Image
     // There's probably a clever C++ way to do this with variadic templates...
     // void setPixel(int i, int j, int k, int l, const v4float& v) {}
     // void setPixel(int i, int j, int k,  const v4float& v) {}
-    void set(int i, int j, const v4float& v)
+    void set(uint32_t i, uint32_t j, const v4float& v)
     {
         assert((i >= 0) || (j >= 0) || (i < width) || (j < height));
         assert(dim == DIM_2D);
@@ -94,7 +95,7 @@ struct Image
     }
     // void get(int i, int j, int k, int l, v4float& v) const {} 
     // void get(int i, int j, int k, v4float& v) const {}
-    void get(int i, int j, v4float& v) const
+    void get(uint32_t i, uint32_t j, v4float& v) const
     {
         assert((i >= 0) || (j >= 0) || (i < width) || (j < height));
         assert(dim == DIM_2D);
