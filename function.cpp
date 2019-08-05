@@ -420,9 +420,10 @@ uint32_t Function::spillVariable(Instruction *instruction, const std::set<uint32
     // Pick one randomly. Can later use ComputeWeight or similar to pick a good one.
     uint32_t regId = NO_REGISTER;
     for (uint32_t liveRegId : liveFloats) {
-        if (alreadySpilled.find(liveRegId) == alreadySpilled.end()) {
+        if (alreadySpilled.find(liveRegId) == alreadySpilled.end()
+                && (regId == NO_REGISTER || liveRegId < regId)) {
+
             regId = liveRegId;
-            break;
         }
     }
     if (regId == NO_REGISTER) {
