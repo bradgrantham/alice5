@@ -85,7 +85,7 @@ void Compiler::emitInstructionsForFunction(Function *function) {
                 break;
 
             case SpvOpTypeBool:
-                ssc << (*reinterpret_cast<uint32_t *>(pr.data) ? "true" : "false");
+                ssc << (*reinterpret_cast<bool *>(pr.data) ? "true" : "false");
                 break;
 
             default:
