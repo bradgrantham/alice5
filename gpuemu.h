@@ -969,19 +969,6 @@ GPUCore::Status GPUCore::step(T& memory)
     return status;
 }
 
-struct RunHeader
-{
-    // Little-endian
-    uint32_t magic = 0x30354c41;        // 'AL51', version 1 of Alice 5 header
-    uint32_t initialPC;                 // Initial value PC is set to
-    uint32_t gl_FragCoordAddress;       // address of vec4 gl_FragCoord input
-    uint32_t colorAddress;              // address of vec4 color output
-    uint32_t iTimeAddress;              // address of float uniform
-    uint32_t iMouseAddress;             // address of ivec4 uniform
-    uint32_t iResolutionAddress;        // address of vec2 iResolution uniform
-    // Bytes to follow are loaded at 0
-};
-
 const uint32_t RunHeader1MagicExpected = 0x31354c41;
 struct RunHeader1
 {
@@ -994,4 +981,22 @@ struct RunHeader1
     //       uint32_t stringLength
     //       stringLength bytes for symbol name including NUL
     // Program and data bytes follow.  Bytes are loaded at 0
+};
+
+const uint32_t RunHeader2MagicExpected = 0x31354c42;
+struct RunHeader2
+{
+    // All words are little-endian.
+    uint32_t magic = RunHeader2MagicExpected;       // 'AL52', version 2 of Alice 5 header
+    uint32_t initialPC;                             // Initial value PC is set to, in bytes.
+    uint32_t symbolCount;                           // Number of symbols (see below).
+    uint32_t textByteCount;                         // Number of bytes of text (code).
+    uint32_t dataByteCount;                         // Number of bytes of data.
+    // symbolCount symbols follow that are of the following layout:
+    //       uint32_t address
+    //       uint32_t inDataSegment: if true, in data segment; else in text (code) segment
+    //       uint32_t stringLength: including nul.
+    //       stringLength bytes for symbol name including nul
+    // Program bytes follow. Bytes are loaded at 0 in text memory.
+    // Data bytes follow. Bytes are loaded at 0 in data memory.
 };

@@ -337,7 +337,7 @@ void Function::computeLiveness() {
         }
     }
     if (PRINT_TIMER_RESULTS || true) {
-        std::cerr << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
+        std::cout << "Livein and liveout took " << timer.elapsed() << " seconds.\n";
     }
 }
 
@@ -361,7 +361,7 @@ uint32_t Function::spillIfNecessary(const std::set<uint32_t> &alreadySpilled) {
         }
     }
 
-    std::cerr << "Max float liveness is " << maxFloatLiveness << "\n";
+    std::cout << "Max float liveness is " << maxFloatLiveness << "\n";
 
     uint32_t spilledRegId = NO_REGISTER;
     if (heaviestInstruction != nullptr) {

@@ -28,6 +28,7 @@ void Compiler::compile() {
     assignRegisters();
 
     // Emit our header.
+    outFile << ".segment text\n";
     std::ostringstream ss;
     ss << "jal ra, " << pgm->functions.at(pgm->mainFunctionId)->cleanName;
     emit(ss.str(), "");
@@ -50,6 +51,7 @@ void Compiler::emitInstructions() {
 
 void Compiler::emitInstructionsForFunction(Function *function) {
     outFile << "; ---------------------------- function \"" << function->cleanName << "\"\n";
+    outFile << ".segment text\n";
     emitLabel(function->cleanName);
 
     // Emit instructions to fill constants.
@@ -124,6 +126,8 @@ void Compiler::emitInstructionsForBlock(Block *block) {
 }
 
 void Compiler::emitVariables() {
+    outFile << "; ---------------------------- variables\n";
+    outFile << ".segment data\n";
     for (auto &[id, var] : pgm->variables) {
         std::string name = getVariableName(id);
 
@@ -140,6 +144,8 @@ void Compiler::emitVariables() {
 }
 
 void Compiler::emitConstants() {
+    outFile << "; ---------------------------- constants\n";
+    outFile << ".segment data\n";
     for (auto &[id, reg] : pgm->constants) {
         std::string name;
         auto nameItr = pgm->names.find(id);

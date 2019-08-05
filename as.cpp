@@ -24,6 +24,12 @@ enum MessageCategory {
     CAT_ERROR,
 };
 
+enum Segment {
+    SEG_EITHER,
+    SEG_TEXT,
+    SEG_DATA,
+};
+
 // Whether to output color codes in errors. We send errors to stderr, so use that.
 static bool useColors() {
     return isatty(fileno(stderr));
@@ -206,6 +212,25 @@ struct Instruction {
 
 // ----------------------------------------------------------------------
 
+// Information about a label.
+struct LabelInfo {
+    // Address in bytes. Could be in text or data segment.
+    uint32_t addr;
+
+    // Whether in data segment (if false, in text segment).
+    bool inDataSegment;
+
+    bool operator==(const LabelInfo &other) const {
+        return addr == other.addr && inDataSegment == other.inDataSegment;
+    }
+
+    bool operator!=(const LabelInfo &other) const {
+        return !(*this == other);
+    }
+};
+
+// ----------------------------------------------------------------------
+
 // Main assembler class.
 class Assembler {
 private:
@@ -230,11 +255,17 @@ private:
     // Pointer to the token we just read.
     const char *previousToken;
 
-    // Output binary.
-    std::vector<Instruction> bin;
+    // In data segment. If false, then in text (code) segment.
+    bool inDataSegment;
 
-    // Map from label name to address in bytes.
-    std::map<std::string,uint32_t> labels;
+    // Output binary for text (code).
+    std::vector<Instruction> textBin;
+
+    // Output binary for data.
+    std::vector<Instruction> dataBin;
+
+    // Map from text (code) label name to info about the label.
+    std::map<std::string,LabelInfo> labels;
 
     // Addresses that store an instruction (for disassembly).
     std::set<uint32_t> instAddrs;
@@ -399,8 +430,12 @@ public:
         // to an unknown label.
         for (pass = 0; pass < 2; pass++) {
             // Clear output.
-            bin.clear();
+            textBin.clear();
+            dataBin.clear();
             instAddrs.clear();
+
+            // Default to code segment.
+            inDataSegment = false;
 
             // Process each line.
             for (lineNumber = 0; lineNumber < lines.size(); lineNumber++) {
@@ -425,8 +460,8 @@ public:
             // Catch up to this source line, if necessary.
             while (true) {
                 // See what source line corresponds to the next instruction to display.
-                displaySourceLine = binIndex < bin.size()
-                    ? bin[binIndex].lineNumber
+                displaySourceLine = binIndex < textBin.size()
+                    ? textBin[binIndex].lineNumber
                     : lines.size();
 
                 // See if previous source line generated multiple instructions.
@@ -457,7 +492,7 @@ public:
     // Dump one instruction with optional source code.
     void dumpInstructionListing(size_t binIndex, const std::string &source) {
         uint32_t pc = binIndex*4;
-        uint32_t instruction = bin[binIndex].opcode;
+        uint32_t instruction = textBin[binIndex].opcode;
 
         // Print out original code.
         std::cout
@@ -485,40 +520,37 @@ public:
         }
 
         // Output header.
-        RunHeader1 header;
+        RunHeader2 header;
         header.initialPC = 0;
         header.symbolCount = labels.size();
+        header.textByteCount = textBin.size()*4;
+        header.dataByteCount = dataBin.size()*4;
         outFile.write(reinterpret_cast<char *>(&header), sizeof(header));
-        for (auto& [symbol, address] : labels) {
-            outFile.write(reinterpret_cast<char *>(&address), sizeof(address));
+
+        // Output symbols.
+        for (auto& [symbol, labelInfo] : labels) {
+            outFile.write(reinterpret_cast<char *>(&labelInfo.addr), sizeof(labelInfo.addr));
+            uint32_t inDataSegment = labelInfo.inDataSegment;
+            outFile.write(reinterpret_cast<char *>(&inDataSegment), sizeof(inDataSegment));
             uint32_t strsize = symbol.size() + 1;
             outFile.write(reinterpret_cast<char *>(&strsize), sizeof(strsize));
             outFile.write(reinterpret_cast<const char *>(symbol.data()), strsize);
         }
 
-        // Write binary.
-        for (Instruction instruction : bin) {
-            // Force little endian.
-            outFile
-                << uint8_t((instruction.opcode >> 0) & 0xFF)
-                << uint8_t((instruction.opcode >> 8) & 0xFF)
-                << uint8_t((instruction.opcode >> 16) & 0xFF)
-                << uint8_t((instruction.opcode >> 24) & 0xFF);
+        // Output text (code).
+        for (Instruction instruction : textBin) {
+            outFile.write(reinterpret_cast<char *>(&instruction.opcode), sizeof(uint32_t));
         }
+
+        // Output data.
+        for (Instruction instruction : dataBin) {
+            outFile.write(reinterpret_cast<char *>(&instruction.opcode), sizeof(uint32_t));
+        }
+
         outFile.close();
     }
 
 private:
-    // Return the address of a label in bytes, or 0xFFFFFFFF if not found.
-    uint32_t getLabelAddress(const std::string &label, uint32_t offset = 0) const {
-        auto itr = labels.find(label);
-        if (itr == labels.end()) {
-            return 0xFFFFFFFF;
-        } else {
-            return itr->second + offset;
-        }
-    }
-
     // Add known registers with prefix from "first" to "last" inclusive, starting
     // at physical register "start".
     void addRegisters(const std::string &prefix, int first, int last, int start) {
@@ -543,6 +575,8 @@ private:
         // See if it's a label.
         if (!opOrLabel.empty()) {
             if (foundChar(':')) {
+                LabelInfo labelInfo{inDataSegment ? dataAddr() : pc(), inDataSegment};
+
                 // Only keep track of labels in the first pass. We keep
                 // them around for the second pass.
                 if (pass == 0) {
@@ -554,14 +588,21 @@ private:
                         error(ss.str());
                     }
 
-                    // It's a label, record it.
-                    labels[opOrLabel] = pc();
+                    // It's a new label, record it.
+                    labels[opOrLabel] = labelInfo;
                 } else {
                     // Make sure it hasn't changed.
-                    assert(labels.at(opOrLabel) == pc());
+                    LabelInfo oldLabelInfo = labels.at(opOrLabel);
+                    if (labels.at(opOrLabel) != labelInfo) {
+                        std::ostringstream ss;
+                        ss << "label has changed from (" << oldLabelInfo.addr << ", "
+                            << oldLabelInfo.inDataSegment << ") to (" << labelInfo.addr
+                            << ", " << labelInfo.inDataSegment << ")";
+                        error(ss.str());
+                    }
                 }
 
-                // Read the operator, if any.
+                // Read the operator after the label, if any.
                 opOrLabel = readIdentifier();
             }
         }
@@ -570,9 +611,28 @@ private:
         if (!opOrLabel.empty()) {
             // See if it's a directive.
             if (opOrLabel == ".word") {
-                int32_t imm = readExpression(32);
-                emit(imm);
+                if (!inDataSegment) {
+                    s = previousToken;
+                    error("can only declare data in data segment");
+                }
+                int32_t imm = readExpression(32, SEG_DATA);
+                emitData(imm);
+            } else if (opOrLabel == ".segment") {
+                std::string segmentType = readIdentifier();
+                if (segmentType == "text") {
+                    inDataSegment = false;
+                } else if (segmentType == "data") {
+                    inDataSegment = true;
+                } else {
+                    s = previousToken;
+                    std::ostringstream ss;
+                    ss << "unknown segment type \"" << segmentType << "\"";
+                    error(ss.str());
+                }
             } else {
+                if (inDataSegment) {
+                    error("can only have instructions in text segment");
+                }
                 parseOperator(opOrLabel);
             }
         }
@@ -703,12 +763,15 @@ private:
     // the %lo() value will later be sign-extended and added to the %hi() value.
     // - The sum of two expressions.
     //
+    // Segment specifies the segment for labels, or SEG_EITHER if either text or data
+    // is allowed.
+    //
     // The base is subtracted from the expression before the size is checked.
-    int32_t readExpression(int bits, uint32_t base = 0) {
+    int32_t readExpression(int bits, Segment segment, uint32_t base = 0) {
         const char *expressionStart = s;
 
         bool loUsed = false;
-        int64_t value = readSum(loUsed) - base;
+        int64_t value = readSum(loUsed, segment) - base;
 
         // If %lo was used in the expression, then we expand the number of bits
         // by one because it's okay to use all bits. (The sign bit is sign-extended
@@ -718,7 +781,7 @@ private:
         }
 
         // Make sure we fit.
-        if (bits < 32) {
+        if (bits < 32 && pass == 1) {
             int32_t limit = 1 << (bits - 1);
             if (value < 0 ? -value > limit : value >= limit) {
                 // Back up over expression.
@@ -740,11 +803,11 @@ private:
     //
     // The loUsed parameter is set to true if the %lo() function
     // is used in the sum. Otherwise it's untouched.
-    int64_t readSum(bool &loUsed) {
+    int64_t readSum(bool &loUsed, Segment segment) {
         int64_t value = 0;
 
         while (true) {
-            value += readAtom(loUsed);
+            value += readAtom(loUsed, segment);
             if (!foundChar('+')) {
                 break;
             }
@@ -757,7 +820,7 @@ private:
     //
     // The loUsed parameter is set to true if the %lo() function
     // is used in the atom. Otherwise it's untouched.
-    int64_t readAtom(bool &loUsed) {
+    int64_t readAtom(bool &loUsed, Segment segment) {
         if (foundChar('%')) {
             const char *functionStart = s;
             std::string func = readIdentifier();
@@ -766,7 +829,7 @@ private:
                 error("expected open parenthesis");
             }
 
-            int64_t value = readSum(loUsed);
+            int64_t value = readSum(loUsed, segment);
 
             if (!foundChar(')')) {
                 error("expected close parenthesis");
@@ -802,8 +865,9 @@ private:
                 // Unknown label.
                 if (pass == 0) {
                     // Use anything, it doesn't matter.
-                    target = pc();
+                    target = 0;
                 } else {
+                    // In second pass all labels must be known.
                     s = previousToken;
                     std::ostringstream ss;
                     ss << "unknown label \"" << label << "\"";
@@ -811,7 +875,27 @@ private:
                 }
             } else {
                 // Found label.
-                target = labels.at(label);
+                LabelInfo labelInfo = labels.at(label);
+                target = labelInfo.addr;
+
+                // Check segment.
+                switch (segment) {
+                    case SEG_EITHER:
+                        // Always okay.
+                        break;
+
+                    case SEG_TEXT:
+                        if (labelInfo.inDataSegment) {
+                            error("can't reference label in data segment here");
+                        }
+                        break;
+
+                    case SEG_DATA:
+                        if (!labelInfo.inDataSegment) {
+                            error("can't reference label in text segment here");
+                        }
+                        break;
+                }
             }
 
             return target;
@@ -924,7 +1008,7 @@ private:
                 if (!foundChar(',')) {
                     error("expected comma");
                 }
-                int32_t imm = readExpression(op.bits);
+                int32_t imm = readExpression(op.bits, SEG_EITHER);
                 emitI(op, rd, rs1, imm);
                 break;
             }
@@ -934,7 +1018,7 @@ private:
                 if (!foundChar(',')) {
                     error("expected comma");
                 }
-                int32_t imm = readExpression(op.bits);
+                int32_t imm = readExpression(op.bits, SEG_DATA);
                 if (!foundChar('(')) {
                     error("expected open parenthesis");
                 }
@@ -957,7 +1041,7 @@ private:
                 if (!foundChar(',')) {
                     error("expected comma");
                 }
-                int32_t imm = readExpression(op.bits);
+                int32_t imm = readExpression(op.bits, SEG_DATA);
                 if (!foundChar('(')) {
                     error("expected open parenthesis");
                 }
@@ -979,7 +1063,7 @@ private:
                     error("expected comma");
                 }
                 // Jump labels are PC-relative.
-                int32_t imm = readExpression(op.bits, pc());
+                int32_t imm = readExpression(op.bits, SEG_TEXT, pc());
                 emitSB(op, rs1, rs2, imm);
                 break;
             }
@@ -989,7 +1073,7 @@ private:
                 if (!foundChar(',')) {
                     error("expected comma");
                 }
-                int32_t imm = readExpression(op.bits);
+                int32_t imm = readExpression(op.bits, SEG_EITHER);
                 emitU(op, rd, imm);
                 break;
             }
@@ -1000,7 +1084,7 @@ private:
                     error("expected comma");
                 }
                 // Jump labels are PC-relative.
-                int32_t imm = readExpression(op.bits, pc());
+                int32_t imm = readExpression(op.bits, SEG_TEXT, pc());
                 emitUJ(op, rd, imm);
                 break;
             }
@@ -1062,7 +1146,12 @@ private:
 
     // Return the PC of the instruction being assembled, in bytes.
     uint32_t pc() {
-        return bin.size()*4;
+        return textBin.size()*4;
+    }
+
+    // Return the address of the next place to put data, in bytes.
+    uint32_t dataAddr() {
+        return dataBin.size()*4;
     }
 
     // Read rounding mode
@@ -1127,7 +1216,7 @@ private:
 
     // Emit a FORMAT_R4 instruction.
     void emitR4(const Operator &op, int rd, int rs1, int rs2, int rs3) {
-        emit(op.opcode
+        emitCode(op.opcode
                 | rd << 7
                 | op.funct3 << 12
                 | rs1 << 15
@@ -1136,7 +1225,7 @@ private:
     }
 
     void emitR4WithRounding(const Operator &op, int rd, int rs1, int rs2, int rs3, int rm) {
-        emit(op.opcode
+        emitCode(op.opcode
                 | rd << 7
                 | rm << 12
                 | rs1 << 15
@@ -1146,7 +1235,7 @@ private:
 
     // Emit a FORMAT_R instruction.
     void emitR(const Operator &op, int rd, int rs1, int rs2) {
-        emit(op.opcode
+        emitCode(op.opcode
                 | rd << 7
                 | op.funct3 << 12
                 | rs1 << 15
@@ -1155,7 +1244,7 @@ private:
     }
 
     void emitRWithRounding(const Operator &op, int rd, int rs1, int rs2, int rm) {
-        emit(op.opcode
+        emitCode(op.opcode
                 | rd << 7
                 | rm << 12
                 | rs1 << 15
@@ -1165,7 +1254,7 @@ private:
 
     // Emit a FORMAT_I instruction.
     void emitI(const Operator &op, int rd, int rs1, int32_t imm) {
-        emit(op.opcode
+        emitCode(op.opcode
                 | rd << 7
                 | op.funct3 << 12
                 | rs1 << 15
@@ -1175,7 +1264,7 @@ private:
 
     // Emit a FORMAT_S instruction.
     void emitS(const Operator &op, int rs2, int32_t imm, int rs1) {
-        emit(op.opcode
+        emitCode(op.opcode
                 | (imm & 0x1F) << 7
                 | op.funct3 << 12
                 | rs1 << 15
@@ -1185,7 +1274,7 @@ private:
 
     // Emit a FORMAT_SB instruction.
     void emitSB(const Operator &op, int rs1, int rs2, int32_t imm) {
-        emit(op.opcode
+        emitCode(op.opcode
                 | ((imm >> 11) & 0x1) << 7
                 | (imm & 0x1E) << 7
                 | op.funct3 << 12
@@ -1197,14 +1286,14 @@ private:
 
     // Emit a FORMAT_U instruction.
     void emitU(const Operator &op, int rd, int32_t imm) {
-        emit(op.opcode
+        emitCode(op.opcode
                 | rd << 7
                 | imm << 12);
     }
 
     // Emit a FORMAT_UJ instruction.
     void emitUJ(const Operator &op, int rd, int32_t imm) {
-        emit(op.opcode
+        emitCode(op.opcode
                 | rd << 7
                 | ((imm >> 12) & 0xFF) << 12
                 | ((imm >> 11) & 0x1) << 20
@@ -1213,8 +1302,13 @@ private:
     }
 
     // Emit an instruction for this source line.
-    void emit(uint32_t instruction) {
-        bin.push_back(Instruction{instruction, lineNumber});
+    void emitCode(uint32_t instruction) {
+        textBin.push_back(Instruction{instruction, lineNumber});
+    }
+
+    // Emit data for this source line.
+    void emitData(uint32_t data) {
+        dataBin.push_back(Instruction{data, lineNumber});
     }
 };
 

@@ -6,6 +6,7 @@
 
 ; some useful constants
 
+.segment data
 .one:
         .word   1065353216      ; 1.0
 
@@ -24,6 +25,7 @@
 .pi:
         .word   1078530011      ; 0x40490fdb = pi
 
+.segment text
 .sin:
         ; save registers here, e.g.
         sw      a0,-4(sp)
@@ -124,6 +126,7 @@
 
         jalr x0, ra, 0                
 
+.segment data
 .sinTableSize:
         .word   1140850688      ; 0x44000000 = 512.0
 sinTable_f32:
@@ -775,6 +778,7 @@ atanTable_f32:
         .word   1061687002 ; 0x3F480EDA = 0.781477
         .word   1061752795 ; 0x3F490FDB = 0.785398
 
+.segment text
 .atan_0_1:
 
         fsw     fa0, -4(sp)
