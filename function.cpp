@@ -264,6 +264,8 @@ void Function::computeLiveness() {
     for (auto &[_, block] : blocks) {
         for (auto inst = block->instructions.head; inst; inst = inst->next) {
             inst_worklist.insert(inst.get());
+            inst->livein.clear();
+            inst->liveout.clear();
         }
     }
 
