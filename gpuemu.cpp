@@ -72,18 +72,21 @@ struct Memory
     uint8_t read8(uint32_t addr)
     {
         if(verbose) printf("read 8 from %08X\n", addr);
+        std::cout.flush();
         assert(addr < memorybytes.size());
         return memorybytes[addr];
     }
     uint16_t read16(uint32_t addr)
     {
         if(verbose) printf("read 16 from %08X\n", addr);
+        std::cout.flush();
         assert(addr + 1 < memorybytes.size());
         return *reinterpret_cast<uint16_t*>(memorybytes.data() + addr);
     }
     uint32_t read32(uint32_t addr)
     {
         if(verbose) printf("read 32 from %08X\n", addr);
+        std::cout.flush();
         assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
         return *reinterpret_cast<uint32_t*>(memorybytes.data() + addr);
@@ -91,6 +94,7 @@ struct Memory
     float readf(uint32_t addr)
     {
         if(verbose) printf("read float from %08X\n", addr);
+        std::cout.flush();
         assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
         return *reinterpret_cast<float*>(memorybytes.data() + addr);
@@ -98,18 +102,21 @@ struct Memory
     void write8(uint32_t addr, uint32_t v)
     {
         if(verbose) printf("write 8 bits of %08X to %08X\n", v, addr);
+        std::cout.flush();
         assert(addr < memorybytes.size());
         memorybytes[addr] = static_cast<uint8_t>(v);
     }
     void write16(uint32_t addr, uint32_t v)
     {
         if(verbose) printf("write 16 bits of %08X to %08X\n", v, addr);
+        std::cout.flush();
         assert(addr + 1 < memorybytes.size());
         *reinterpret_cast<uint16_t*>(memorybytes.data() + addr) = static_cast<uint16_t>(v);
     }
     void write32(uint32_t addr, uint32_t v)
     {
         if(verbose) printf("write 32 bits of %08X to %08X\n", v, addr);
+        std::cout.flush();
         assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
         *reinterpret_cast<uint32_t*>(memorybytes.data() + addr) = v;
@@ -117,6 +124,7 @@ struct Memory
     void writef(uint32_t addr, float v)
     {
         if(verbose) printf("write float %f to %08X\n", v, addr);
+        std::cout.flush();
         assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
         *reinterpret_cast<float*>(memorybytes.data() + addr) = v;
