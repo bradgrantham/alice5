@@ -114,7 +114,7 @@ void RiscVCross::emit(Compiler *compiler)
     compiler->emit("addi sp, sp, -28", "Make room on stack");
     compiler->emit("sw ra, 24(sp)", "Save return address");
 
-    for (size_t i = argIdList.size() - 1; i >= 0; i--) {
+    for (int i = argIdList.size() - 1; i >= 0; i--) {
         std::ostringstream ss;
         ss << "fsw " << compiler->reg(argIdList[i]) << ", " << (i*4) << "(sp)";
         compiler->emit(ss.str(), "Push parameter");
