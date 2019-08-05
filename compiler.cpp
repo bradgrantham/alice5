@@ -202,11 +202,7 @@ void Compiler::emitConstant(uint32_t id, uint32_t typeId, unsigned char *data) {
         }
 
         case SpvOpTypeVector: {
-            const TypeVector *typeVector = pgm->getTypeAsVector(typeId);
-            for (uint32_t i = 0; i < typeVector->count; i++) {
-                auto [subtype, offset] = pgm->getConstituentInfo(typeId, i);
-                emitConstant(id, subtype, data + offset);
-            }
+            emit("", "Omitting constant vector, it shouldn't be referenced");
             break;
         }
 
