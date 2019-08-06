@@ -26,7 +26,6 @@ void print_inst(uint64_t pc, uint32_t inst, const AddressToSymbolMap& addressesT
     disasm_inst(buf, sizeof(buf), rv64, pc, inst);
     printf("        %08" PRIx64 ":  %s\n", pc, buf);
 }
-
     
 void dumpGPUCore(const GPUCore& core)
 {
@@ -265,16 +264,15 @@ void usage(const char* progname)
             int(std::thread::hardware_concurrency()));
 }
 
-bool printDisassembly = false;
-bool printMemoryAccess = false;
-bool printCoreDiff = false;
-
 struct GPUShared
 {
     std::mutex rendererMutex;
     bool coreException = false;
     unsigned char *img;
     std::set<std::string> substitutedFunctions;
+    bool printDisassembly = false;
+    bool printMemoryAccess = false;
+    bool printCoreDiff = false;
     uint64_t dispatchedCount = 0;
 };
 
@@ -329,22 +327,22 @@ void render(const coreTemplate& tmpl, GPUShared& shared, int start_row, int skip
             core.regs.x[2] = tmpl.data_bytes.size(); // Set SP to end of memory 
             core.regs.pc = tmpl.initialPC;
 
-            if(printDisassembly) {
+            if(shared.printDisassembly) {
                 std::cout << "; pixel " << i << ", " << j << '\n';
             }
             try {
                 do {
                     GPUCore::Registers oldRegs = core.regs;
-                    if(printDisassembly) {
+                    if(shared.printDisassembly) {
                         print_inst(core.regs.pc, text_memory.read32(core.regs.pc), tmpl.textAddressesToSymbols);
                     }
-                    data_memory.verbose = printMemoryAccess;
-                    text_memory.verbose = printMemoryAccess;
+                    data_memory.verbose = shared.printMemoryAccess;
+                    text_memory.verbose = shared.printMemoryAccess;
                     status = core.step(text_memory, data_memory);
                     coreDispatchedCount ++;
                     data_memory.verbose = false;
                     text_memory.verbose = false;
-                    if(printCoreDiff) {
+                    if(shared.printCoreDiff) {
                         dumpRegsDiff(oldRegs, core.regs);
                     }
                 } while(core.regs.pc != 0xffffffff && status == GPUCore::RUNNING);
@@ -384,7 +382,9 @@ int main(int argc, char **argv)
     int specificPixelX = -1;
     int specificPixelY = -1;
     int threadCount = std::thread::hardware_concurrency();
+
     coreTemplate tmpl;
+    GPUShared shared;
 
     char *progname = argv[0];
     argv++; argc--;
@@ -392,7 +392,7 @@ int main(int argc, char **argv)
     while(argc > 0 && argv[0][0] == '-') {
         if(strcmp(argv[0], "-v") == 0) {
 
-            printMemoryAccess = true;
+            shared.printMemoryAccess = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "--pixel") == 0) {
@@ -408,7 +408,7 @@ int main(int argc, char **argv)
 
         } else if(strcmp(argv[0], "--diff") == 0) {
 
-            printCoreDiff = true;
+            shared.printCoreDiff = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-j") == 0) {
@@ -427,7 +427,7 @@ int main(int argc, char **argv)
 
         } else if(strcmp(argv[0], "-S") == 0) {
 
-            printDisassembly = true;
+            shared.printDisassembly = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-f") == 0) {
@@ -508,7 +508,6 @@ int main(int argc, char **argv)
         }
     }
 
-    GPUShared shared;
     shared.img = new unsigned char[tmpl.imageWidth * tmpl.imageHeight * 3];
 
     tmpl.gl_FragCoordAddress = tmpl.data_symbols["gl_FragCoord"];
