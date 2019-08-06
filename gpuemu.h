@@ -1,4 +1,3 @@
-#include <functional>
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
@@ -196,7 +195,67 @@ struct GPUCore
     // void write8(uint32_t addr, uint8_t v);
     // void write16(uint32_t addr, uint16_t v);
     // void write32(uint32_t addr, uint32_t v);
+
+    template <class RWM>
+    float pop32(RWM& data_memory)
+    {
+        float v = data_memory.read32(regs.x[2]);
+        regs.x[2] += 4;
+        return v;
+    };
+    template <class RWM>
+    void push32(RWM& data_memory, uint32_t f)
+    {
+        regs.x[2] -= 4;
+        data_memory.write32(regs.x[2], f);
+    };
+    template <class RWM>
+    float popf(RWM& data_memory)
+    {
+        float v = data_memory.readf(regs.x[2]);
+        regs.x[2] += 4;
+        return v;
+    };
+    template <class RWM>
+    void pushf(RWM& data_memory, float f)
+    {
+        regs.x[2] -= 4;
+        data_memory.writef(regs.x[2], f);
+    };
     
+    void unimpl(uint32_t insn, Status& status)
+    {
+        std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
+        std::cerr << " with 14..12=" << std::dec << std::setfill('0') << std::setw(1) << ((insn & 0x7000) >> 12);
+        std::cerr << " and 6..2=0x" << std::hex << std::setfill('0') << std::setw(2) << ((insn & 0x7F) >> 2) << std::dec << '\n';
+        status = UNIMPLEMENTED_OPCODE;
+    };
+
+    void unimpl_subst(Status& status)
+    {
+        std::cerr << "unimplemented substitution " << substFunctions[regs.pc] << "\n";
+        status = UNIMPLEMENTED_OPCODE;
+    };
+
+    int previous_rounding_mode;
+    void setrm(uint32_t rm)
+    {
+        previous_rounding_mode = fegetround();
+        switch(rm) {
+            case RM_RDN: fesetround(FE_DOWNWARD); break;
+            case RM_RNE: fesetround(FE_TONEAREST); break;
+            case RM_RTZ: fesetround(FE_TOWARDZERO); break;
+            case RM_RUP: fesetround(FE_UPWARD); break;
+            default:
+                std::cerr << "unimplemented rounding mode " << rm << " (ignored)\n";
+                break;
+        }
+    };
+    void restorerm(void)
+    {
+        fesetround(previous_rounding_mode);
+    };
+
     template <class ROM, class RWM>
     Status step(ROM& text_memory, RWM& data_memory);
 
@@ -272,40 +331,6 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
         (getBits(insn, 30, 21) << 1),
         21);
 
-    std::function<float(void)> popf = [&]() { float v = data_memory.readf(regs.x[2]); regs.x[2] += 4; return v; };
-    std::function<void(float)> pushf = [&](float f) { regs.x[2] -= 4; data_memory.writef(regs.x[2], f); };
-    std::function<uint32_t(void)> pop32 = [&]() { uint32_t v = data_memory.read32(regs.x[2]); regs.x[2] += 4; return v; };
-    std::function<void(uint32_t)> push32 = [&](uint32_t f) { regs.x[2] -= 4; data_memory.write32(regs.x[2], f); };
-
-    std::function<void(void)> unimpl = [&]() {
-        std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
-        std::cerr << " with 14..12=" << std::dec << std::setfill('0') << std::setw(1) << ((insn & 0x7000) >> 12);
-        std::cerr << " and 6..2=0x" << std::hex << std::setfill('0') << std::setw(2) << ((insn & 0x7F) >> 2) << std::dec << '\n';
-        status = UNIMPLEMENTED_OPCODE;
-    };
-
-    std::function<void(void)> unimpl_subst = [&]() {
-        std::cerr << "unimplemented substitution " << substFunctions[regs.pc] << "\n";
-        status = UNIMPLEMENTED_OPCODE;
-    };
-
-    int previous_rounding_mode;
-    std::function<void(void)> setrm = [&]() {
-        previous_rounding_mode = fegetround();
-        switch(rm) {
-            case RM_RDN: fesetround(FE_DOWNWARD); break;
-            case RM_RNE: fesetround(FE_TONEAREST); break;
-            case RM_RTZ: fesetround(FE_TOWARDZERO); break;
-            case RM_RUP: fesetround(FE_UPWARD); break;
-            default:
-                std::cerr << "unimplemented rounding mode " << rm << " (ignored)\n";
-                break;
-        }
-    };
-    std::function<void(void)> restorerm = [&]() {
-        fesetround(previous_rounding_mode);
-    };
-
     switch(insn & 0x707F) {
         // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
         case makeOpcode(2, 0x01, 3): {
@@ -327,11 +352,11 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
         {
             if(dump) std::cout << "fmadd\n";
             if(fmt == 0x0) { // size = .s
-                setrm();
+                setrm(rm);
                 regs.f[rd] = regs.f[rs1] * regs.f[rs2] + regs.f[rs3];
                 restorerm();
             } else {
-                unimpl();
+                unimpl(insn, status);
             }
             regs.pc += 4;
             break;
@@ -357,12 +382,12 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
             if(dump) std::cout << "fadd etc\n";
             if(fmt == 0x0) { // size = .s
                 switch(ffunct) {
-                    case 0x00: /* fadd */ setrm(); regs.f[rd] = regs.f[rs1] + regs.f[rs2]; restorerm(); break;
-                    case 0x01: /* fsub */ setrm(); regs.f[rd] = regs.f[rs1] - regs.f[rs2]; restorerm(); break;
-                    case 0x02: /* fmul */ setrm(); regs.f[rd] = regs.f[rs1] * regs.f[rs2]; restorerm(); break;
-                    case 0x03: /* fdiv */ setrm(); regs.f[rd] = regs.f[rs1] / regs.f[rs2]; restorerm(); break;
+                    case 0x00: /* fadd */ setrm(rm); regs.f[rd] = regs.f[rs1] + regs.f[rs2]; restorerm(); break;
+                    case 0x01: /* fsub */ setrm(rm); regs.f[rd] = regs.f[rs1] - regs.f[rs2]; restorerm(); break;
+                    case 0x02: /* fmul */ setrm(rm); regs.f[rd] = regs.f[rs1] * regs.f[rs2]; restorerm(); break;
+                    case 0x03: /* fdiv */ setrm(rm); regs.f[rd] = regs.f[rs1] / regs.f[rs2]; restorerm(); break;
                     case 0x05: /* fmin or fmax */ regs.f[rd] = (funct3 == 0) ? fminf(regs.f[rs1], regs.f[rs2]) : fmaxf(regs.f[rs1], regs.f[rs2]); break;
-                    case 0x0B: /* fsqrt */ setrm(); regs.f[rd] = sqrtf(regs.f[rs1]); restorerm(); break;
+                    case 0x0B: /* fsqrt */ setrm(rm); regs.f[rd] = sqrtf(regs.f[rs1]); restorerm(); break;
                     case 0x14:  { // fp comparison
                         if(rd > 0) {
                             if(funct3 == 0x0) { // fle 
@@ -379,11 +404,11 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                         if(rd > 0) {
                             // ignoring setting valid flags
                             if(rs2 == 0) {      // fcvt.w.s
-                                setrm();
+                                setrm(rm);
                                 regs.x[rd] = std::rint(std::clamp(regs.f[rs1], -2147483648.0f, 2147483647.0f));
                                 restorerm();
                             } else if(rs2 == 1) {       // fcvt.wu.s
-                                setrm();
+                                setrm(rm);
                                 regs.x[rd] = std::rint(std::clamp(regs.f[rs1], 0.0f, 4294967295.0f));
                                 restorerm();
                             }
@@ -397,10 +422,10 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                             if(fmt == 0) {
                                 regs.f[rd] = intToFloat(regs.x[rs1]);
                             } else {
-                                unimpl();
+                                unimpl(insn, status);
                             }
                         } else {
-                            unimpl();
+                            unimpl(insn, status);
                         }
                         break;
                     }
@@ -408,25 +433,25 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                     case 0x1A: {
                         if(rs2 == 0) {          // fcvt.s.w
                             if(fmt == 0) {
-                                setrm();
+                                setrm(rm);
                                 regs.f[rd] = *reinterpret_cast<int32_t*>(&regs.x[rs1]);
                                 restorerm();
                             } else {
                                 printf("fmt = %d\n", fmt);
-                                unimpl();
+                                unimpl(insn, status);
                             }
                         } else if(rs2 == 1) {   // fcvt.s.wu
                             if(fmt == 0) {
-                                setrm();
+                                setrm(rm);
                                 regs.f[rd] = regs.x[rs1];
                                 restorerm();
                             } else {
                                 printf("fmt = %d\n", fmt);
-                                unimpl();
+                                unimpl(insn, status);
                             }
                         } else {
                             printf("rs2 = %d\n", rs2);
-                            unimpl();
+                            unimpl(insn, status);
                         }
                         break;
                     }
@@ -446,15 +471,15 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                             fd = (fs1 & 0x7FFFFFFF) | ((fs2 & 0x80000000) ^ (fs1 & 0x80000000));
                         } else {
                             fd = 0;
-                            unimpl();
+                            unimpl(insn, status);
                         }
                         regs.f[rd] = intToFloat(fd);
                         break;
                     }
-                    default: unimpl(); break;
+                    default: unimpl(insn, status); break;
                 }
             } else {
-                unimpl();
+                unimpl(insn, status);
             }
             regs.pc += 4;
             break;
@@ -469,7 +494,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
             if(insn == 0x00100073) {
                 status = BREAK;
             } else {
-                unimpl();
+                unimpl(insn, status);
             }
             break;
         }
@@ -498,7 +523,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                     case 2: regs.x[rd] = data_memory.read32(regs.x[rs1] + immI); break;
                     case 4: regs.x[rd] = data_memory.read8(regs.x[rs1] + immI); break;
                     case 5: regs.x[rd] = data_memory.read16(regs.x[rs1] + immI); break;
-                    default: unimpl(); break;
+                    default: unimpl(insn, status); break;
                 }
             }
             regs.pc += 4;
@@ -525,7 +550,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                 case 5: regs.pc += (static_cast<int32_t>(regs.x[rs1]) >= static_cast<int32_t>(regs.x[rs2])) ? immSB : 4; break;
                 case 6: regs.pc += (regs.x[rs1] < regs.x[rs2]) ? immSB : 4; break;
                 case 7: regs.pc += (regs.x[rs1] >= regs.x[rs2]) ? immSB : 4; break;
-                default: unimpl(); break;
+                default: unimpl(insn, status); break;
             }
             break;
         }
@@ -541,7 +566,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                         } else if(funct7 == 32) {
                             regs.x[rd] = regs.x[rs1] - regs.x[rs2]; // sub
                         } else {
-                            unimpl();
+                            unimpl(insn, status);
                         }
                         break;
                     }
@@ -555,7 +580,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                             // defined in C but I'll risk it.
                             regs.x[rd] = ((int32_t)regs.x[rs1]) >> (regs.x[rs2] & 0x1F); break;     // sra
                         } else {
-                            unimpl();
+                            unimpl(insn, status);
                         }
                         break;
                     }
@@ -565,7 +590,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                     case 6: regs.x[rd] = regs.x[rs1] | regs.x[rs2]; break;  // or
                     case 7: regs.x[rd] = regs.x[rs1] & regs.x[rs2]; break;  // and
                     default: {
-                        unimpl();
+                        unimpl(insn, status);
                     }
                 }
             }
@@ -605,7 +630,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                     case 4: regs.x[rd] = regs.x[rs1] ^ immI; break;     // xori
                     case 6: regs.x[rd] = regs.x[rs1] | immI; break;     // ori
                     case 7: regs.x[rd] = regs.x[rs1] & immI; break;     // andi
-                    default: unimpl(); break;
+                    default: unimpl(insn, status); break;
                 }
             } else {
                 if((funct3 == 0) && (rs1 == 0) && (immI == 0)) {
@@ -613,350 +638,350 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                         substitutedFunctions.insert(substFunctionNames[regs.pc]);
                         switch(substFunctions[regs.pc]) {
                             case SUBST_SIN: {
-                                pushf(sinf(popf()));
+                                pushf(data_memory, sinf(popf(data_memory)));
                                 break;
                             }
                             case SUBST_ATAN: {
-                                pushf(atanf(popf()));
+                                pushf(data_memory, atanf(popf(data_memory)));
                                 break;
                             }
                             case SUBST_POW: {
-                                float x = popf();
-                                float y = popf();
-                                pushf(powf(x, y));
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
+                                pushf(data_memory, powf(x, y));
                                 break;
                             }
                             case SUBST_MAX: {
-                                float x = popf();
-                                float y = popf();
-                                pushf(x > y ? x : y);
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
+                                pushf(data_memory, x > y ? x : y);
                                 break;
                             }
                             case SUBST_MIN: {
-                                float x = popf();
-                                float y = popf();
-                                pushf(x < y ? x : y);
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
+                                pushf(data_memory, x < y ? x : y);
                                 break;
                             }
                             case SUBST_COS: {
-                                pushf(cosf(popf()));
+                                pushf(data_memory, cosf(popf(data_memory)));
                                 break;
                             }
                             case SUBST_LOG2: {
-                                pushf(log2f(popf()));
+                                pushf(data_memory, log2f(popf(data_memory)));
                                 break;
                             }
                             case SUBST_EXP: {
-                                pushf(expf(popf()));
+                                pushf(data_memory, expf(popf(data_memory)));
                                 break;
                             }
                             case SUBST_MOD: {
-                                float x = popf();
-                                float y = popf();
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
                                 // fmodf() isn't right for us, it's the remainder after
                                 // rounding toward zero, but we need to floor.
                                 float q = floorf(x/y);
-                                pushf(x - q*y);
+                                pushf(data_memory, x - q*y);
                                 break;
                             }
                             case SUBST_INVERSESQRT: {
-                                pushf(1.0 / sqrtf(popf()));
+                                pushf(data_memory, 1.0 / sqrtf(popf(data_memory)));
                                 break;
                             }
                             case SUBST_ASIN: {
-                                pushf(asinf(popf()));
+                                pushf(data_memory, asinf(popf(data_memory)));
                                 break;
                             }
                             case SUBST_LOG: {
-                                pushf(logf(popf()));
+                                pushf(data_memory, logf(popf(data_memory)));
                                 break;
                             }
                             case SUBST_ACOS: {
-                                pushf(acosf(popf()));
+                                pushf(data_memory, acosf(popf(data_memory)));
                                 break;
                             }
                             case SUBST_RADIANS: {
-                                pushf(popf() / 180.0 * M_PI);
+                                pushf(data_memory, popf(data_memory) / 180.0 * M_PI);
                                 break;
                             }
                             case SUBST_DEGREES: {
-                                pushf(popf() * 180.0 / M_PI);
+                                pushf(data_memory, popf(data_memory) * 180.0 / M_PI);
                                 break;
                             }
                             case SUBST_EXP2: {
-                                pushf(exp2f(popf()));
+                                pushf(data_memory, exp2f(popf(data_memory)));
                                 break;
                             }
                             case SUBST_TAN: {
-                                pushf(tanf(popf()));
+                                pushf(data_memory, tanf(popf(data_memory)));
                                 break;
                             }
                             case SUBST_ATAN2: {
-                                float y = popf();
-                                float x = popf();
-                                pushf(atan2f(y, x));
+                                float y = popf(data_memory);
+                                float x = popf(data_memory);
+                                pushf(data_memory, atan2f(y, x));
                                 break;
                             }
                             case SUBST_CROSS: {
                                 float x[3], y[3], z[3];
-                                x[0] = popf();
-                                x[1] = popf();
-                                x[2] = popf();
-                                y[0] = popf();
-                                y[1] = popf();
-                                y[2] = popf();
+                                x[0] = popf(data_memory);
+                                x[1] = popf(data_memory);
+                                x[2] = popf(data_memory);
+                                y[0] = popf(data_memory);
+                                y[1] = popf(data_memory);
+                                y[2] = popf(data_memory);
                                 z[0] = x[1] * y[2] - y[1] * x[2];
                                 z[1] = x[2] * y[0] - y[2] * x[0];
                                 z[2] = x[0] * y[1] - y[0] * x[1];
-                                pushf(z[2]);
-                                pushf(z[1]);
-                                pushf(z[0]);
+                                pushf(data_memory, z[2]);
+                                pushf(data_memory, z[1]);
+                                pushf(data_memory, z[0]);
                                 break;
                             }
                             case SUBST_NORMALIZE1: {
-                                float x = popf();
-                                pushf(x < 0.0 ? -1.0f : 1.0f);
+                                float x = popf(data_memory);
+                                pushf(data_memory, x < 0.0 ? -1.0f : 1.0f);
                                 break;
                             }
                             case SUBST_NORMALIZE2: {
-                                float x = popf();
-                                float y = popf();
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
                                 float d = 1.0f / sqrtf(x * x + y * y);
-                                pushf(y * d);
-                                pushf(x * d);
+                                pushf(data_memory, y * d);
+                                pushf(data_memory, x * d);
                                 break;
                             }
                             case SUBST_NORMALIZE3: {
-                                float x = popf();
-                                float y = popf();
-                                float z = popf();
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
+                                float z = popf(data_memory);
                                 float d = 1.0f / sqrtf(x * x + y * y + z * z);
-                                pushf(z * d);
-                                pushf(y * d);
-                                pushf(x * d);
+                                pushf(data_memory, z * d);
+                                pushf(data_memory, y * d);
+                                pushf(data_memory, x * d);
                                 break;
                             }
                             case SUBST_NORMALIZE4: {
-                                float x = popf();
-                                float y = popf();
-                                float z = popf();
-                                float w = popf();
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
+                                float z = popf(data_memory);
+                                float w = popf(data_memory);
                                 float d = 1.0f / sqrtf(x * x + y * y + z * z + w * w);
-                                pushf(w * d);
-                                pushf(z * d);
-                                pushf(y * d);
-                                pushf(x * d);
+                                pushf(data_memory, w * d);
+                                pushf(data_memory, z * d);
+                                pushf(data_memory, y * d);
+                                pushf(data_memory, x * d);
                                 break;
                             }
                             case SUBST_FLOOR: {
-                                float f = popf();
-                                pushf(floorf(f));
+                                float f = popf(data_memory);
+                                pushf(data_memory, floorf(f));
                                 break;
                             }
                             case SUBST_DOT1: {
-                                float x1 = popf();
-                                float x2 = popf();
+                                float x1 = popf(data_memory);
+                                float x2 = popf(data_memory);
                                 float v = x1 * x2;
-                                pushf(v);
+                                pushf(data_memory, v);
                                 break;
                             }
                             case SUBST_DOT2: {
-                                float x1 = popf();
-                                float y1 = popf();
-                                float x2 = popf();
-                                float y2 = popf();
+                                float x1 = popf(data_memory);
+                                float y1 = popf(data_memory);
+                                float x2 = popf(data_memory);
+                                float y2 = popf(data_memory);
                                 float v = x1 * x2 + y1 * y2;
-                                pushf(v);
+                                pushf(data_memory, v);
                                 break;
                             }
                             case SUBST_DOT3: {
-                                float x1 = popf();
-                                float y1 = popf();
-                                float z1 = popf();
-                                float x2 = popf();
-                                float y2 = popf();
-                                float z2 = popf();
+                                float x1 = popf(data_memory);
+                                float y1 = popf(data_memory);
+                                float z1 = popf(data_memory);
+                                float x2 = popf(data_memory);
+                                float y2 = popf(data_memory);
+                                float z2 = popf(data_memory);
                                 float v = x1 * x2 + y1 * y2 + z1 * z2;
-                                pushf(v);
+                                pushf(data_memory, v);
                                 break;
                             }
                             case SUBST_DOT4: {
-                                float x1 = popf();
-                                float y1 = popf();
-                                float z1 = popf();
-                                float w1 = popf();
-                                float x2 = popf();
-                                float y2 = popf();
-                                float z2 = popf();
-                                float w2 = popf();
+                                float x1 = popf(data_memory);
+                                float y1 = popf(data_memory);
+                                float z1 = popf(data_memory);
+                                float w1 = popf(data_memory);
+                                float x2 = popf(data_memory);
+                                float y2 = popf(data_memory);
+                                float z2 = popf(data_memory);
+                                float w2 = popf(data_memory);
                                 float v = x1 * x2 + y1 * y2 + z1 * z2 + w1 * w2;
-                                pushf(v);
+                                pushf(data_memory, v);
                                 break;
                             }
                             case SUBST_ALL1: {
-                                uint32_t x = pop32();
-                                push32(x);
+                                uint32_t x = pop32(data_memory);
+                                push32(data_memory, x);
                                 break;
                             }
                             case SUBST_ALL2: {
-                                uint32_t x = pop32();
-                                uint32_t y = pop32();
-                                push32(x && y);
+                                uint32_t x = pop32(data_memory);
+                                uint32_t y = pop32(data_memory);
+                                push32(data_memory, x && y);
                                 break;
                             }
                             case SUBST_ALL3: {
-                                uint32_t x = pop32();
-                                uint32_t y = pop32();
-                                uint32_t z = pop32();
-                                push32(x && y && z);
+                                uint32_t x = pop32(data_memory);
+                                uint32_t y = pop32(data_memory);
+                                uint32_t z = pop32(data_memory);
+                                push32(data_memory, x && y && z);
                                 break;
                             }
                             case SUBST_ALL4: {
-                                uint32_t x = pop32();
-                                uint32_t y = pop32();
-                                uint32_t z = pop32();
-                                uint32_t w = pop32();
-                                push32(x && y && z && w);
+                                uint32_t x = pop32(data_memory);
+                                uint32_t y = pop32(data_memory);
+                                uint32_t z = pop32(data_memory);
+                                uint32_t w = pop32(data_memory);
+                                push32(data_memory, x && y && z && w);
                                 break;
                             }
                             case SUBST_ANY1: {
-                                uint32_t x = pop32();
-                                push32(x);
+                                uint32_t x = pop32(data_memory);
+                                push32(data_memory, x);
                                 break;
                             }
                             case SUBST_ANY2: {
-                                uint32_t x = pop32();
-                                uint32_t y = pop32();
-                                push32(x || y);
+                                uint32_t x = pop32(data_memory);
+                                uint32_t y = pop32(data_memory);
+                                push32(data_memory, x || y);
                                 break;
                             }
                             case SUBST_ANY3: {
-                                uint32_t x = pop32();
-                                uint32_t y = pop32();
-                                uint32_t z = pop32();
-                                push32(x || y || z);
+                                uint32_t x = pop32(data_memory);
+                                uint32_t y = pop32(data_memory);
+                                uint32_t z = pop32(data_memory);
+                                push32(data_memory, x || y || z);
                                 break;
                             }
                             case SUBST_ANY4: {
-                                uint32_t x = pop32();
-                                uint32_t y = pop32();
-                                uint32_t z = pop32();
-                                uint32_t w = pop32();
-                                push32(x || y || z || w);
+                                uint32_t x = pop32(data_memory);
+                                uint32_t y = pop32(data_memory);
+                                uint32_t z = pop32(data_memory);
+                                uint32_t w = pop32(data_memory);
+                                push32(data_memory, x || y || z || w);
                                 break;
                             }
                             case SUBST_STEP: {
-                                float edge = popf();
-                                float x = popf();
+                                float edge = popf(data_memory);
+                                float x = popf(data_memory);
                                 float y = (x < edge) ? 0.0f : 1.0f;
-                                pushf(y);
+                                pushf(data_memory, y);
                                 break;
                             }
                             case SUBST_FRACT: {
-                                float f = popf();
-                                pushf(f - floorf(f));
+                                float f = popf(data_memory);
+                                pushf(data_memory, f - floorf(f));
                                 break;
                             }
                             case SUBST_REFRACT1: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_REFRACT2: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_REFRACT3: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_REFRACT4: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_DISTANCE1: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_DISTANCE2: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_DISTANCE3: {
-                                float x1 = popf();
-                                float y1 = popf();
-                                float z1 = popf();
-                                float x2 = popf();
-                                float y2 = popf();
-                                float z2 = popf();
+                                float x1 = popf(data_memory);
+                                float y1 = popf(data_memory);
+                                float z1 = popf(data_memory);
+                                float x2 = popf(data_memory);
+                                float y2 = popf(data_memory);
+                                float z2 = popf(data_memory);
                                 float dx = x1 - x2;
                                 float dy = y1 - y2;
                                 float dz = z1 - z2;
-                                pushf(sqrtf(dx*dx + dy*dy + dz*dz));
+                                pushf(data_memory, sqrtf(dx*dx + dy*dy + dz*dz));
                                 break;
                             }
                             case SUBST_DISTANCE4: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_REFLECT1: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_REFLECT2: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_REFLECT3: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_REFLECT4: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_FACEFORWARD1: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_FACEFORWARD2: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_FACEFORWARD3: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_FACEFORWARD4: {
-                                unimpl_subst();
+                                unimpl_subst(status);
                                 break;
                             }
                             case SUBST_LENGTH1: {
-                                float x = popf();
-                                pushf(fabsf(x));
+                                float x = popf(data_memory);
+                                pushf(data_memory, fabsf(x));
                                 break;
                             }
                             case SUBST_LENGTH2: {
-                                float x = popf();
-                                float y = popf();
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
                                 float d = sqrtf(x * x + y * y);
-                                pushf(d);
+                                pushf(data_memory, d);
                                 break;
                             }
                             case SUBST_LENGTH3: {
-                                float x = popf();
-                                float y = popf();
-                                float z = popf();
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
+                                float z = popf(data_memory);
                                 float d = sqrtf(x * x + y * y + z * z);
-                                pushf(d);
+                                pushf(data_memory, d);
                                 break;
                             }
                             case SUBST_LENGTH4: {
-                                float x = popf();
-                                float y = popf();
-                                float z = popf();
-                                float w = popf();
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
+                                float z = popf(data_memory);
+                                float w = popf(data_memory);
                                 float d = sqrtf(x * x + y * y + z * z + w * w);
-                                pushf(d);
+                                pushf(data_memory, d);
                                 break;
                             }
                         }
@@ -971,7 +996,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
         }
 
         default: {
-            unimpl();
+            unimpl(insn, status);
         }
     }
     return status;
