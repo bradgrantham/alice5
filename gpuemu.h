@@ -720,8 +720,8 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 float x = popf();
                                 float y = popf();
                                 float d = 1.0f / sqrtf(x * x + y * y);
-                                pushf(x * d);
                                 pushf(y * d);
+                                pushf(x * d);
                                 break;
                             }
                             case SUBST_NORMALIZE3: {
@@ -729,9 +729,9 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 float y = popf();
                                 float z = popf();
                                 float d = 1.0f / sqrtf(x * x + y * y + z * z);
-                                pushf(x * d);
-                                pushf(y * d);
                                 pushf(z * d);
+                                pushf(y * d);
+                                pushf(x * d);
                                 break;
                             }
                             case SUBST_NORMALIZE4: {
@@ -740,10 +740,10 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 float z = popf();
                                 float w = popf();
                                 float d = 1.0f / sqrtf(x * x + y * y + z * z + w * w);
-                                pushf(x * d);
-                                pushf(y * d);
-                                pushf(z * d);
                                 pushf(w * d);
+                                pushf(z * d);
+                                pushf(y * d);
+                                pushf(x * d);
                                 break;
                             }
                             case SUBST_FLOOR: {
@@ -889,7 +889,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 float dx = x1 - x2;
                                 float dy = y1 - y2;
                                 float dz = z1 - z2;
-                                push32(sqrtf(dx*dx + dy*dy + dz*dz));
+                                pushf(sqrtf(dx*dx + dy*dy + dz*dz));
                                 break;
                             }
                             case SUBST_DISTANCE4: {
