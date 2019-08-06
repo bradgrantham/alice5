@@ -600,7 +600,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                 switch(funct3) {
                     case 0: regs.x[rd] = regs.x[rs1] + immI; break;     // addi
                     case 1: regs.x[rd] = regs.x[rs1] << shamt; break;   // slli
-                    case 2: regs.x[rd] = ((int32_t)regs.x[rs1] < immI); break;      // slti
+                    case 2: regs.x[rd] = int32_t(regs.x[rs1]) < int32_t(immI); break; // slti
                     case 3: regs.x[rd] = regs.x[rs1] < immI; break;     // sltiu
                     case 4: regs.x[rd] = regs.x[rs1] ^ immI; break;     // xori
                     case 6: regs.x[rd] = regs.x[rs1] | immI; break;     // ori
