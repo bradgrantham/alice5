@@ -723,19 +723,19 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 break;
                             }
                             case SUBST_CROSS: {
-                                float x[3], y[3], z[3];
-                                x[0] = popf(data_memory);
-                                x[1] = popf(data_memory);
-                                x[2] = popf(data_memory);
-                                y[0] = popf(data_memory);
-                                y[1] = popf(data_memory);
-                                y[2] = popf(data_memory);
-                                z[0] = x[1] * y[2] - y[1] * x[2];
-                                z[1] = x[2] * y[0] - y[2] * x[0];
-                                z[2] = x[0] * y[1] - y[0] * x[1];
-                                pushf(data_memory, z[2]);
-                                pushf(data_memory, z[1]);
-                                pushf(data_memory, z[0]);
+                                float v1[3], v2[3], cross[3];
+                                v1[0] = popf(data_memory);
+                                v1[1] = popf(data_memory);
+                                v1[2] = popf(data_memory);
+                                v2[0] = popf(data_memory);
+                                v2[1] = popf(data_memory);
+                                v2[2] = popf(data_memory);
+                                cross[0] = v1[1] * v2[2] - v2[1] * v1[2];
+                                cross[1] = v1[2] * v2[0] - v2[2] * v1[0];
+                                cross[2] = v1[0] * v2[1] - v2[0] * v1[1];
+                                pushf(data_memory, cross[2]);
+                                pushf(data_memory, cross[1]);
+                                pushf(data_memory, cross[0]);
                                 break;
                             }
                             case SUBST_NORMALIZE1: {
@@ -913,9 +913,9 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 float x2 = popf(data_memory);
                                 float y2 = popf(data_memory);
                                 float z2 = popf(data_memory);
-                                float dx = x1 - x2;
-                                float dy = y1 - y2;
-                                float dz = z1 - z2;
+                                float dx = x2 - x1;
+                                float dy = y2 - y1;
+                                float dz = z2 - z1;
                                 pushf(data_memory, sqrtf(dx*dx + dy*dy + dz*dz));
                                 break;
                             }
