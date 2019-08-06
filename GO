@@ -9,5 +9,5 @@ fi
 make -j && \
     ./shade -c -O -o out.s -v -S "$program" > out && \
     ./as -v out.s > out.lst && \
-    ./gpuemu -f 90 --term out.o
+    ./gpuemu -j 1 -f 90 --term out.o
 

@@ -350,6 +350,7 @@ void render(const CoreTemplate* tmpl, CoreShared* shared, int start_row, int ski
     }
 
     for(int j = start_row; j < tmpl->afterLastY; j += skip_rows) {
+        GPUCore::Registers oldRegs;
         for(int i = tmpl->startX; i < tmpl->afterLastX; i++) {
 
             if(shared->coreHadAnException)
@@ -370,7 +371,9 @@ void render(const CoreTemplate* tmpl, CoreShared* shared, int start_row, int ski
 
             try {
                 do {
-                    GPUCore::Registers oldRegs = core.regs;
+                    if(tmpl->printCoreDiff) {
+                        oldRegs = core.regs;
+                    }
                     if(tmpl->printDisassembly) {
                         print_inst(core.regs.pc, text_memory.read32(core.regs.pc), tmpl->textAddressesToSymbols);
                     }
