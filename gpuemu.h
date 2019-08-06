@@ -198,13 +198,13 @@ struct GPUCore
     // void write32(uint32_t addr, uint32_t v);
     
     template <class T>
-    Status step(T& memory);
+    Status step(T& text_memory, T& data_memory);
 
     template <class T>
-    Status stepUntilException(T& memory)
+    Status stepUntilException(T& text_memory, T& data_memory)
     {
         Status status;
-        while((status = step(memory)) == RUNNING);
+        while((status = step(text_memory, data_memory)) == RUNNING);
         return status;
     }
 };
@@ -239,9 +239,9 @@ const bool dump = false;
         case makeOpcode(7, (a), (b)):
 
 template <class T>
-GPUCore::Status GPUCore::step(T& memory)
+GPUCore::Status GPUCore::step(T& text_memory, T& data_memory)
 {
-    uint32_t insn = memory.read32(regs.pc);
+    uint32_t insn = text_memory.read32(regs.pc);
 
     Status status = RUNNING;
 
@@ -272,10 +272,10 @@ GPUCore::Status GPUCore::step(T& memory)
         (getBits(insn, 30, 21) << 1),
         21);
 
-    std::function<float(void)> popf = [&]() { float v = memory.readf(regs.x[2]); regs.x[2] += 4; return v; };
-    std::function<void(float)> pushf = [&](float f) { regs.x[2] -= 4; memory.writef(regs.x[2], f); };
-    std::function<uint32_t(void)> pop32 = [&]() { uint32_t v = memory.read32(regs.x[2]); regs.x[2] += 4; return v; };
-    std::function<void(uint32_t)> push32 = [&](uint32_t f) { regs.x[2] -= 4; memory.write32(regs.x[2], f); };
+    std::function<float(void)> popf = [&]() { float v = data_memory.readf(regs.x[2]); regs.x[2] += 4; return v; };
+    std::function<void(float)> pushf = [&](float f) { regs.x[2] -= 4; data_memory.writef(regs.x[2], f); };
+    std::function<uint32_t(void)> pop32 = [&]() { uint32_t v = data_memory.read32(regs.x[2]); regs.x[2] += 4; return v; };
+    std::function<void(uint32_t)> push32 = [&](uint32_t f) { regs.x[2] -= 4; data_memory.write32(regs.x[2], f); };
 
     std::function<void(void)> unimpl = [&]() {
         std::cerr << "unimplemented instruction " << std::hex << std::setfill('0') << std::setw(8) << insn;
@@ -310,7 +310,7 @@ GPUCore::Status GPUCore::step(T& memory)
         // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
         case makeOpcode(2, 0x01, 3): {
             if(dump) std::cout << "flw\n";
-            regs.f[rd] = memory.readf(regs.x[rs1] + immI);
+            regs.f[rd] = data_memory.readf(regs.x[rs1] + immI);
             regs.pc += 4;
             break;
         }
@@ -318,7 +318,7 @@ GPUCore::Status GPUCore::step(T& memory)
         // fsw       imm12hi rs1 rs2 imm12lo 14..12=2 6..2=0x09 1..0=3
         case makeOpcode(2, 0x09, 3): {
             if(dump) std::cout << "fsw\n";
-            memory.writef(regs.x[rs1] + immS, regs.f[rs2]);
+            data_memory.writef(regs.x[rs1] + immS, regs.f[rs2]);
             regs.pc += 4;
             break;
         }
@@ -480,9 +480,9 @@ GPUCore::Status GPUCore::step(T& memory)
         { // sb, sh, sw
             if(dump) std::cout << "sw\n";
             switch(funct3) {
-                case 0: memory.write8(regs.x[rs1] + immS, regs.x[rs2] & 0xFF); break;
-                case 1: memory.write16(regs.x[rs1] + immS, regs.x[rs2] & 0xFFFF); break;
-                case 2: memory.write32(regs.x[rs1] + immS, regs.x[rs2]); break;
+                case 0: data_memory.write8(regs.x[rs1] + immS, regs.x[rs2] & 0xFF); break;
+                case 1: data_memory.write16(regs.x[rs1] + immS, regs.x[rs2] & 0xFFFF); break;
+                case 2: data_memory.write32(regs.x[rs1] + immS, regs.x[rs2]); break;
             }
             regs.pc += 4;
             break;
@@ -493,11 +493,11 @@ GPUCore::Status GPUCore::step(T& memory)
             if(dump) std::cout << "load\n";
             if(rd != 0) {
                 switch(funct3) {
-                    case 0: regs.x[rd] = extendSign(memory.read8(regs.x[rs1] + immI), 8); break;
-                    case 1: regs.x[rd] = extendSign(memory.read16(regs.x[rs1] + immI), 16); break;
-                    case 2: regs.x[rd] = memory.read32(regs.x[rs1] + immI); break;
-                    case 4: regs.x[rd] = memory.read8(regs.x[rs1] + immI); break;
-                    case 5: regs.x[rd] = memory.read16(regs.x[rs1] + immI); break;
+                    case 0: regs.x[rd] = extendSign(data_memory.read8(regs.x[rs1] + immI), 8); break;
+                    case 1: regs.x[rd] = extendSign(data_memory.read16(regs.x[rs1] + immI), 16); break;
+                    case 2: regs.x[rd] = data_memory.read32(regs.x[rs1] + immI); break;
+                    case 4: regs.x[rd] = data_memory.read8(regs.x[rs1] + immI); break;
+                    case 5: regs.x[rd] = data_memory.read16(regs.x[rs1] + immI); break;
                     default: unimpl(); break;
                 }
             }
