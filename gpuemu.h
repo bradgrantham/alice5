@@ -197,11 +197,11 @@ struct GPUCore
     // void write16(uint32_t addr, uint16_t v);
     // void write32(uint32_t addr, uint32_t v);
     
-    template <class T>
-    Status step(T& text_memory, T& data_memory);
+    template <class ROM, class RWM>
+    Status step(ROM& text_memory, RWM& data_memory);
 
-    template <class T>
-    Status stepUntilException(T& text_memory, T& data_memory)
+    template <class ROM, class RWM>
+    Status stepUntilException(ROM& text_memory, RWM& data_memory)
     {
         Status status;
         while((status = step(text_memory, data_memory)) == RUNNING);
@@ -238,8 +238,8 @@ const bool dump = false;
         case makeOpcode(6, (a), (b)): \
         case makeOpcode(7, (a), (b)):
 
-template <class T>
-GPUCore::Status GPUCore::step(T& text_memory, T& data_memory)
+template <class ROM, class RWM>
+GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
 {
     uint32_t insn = text_memory.read32(regs.pc);
 
