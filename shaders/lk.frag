@@ -54,6 +54,7 @@ vec2 dist(vec3 p, bool includeFloor) {
     float bd = box_dist(p, vec3(0.0, 0.0, 0.0), vec3(2.5), 0.5);
     
     float od = difference_d(bd, sd);
+    od = sd;
     
     if (includeFloor) {
 	    float fd = p.y - -3.0;

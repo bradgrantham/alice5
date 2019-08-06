@@ -81,5 +81,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     outv = v;
     */
 
-    outf = inf + 2.0;
+    int x = int(inf);
+    if (x == 1) {
+        outf = 2.0;
+    } else {
+        outf = 3.0;
+    }
 }

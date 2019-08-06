@@ -282,32 +282,23 @@ void InsnIAdd::emit(Compiler *compiler)
 
 void InsnIEqual::emit(Compiler *compiler)
 {
-    std::string localLabel = compiler->makeLocalLabel();
-
-    // add result, x0, x0
+    // sub result, op1, op2
     std::ostringstream ss1;
-    ss1 << "add " << compiler->reg(resultId()) << ", x0, x0";
+    ss1 << "sub "
+        << compiler->reg(resultId()) << ", "
+        << compiler->reg(operand1Id()) << ", "
+        << compiler->reg(operand2Id());
     std::ostringstream ssc1;
-    ssc1 << "r" << resultId() << " = 0";
+    ssc1 << "r" << resultId() << " = r" << operand1Id() << " - r" << operand2Id();
     compiler->emit(ss1.str(), ssc1.str());
 
-    // bne op1, op2, local
+    // sltiu result, result, 1
     std::ostringstream ss2;
-    ss2 << "bne " << compiler->reg(operand1Id()) << ", "
-        << compiler->reg(operand2Id()) << ", " << localLabel;
+    ss2 << "sltiu " << compiler->reg(resultId()) << ", " << compiler->reg(resultId()) << ", 1";
     std::ostringstream ssc2;
-    ssc2 << "r" << operand1Id() << " != r" << operand2Id();
+    ssc2 << "r" << resultId() << " = 1 if difference was 0 (r"
+        << operand1Id() << " == r" << operand2Id() << ")";
     compiler->emit(ss2.str(), ssc2.str());
-
-    // addi result, x0, 1
-    std::ostringstream ss3;
-    ss3 << "addi " << compiler->reg(resultId()) << ", x0, 1";
-    std::ostringstream ssc3;
-    ssc3 << "r" << resultId() << " = 1";
-    compiler->emit(ss3.str(), ssc3.str());
-
-    // local:
-    compiler->emitLabel(localLabel);
 }
 
 void InsnSLessThan::emit(Compiler *compiler)
@@ -430,6 +421,11 @@ void InsnPhi::emit(Compiler *compiler)
 void InsnConvertFToS::emit(Compiler *compiler)
 {
     compiler->emitUnaryOp("fcvt.w.s", resultId(), floatValueId());
+}
+
+void InsnConvertSToF::emit(Compiler *compiler)
+{
+    compiler->emitUnaryOp("fcvt.s.w", resultId(), signedValueId());
 }
 
 void InsnFOrdEqual::emit(Compiler *compiler)

@@ -379,9 +379,9 @@ def main():
 
     opcode_decode_f.write("            default: {\n")
     opcode_decode_f.write("                if(pgm->throwOnUnimplemented) {\n")
-    opcode_decode_f.write("                    throw std::runtime_error(\"unimplemented GLSLstd450 opcode \" + OpcodeToString[opcode] + \" (\" + std::to_string(opcode) + \")\");\n")
+    opcode_decode_f.write("                    throw std::runtime_error(\"unimplemented GLSLstd450 opcode \" + OpcodeToString[0x10000 | opcode] + \" (\" + std::to_string(opcode) + \")\");\n")
     opcode_decode_f.write("                } else {\n")
-    opcode_decode_f.write("                    std::cout << \"unimplemented GLSLstd450 opcode \" << OpcodeToString[opcode] << \" (\" << opcode << \")\\n\";\n")
+    opcode_decode_f.write("                    std::cerr << \"unimplemented GLSLstd450 opcode \" << OpcodeToString[0x10000 | opcode] << \" (\" << opcode << \")\\n\";\n")
     opcode_decode_f.write("                    pgm->hasUnimplemented = true;\n")
     opcode_decode_f.write("                }\n")
     opcode_decode_f.write("                break;\n")

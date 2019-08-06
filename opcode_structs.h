@@ -239,6 +239,7 @@ struct InsnConvertSToF : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepConvertSToF(*this); }
     virtual uint32_t opcode() const { return SpvOpConvertSToF; }
     virtual std::string name() const { return "OpConvertSToF"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // OpFNegate instruction (code 127).

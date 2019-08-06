@@ -1520,7 +1520,7 @@ case GLSLstd450Refract: {
 
             default: {
                 if(pgm->throwOnUnimplemented) {
-                    throw std::runtime_error("unimplemented GLSLstd450 opcode " + OpcodeToString[opcode] + " (" + std::to_string(opcode) + ")");
+                    throw std::runtime_error("unimplemented GLSLstd450 opcode " + OpcodeToString[0x10000 | opcode] + " (" + std::to_string(opcode) + ")");
                 } else {
                     std::cerr << "unimplemented GLSLstd450 opcode " << OpcodeToString[0x10000 | opcode] << " (" << opcode << ")\n";
                     pgm->hasUnimplemented = true;
