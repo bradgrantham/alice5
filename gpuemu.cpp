@@ -264,19 +264,21 @@ void usage(const char* progname)
             int(std::thread::hardware_concurrency()));
 }
 
-struct GPUShared
+struct CoreShared
 {
-    std::mutex rendererMutex;
-    bool coreException = false;
+    bool coreHadAnException = false; // Only set to true after initialization
     unsigned char *img;
+    std::mutex rendererMutex;
+
+    // Number of rows still left to shade (for progress report).
+    std::atomic_int rowsLeft;
+
+    // These require exclusion using rendererMutex
     std::set<std::string> substitutedFunctions;
-    bool printDisassembly = false;
-    bool printMemoryAccess = false;
-    bool printCoreDiff = false;
     uint64_t dispatchedCount = 0;
 };
 
-struct coreTemplate
+struct CoreTemplate
 {
     std::vector<uint8_t> text_bytes;
     std::vector<uint8_t> data_bytes;
@@ -294,84 +296,130 @@ struct coreTemplate
     uint32_t gl_FragCoordAddress;
     uint32_t colorAddress;
     uint32_t iTimeAddress;
+    bool printDisassembly = false;
+    bool printMemoryAccess = false;
+    bool printCoreDiff = false;
 };
 
-void render(const coreTemplate& tmpl, GPUShared& shared, int start_row, int skip_rows)
+// Thread to show progress to the user.
+void showProgress(const CoreTemplate* tmpl, CoreShared* shared, std::chrono::time_point<std::chrono::steady_clock> startTime)
 {
-    uint64_t coreDispatchedCount = 0;
-    ReadWriteMemory data_memory(tmpl.data_bytes, false);
-    ReadOnlyMemory text_memory(tmpl.text_bytes, false);
+    int totalRows = tmpl->afterLastY - tmpl->startY;
 
-    const float fw = tmpl.imageWidth;
-    const float fh = tmpl.imageHeight;
-    const float one = 1.0;
+    while(true) {
+        int left = shared->rowsLeft;
+        if (left == 0) {
+            break;
+        }
 
-    if (tmpl.data_symbols.find(".anonymous") != tmpl.data_symbols.end()) {
-        set(data_memory, tmpl.data_symbols.find(".anonymous")->second, v3float{fw, fh, one});
-        set(data_memory, tmpl.data_symbols.find(".anonymous")->second + sizeof(v3float), tmpl.frameTime);
+        std::cout << left << " rows left of " << totalRows;
+
+        // Estimate time left.
+        if (left != totalRows) {
+            auto now = std::chrono::steady_clock::now();
+            auto elapsedTime = now - startTime;
+            auto elapsedSeconds = double(elapsedTime.count())*
+                std::chrono::steady_clock::period::num/
+                std::chrono::steady_clock::period::den;
+            auto secondsLeft = elapsedSeconds*left/(totalRows - left);
+
+            std::cout << " (" << int(secondsLeft) << " seconds left)   ";
+        }
+        std::cout << "\r";
+        std::cout.flush();
+
+        // Wait one second while polling.
+        for (int i = 0; i < 100 && shared->rowsLeft > 0; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
     }
 
-    GPUCore core(tmpl.text_symbols);
+    // Clear the line.
+    std::cout << "                                                             \r";
+}
+
+
+void render(const CoreTemplate* tmpl, CoreShared* shared, int start_row, int skip_rows)
+{
+    uint64_t coreDispatchedCount = 0;
+
+    ReadWriteMemory data_memory(tmpl->data_bytes, false);
+    ReadOnlyMemory text_memory(tmpl->text_bytes, false);
+
+    GPUCore core(tmpl->text_symbols);
     GPUCore::Status status;
 
-    for(int j = start_row; j < tmpl.afterLastY; j += skip_rows) {
-        for(int i = tmpl.startX; i < tmpl.afterLastX; i++) {
-            if(shared.coreException)
+    const float fw = tmpl->imageWidth;
+    const float fh = tmpl->imageHeight;
+    const float one = 1.0;
+
+    if (tmpl->data_symbols.find(".anonymous") != tmpl->data_symbols.end()) {
+        set(data_memory, tmpl->data_symbols.find(".anonymous")->second, v3float{fw, fh, one});
+        set(data_memory, tmpl->data_symbols.find(".anonymous")->second + sizeof(v3float), tmpl->frameTime);
+    }
+
+    for(int j = start_row; j < tmpl->afterLastY; j += skip_rows) {
+        for(int i = tmpl->startX; i < tmpl->afterLastX; i++) {
+
+            if(shared->coreHadAnException)
                 return;
-            set(data_memory, tmpl.gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
-            set(data_memory, tmpl.colorAddress, v4float{1, 1, 1, 1});
+
+            set(data_memory, tmpl->gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
+            set(data_memory, tmpl->colorAddress, v4float{1, 1, 1, 1});
             if(false) // XXX TODO: when iTime is exported by compilation
-                set(data_memory, tmpl.iTimeAddress, tmpl.frameTime);
+                set(data_memory, tmpl->iTimeAddress, tmpl->frameTime);
 
             core.regs.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
-            core.regs.x[2] = tmpl.data_bytes.size(); // Set SP to end of memory 
-            core.regs.pc = tmpl.initialPC;
+            core.regs.x[2] = tmpl->data_bytes.size(); // Set SP to end of memory 
+            core.regs.pc = tmpl->initialPC;
 
-            if(shared.printDisassembly) {
+            if(tmpl->printDisassembly) {
                 std::cout << "; pixel " << i << ", " << j << '\n';
             }
+
             try {
                 do {
                     GPUCore::Registers oldRegs = core.regs;
-                    if(shared.printDisassembly) {
-                        print_inst(core.regs.pc, text_memory.read32(core.regs.pc), tmpl.textAddressesToSymbols);
+                    if(tmpl->printDisassembly) {
+                        print_inst(core.regs.pc, text_memory.read32(core.regs.pc), tmpl->textAddressesToSymbols);
                     }
-                    data_memory.verbose = shared.printMemoryAccess;
-                    text_memory.verbose = shared.printMemoryAccess;
+                    data_memory.verbose = tmpl->printMemoryAccess;
+                    text_memory.verbose = tmpl->printMemoryAccess;
                     status = core.step(text_memory, data_memory);
                     coreDispatchedCount ++;
                     data_memory.verbose = false;
                     text_memory.verbose = false;
-                    if(shared.printCoreDiff) {
+                    if(tmpl->printCoreDiff) {
                         dumpRegsDiff(oldRegs, core.regs);
                     }
                 } while(core.regs.pc != 0xffffffff && status == GPUCore::RUNNING);
             } catch(const std::exception& e) {
                 std::cerr << "core " << start_row << ", " << e.what() << '\n';
                 dumpGPUCore(core);
-                shared.coreException = true;
+                shared->coreHadAnException = true;
                 return;
             }
 
             if(status != GPUCore::BREAK) {
                 std::cerr << "core " << start_row << ", " << "unexpected core step result " << status << '\n';
                 dumpGPUCore(core);
-                shared.coreException = true;
+                shared->coreHadAnException = true;
                 return;
             }
 
             v3float rgb;
-            get(data_memory, tmpl.data_symbols.find("color")->second, rgb);
+            get(data_memory, tmpl->colorAddress, rgb);
 
-            int pixelOffset = 3 * ((tmpl.imageHeight - 1 - j) * tmpl.imageWidth + i);
+            int pixelOffset = 3 * ((tmpl->imageHeight - 1 - j) * tmpl->imageWidth + i);
             for(int c = 0; c < 3; c++)
-                shared.img[pixelOffset + c] = std::clamp(int(rgb[c] * 255.99), 0, 255);
+                shared->img[pixelOffset + c] = std::clamp(int(rgb[c] * 255.99), 0, 255);
         }
+        shared->rowsLeft --;
     }
     {
-        std::lock_guard<std::mutex> lck (shared.rendererMutex);
-        shared.dispatchedCount += coreDispatchedCount;
-        shared.substitutedFunctions.insert(core.substitutedFunctions.begin(), core.substitutedFunctions.end());
+        std::scoped_lock l(shared->rendererMutex);
+        shared->dispatchedCount += coreDispatchedCount;
+        shared->substitutedFunctions.insert(core.substitutedFunctions.begin(), core.substitutedFunctions.end());
     }
 }
 
@@ -383,8 +431,8 @@ int main(int argc, char **argv)
     int specificPixelY = -1;
     int threadCount = std::thread::hardware_concurrency();
 
-    coreTemplate tmpl;
-    GPUShared shared;
+    CoreTemplate tmpl;
+    CoreShared shared;
 
     char *progname = argv[0];
     argv++; argc--;
@@ -392,7 +440,7 @@ int main(int argc, char **argv)
     while(argc > 0 && argv[0][0] == '-') {
         if(strcmp(argv[0], "-v") == 0) {
 
-            shared.printMemoryAccess = true;
+            tmpl.printMemoryAccess = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "--pixel") == 0) {
@@ -408,7 +456,7 @@ int main(int argc, char **argv)
 
         } else if(strcmp(argv[0], "--diff") == 0) {
 
-            shared.printCoreDiff = true;
+            tmpl.printCoreDiff = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-j") == 0) {
@@ -427,7 +475,7 @@ int main(int argc, char **argv)
 
         } else if(strcmp(argv[0], "-S") == 0) {
 
-            shared.printDisassembly = true;
+            tmpl.printDisassembly = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-f") == 0) {
@@ -530,13 +578,26 @@ int main(int argc, char **argv)
 
     std::cout << "Using " << threadCount << " threads.\n";
 
+    std::vector<std::thread *> thread;
     for (int t = 0; t < threadCount; t++) {
-        render(tmpl, shared, t, threadCount);
-        if(shared.coreException) {
-            // kill other threads
-            exit(EXIT_FAILURE);
-        }
+        thread.push_back(new std::thread(render, &tmpl, &shared, tmpl.startY + t, threadCount));
     }
+
+    // Progress information.
+    shared.rowsLeft = tmpl.afterLastY - tmpl.startY;
+    thread.push_back(new std::thread(showProgress, &tmpl, &shared, frameElapsed.startTime()));
+
+    // Wait for worker threads to quit.
+    for (size_t t = 0; t < thread.size(); t++) {
+        std::thread* td = thread.back();
+        thread.pop_back();
+        td->join();
+    }
+
+    if(shared.coreHadAnException) {
+        exit(EXIT_FAILURE);
+    }
+
     for(auto& subst: shared.substitutedFunctions) {
         std::cout << "substituted for " << subst << '\n';
     }
