@@ -1135,7 +1135,7 @@ int main(int argc, char **argv)
             thread.push_back(new std::thread(showProgress, image->height, timer.startTime()));
 
             // Wait for worker threads to quit.
-            for (size_t t = 0; t < thread.size(); t++) {
+            while (!thread.empty()) {
                 std::thread* td = thread.back();
                 thread.pop_back();
                 td->join();
