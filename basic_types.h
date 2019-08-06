@@ -645,9 +645,14 @@ struct Instruction {
         argIdSet.erase(oldRegId);
         argIdSet.insert(newRegId);
 
-        auto itr = std::find(argIdList.begin(), argIdList.end(), oldRegId);
-        assert(itr != argIdList.end());
-        *itr = newRegId;
+        int foundCount = 0;
+        for (auto itr = argIdList.begin(); itr != argIdList.end(); ++itr) {
+            if (*itr == oldRegId) {
+                *itr = newRegId;
+                foundCount++;
+            }
+        }
+        assert(foundCount > 0);
     }
 
     // Dump a rough disassembly to stdout.

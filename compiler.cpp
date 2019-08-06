@@ -673,7 +673,9 @@ void Compiler::emitCall(const std::string &functionName,
         } else {
             ss << "fsw f" << (phy - 32) << ", " << i*4 << "(sp)";
         }
-        emit(ss.str(), "Push parameter");
+        std::ostringstream ssc;
+        ssc << "Push parameter r" << operandIds[i];
+        emit(ss.str(), ssc.str());
     }
 
     // Call routines.
@@ -692,7 +694,9 @@ void Compiler::emitCall(const std::string &functionName,
         } else {
             ss << "flw f" << (phy - 32) << ", " << i*4 << "(sp)";
         }
-        emit(ss.str(), "Pop result");
+        std::ostringstream ssc;
+        ssc << "Pop result r" << resultIds[i];
+        emit(ss.str(), ssc.str());
     }
 
     {

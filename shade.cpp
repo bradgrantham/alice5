@@ -117,7 +117,9 @@ void RiscVCross::emit(Compiler *compiler)
     for (int i = argIdList.size() - 1; i >= 0; i--) {
         std::ostringstream ss;
         ss << "fsw " << compiler->reg(argIdList[i]) << ", " << (i*4) << "(sp)";
-        compiler->emit(ss.str(), "Push parameter");
+        std::ostringstream ssc;
+        ssc << "Push parameter r" << argIdList[i];
+        compiler->emit(ss.str(), ssc.str());
     }
 
     compiler->emit("jal ra, .cross", "Call routine");
@@ -125,7 +127,9 @@ void RiscVCross::emit(Compiler *compiler)
     for (size_t i = 0; i < resIdList.size(); i++) {
         std::ostringstream ss;
         ss << "flw " << compiler->reg(resIdList[i]) << ", " << (i*4) << "(sp)";
-        compiler->emit(ss.str(), "Pop result");
+        std::ostringstream ssc;
+        ssc << "Pop result r" << resIdList[i];
+        compiler->emit(ss.str(), ssc.str());
     }
 
     compiler->emit("lw ra, 12(sp)", "Restore return address");
@@ -134,99 +138,68 @@ void RiscVCross::emit(Compiler *compiler)
 
 void RiscVLength::emit(Compiler *compiler)
 {
-    size_t n = operandIds.size();
+    size_t n = argIdList.size();
     assert(n <= 4);
-
-    std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId());
 
     std::ostringstream functionName;
     functionName << ".length" << n;
 
-    compiler->emitCall(functionName.str(), resultIds, operandIds);
+    compiler->emitCall(functionName.str(), resIdList, argIdList);
 }
 
 void RiscVNormalize::emit(Compiler *compiler)
 {
-    size_t n = operandIds.size();
+    size_t n = argIdList.size();
     assert(n <= 4);
 
     std::ostringstream functionName;
     functionName << ".normalize" << n;
 
-    compiler->emitCall(functionName.str(), resultIds, operandIds);
+    compiler->emitCall(functionName.str(), resIdList, argIdList);
 }
 
 void RiscVDistance::emit(Compiler *compiler)
 {
-    size_t n = vector1Ids.size();
+    size_t n = argIdList.size()/2;
     assert(n <= 4);
-
-    std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId());
-
-    std::vector<uint32_t> operandIds;
-    for (auto id : vector1Ids) {
-        operandIds.push_back(id);
-    }
-    for (auto id : vector2Ids) {
-        operandIds.push_back(id);
-    }
 
     std::ostringstream functionName;
     functionName << ".distance" << n;
 
-    compiler->emitCall(functionName.str(), resultIds, operandIds);
+    compiler->emitCall(functionName.str(), resIdList, argIdList);
 }
 
 void RiscVDot::emit(Compiler *compiler)
 {
-    size_t n = vector1Ids.size();
+    size_t n = argIdList.size()/2;
     assert(n <= 4);
-
-    std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId());
-
-    std::vector<uint32_t> operandIds;
-    for (auto id : vector1Ids) {
-        operandIds.push_back(id);
-    }
-    for (auto id : vector2Ids) {
-        operandIds.push_back(id);
-    }
 
     std::ostringstream functionName;
     functionName << ".dot" << n;
 
-    compiler->emitCall(functionName.str(), resultIds, operandIds);
+    compiler->emitCall(functionName.str(), resIdList, argIdList);
 }
 
 void RiscVAll::emit(Compiler *compiler)
 {
-    size_t n = operandIds.size();
+    size_t n = argIdList.size();
     assert(n <= 4);
-
-    std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId());
 
     std::ostringstream functionName;
     functionName << ".all" << n;
 
-    compiler->emitCall(functionName.str(), resultIds, operandIds);
+    compiler->emitCall(functionName.str(), resIdList, argIdList);
 }
 
 void RiscVAny::emit(Compiler *compiler)
 {
-    size_t n = operandIds.size();
+    size_t n = argIdList.size();
     assert(n <= 4);
-
-    std::vector<uint32_t> resultIds;
-    resultIds.push_back(resultId());
 
     std::ostringstream functionName;
     functionName << ".any" << n;
 
-    compiler->emitCall(functionName.str(), resultIds, operandIds);
+    compiler->emitCall(functionName.str(), resIdList, argIdList);
 }
 
 // -----------------------------------------------------------------------------------

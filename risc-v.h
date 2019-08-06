@@ -119,7 +119,7 @@ struct RiscVCross : public Instruction {
 
 // Length instruction.
 struct RiscVLength : public Instruction {
-    RiscVLength(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), operandIds(operandIds) {
+    RiscVLength(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         for (auto operandId : operandIds) {
             addParameter(operandId);
@@ -127,7 +127,6 @@ struct RiscVLength : public Instruction {
     }
     uint32_t type; // result type
     uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
-    std::vector<uint32_t> operandIds; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpLength; }
     virtual std::string name() const { return "length"; }
@@ -136,7 +135,7 @@ struct RiscVLength : public Instruction {
 
 // Normalize instruction.
 struct RiscVNormalize : public Instruction {
-    RiscVNormalize(LineInfo& lineInfo, uint32_t type, const std::vector<uint32_t> resultIds, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), resultIds(resultIds), operandIds(operandIds) {
+    RiscVNormalize(LineInfo& lineInfo, uint32_t type, const std::vector<uint32_t> resultIds, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type) {
         for (auto resultId : resultIds) {
             addResult(resultId);
         }
@@ -145,8 +144,6 @@ struct RiscVNormalize : public Instruction {
         }
     }
     uint32_t type; // result type
-    std::vector<uint32_t> resultIds; // results from register
-    std::vector<uint32_t> operandIds; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpNormalize; }
     virtual std::string name() const { return "normalize"; }
@@ -155,7 +152,7 @@ struct RiscVNormalize : public Instruction {
 
 // Dot instruction.
 struct RiscVDot : public Instruction {
-    RiscVDot(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &vector1Ids, const std::vector<uint32_t> &vector2Ids) : Instruction(lineInfo), type(type), vector1Ids(vector1Ids), vector2Ids(vector2Ids) {
+    RiscVDot(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &vector1Ids, const std::vector<uint32_t> &vector2Ids) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         for (auto id : vector1Ids) {
             addParameter(id);
@@ -166,8 +163,6 @@ struct RiscVDot : public Instruction {
     }
     uint32_t type; // result type
     uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
-    std::vector<uint32_t> vector1Ids; // operands from register
-    std::vector<uint32_t> vector2Ids; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpDot; }
     virtual std::string name() const { return "dot"; }
@@ -176,7 +171,7 @@ struct RiscVDot : public Instruction {
 
 // All instruction. Like the InsnAll instruction, but lists each sub-element of the vector.
 struct RiscVAll : public Instruction {
-    RiscVAll(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), operandIds(operandIds) {
+    RiscVAll(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         for (auto operandId : operandIds) {
             addParameter(operandId);
@@ -184,7 +179,6 @@ struct RiscVAll : public Instruction {
     }
     uint32_t type; // result type
     uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
-    std::vector<uint32_t> operandIds; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpAll; }
     virtual std::string name() const { return "all"; }
@@ -193,7 +187,7 @@ struct RiscVAll : public Instruction {
 
 // Any instruction. Like the InsnAny instruction, but lists each sub-element of the vector.
 struct RiscVAny : public Instruction {
-    RiscVAny(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type), operandIds(operandIds) {
+    RiscVAny(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         for (auto operandId : operandIds) {
             addParameter(operandId);
@@ -201,7 +195,6 @@ struct RiscVAny : public Instruction {
     }
     uint32_t type; // result type
     uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
-    std::vector<uint32_t> operandIds; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpAny; }
     virtual std::string name() const { return "any"; }
@@ -210,7 +203,7 @@ struct RiscVAny : public Instruction {
 
 // Distance instruction.
 struct RiscVDistance : public Instruction {
-    RiscVDistance(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &vector1Ids, const std::vector<uint32_t> &vector2Ids) : Instruction(lineInfo), type(type), vector1Ids(vector1Ids), vector2Ids(vector2Ids) {
+    RiscVDistance(LineInfo& lineInfo, uint32_t type, uint32_t resultId, const std::vector<uint32_t> &vector1Ids, const std::vector<uint32_t> &vector2Ids) : Instruction(lineInfo), type(type) {
         addResult(resultId);
         for (auto id : vector1Ids) {
             addParameter(id);
@@ -221,8 +214,6 @@ struct RiscVDistance : public Instruction {
     }
     uint32_t type; // result type
     uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
-    std::vector<uint32_t> vector1Ids; // operands from register
-    std::vector<uint32_t> vector2Ids; // operands from register
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpDistance; }
     virtual std::string name() const { return "distance"; }
