@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <cassert>
 #include <cstdlib>
+#include <thread>
+#include <mutex>
 #include "gpuemu.h"
 #include "timer.h"
 
@@ -251,6 +253,8 @@ void usage(const char* progname)
     printf("\t-v        Print memory access\n");
     printf("\t-S        show the disassembly of the SPIR-V code\n");
     printf("\t--term    draw output image on terminal (in addition to file)\n");
+    printf("\t-j N      Use N threads [%d]\n",
+            int(std::thread::hardware_concurrency()));
 }
 
 
@@ -264,6 +268,7 @@ int main(int argc, char **argv)
     float frameTime = 1.5f;
     int specificPixelX = -1;
     int specificPixelY = -1;
+    int threadCount = std::thread::hardware_concurrency();
 
     char *progname = argv[0];
     argv++; argc--;
@@ -289,6 +294,15 @@ int main(int argc, char **argv)
 
             printCoreDiff = true;
             argv++; argc--;
+
+        } else if(strcmp(argv[0], "-j") == 0) {
+
+            if(argc < 2) {
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            threadCount = atoi(argv[1]);
+            argv += 2; argc -= 2;
 
         } else if(strcmp(argv[0], "--term") == 0) {
 
@@ -364,11 +378,6 @@ int main(int argc, char **argv)
         textAddressesToSymbols[address] = symbol;
 
     data_bytes.resize(data_bytes.size() + 0x10000);
-    ReadWriteMemory data_memory(data_bytes, false);
-    ReadOnlyMemory text_memory(text_bytes, false);
-
-    GPUCore core(text_symbols);
-    GPUCore::Status status;
 
     int imageWidth = 320;
     int imageHeight = 180;
@@ -390,10 +399,6 @@ int main(int argc, char **argv)
         }
     }
 
-    if (data_symbols.find(".anonymous") != data_symbols.end()) {
-        set(data_memory, data_symbols[".anonymous"], v3float{fw, fh, one});
-        set(data_memory, data_symbols[".anonymous"] + sizeof(v3float), frameTime);
-    }
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
 
     uint32_t gl_FragCoordAddress = data_symbols["gl_FragCoord"];
@@ -415,9 +420,24 @@ int main(int argc, char **argv)
         afterlastY = startY + 1;
     }
 
-    for(int j = startY; j < afterlastY; j++)
-        for(int i = startX; i < afterlastX; i++) {
+    std::cout << "Using " << threadCount << " threads.\n";
 
+    std::mutex mtx;
+    std::set<std::string> substitutedFunctions;
+
+    for(int j = startY; j < afterlastY; j++) {
+        ReadWriteMemory data_memory(data_bytes, false);
+        ReadOnlyMemory text_memory(text_bytes, false);
+
+        if (data_symbols.find(".anonymous") != data_symbols.end()) {
+            set(data_memory, data_symbols[".anonymous"], v3float{fw, fh, one});
+            set(data_memory, data_symbols[".anonymous"] + sizeof(v3float), frameTime);
+        }
+
+        GPUCore core(text_symbols);
+        GPUCore::Status status;
+
+        for(int i = startX; i < afterlastX; i++) {
             set(data_memory, gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
             set(data_memory, colorAddress, v4float{1, 1, 1, 1});
             if(false) // XXX TODO: when iTime is exported by compilation
@@ -466,19 +486,25 @@ int main(int argc, char **argv)
             float g = intToFloat(ig);
             float b = intToFloat(ib);
             // float a = *reinterpret_cast<float*>(&ia);
-            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 0] = std::clamp(int(r * 255.99), 0, 255);
-            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 1] = std::clamp(int(g * 255.99), 0, 255);
-            img[3 * ((imageHeight - 1 - j) * imageWidth + i) + 2] = std::clamp(int(b * 255.99), 0, 255);
+            int pixelOffset = 3 * ((imageHeight - 1 - j) * imageWidth + i);
+            img[pixelOffset + 0] = std::clamp(int(r * 255.99), 0, 255);
+            img[pixelOffset + 1] = std::clamp(int(g * 255.99), 0, 255);
+            img[pixelOffset + 2] = std::clamp(int(b * 255.99), 0, 255);
         }
+
+        {
+            std::lock_guard<std::mutex> lck (mtx);
+            substitutedFunctions.insert(core.substitutedFunctions.begin(), core.substitutedFunctions.end());
+        }
+    }
+    for(auto& subst: substitutedFunctions) {
+        std::cout << "substituted for " << subst << '\n';
+    }
     std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";
     std::cout << dispatchedCount << " instructions executed.\n";
     float fps = 50000000.0f / dispatchedCount;
     std::cout << fps << " fps estimated at 50 MHz.\n";
     std::cout << "at least " << (int)ceilf(5.0 / fps) << " cores required at 50 MHz for 5 fps.\n";
-
-    for(auto& subst: core.substitutedFunctions) {
-        std::cout << "substituted for " << subst << '\n';
-    }
 
     FILE *fp = fopen("emulated.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", imageWidth, imageHeight);
