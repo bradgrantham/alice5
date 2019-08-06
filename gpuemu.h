@@ -880,10 +880,16 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 break;
                             }
                             case SUBST_DISTANCE3: {
-                                uint32_t x = pop32();
-                                uint32_t y = pop32();
-                                uint32_t z = pop32();
-                                push32(sqrtf(x*x + y*y + z*z));
+                                float x1 = popf();
+                                float y1 = popf();
+                                float z1 = popf();
+                                float x2 = popf();
+                                float y2 = popf();
+                                float z2 = popf();
+                                float dx = x1 - x2;
+                                float dy = y1 - y2;
+                                float dz = z1 - z2;
+                                push32(sqrtf(dx*dx + dy*dy + dz*dz));
                                 break;
                             }
                             case SUBST_DISTANCE4: {
