@@ -1,5 +1,11 @@
 #!/bin/bash
 
+animate=0
+if [ "$1" == "--animate" ]; then
+    animate=1
+    shift
+fi
+
 program="$1"
 if [ "$program" == "" ]; then
     echo "Usage: $0 program.frag"
@@ -8,6 +14,24 @@ fi
 
 make -j && \
     ./shade -c -O -o out.s -v -S "$program" > out && \
-    ./as -v out.s > out.lst && \
-    ./gpuemu -j 1 -f 90 --term out.o
+    ./as -v out.s > out.lst
+if [ $? != 0 ]; then
+    exit 1
+fi
+
+if [ "$animate" == "1" ]; then
+    if [ -d anim ]; then
+        rm -r anim
+    fi
+    mkdir anim
+
+    seq 0 199 | while read frame; do
+        ./gpuemu -f $frame --term out.o
+        mv emulated.ppm anim/out-$(printf "%03d" $frame).ppm
+    done
+
+    convert anim/*.ppm out.gif
+else
+    ./gpuemu -f 90 --term out.o
+fi
 
