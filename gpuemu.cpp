@@ -338,7 +338,6 @@ void showProgress(const CoreTemplate* tmpl, CoreShared* shared, std::chrono::tim
     std::cout << "                                                             \r";
 }
 
-
 void render(const CoreTemplate* tmpl, CoreShared* shared, int start_row, int skip_rows)
 {
     uint64_t coreDispatchedCount = 0;
@@ -579,6 +578,7 @@ int main(int argc, char **argv)
     std::cout << "Using " << threadCount << " threads.\n";
 
     std::vector<std::thread *> thread;
+
     for (int t = 0; t < threadCount; t++) {
         thread.push_back(new std::thread(render, &tmpl, &shared, tmpl.startY + t, threadCount));
     }
@@ -588,7 +588,7 @@ int main(int argc, char **argv)
     thread.push_back(new std::thread(showProgress, &tmpl, &shared, frameElapsed.startTime()));
 
     // Wait for worker threads to quit.
-    for (size_t t = 0; t < thread.size(); t++) {
+    while(!thread.empty()) {
         std::thread* td = thread.back();
         thread.pop_back();
         td->join();
