@@ -207,6 +207,14 @@ void set(MEMORY& memory, uint32_t address, const std::array<TYPE, N>& value)
         memory.write32(address + i * sizeof(uint32_t), *reinterpret_cast<const uint32_t*>(&value[i]));
 }
 
+template <class MEMORY, class TYPE, unsigned long N>
+void get(MEMORY& memory, uint32_t address, std::array<TYPE, N>& value)
+{
+    static_assert(sizeof(TYPE) == sizeof(uint32_t));
+    for(unsigned long i = 0; i < N; i++)
+        *reinterpret_cast<uint32_t*>(&value[i]) = memory.read32(address + i * sizeof(uint32_t));
+}
+
 typedef std::array<float,1> v1float;
 typedef std::array<uint32_t,1> v1uint;
 typedef std::array<int32_t,1> v1int;
@@ -478,18 +486,12 @@ int main(int argc, char **argv)
                 exit(EXIT_FAILURE);
             }
 
-            uint32_t ir = data_memory.read32(data_symbols["color"] +  0);
-            uint32_t ig = data_memory.read32(data_symbols["color"] +  4);
-            uint32_t ib = data_memory.read32(data_symbols["color"] +  8);
-            // uint32_t ia = data_memory.read32(data_symbols["color"] + 12);
-            float r = intToFloat(ir);
-            float g = intToFloat(ig);
-            float b = intToFloat(ib);
-            // float a = *reinterpret_cast<float*>(&ia);
+            v3float rgb;
+            get(data_memory, data_symbols["color"], rgb);
+
             int pixelOffset = 3 * ((imageHeight - 1 - j) * imageWidth + i);
-            img[pixelOffset + 0] = std::clamp(int(r * 255.99), 0, 255);
-            img[pixelOffset + 1] = std::clamp(int(g * 255.99), 0, 255);
-            img[pixelOffset + 2] = std::clamp(int(b * 255.99), 0, 255);
+            for(int c = 0; c < 3; c++)
+                img[pixelOffset + c] = std::clamp(int(rgb[c] * 255.99), 0, 255);
         }
 
         {
