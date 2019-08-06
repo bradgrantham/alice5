@@ -61,11 +61,12 @@ void dumpRegsDiff(const GPUCore::Registers& prev, const GPUCore::Registers& cur)
     }
     std::cout << std::setfill(' ');
 }
-struct Memory
+
+struct ReadOnlyMemory
 {
     std::vector<uint8_t> memorybytes;
     bool verbose;
-    Memory(const std::vector<uint8_t>& memorybytes_, bool verbose_ = false) :
+    ReadOnlyMemory(const std::vector<uint8_t>& memorybytes_, bool verbose_ = false) :
         memorybytes(memorybytes_),
         verbose(verbose_)
     {}
@@ -99,6 +100,13 @@ struct Memory
         assert(addr + 3 < memorybytes.size());
         return *reinterpret_cast<float*>(memorybytes.data() + addr);
     }
+};
+
+struct ReadWriteMemory : public ReadOnlyMemory
+{
+    ReadWriteMemory(const std::vector<uint8_t>& memorybytes_, bool verbose_ = false) :
+        ReadOnlyMemory(memorybytes_, verbose_)
+    {}
     void write8(uint32_t addr, uint32_t v)
     {
         if(verbose) printf("write 8 bits of %08X to %08X\n", v, addr);
@@ -131,46 +139,53 @@ struct Memory
     }
 };
 
-bool ReadBinary(std::ifstream& binaryFile, RunHeader1& header, SymbolTable& symbols, std::vector<uint8_t>& bytes)
+bool ReadBinary(std::ifstream& binaryFile, RunHeader2& header, SymbolTable& text_symbols, SymbolTable& data_symbols, std::vector<uint8_t>& text_bytes, std::vector<uint8_t>& data_bytes)
 {
+    // TODO: dangerous because of struct packing?
     binaryFile.read(reinterpret_cast<char*>(&header), sizeof(header));
     if(!binaryFile) {
         std::cerr << "failed to read header, only " << binaryFile.gcount() << " bytes read\n";
         return false;
     }
 
-    if(header.magic != RunHeader1MagicExpected) {
+    if(header.magic != RunHeader2MagicExpected) {
         std::cerr << "magic read did not match magic expected for RunHeader1\n";
         return false;
     }
 
     for(uint32_t i = 0; i < header.symbolCount; i++) {
-        uint32_t addressAndLength[2];
+        uint32_t symbolData[3];
 
-        binaryFile.read(reinterpret_cast<char*>(addressAndLength), sizeof(addressAndLength));
+        binaryFile.read(reinterpret_cast<char*>(symbolData), sizeof(symbolData));
         if(!binaryFile) {
             std::cerr << "failed to read address and length for symbol " << i << " only " << binaryFile.gcount() << " bytes read\n";
             return false;
         }
 
-        std::string symbol;
-        symbol.resize(addressAndLength[1] - 1);
+        uint32_t symbolAddress = symbolData[0];
+        bool symbolInDataSegment = symbolData[1] != 0;
+        uint32_t symbolStringLength = symbolData[2];
 
-        binaryFile.read(symbol.data(), addressAndLength[1]);
+        std::string symbol;
+        symbol.resize(symbolStringLength - 1);
+
+        binaryFile.read(symbol.data(), symbolStringLength);
         if(!binaryFile) {
             std::cerr << "failed to symbol string for symbol " << i << " only " << binaryFile.gcount() << " bytes read\n";
             return false;
         }
 
-        symbols[symbol] = addressAndLength[0];
+        if(symbolInDataSegment) {
+            data_symbols[symbol] = symbolAddress;
+        } else {
+            text_symbols[symbol] = symbolAddress;
+        }
     }
 
-    std::ifstream::pos_type bytesStart = binaryFile.tellg();
-    binaryFile.seekg(0, std::ios::end);
-    std::ifstream::pos_type bytesEnd = binaryFile.tellg();
-    binaryFile.seekg(bytesStart, std::ios::beg);
-    bytes.resize(bytesEnd - bytesStart);
-    binaryFile.read(reinterpret_cast<char*>(bytes.data()), bytesEnd - bytesStart);
+    text_bytes.resize(header.textByteCount);
+    data_bytes.resize(header.dataByteCount);
+    binaryFile.read(reinterpret_cast<char*>(text_bytes.data()), header.textByteCount);
+    binaryFile.read(reinterpret_cast<char*>(data_bytes.data()), header.dataByteCount);
 
     return true;
 }
@@ -318,35 +333,41 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    RunHeader1 header;
-    SymbolTable symbols;
-    std::vector<uint8_t> bytes;
+    RunHeader2 header;
+    SymbolTable text_symbols;
+    SymbolTable data_symbols;
+    std::vector<uint8_t> text_bytes;
+    std::vector<uint8_t> data_bytes;
 
     std::ifstream binaryFile(argv[0], std::ios::in | std::ios::binary);
     if(!binaryFile.good()) {
         throw std::runtime_error(std::string("couldn't open file ") + argv[0] + " for reading");
     }
 
-    if(!ReadBinary(binaryFile, header, symbols, bytes)) {
+    if(!ReadBinary(binaryFile, header, text_symbols, data_symbols, text_bytes, data_bytes)) {
         exit(EXIT_FAILURE);
     }
 
     if(printSymbols) {
-        for(auto& [symbol, address]: symbols) {
-            std::cout << "symbol \"" << symbol << "\" is at " << address << "\n";
+        for(auto& [symbol, address]: text_symbols) {
+            std::cout << "text segment symbol \"" << symbol << "\" is at " << address << "\n";
+        }
+        for(auto& [symbol, address]: data_symbols) {
+            std::cout << "data segment symbol \"" << symbol << "\" is at " << address << "\n";
         }
     }
 
     binaryFile.close();
 
-    AddressToSymbolMap addressesToSymbols;
-    for(auto& [symbol, address]: symbols)
-        addressesToSymbols[address] = symbol;
+    AddressToSymbolMap textAddressesToSymbols;
+    for(auto& [symbol, address]: text_symbols)
+        textAddressesToSymbols[address] = symbol;
 
-    bytes.resize(bytes.size() + 0x10000);
-    Memory m(bytes, false);
+    data_bytes.resize(data_bytes.size() + 0x10000);
+    ReadWriteMemory data_memory(data_bytes, false);
+    ReadOnlyMemory text_memory(text_bytes, false);
 
-    GPUCore core(symbols);
+    GPUCore core(text_symbols);
     GPUCore::Status status;
 
     int imageWidth = 320;
@@ -357,27 +378,27 @@ int main(int argc, char **argv)
     // float zero = 0.0;
     float one = 1.0;
     for(auto& s: { "gl_FragCoord", "color"}) {
-        if (symbols.find(s) == symbols.end()) {
+        if (data_symbols.find(s) == data_symbols.end()) {
             std::cerr << "No memory location for required variable " << s << ".\n";
             exit(EXIT_FAILURE);
         }
     }
     for(auto& s: { "iResolution", "iTime", "iMouse"}) {
-        if (symbols.find(s) == symbols.end()) {
+        if (data_symbols.find(s) == data_symbols.end()) {
             // Don't warn, these are in the anonymous params.
             // std::cerr << "Warning: No memory location for variable " << s << ".\n";
         }
     }
 
-    if (symbols.find(".anonymous") != symbols.end()) {
-        set(m, symbols[".anonymous"], v3float{fw, fh, one});
-        set(m, symbols[".anonymous"] + sizeof(v3float), frameTime);
+    if (data_symbols.find(".anonymous") != data_symbols.end()) {
+        set(data_memory, data_symbols[".anonymous"], v3float{fw, fh, one});
+        set(data_memory, data_symbols[".anonymous"] + sizeof(v3float), frameTime);
     }
     unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
 
-    uint32_t gl_FragCoordAddress = symbols["gl_FragCoord"];
-    uint32_t colorAddress = symbols["color"];
-    uint32_t iTimeAddress = symbols["iTime"];
+    uint32_t gl_FragCoordAddress = data_symbols["gl_FragCoord"];
+    uint32_t colorAddress = data_symbols["color"];
+    uint32_t iTimeAddress = data_symbols["iTime"];
 
     Timer frameElapsed;
     uint64_t dispatchedCount = 0;
@@ -397,13 +418,13 @@ int main(int argc, char **argv)
     for(int j = startY; j < afterlastY; j++)
         for(int i = startX; i < afterlastX; i++) {
 
-            set(m, gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
-            set(m, colorAddress, v4float{1, 1, 1, 1});
+            set(data_memory, gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
+            set(data_memory, colorAddress, v4float{1, 1, 1, 1});
             if(false) // XXX TODO: when iTime is exported by compilation
-                set(m, iTimeAddress, frameTime);
+                set(data_memory, iTimeAddress, frameTime);
 
             core.regs.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
-            core.regs.x[2] = bytes.size(); // Set SP to end of memory 
+            core.regs.x[2] = data_bytes.size(); // Set SP to end of memory 
             core.regs.pc = header.initialPC;
 
             if(disassemble) {
@@ -413,12 +434,14 @@ int main(int argc, char **argv)
                 do {
                     GPUCore::Registers oldRegs = core.regs;
                     if(disassemble) {
-                        print_inst(core.regs.pc, m.read32(core.regs.pc), addressesToSymbols);
+                        print_inst(core.regs.pc, text_memory.read32(core.regs.pc), textAddressesToSymbols);
                     }
-                    m.verbose = verboseMemory;
-                    status = core.step(m);
+                    data_memory.verbose = verboseMemory;
+                    text_memory.verbose = verboseMemory;
+                    status = core.step(text_memory, data_memory);
                     dispatchedCount ++;
-                    m.verbose = false;
+                    data_memory.verbose = false;
+                    text_memory.verbose = false;
                     if(printCoreDiff) {
                         dumpRegsDiff(oldRegs, core.regs);
                     }
@@ -435,10 +458,10 @@ int main(int argc, char **argv)
                 exit(EXIT_FAILURE);
             }
 
-            uint32_t ir = m.read32(symbols["color"] +  0);
-            uint32_t ig = m.read32(symbols["color"] +  4);
-            uint32_t ib = m.read32(symbols["color"] +  8);
-            // uint32_t ia = m.read32(symbols["color"] + 12);
+            uint32_t ir = data_memory.read32(data_symbols["color"] +  0);
+            uint32_t ig = data_memory.read32(data_symbols["color"] +  4);
+            uint32_t ib = data_memory.read32(data_symbols["color"] +  8);
+            // uint32_t ia = data_memory.read32(data_symbols["color"] + 12);
             float r = intToFloat(ir);
             float g = intToFloat(ig);
             float b = intToFloat(ib);
