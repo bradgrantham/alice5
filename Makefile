@@ -41,7 +41,7 @@ as: as.cpp $(DIS_OBJ)
 	$(CXX) --std=c++17 -Wall as.cpp $(DIS_OBJ) -o $@
 
 gpuemu: gpuemu.cpp $(DIS_OBJ) gpuemu.h
-	$(CXX) $(CXXFLAGS) --std=c++17 -Wall gpuemu.cpp $(DIS_OBJ) -o $@
+	$(CXX) $(CXXFLAGS) --std=c++17 -Wall gpuemu.cpp $(DIS_OBJ) -lpthread -o $@
 
 pcopy_test: pcopy_test.cpp pcopy.cpp pcopy.h
 	$(CXX) $(CXXFLAGS) --std=c++17 -Wall pcopy_test.cpp pcopy.cpp -o $@
