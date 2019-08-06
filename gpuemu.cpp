@@ -265,18 +265,126 @@ void usage(const char* progname)
             int(std::thread::hardware_concurrency()));
 }
 
+bool printDisassembly = false;
+bool printMemoryAccess = false;
+bool printCoreDiff = false;
+
+struct GPUShared
+{
+    std::mutex rendererMutex;
+    bool coreException = false;
+    unsigned char *img;
+    std::set<std::string> substitutedFunctions;
+    uint64_t dispatchedCount = 0;
+};
+
+struct coreTemplate
+{
+    std::vector<uint8_t> text_bytes;
+    std::vector<uint8_t> data_bytes;
+    SymbolTable text_symbols;
+    SymbolTable data_symbols;
+    uint32_t initialPC;
+    int imageWidth;
+    int imageHeight;
+    float frameTime;
+    int startX;
+    int startY;
+    int afterLastX;
+    int afterLastY;
+    AddressToSymbolMap textAddressesToSymbols;
+    uint32_t gl_FragCoordAddress;
+    uint32_t colorAddress;
+    uint32_t iTimeAddress;
+};
+
+void render(const coreTemplate& tmpl, GPUShared& shared, int start_row, int skip_rows)
+{
+    uint64_t coreDispatchedCount = 0;
+    ReadWriteMemory data_memory(tmpl.data_bytes, false);
+    ReadOnlyMemory text_memory(tmpl.text_bytes, false);
+
+    const float fw = tmpl.imageWidth;
+    const float fh = tmpl.imageHeight;
+    const float one = 1.0;
+
+    if (tmpl.data_symbols.find(".anonymous") != tmpl.data_symbols.end()) {
+        set(data_memory, tmpl.data_symbols.find(".anonymous")->second, v3float{fw, fh, one});
+        set(data_memory, tmpl.data_symbols.find(".anonymous")->second + sizeof(v3float), tmpl.frameTime);
+    }
+
+    GPUCore core(tmpl.text_symbols);
+    GPUCore::Status status;
+
+    for(int j = start_row; j < tmpl.afterLastY; j += skip_rows) {
+        for(int i = tmpl.startX; i < tmpl.afterLastX; i++) {
+            if(shared.coreException)
+                return;
+            set(data_memory, tmpl.gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
+            set(data_memory, tmpl.colorAddress, v4float{1, 1, 1, 1});
+            if(false) // XXX TODO: when iTime is exported by compilation
+                set(data_memory, tmpl.iTimeAddress, tmpl.frameTime);
+
+            core.regs.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
+            core.regs.x[2] = tmpl.data_bytes.size(); // Set SP to end of memory 
+            core.regs.pc = tmpl.initialPC;
+
+            if(printDisassembly) {
+                std::cout << "; pixel " << i << ", " << j << '\n';
+            }
+            try {
+                do {
+                    GPUCore::Registers oldRegs = core.regs;
+                    if(printDisassembly) {
+                        print_inst(core.regs.pc, text_memory.read32(core.regs.pc), tmpl.textAddressesToSymbols);
+                    }
+                    data_memory.verbose = printMemoryAccess;
+                    text_memory.verbose = printMemoryAccess;
+                    status = core.step(text_memory, data_memory);
+                    coreDispatchedCount ++;
+                    data_memory.verbose = false;
+                    text_memory.verbose = false;
+                    if(printCoreDiff) {
+                        dumpRegsDiff(oldRegs, core.regs);
+                    }
+                } while(core.regs.pc != 0xffffffff && status == GPUCore::RUNNING);
+            } catch(const std::exception& e) {
+                std::cerr << "core " << start_row << ", " << e.what() << '\n';
+                dumpGPUCore(core);
+                shared.coreException = true;
+                return;
+            }
+
+            if(status != GPUCore::BREAK) {
+                std::cerr << "core " << start_row << ", " << "unexpected core step result " << status << '\n';
+                dumpGPUCore(core);
+                shared.coreException = true;
+                return;
+            }
+
+            v3float rgb;
+            get(data_memory, tmpl.data_symbols.find("color")->second, rgb);
+
+            int pixelOffset = 3 * ((tmpl.imageHeight - 1 - j) * tmpl.imageWidth + i);
+            for(int c = 0; c < 3; c++)
+                shared.img[pixelOffset + c] = std::clamp(int(rgb[c] * 255.99), 0, 255);
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lck (shared.rendererMutex);
+        shared.dispatchedCount += coreDispatchedCount;
+        shared.substitutedFunctions.insert(core.substitutedFunctions.begin(), core.substitutedFunctions.end());
+    }
+}
 
 int main(int argc, char **argv)
 {
-    bool verboseMemory = false;
-    bool disassemble = false;
-    bool printCoreDiff = false;
     bool imageToTerminal = false;
     bool printSymbols = false;
-    float frameTime = 1.5f;
     int specificPixelX = -1;
     int specificPixelY = -1;
     int threadCount = std::thread::hardware_concurrency();
+    coreTemplate tmpl;
 
     char *progname = argv[0];
     argv++; argc--;
@@ -284,7 +392,7 @@ int main(int argc, char **argv)
     while(argc > 0 && argv[0][0] == '-') {
         if(strcmp(argv[0], "-v") == 0) {
 
-            verboseMemory = true;
+            printMemoryAccess = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "--pixel") == 0) {
@@ -319,7 +427,7 @@ int main(int argc, char **argv)
 
         } else if(strcmp(argv[0], "-S") == 0) {
 
-            disassemble = true;
+            printDisassembly = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-f") == 0) {
@@ -329,7 +437,7 @@ int main(int argc, char **argv)
                 usage(progname);
                 exit(EXIT_FAILURE);
             }
-            frameTime = atoi(argv[1]) / 60.0f;
+            tmpl.frameTime = atoi(argv[1]) / 60.0f;
             argv+=2; argc-=2;
 
         } else if(strcmp(argv[0], "-d") == 0) {
@@ -356,171 +464,102 @@ int main(int argc, char **argv)
     }
 
     RunHeader2 header;
-    SymbolTable text_symbols;
-    SymbolTable data_symbols;
-    std::vector<uint8_t> text_bytes;
-    std::vector<uint8_t> data_bytes;
 
     std::ifstream binaryFile(argv[0], std::ios::in | std::ios::binary);
     if(!binaryFile.good()) {
         throw std::runtime_error(std::string("couldn't open file ") + argv[0] + " for reading");
     }
 
-    if(!ReadBinary(binaryFile, header, text_symbols, data_symbols, text_bytes, data_bytes)) {
+    if(!ReadBinary(binaryFile, header, tmpl.text_symbols, tmpl.data_symbols, tmpl.text_bytes, tmpl.data_bytes)) {
         exit(EXIT_FAILURE);
     }
 
+    tmpl.initialPC = header.initialPC;
+
     if(printSymbols) {
-        for(auto& [symbol, address]: text_symbols) {
+        for(auto& [symbol, address]: tmpl.text_symbols) {
             std::cout << "text segment symbol \"" << symbol << "\" is at " << address << "\n";
         }
-        for(auto& [symbol, address]: data_symbols) {
+        for(auto& [symbol, address]: tmpl.data_symbols) {
             std::cout << "data segment symbol \"" << symbol << "\" is at " << address << "\n";
         }
     }
 
     binaryFile.close();
 
-    AddressToSymbolMap textAddressesToSymbols;
-    for(auto& [symbol, address]: text_symbols)
-        textAddressesToSymbols[address] = symbol;
+    for(auto& [symbol, address]: tmpl.text_symbols)
+        tmpl.textAddressesToSymbols[address] = symbol;
 
-    data_bytes.resize(data_bytes.size() + 0x10000);
+    tmpl.data_bytes.resize(tmpl.data_bytes.size() + 0x10000);
 
-    int imageWidth = 320;
-    int imageHeight = 180;
+    tmpl.imageWidth = 320;
+    tmpl.imageHeight = 180;
 
-    float fw = imageWidth;
-    float fh = imageHeight;
-    // float zero = 0.0;
-    float one = 1.0;
     for(auto& s: { "gl_FragCoord", "color"}) {
-        if (data_symbols.find(s) == data_symbols.end()) {
+        if (tmpl.data_symbols.find(s) == tmpl.data_symbols.end()) {
             std::cerr << "No memory location for required variable " << s << ".\n";
             exit(EXIT_FAILURE);
         }
     }
     for(auto& s: { "iResolution", "iTime", "iMouse"}) {
-        if (data_symbols.find(s) == data_symbols.end()) {
+        if (tmpl.data_symbols.find(s) == tmpl.data_symbols.end()) {
             // Don't warn, these are in the anonymous params.
             // std::cerr << "Warning: No memory location for variable " << s << ".\n";
         }
     }
 
-    unsigned char *img = new unsigned char[imageWidth * imageHeight * 3];
+    GPUShared shared;
+    shared.img = new unsigned char[tmpl.imageWidth * tmpl.imageHeight * 3];
 
-    uint32_t gl_FragCoordAddress = data_symbols["gl_FragCoord"];
-    uint32_t colorAddress = data_symbols["color"];
-    uint32_t iTimeAddress = data_symbols["iTime"];
+    tmpl.gl_FragCoordAddress = tmpl.data_symbols["gl_FragCoord"];
+    tmpl.colorAddress = tmpl.data_symbols["color"];
+    tmpl.iTimeAddress = tmpl.data_symbols["iTime"];
 
     Timer frameElapsed;
-    uint64_t dispatchedCount = 0;
 
-    int startX = 0;
-    int afterlastX = imageWidth;
-    int startY = 0;
-    int afterlastY = imageHeight;
+    tmpl.startX = 0;
+    tmpl.afterLastX = tmpl.imageWidth;
+    tmpl.startY = 0;
+    tmpl.afterLastY = tmpl.imageHeight;
 
     if(specificPixelX != -1) {
-        startX = specificPixelX;
-        afterlastX = startX + 1;
-        startY = specificPixelY;
-        afterlastY = startY + 1;
+        tmpl.startX = specificPixelX;
+        tmpl.afterLastX = specificPixelX + 1;
+        tmpl.startY = specificPixelY;
+        tmpl.afterLastY = specificPixelY + 1;
     }
 
     std::cout << "Using " << threadCount << " threads.\n";
 
-    std::mutex mtx;
-    std::set<std::string> substitutedFunctions;
-
-    for(int j = startY; j < afterlastY; j++) {
-        ReadWriteMemory data_memory(data_bytes, false);
-        ReadOnlyMemory text_memory(text_bytes, false);
-
-        if (data_symbols.find(".anonymous") != data_symbols.end()) {
-            set(data_memory, data_symbols[".anonymous"], v3float{fw, fh, one});
-            set(data_memory, data_symbols[".anonymous"] + sizeof(v3float), frameTime);
-        }
-
-        GPUCore core(text_symbols);
-        GPUCore::Status status;
-
-        for(int i = startX; i < afterlastX; i++) {
-            set(data_memory, gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
-            set(data_memory, colorAddress, v4float{1, 1, 1, 1});
-            if(false) // XXX TODO: when iTime is exported by compilation
-                set(data_memory, iTimeAddress, frameTime);
-
-            core.regs.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
-            core.regs.x[2] = data_bytes.size(); // Set SP to end of memory 
-            core.regs.pc = header.initialPC;
-
-            if(disassemble) {
-                std::cout << "; pixel " << i << ", " << j << '\n';
-            }
-            try {
-                do {
-                    GPUCore::Registers oldRegs = core.regs;
-                    if(disassemble) {
-                        print_inst(core.regs.pc, text_memory.read32(core.regs.pc), textAddressesToSymbols);
-                    }
-                    data_memory.verbose = verboseMemory;
-                    text_memory.verbose = verboseMemory;
-                    status = core.step(text_memory, data_memory);
-                    dispatchedCount ++;
-                    data_memory.verbose = false;
-                    text_memory.verbose = false;
-                    if(printCoreDiff) {
-                        dumpRegsDiff(oldRegs, core.regs);
-                    }
-                } while(core.regs.pc != 0xffffffff && status == GPUCore::RUNNING);
-            } catch(const std::exception& e) {
-                std::cerr << e.what() << '\n';
-                dumpGPUCore(core);
-                exit(EXIT_FAILURE);
-            }
-
-            if(status != GPUCore::BREAK) {
-                std::cerr << "unexpected core step result " << status << '\n';
-                dumpGPUCore(core);
-                exit(EXIT_FAILURE);
-            }
-
-            v3float rgb;
-            get(data_memory, data_symbols["color"], rgb);
-
-            int pixelOffset = 3 * ((imageHeight - 1 - j) * imageWidth + i);
-            for(int c = 0; c < 3; c++)
-                img[pixelOffset + c] = std::clamp(int(rgb[c] * 255.99), 0, 255);
-        }
-
-        {
-            std::lock_guard<std::mutex> lck (mtx);
-            substitutedFunctions.insert(core.substitutedFunctions.begin(), core.substitutedFunctions.end());
+    for (int t = 0; t < threadCount; t++) {
+        render(tmpl, shared, t, threadCount);
+        if(shared.coreException) {
+            // kill other threads
+            exit(EXIT_FAILURE);
         }
     }
-    for(auto& subst: substitutedFunctions) {
+    for(auto& subst: shared.substitutedFunctions) {
         std::cout << "substituted for " << subst << '\n';
     }
     std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";
-    std::cout << dispatchedCount << " instructions executed.\n";
-    float fps = 50000000.0f / dispatchedCount;
+    std::cout << shared.dispatchedCount << " instructions executed.\n";
+    float fps = 50000000.0f / shared.dispatchedCount;
     std::cout << fps << " fps estimated at 50 MHz.\n";
     std::cout << "at least " << (int)ceilf(5.0 / fps) << " cores required at 50 MHz for 5 fps.\n";
 
     FILE *fp = fopen("emulated.ppm", "wb");
-    fprintf(fp, "P6 %d %d 255\n", imageWidth, imageHeight);
-    fwrite(img, 1, imageWidth * imageHeight * 3, fp);
+    fprintf(fp, "P6 %d %d 255\n", tmpl.imageWidth, tmpl.imageHeight);
+    fwrite(shared.img, 1, tmpl.imageWidth * tmpl.imageHeight * 3, fp);
     fclose(fp);
 
     if (imageToTerminal) {
         // https://www.iterm2.com/documentation-images.html
         std::ostringstream ss;
-        ss << "P6 " << imageWidth << " " << imageHeight << " 255\n";
-        ss.write(reinterpret_cast<char *>(img), 3*imageWidth*imageHeight);
+        ss << "P6 " << tmpl.imageWidth << " " << tmpl.imageHeight << " 255\n";
+        ss.write(reinterpret_cast<char *>(shared.img), 3*tmpl.imageWidth*tmpl.imageHeight);
         std::cout << "\033]1337;File=width="
-            << imageWidth << "px;height="
-            << imageHeight << "px;inline=1:"
+            << tmpl.imageWidth << "px;height="
+            << tmpl.imageHeight << "px;inline=1:"
             << base64Encode(ss.str()) << "\007\n";
     }
 }
