@@ -737,6 +737,20 @@ void Compiler::emitBinCall(const std::string &functionName, uint32_t resultId,
     emitCall(functionName, resultIds, operandIds);
 }
 
+void Compiler::emitTerCall(const std::string &functionName, uint32_t resultId,
+        uint32_t operand1Id, uint32_t operand2Id, uint32_t operand3Id) {
+
+    std::vector<uint32_t> operandIds;
+    std::vector<uint32_t> resultIds;
+
+    operandIds.push_back(operand1Id);
+    operandIds.push_back(operand2Id);
+    operandIds.push_back(operand3Id);
+    resultIds.push_back(resultId);
+
+    emitCall(functionName, resultIds, operandIds);
+}
+
 void Compiler::emit(const std::string &op, const std::string &comment) {
     std::ios oldState(nullptr);
     oldState.copyfmt(outFile);

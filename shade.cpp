@@ -164,6 +164,17 @@ void RiscVLength::emit(Compiler *compiler)
     compiler->emitCall(functionName.str(), resIdList, argIdList);
 }
 
+void RiscVReflect::emit(Compiler *compiler)
+{
+    size_t n = resIdList.size();
+    assert(n <= 4);
+
+    std::ostringstream functionName;
+    functionName << ".reflect" << n;
+
+    compiler->emitCall(functionName.str(), resIdList, argIdList);
+}
+
 void RiscVNormalize::emit(Compiler *compiler)
 {
     size_t n = argIdList.size();
@@ -623,6 +634,21 @@ void InsnGLSLstd450FMax::emit(Compiler *compiler)
 void InsnGLSLstd450Pow::emit(Compiler *compiler)
 {
     compiler->emitBinCall(".pow", resultId(), xId(), yId());
+}
+
+void InsnGLSLstd450FClamp::emit(Compiler *compiler)
+{
+    compiler->emitTerCall(".clamp", resultId(), xId(), minValId(), maxValId());
+}
+
+void InsnGLSLstd450FMix::emit(Compiler *compiler)
+{
+    compiler->emitTerCall(".mix", resultId(), xId(), yId(), aId());
+}
+
+void InsnGLSLstd450SmoothStep::emit(Compiler *compiler)
+{
+    compiler->emitTerCall(".smoothstep", resultId(), edge0Id(), edge1Id(), xId());
 }
 
 // -----------------------------------------------------------------------------------

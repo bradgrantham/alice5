@@ -34,6 +34,36 @@ uint32_t floatToInt(float f) {
     return u.i;
 }
 
+// --- Copied from interpreter.cpp. Didn't bother putting in shared file ---
+// --- because these will be deleted when we move them to library.s      ---
+
+// Returns the value x clamped to the range minVal to maxVal per the GLSL docs.
+static float fclamp(float x, float minVal, float maxVal)
+{
+    return fminf(fmaxf(x, minVal), maxVal);
+}
+
+// Compute the smoothstep function per the GLSL docs. They say that the
+// results are undefined if edge0 >= edge1, but we allow edge0 > edge1.
+static float smoothstep(float edge0, float edge1, float x)
+{
+    if (edge0 == edge1) {
+        return 0;
+    }
+
+    float t = fclamp((x - edge0)/(edge1 - edge0), 0.0, 1.0);
+
+    return t*t*(3 - 2*t);
+}
+
+// Mixes between x and y according to a.
+static float fmix(float x, float y, float a)
+{
+    return x*(1.0 - a) + y*a;
+}
+
+// -------------------------------------------------------------------------
+
 struct GPUCore
 {
     // Loosely modeled on RISC-V RVI, RVA, RVM, RVF
@@ -57,6 +87,9 @@ struct GPUCore
         SUBST_POW,
         SUBST_MAX,
         SUBST_MIN,
+        SUBST_CLAMP,
+        SUBST_MIX,
+        SUBST_SMOOTHSTEP,
         SUBST_NORMALIZE1,
         SUBST_NORMALIZE2,
         SUBST_NORMALIZE3,
@@ -128,6 +161,9 @@ struct GPUCore
             { ".pow", SUBST_POW },
             { ".max", SUBST_MAX },
             { ".min", SUBST_MIN },
+            { ".clamp", SUBST_CLAMP },
+            { ".mix", SUBST_MIX },
+            { ".smoothstep", SUBST_SMOOTHSTEP },
             { ".normalize1", SUBST_NORMALIZE1 },
             { ".normalize2", SUBST_NORMALIZE2 },
             { ".normalize3", SUBST_NORMALIZE3 },
@@ -663,6 +699,27 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 pushf(data_memory, x < y ? x : y);
                                 break;
                             }
+                            case SUBST_CLAMP: {
+                                float x = popf(data_memory);
+                                float minVal = popf(data_memory);
+                                float maxVal = popf(data_memory);
+                                pushf(data_memory, fclamp(x, minVal, maxVal));
+                                break;
+                            }
+                            case SUBST_MIX: {
+                                float x = popf(data_memory);
+                                float y = popf(data_memory);
+                                float a = popf(data_memory);
+                                pushf(data_memory, fmix(x, y, a));
+                                break;
+                            }
+                            case SUBST_SMOOTHSTEP: {
+                                float edge0 = popf(data_memory);
+                                float edge1 = popf(data_memory);
+                                float x = popf(data_memory);
+                                pushf(data_memory, smoothstep(edge0, edge1, x));
+                                break;
+                            }
                             case SUBST_COS: {
                                 pushf(data_memory, cosf(popf(data_memory)));
                                 break;
@@ -932,7 +989,19 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 break;
                             }
                             case SUBST_REFLECT3: {
-                                unimpl_subst(status);
+                                float ix = popf(data_memory);
+                                float iy = popf(data_memory);
+                                float iz = popf(data_memory);
+                                float nx = popf(data_memory);
+                                float ny = popf(data_memory);
+                                float nz = popf(data_memory);
+                                float dot = ix*nx + iy*ny + iz*nz;
+                                float rx = ix - 2*dot*nx;
+                                float ry = iy - 2*dot*ny;
+                                float rz = iz - 2*dot*nz;
+                                pushf(data_memory, rx);
+                                pushf(data_memory, ry);
+                                pushf(data_memory, rz);
                                 break;
                             }
                             case SUBST_REFLECT4: {

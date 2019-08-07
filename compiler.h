@@ -163,6 +163,11 @@ struct Compiler {
     // Emit a call to a two-parameter floating-point routine.
     void emitBinCall(const std::string &functionName, uint32_t resultId,
             uint32_t operand1Id, uint32_t operand2Id);
+
+    // Emit a call to a three-parameter floating-point routine.
+    void emitTerCall(const std::string &functionName, uint32_t resultId,
+            uint32_t operand1Id, uint32_t operand2Id, uint32_t operand3Id);
+
     void emit(const std::string &op, const std::string &comment);
 
     // Just before a Branch or BranchConditional instruction, copy any

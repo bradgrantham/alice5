@@ -1049,6 +1049,7 @@ struct InsnGLSLstd450FClamp : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FClamp(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FClamp; }
     virtual std::string name() const { return "GLSLstd450FClamp"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450FMix instruction (code 46).
@@ -1067,6 +1068,7 @@ struct InsnGLSLstd450FMix : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450FMix(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450FMix; }
     virtual std::string name() const { return "GLSLstd450FMix"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Step instruction (code 48).
@@ -1102,6 +1104,7 @@ struct InsnGLSLstd450SmoothStep : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450SmoothStep(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450SmoothStep; }
     virtual std::string name() const { return "GLSLstd450SmoothStep"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Length instruction (code 66).

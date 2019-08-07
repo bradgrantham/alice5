@@ -13,6 +13,7 @@ enum {
     RiscVOpCross,
     RiscVOpMove,
     RiscVOpLength,
+    RiscVOpReflect,
     RiscVOpNormalize,
     RiscVOpDot,
     RiscVOpAll,
@@ -136,6 +137,23 @@ struct RiscVLength : public Instruction {
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpLength; }
     virtual std::string name() const { return "length"; }
+    virtual void emit(Compiler *compiler);
+};
+
+// Reflect instruction.
+struct RiscVReflect : public Instruction {
+    RiscVReflect(LineInfo& lineInfo, uint32_t type, const std::vector<uint32_t> resultIds, const std::vector<uint32_t> &operandIds) : Instruction(lineInfo), type(type) {
+        for (auto resultId : resultIds) {
+            addResult(resultId);
+        }
+        for (auto operandId : operandIds) {
+            addParameter(operandId);
+        }
+    }
+    uint32_t type; // result type
+    virtual void step(Interpreter *interpreter) { assert(false); }
+    virtual uint32_t opcode() const { return RiscVOpReflect; }
+    virtual std::string name() const { return "reflect"; }
     virtual void emit(Compiler *compiler);
 };
 

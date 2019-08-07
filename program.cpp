@@ -889,9 +889,38 @@ void Program::expandVectorsInBlock(Block *block) {
                  expandVectorsUniOp<InsnGLSLstd450Exp>(instruction, newList, replaced);
                  break;
 
-            case 0x10000 | GLSLstd450Reflect:
-                 expandVectorsBinOp<InsnGLSLstd450Reflect>(instruction, newList, replaced);
-                 break;
+            case 0x10000 | GLSLstd450Reflect: {
+                InsnGLSLstd450Reflect *insn = dynamic_cast<InsnGLSLstd450Reflect *>(instruction);
+
+                const TypeVector *typeVector = getTypeAsVector(resultTypes.at(insn->iId()));
+
+                std::vector<uint32_t> resultIds;
+                std::vector<uint32_t> operandIds;
+                if (typeVector != nullptr) {
+                    // Operand is vector.
+                    for (uint32_t i = 0; i < typeVector->count; i++) {
+                        resultIds.push_back(scalarize(insn->resultId(), i, typeVector->type));
+                    }
+                    for (uint32_t i = 0; i < typeVector->count; i++) {
+                        operandIds.push_back(scalarize(insn->iId(), i, typeVector->type));
+                    }
+                    for (uint32_t i = 0; i < typeVector->count; i++) {
+                        operandIds.push_back(scalarize(insn->nId(), i, typeVector->type));
+                    }
+                } else {
+                    // Operand is scalar.
+                    resultIds.push_back(insn->resultId());
+                    operandIds.push_back(insn->iId());
+                    operandIds.push_back(insn->nId());
+                }
+                newList.push_back(std::make_shared<RiscVReflect>(insn->lineInfo,
+                            insn->type,
+                            resultIds,
+                            operandIds));
+
+                replaced = true;
+                break;
+            }
 
             case 0x10000 | GLSLstd450Length: {
                 InsnGLSLstd450Length *insn = dynamic_cast<InsnGLSLstd450Length *>(instruction);
