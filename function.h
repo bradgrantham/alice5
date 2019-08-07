@@ -52,7 +52,7 @@ struct Function {
     void ensureMaxRegisters();
 
     // Compute live in and live out registers for each instruction.
-    void computeLiveness();
+    void computeLiveness(uint32_t spilledRegId);
 
     // Spill registers if they won't fit in our hardware registers. Returns
     // the ID of the spilled register, or NO_REGISTER if nothing was spilled.

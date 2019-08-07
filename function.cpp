@@ -241,11 +241,11 @@ void Function::ensureMaxRegisters() {
     // Set of registers that have already been spilled, so we don't spill them
     // again.
     std::set<uint32_t> alreadySpilled;
-    uint32_t spilledRegId;
+    uint32_t spilledRegId = NO_REGISTER;
 
     do {
-        computeLiveness();
-        dumpInstructions("After liveness");
+        computeLiveness(spilledRegId);
+        // dumpInstructions("After liveness");
         spilledRegId = spillIfNecessary(alreadySpilled);
         if (spilledRegId != NO_REGISTER) {
             alreadySpilled.insert(spilledRegId);
@@ -256,7 +256,7 @@ void Function::ensureMaxRegisters() {
 
 int ___count = 0; // XXX
 
-void Function::computeLiveness() {
+void Function::computeLiveness(uint32_t spilledRegId) {
     Timer timer;
     std::set<Instruction *> inst_worklist; // Instructions left to work on.
 
@@ -264,8 +264,19 @@ void Function::computeLiveness() {
     for (auto &[_, block] : blocks) {
         for (auto inst = block->instructions.head; inst; inst = inst->next) {
             inst_worklist.insert(inst.get());
-            inst->livein.clear();
-            inst->liveout.clear();
+
+            if (spilledRegId == NO_REGISTER) {
+                // Clear all info for initial liveness analysis.
+                inst->livein.clear();
+                inst->liveout.clear();
+            } else {
+                // We just spilled one register. No need to clear all, just do
+                // the one we spilled.
+                for (auto &[_, livein] : inst->livein) {
+                    livein.erase(spilledRegId);
+                }
+                inst->liveout.erase(spilledRegId);
+            }
         }
     }
 
