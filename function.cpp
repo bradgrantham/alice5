@@ -263,12 +263,11 @@ void Function::computeLiveness(uint32_t spilledRegId) {
     // Insert all instructions of all blocks.
     for (auto &[_, block] : blocks) {
         for (auto inst = block->instructions.head; inst; inst = inst->next) {
-            inst_worklist.insert(inst.get());
-
             if (spilledRegId == NO_REGISTER) {
                 // Clear all info for initial liveness analysis.
                 inst->livein.clear();
                 inst->liveout.clear();
+                inst_worklist.insert(inst.get());
             } else {
                 // We just spilled one register. No need to clear all, just do
                 // the one we spilled.
@@ -276,6 +275,11 @@ void Function::computeLiveness(uint32_t spilledRegId) {
                     livein.erase(spilledRegId);
                 }
                 inst->liveout.erase(spilledRegId);
+
+                if (inst->needLiveness) {
+                    inst_worklist.insert(inst.get());
+                    inst->needLiveness = false;
+                }
             }
         }
     }
@@ -503,6 +507,9 @@ uint32_t Function::spillVariable(Instruction *instruction, const std::set<uint32
                 // Rename the use.
                 inst->changeArg(regId, newRegId);
                 // XXX do we need to call recomputeArgs() if this is a RiscVPhi?
+
+                // Mark it as needing new liveness info.
+                inst->needLiveness = true;
             }
         }
     }
@@ -513,6 +520,9 @@ uint32_t Function::spillVariable(Instruction *instruction, const std::set<uint32
         LineInfo lineInfo;
         std::shared_ptr<Instruction> saveInstruction = std::make_shared<RiscVStore>(
                 lineInfo, varId, regId, NO_MEMORY_ACCESS_SEMANTIC, 0);
+
+        // Mark it as needing new liveness info.
+        saveInstruction->needLiveness = true;
 
         // Find the definition.
         found = false;

@@ -549,7 +549,7 @@ struct RiscVPhi;
 // Base class for individual instructions.
 struct Instruction {
     Instruction(const LineInfo& lineInfo)
-        : list(nullptr), lineInfo(lineInfo) {
+        : list(nullptr), lineInfo(lineInfo), needLiveness(false) {
 
         // Nothing.
     }
@@ -586,6 +586,9 @@ struct Instruction {
 
     // Registers that are live leaving this instruction.
     std::set<uint32_t> liveout;
+
+    // Whether we need to recompute liveness for this instruction.
+    bool needLiveness;
 
     // Step the interpreter forward one instruction.
     virtual void step(Interpreter *interpreter) = 0;
