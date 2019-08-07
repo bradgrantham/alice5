@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 
-if [ "$1" == "--compile" ]
-then
+interpret=true
+compile=false
+
+if [ "$1" == "--compile" ]; then
+    compile=true
+    interpret=false
+    shift
+elif [ "$1" == "--both" ]; then
     compile=true
     shift
-else
-    compile=false
 fi
 
 if [ "$1" == "" ]
@@ -18,17 +22,18 @@ else
 fi
 
 echo 
-for i in $shaders
+for shader in $shaders
 do
-    echo "============================================== $i"
-    if [ $compile = true ]; then
-        ./shade -c -O -o x.s shaders/$i.frag > /dev/null && \
+    echo "============================================== $shader"
+    if [ "$compile" = true ]; then
+        ./shade -c -O -o x.s shaders/$shader.frag > /dev/null && \
             ./as x.s && \
             ./gpuemu -f 90 --term x.o && \
-            mv emulated.ppm $i.ppm
-    else
-        ./shade --term -f 90 90 shaders/$i.frag
-        mv image0090.ppm $i.ppm
+            mv emulated.ppm $shader-compile.ppm
+    fi
+    if [ "$interpret" = true ]; then
+        ./shade --term -f 90 90 shaders/$shader.frag
+        mv image0090.ppm $shader-interpret.ppm
     fi
 done
 
