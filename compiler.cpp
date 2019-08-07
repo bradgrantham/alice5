@@ -590,7 +590,10 @@ std::string Compiler::reg(uint32_t id) const {
 }
 
 void Compiler::emitCopyVariable(uint32_t dst, uint32_t src, const std::string &comment) {
-    emitCopyRegister(asRegister(dst)->phy, asRegister(src)->phy, comment);
+    std::ostringstream ssc;
+    ssc << "r" << dst << " <- r" << src << comment;
+
+    emitCopyRegister(asRegister(dst)->phy, asRegister(src)->phy, ssc.str());
 }
 
 void Compiler::emitCopyRegister(uint32_t dst, uint32_t src, const std::string &comment) {

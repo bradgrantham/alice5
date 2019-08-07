@@ -306,32 +306,32 @@ void InsnLogicalNot::emit(Compiler *compiler)
 void InsnSelect::emit(Compiler *compiler)
 {
     // If conditionId() is true, pick object1Id(), else pick object2Id().
+
     std::string falseLabel = compiler->makeLocalLabel();
+    std::string endLabel = compiler->makeLocalLabel();
 
-    // Copy false value to result.
-    {
-        std::ostringstream ssc;
-        ssc << "r" << resultId() << " <- r" << object2Id() << " (false result)";
-        compiler->emitCopyVariable(resultId(), object2Id(), ssc.str());
-    }
-
-    // Skip copying true value if condition is false.
+    // Skip to false copy if condition is zero.
     {
         std::ostringstream ss;
         ss << "beq " << compiler->reg(conditionId()) << ", x0, " << falseLabel;
         std::ostringstream ssc;
-        ssc << "r" << conditionId();
+        ssc << "r" << conditionId() << " == 0 ?";
         compiler->emit(ss.str(), ssc.str());
     }
 
     // Copy true value to result.
+    compiler->emitCopyVariable(resultId(), object1Id(), " (true result)");
+
     {
-        std::ostringstream ssc;
-        ssc << "r" << resultId() << " <- r" << object1Id() << " (true result)";
-        compiler->emitCopyVariable(resultId(), object1Id(), ssc.str());
+        std::ostringstream ss;
+        ss << "jal x0, " << endLabel;
+        compiler->emit(ss.str(), "jump to end of select");
     }
 
+    // Copy false value to result.
     compiler->emitLabel(falseLabel);
+    compiler->emitCopyVariable(resultId(), object2Id(), " (false result)");
+    compiler->emitLabel(endLabel);
 }
 
 void InsnFunctionCall::emit(Compiler *compiler)
