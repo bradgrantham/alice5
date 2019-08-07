@@ -208,12 +208,20 @@ void Compiler::emitConstant(uint32_t id, uint32_t typeId, unsigned char *data) {
         }
 
         case SpvOpTypeVector: {
+            // I think only Undef constants apply here.
             emit("", "Omitting constant vector, it shouldn't be referenced");
             break;
         }
 
+        case SpvOpTypeMatrix: {
+            // I think only Undef constants apply here.
+            emit("", "Omitting constant matrix, it shouldn't be referenced");
+            break;
+        }
+
         default:
-            std::cerr << "Error: Unhandled type for constant " << id << ".\n";
+            std::cerr << "Error: Unhandled type for constant " << id << " ("
+                << type->op() << ").\n";
             exit(EXIT_FAILURE);
     }
 }
