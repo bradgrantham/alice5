@@ -969,6 +969,7 @@ struct InsnGLSLstd450Exp : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Exp; }
     virtual std::string name() const { return "GLSLstd450Exp"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Exp2 instruction (code 29).
@@ -983,6 +984,7 @@ struct InsnGLSLstd450Exp2 : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp2(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Exp2; }
     virtual std::string name() const { return "GLSLstd450Exp2"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450Sqrt instruction (code 31).

@@ -14,9 +14,7 @@ fi
 
 if [ "$1" == "" ]
 then
-    shaders="func_test creation define lk wavy wetrock flirt"
-    # Disable wetwork and flirt, they currently hang the compiler.
-    shaders="func_test creation define wavy lk"
+    shaders="func_test creation define wavy lk wetrock flirt"
 else
     shaders="$*"
 fi

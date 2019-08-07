@@ -592,6 +592,16 @@ void InsnGLSLstd450Atan2::emit(Compiler *compiler)
     compiler->emitBinCall(".atan2", resultId(), yId(), xId());
 }
 
+void InsnGLSLstd450Exp::emit(Compiler *compiler)
+{
+    compiler->emitUniCall(".exp", resultId(), xId());
+}
+
+void InsnGLSLstd450Exp2::emit(Compiler *compiler)
+{
+    compiler->emitUniCall(".exp2", resultId(), xId());
+}
+
 void InsnGLSLstd450FAbs::emit(Compiler *compiler)
 {
     std::ostringstream ss1;
