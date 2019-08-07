@@ -876,7 +876,6 @@ atanTable_f32:
         bne     a1,zero,.atan_small_y_x ; if(fabs_y_x <= 1.0) goto atan_small_y_x
         ; a1 is available after this line
 
-        ;     return copysign(M_PI / 2, y_x) + brad_atan_0_1(1.0 / fabs_y_x);
         ;     return copysign(M_PI / 2.0, y_x) + -copysign(brad_atan_0_1(1.0 / fabs(y_x)), y_x);
         ; begin using fa3
         fdiv.s  fa3, fa1, fa2
