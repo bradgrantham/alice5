@@ -449,15 +449,19 @@ uint32_t Function::spillVariable(Instruction *instruction, const std::set<uint32
     // We may not have a type for the "pointer to variable" that we need, so create one.
     // It's probably okay if one already exists, I don't think we ever compare types
     // by ID.
-    uint32_t pointerTypeId = program->nextReg++;
-    program->types[pointerTypeId] = std::make_shared<TypePointer>(program->types[typeId],
-            typeId, SpvStorageClassFunction);
-    program->typeSizes[pointerTypeId] = sizeof(uint32_t);
+    uint32_t pointerTypeId = 0;
+    uint32_t varId = 0;
+    if (!isConstant) {
+        pointerTypeId = program->nextReg++;
+        program->types[pointerTypeId] = std::make_shared<TypePointer>(program->types[typeId],
+                typeId, SpvStorageClassFunction);
+        program->typeSizes[pointerTypeId] = sizeof(uint32_t);
 
-    // Create a new local (function) variable.
-    uint32_t varId = program->nextReg++;
-    program->variables[varId] = {pointerTypeId, SpvStorageClassFunction,
-        NO_INITIALIZER, 0xFFFFFFFF};
+        // Create a new local (function) variable.
+        varId = program->nextReg++;
+        program->variables[varId] = {pointerTypeId, SpvStorageClassFunction,
+            NO_INITIALIZER, 0xFFFFFFFF};
+    }
 
     // Find every use.
     bool found = false;
@@ -472,8 +476,15 @@ uint32_t Function::spillVariable(Instruction *instruction, const std::set<uint32
 
                 // Add a load instruction before the use.
                 LineInfo lineInfo;
-                std::shared_ptr<Instruction> loadInstruction = std::make_shared<RiscVLoad>(
-                        lineInfo, typeId, newRegId, varId, NO_MEMORY_ACCESS_SEMANTIC, 0);
+                std::shared_ptr<Instruction> loadInstruction;
+
+                if (isConstant) {
+                    loadInstruction = std::make_shared<RiscVLoadConst>(
+                            lineInfo, typeId, newRegId, regId);
+                } else {
+                    loadInstruction = std::make_shared<RiscVLoad>(
+                            lineInfo, typeId, newRegId, varId, NO_MEMORY_ACCESS_SEMANTIC, 0);
+                }
 
                 // Insert before this instruction.
                 block->instructions.insert(loadInstruction, inst);
@@ -486,19 +497,12 @@ uint32_t Function::spillVariable(Instruction *instruction, const std::set<uint32
     }
     assert(found);
 
-    // Create the store instruction.
-    LineInfo lineInfo;
-    std::shared_ptr<Instruction> saveInstruction = std::make_shared<RiscVStore>(
-            lineInfo, varId, regId, NO_MEMORY_ACCESS_SEMANTIC, 0);
+    if (!isConstant) {
+        // Create the store instruction.
+        LineInfo lineInfo;
+        std::shared_ptr<Instruction> saveInstruction = std::make_shared<RiscVStore>(
+                lineInfo, varId, regId, NO_MEMORY_ACCESS_SEMANTIC, 0);
 
-    if (isConstant) {
-        // Insert store at the very beginning of the function.
-        // XXX this is wasteful. We could just load from the constant directly
-        // each time, but we don't have an effective way to represent that load
-        // above.
-        Block *block = blocks.at(startBlockId).get();
-        block->instructions.insert(saveInstruction, block->instructions.head);
-    } else {
         // Find the definition.
         found = false;
         for (auto &[_, block] : blocks) {

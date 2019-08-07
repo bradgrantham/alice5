@@ -56,56 +56,73 @@ void RiscVPhi::emit(Compiler *compiler)
 
 void RiscVAddi::emit(Compiler *compiler)
 {
-    compiler->emitBinaryImmOp("addi", resultId(), rs1, imm);
+    compiler->emitBinaryImmOp("addi", resultId(), rs1(), imm);
 }
 
 void RiscVLoad::emit(Compiler *compiler)
 {
-    std::ostringstream ss1;
+    std::ostringstream ss;
+    std::ostringstream ssc;
     if (compiler->isRegFloat(resultId())) {
-        ss1 << "flw ";
+        ss << "flw ";
     } else {
-        ss1 << "lw ";
+        ss << "lw ";
     }
-    ss1 << compiler->reg(resultId()) << ", ";
-    if (compiler->asRegister(pointerId) == nullptr) {
+    ss << compiler->reg(resultId()) << ", ";
+    assert(!compiler->pgm->isConstant(pointerId())); // Use RiscVLoadConst.
+    if (compiler->asRegister(pointerId()) == nullptr) {
         // It's a variable reference.
-        ss1 << compiler->getVariableName(pointerId);
+        ss << compiler->getVariableName(pointerId());
         if (offset != 0) {
-            ss1 << "+" << offset;
+            ss << "+" << offset;
         }
-        ss1 << "(x0)";
+        ss << "(x0)";
     } else {
         // It's a register reference.
-        ss1 << offset << "(" << compiler->reg(pointerId) << ")";
+        ss << offset << "(" << compiler->reg(pointerId()) << ")";
     }
-    std::ostringstream ss2;
-    ss2 << "r" << resultId() << " = (r" << pointerId << ")";
-    compiler->emit(ss1.str(), ss2.str());
+    ssc << "r" << resultId() << " = (r" << pointerId() << ")";
+    compiler->emit(ss.str(), ssc.str());
+}
+
+void RiscVLoadConst::emit(Compiler *compiler)
+{
+    std::ostringstream ss;
+    std::ostringstream ssc;
+
+    if (compiler->isRegFloat(resultId())) {
+        ss << "flw ";
+    } else {
+        ss << "lw ";
+    }
+    ss << compiler->reg(resultId()) << ", " << ".C" << constId << "(x0)";
+    ssc << "r" << resultId() << " = constant r" << constId;
+
+    compiler->emit(ss.str(), ssc.str());
 }
 
 void RiscVStore::emit(Compiler *compiler)
 {
     std::ostringstream ss1;
-    if (compiler->isRegFloat(objectId)) {
+    if (compiler->isRegFloat(objectId())) {
         ss1 << "fsw ";
     } else {
         ss1 << "sw ";
     }
-    ss1 << compiler->reg(objectId) << ", ";
-    if (compiler->asRegister(pointerId) == nullptr) {
+    ss1 << compiler->reg(objectId()) << ", ";
+    if (compiler->asRegister(pointerId()) == nullptr) {
         // It's a variable reference.
-        ss1 << compiler->getVariableName(pointerId);
+        ss1 << compiler->getVariableName(pointerId());
         if (offset != 0) {
             ss1 << "+" << offset;
         }
         ss1 << "(x0)";
     } else {
         // It's a register reference.
-        ss1 << offset << "(" << compiler->reg(pointerId) << ")";
+        ss1 << offset << "(" << compiler->reg(pointerId()) << ")";
     }
     std::ostringstream ss2;
-    ss2 << "(r" << pointerId << ") = r" << objectId;
+    ss2 << "(r" << pointerId() << ") = r" << objectId();
     compiler->emit(ss1.str(), ss2.str());
 }
 

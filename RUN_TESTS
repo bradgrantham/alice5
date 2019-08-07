@@ -25,15 +25,15 @@ echo
 for shader in $shaders
 do
     echo "============================================== $shader"
+    if [ "$interpret" = true ]; then
+        ./shade --term -f 90 90 shaders/$shader.frag
+        mv image0090.ppm $shader-interpret.ppm
+    fi
     if [ "$compile" = true ]; then
         ./shade -c -O -o x.s shaders/$shader.frag > /dev/null && \
             ./as x.s && \
             ./gpuemu -f 90 --term x.o && \
             mv emulated.ppm $shader-compile.ppm
-    fi
-    if [ "$interpret" = true ]; then
-        ./shade --term -f 90 90 shaders/$shader.frag
-        mv image0090.ppm $shader-interpret.ppm
     fi
 done
 

@@ -8,6 +8,7 @@
 enum {
     RiscVOpAddi = 16384, // XXX not sure what's a safe number to start with.
     RiscVOpLoad,
+    RiscVOpLoadConst,
     RiscVOpStore,
     RiscVOpCross,
     RiscVOpMove,
@@ -22,13 +23,13 @@ enum {
 
 // "addi" instruction.
 struct RiscVAddi : public Instruction {
-    RiscVAddi(LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t rs1, uint32_t imm) : Instruction(lineInfo), type(type), rs1(rs1), imm(imm) {
+    RiscVAddi(LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t rs1, uint32_t imm) : Instruction(lineInfo), type(type), imm(imm) {
         addResult(resultId);
         addParameter(rs1);
     }
     uint32_t type; // result type
     uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
-    uint32_t rs1; // operand from register
+    uint32_t rs1() const { return argIdList[0]; } // operand from register
     uint32_t imm; // 12-bit immediate
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpAddi; }
@@ -38,13 +39,13 @@ struct RiscVAddi : public Instruction {
 
 // Load instruction (int or float).
 struct RiscVLoad : public Instruction {
-    RiscVLoad(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo), type(type), pointerId(pointerId), memoryAccess(memoryAccess), offset(offset) {
+    RiscVLoad(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t pointerId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo), type(type), memoryAccess(memoryAccess), offset(offset) {
         addResult(resultId);
         addParameter(pointerId);
     }
     uint32_t type; // result type
     uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
-    uint32_t pointerId; // operand from register
+    uint32_t pointerId() const { return argIdList[0]; } // operand from register
     uint32_t memoryAccess; // MemoryAccess (optional)
     uint32_t offset; // In bytes.
     virtual void step(Interpreter *interpreter) { assert(false); }
@@ -53,14 +54,29 @@ struct RiscVLoad : public Instruction {
     virtual void emit(Compiler *compiler);
 };
 
+// Load constant instruction (int or float).
+struct RiscVLoadConst : public Instruction {
+    RiscVLoadConst(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t constId) : Instruction(lineInfo), type(type), constId(constId) {
+        addResult(resultId);
+        // Don't put constId as a parameter or it'll be marked as live-in.
+    }
+    uint32_t type; // result type
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t constId;
+    virtual void step(Interpreter *interpreter) { assert(false); }
+    virtual uint32_t opcode() const { return RiscVOpLoadConst; }
+    virtual std::string name() const { return "loadconst"; }
+    virtual void emit(Compiler *compiler);
+};
+
 // Store instruction (int or float).
 struct RiscVStore : public Instruction {
-    RiscVStore(const LineInfo& lineInfo, uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo), pointerId(pointerId), objectId(objectId), memoryAccess(memoryAccess), offset(offset) {
+    RiscVStore(const LineInfo& lineInfo, uint32_t pointerId, uint32_t objectId, uint32_t memoryAccess, uint32_t offset) : Instruction(lineInfo), memoryAccess(memoryAccess), offset(offset) {
         addParameter(pointerId);
         addParameter(objectId);
     }
-    uint32_t pointerId; // operand from register
-    uint32_t objectId; // operand from register
+    uint32_t pointerId() const { return argIdList[0]; }
+    uint32_t objectId() const { return argIdList[1]; }
     uint32_t memoryAccess; // MemoryAccess (optional)
     uint32_t offset; // In bytes.
     virtual void step(Interpreter *interpreter) { assert(false); }
@@ -81,17 +97,7 @@ struct RiscVCross : public Instruction {
             uint32_t yId0,
             uint32_t yId1,
             uint32_t yId2)
-        : Instruction(lineInfo),
-        resultId0(resultId0),
-        resultId1(resultId1),
-        resultId2(resultId2),
-        xId0(xId0),
-        xId1(xId1),
-        xId2(xId2),
-        yId0(yId0),
-        yId1(yId1),
-        yId2(yId2)
-    {
+        : Instruction(lineInfo) {
         addResult(resultId0);
         addResult(resultId1);
         addResult(resultId2);
@@ -102,15 +108,15 @@ struct RiscVCross : public Instruction {
         addParameter(yId1);
         addParameter(yId2);
     }
-    uint32_t resultId0;
-    uint32_t resultId1;
-    uint32_t resultId2;
-    uint32_t xId0;
-    uint32_t xId1;
-    uint32_t xId2;
-    uint32_t yId0;
-    uint32_t yId1;
-    uint32_t yId2;
+    uint32_t resultId0() const { return resIdList[0]; }
+    uint32_t resultId1() const { return resIdList[1]; }
+    uint32_t resultId2() const { return resIdList[2]; }
+    uint32_t xId0() const { return argIdList[0]; }
+    uint32_t xId1() const { return argIdList[1]; }
+    uint32_t xId2() const { return argIdList[2]; }
+    uint32_t yId0() const { return argIdList[3]; }
+    uint32_t yId1() const { return argIdList[4]; }
+    uint32_t yId2() const { return argIdList[5]; }
     virtual void step(Interpreter *interpreter) { assert(false); }
     virtual uint32_t opcode() const { return RiscVOpCross; }
     virtual std::string name() const { return "cross"; }
