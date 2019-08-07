@@ -421,6 +421,7 @@ int main(int argc, char **argv)
 {
     bool imageToTerminal = false;
     bool printSymbols = false;
+    bool printSubstitutions = false;
     int specificPixelX = -1;
     int specificPixelY = -1;
     int threadCount = std::thread::hardware_concurrency();
@@ -485,6 +486,11 @@ int main(int argc, char **argv)
         } else if(strcmp(argv[0], "-d") == 0) {
 
             printSymbols = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "--subst") == 0) {
+
+            printSubstitutions = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-h") == 0) {
@@ -593,9 +599,12 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    for(auto& subst: shared.substitutedFunctions) {
-        std::cout << "substituted for " << subst << '\n';
+    if(printSubstitutions) {
+        for(auto& subst: shared.substitutedFunctions) {
+            std::cout << "substituted for " << subst << '\n';
+        }
     }
+
     std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";
     std::cout << shared.dispatchedCount << " instructions executed.\n";
     float fps = 50000000.0f / shared.dispatchedCount;
