@@ -356,7 +356,7 @@ void render(const CoreTemplate* tmpl, CoreShared* shared, int start_row, int ski
             if(shared->coreHadAnException)
                 return;
 
-            set(data_memory, tmpl->gl_FragCoordAddress, v4float{(float)i, (float)j, 0, 0});
+            set(data_memory, tmpl->gl_FragCoordAddress, v4float{i + 0.5f, j + 0.5f, 0, 0});
             set(data_memory, tmpl->colorAddress, v4float{1, 1, 1, 1});
             if(false) // XXX TODO: when iTime is exported by compilation
                 set(data_memory, tmpl->iTimeAddress, tmpl->frameTime);
