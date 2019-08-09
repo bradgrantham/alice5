@@ -16,5 +16,5 @@ build: verilate
 
 .PHONY: verilate
 verilate:
-	verilator -Wall --cc $(MAIN).v --exe $(MAIN_CPP).cpp
+	verilator -Wall -Wno-fatal --cc $(MAIN).v --exe $(MAIN_CPP).cpp
 
