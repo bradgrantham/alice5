@@ -8,6 +8,16 @@ int main(int argc, char **argv) {
     Verilated::debug(1);
 
     VMain *top = new VMain;
+
+    // Run one clock to propagate reset (??)
+    for(int i = 0; i < 2; i++) {
+        // Toggle clock.
+        top->clock = top->clock ^ 1;
+
+        // Eval all Verilog code.
+        top->eval();
+    }
+
     uint32_t counter = 0;
 
     while (!Verilated::gotFinish()) {
