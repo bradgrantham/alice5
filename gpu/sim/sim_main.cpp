@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
             if (counter < 8) {
                 top->ext_address = counter;
                 top->ext_write = 1;
-                top->ext_in_data = counter*3;
+                top->ext_in_data = counter*3 + 1;
                 std::cout << "Writing to " << counter << " value " << top->ext_in_data << "\n";
             } else if (counter < 16) {
                 top->ext_address = counter - 8;
