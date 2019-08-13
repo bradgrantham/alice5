@@ -202,6 +202,9 @@ void usage(const char* progname)
     printf("\t-v        Print memory access\n");
     printf("\t-S        show the disassembly of the SPIR-V code\n");
     printf("\t--term    draw output image on terminal (in addition to file)\n");
+    printf("\t-d        print symbols\n");
+    printf("\t--header  print information about the object file and\n");
+    printf("\t          exit before emulation\n");
     printf("\t-j N      Use N threads [%d]\n",
             int(std::thread::hardware_concurrency()));
 }
@@ -372,6 +375,7 @@ int main(int argc, char **argv)
     bool imageToTerminal = false;
     bool printSymbols = false;
     bool printSubstitutions = false;
+    bool printHeaderInfo = false;
     int specificPixelX = -1;
     int specificPixelY = -1;
     int threadCount = std::thread::hardware_concurrency();
@@ -398,6 +402,11 @@ int main(int argc, char **argv)
             specificPixelX = atoi(argv[1]);
             specificPixelY = atoi(argv[2]);
             argv+=3; argc-=3;
+
+        } else if(strcmp(argv[0], "--header") == 0) {
+
+            printHeaderInfo = true;
+            argv++; argc--;
 
         } else if(strcmp(argv[0], "--diff") == 0) {
 
@@ -471,9 +480,6 @@ int main(int argc, char **argv)
     if(!ReadBinary(binaryFile, header, tmpl.text_symbols, tmpl.data_symbols, tmpl.text_bytes, tmpl.data_bytes)) {
         exit(EXIT_FAILURE);
     }
-
-    tmpl.initialPC = header.initialPC;
-
     if(printSymbols) {
         for(auto& [symbol, address]: tmpl.text_symbols) {
             std::cout << "text segment symbol \"" << symbol << "\" is at " << address << "\n";
@@ -482,6 +488,15 @@ int main(int argc, char **argv)
             std::cout << "data segment symbol \"" << symbol << "\" is at " << address << "\n";
         }
     }
+    if(printHeaderInfo) {
+        std::cout << tmpl.text_bytes.size() << " bytes of inst memory\n";
+        std::cout << tmpl.data_bytes.size() << " bytes of data memory\n";
+        std::cout << std::setfill('0');
+        std::cout << "initial PC is " << header.initialPC << " (0x" << std::hex << std::setw(8) << header.initialPC << std::dec << ")\n";
+        exit(EXIT_SUCCESS);
+    }
+
+    tmpl.initialPC = header.initialPC;
 
     binaryFile.close();
 
