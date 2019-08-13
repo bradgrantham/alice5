@@ -46,9 +46,9 @@ int main(int argc, char **argv) {
     }
 
     RunHeader2 header;
-    std::vector<uint8_t> text_bytes;
+    std::vector<uint8_t> inst_bytes;
     std::vector<uint8_t> data_bytes;
-    SymbolTable text_symbols;
+    SymbolTable inst_symbols;
     SymbolTable data_symbols;
 
     std::ifstream binaryFile(argv[0], std::ios::in | std::ios::binary);
@@ -56,10 +56,10 @@ int main(int argc, char **argv) {
         throw std::runtime_error(std::string("couldn't open file ") + argv[0] + " for reading");
     }
 
-    if(!ReadBinary(binaryFile, header, text_symbols, data_symbols, text_bytes, data_bytes)) {
+    if(!ReadBinary(binaryFile, header, inst_symbols, data_symbols, inst_bytes, data_bytes)) {
         exit(EXIT_FAILURE);
     }
-    assert(text_bytes.size() % 4 == 0);
+    assert(inst_bytes.size() % 4 == 0);
 
     VMain *top = new VMain;
 
@@ -72,16 +72,16 @@ int main(int argc, char **argv) {
         top->eval();
     }
 
-    // Write text bytes to text memory
-    for(uint32_t address = 0; address < text_bytes.size(); address += 4) {
+    // Write inst bytes to inst memory
+    for(uint32_t address = 0; address < inst_bytes.size(); address += 4) {
         top->ext_address = address;
         top->ext_write = 1;
-        uint32_t text_word = 
-            text_bytes[address + 0] << 24 |
-            text_bytes[address + 1] << 16 |
-            text_bytes[address + 2] <<  8 |
-            text_bytes[address + 3] <<  0;
-        top->ext_in_data = text_word;
+        uint32_t inst_word = 
+            inst_bytes[address + 0] << 24 |
+            inst_bytes[address + 1] << 16 |
+            inst_bytes[address + 2] <<  8 |
+            inst_bytes[address + 3] <<  0;
+        top->ext_in_data = inst_word;
 
         if(beVerbose) {
             std::cout << std::setfill('0');
