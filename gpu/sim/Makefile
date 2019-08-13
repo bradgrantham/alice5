@@ -5,10 +5,6 @@ VERILATOR_ROOT=$(HOME)
 MAIN=Main
 MAIN_CPP=sim_main
 
-# .PHONY: run
-# run: build
-	# ./obj_dir/V$(MAIN)
-
 .PHONY: build
 build: verilate
 	# Add OPT=-DVL_DEBUG to display debug output.
@@ -18,3 +14,9 @@ build: verilate
 verilate:
 	verilator -Wall -Wno-fatal -CFLAGS "-I../../.. --std=c++17" --cc $(MAIN).v --exe $(MAIN_CPP).cpp
 
+simple.o: simple.s
+	../../as -o simple.o simple.s
+
+.PHONY: simple
+simple: build simple.o
+	./obj_dir/V$(MAIN) simple.o

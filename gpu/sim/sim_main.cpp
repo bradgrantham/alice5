@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
 
     VMain *top = new VMain;
 
-    // Run one clock to propagate reset (??)
+    // Run one clock cycle.
     for(int i = 0; i < 2; i++) {
         // Toggle clock.
         top->clock = top->clock ^ 1;
