@@ -5,6 +5,10 @@
 #include "objectfile.h"
 
 #include "VMain.h"
+#include "VMain_Main.h"
+#include "VMain_Registers.h"
+#include "VMain_BlockRam__A5.h"
+#include "VMain_BlockRam__A10.h"
 
 void usage(const char* progname)
 {
@@ -141,6 +145,9 @@ int main(int argc, char **argv) {
             } else if(counter < 32) {
                 top->data_ext_address = counter - 16;
                 top->data_ext_write = 0;
+            } else if(counter < 64) {
+                top->reg_ext_address = counter - 32;
+                top->reg_ext_read = 1;
             } else {
                 break;
             }
@@ -155,7 +162,7 @@ int main(int argc, char **argv) {
 
         // After request. Get result of read.
         if (top->clock) {
-            std::cout << "LED: " << bool(top->led) << "\n";
+            /// std::cout << "LED: " << bool(top->led) << "\n";
 
             if(counter < 16) {
                 std::cout << std::setfill('0');
@@ -163,9 +170,35 @@ int main(int argc, char **argv) {
             } else if(counter < 32) {
                 std::cout << std::setfill('0');
                 std::cout << "Reading " << (counter - 16) << " to get data value 0x" << std::hex << std::setw(8) << top->data_ext_out_data << std::dec << std::setw(0) << "\n";
+            } else if(counter < 64) {
+                std::cout << std::setfill('0');
+                std::cout << "Reading register " << (counter - 32) << " to get value 0x" << std::hex << std::setw(8) << top->reg_ext_out_data << std::dec << std::setw(0) << "\n";
             }
 
             counter++;
+        }
+
+        if (top->clock) {
+            std::cout
+                << (int) top->Main->test_write_address << " "
+                << (int) top->Main->test_write << " "
+                << (int) top->Main->test_write_data << ", "
+                << (int) top->Main->test_read_address << " "
+                << (int) top->Main->test_read << " "
+                << (int) top->Main->test_read_data << ", "
+                << (int) top->Main->test_state << "\n";
+            // Dump register contents.
+            for (int i = 0; i < 32; i++) {
+                // Draw in columns.
+                int r = i%4*8 + i/4;
+                std::cout << std::setfill('0');
+                std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x" << std::hex << std::setw(8)
+                    << top->Main->registers->bank1->memory[r] << std::dec << std::setw(0) << "   ";
+                if (i % 4 == 3) {
+                    std::cout << "\n";
+                }
+            }
+            std::cout << "---\n";
         }
     }
 

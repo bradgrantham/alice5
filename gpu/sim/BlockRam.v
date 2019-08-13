@@ -1,5 +1,5 @@
 
-// True dual-ported block RAM.
+// Simple dual-ported block RAM.
 module BlockRam
     #(parameter WORD_WIDTH=32, ADDRESS_WIDTH) 
 (
@@ -16,7 +16,7 @@ module BlockRam
     output reg [WORD_WIDTH-1:0] read_data
 );
 
-    reg [WORD_WIDTH-1:0] memory [2**ADDRESS_WIDTH-1:0];
+    reg [WORD_WIDTH-1:0] memory [2**ADDRESS_WIDTH-1:0] /* verilator public */;
 
     always @(posedge clock) begin
         // Handle writes.
@@ -26,7 +26,7 @@ module BlockRam
 
         // Handle reads.
         if (read) begin
-            if (write) begin
+            if (write && write_address == read_address) begin
                 // Carefully read the Cyclone V behavior for read-during-write. It's
                 // configurable and complicated. I just did something simple here.
                 read_data <= write_data;
