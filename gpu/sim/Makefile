@@ -5,9 +5,9 @@ VERILATOR_ROOT=$(HOME)
 MAIN=Main
 MAIN_CPP=sim_main
 
-.PHONY: run
-run: build
-	./obj_dir/V$(MAIN)
+# .PHONY: run
+# run: build
+	# ./obj_dir/V$(MAIN)
 
 .PHONY: build
 build: verilate
@@ -16,5 +16,5 @@ build: verilate
 
 .PHONY: verilate
 verilate:
-	verilator -Wall -Wno-fatal --cc $(MAIN).v --exe $(MAIN_CPP).cpp
+	verilator -Wall -Wno-fatal -CFLAGS "-I../../.. --std=c++17" --cc $(MAIN).v --exe $(MAIN_CPP).cpp
 
