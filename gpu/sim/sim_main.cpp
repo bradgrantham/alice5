@@ -74,18 +74,18 @@ int main(int argc, char **argv) {
 
     // Write inst bytes to inst memory
     for(uint32_t address = 0; address < inst_bytes.size(); address += 4) {
-        top->ext_address = address;
-        top->ext_write = 1;
+        top->inst_ext_address = address / 4;
+        top->inst_ext_write = 1;
         uint32_t inst_word = 
             inst_bytes[address + 0] << 24 |
             inst_bytes[address + 1] << 16 |
             inst_bytes[address + 2] <<  8 |
             inst_bytes[address + 3] <<  0;
-        top->ext_in_data = inst_word;
+        top->inst_ext_in_data = inst_word;
 
         if(beVerbose) {
             std::cout << std::setfill('0');
-            std::cout << "Writing to " << address << " value 0x" << std::hex << std::setw(8) << top->ext_in_data << std::dec << std::setw(0) << "\n";
+            std::cout << "Writing to inst " << address << " value 0x" << std::hex << std::setw(8) << top->inst_ext_in_data << std::dec << std::setw(0) << "\n";
         }
 
         // Toggle clock.
@@ -101,23 +101,50 @@ int main(int argc, char **argv) {
         top->eval();
     }
 
+    // Write data bytes to data memory
+    for(uint32_t address = 0; address < data_bytes.size(); address += 4) {
+        top->data_ext_address = address;
+        top->data_ext_write = 1;
+        uint32_t data_word = 
+            data_bytes[address + 0] << 24 |
+            data_bytes[address + 1] << 16 |
+            data_bytes[address + 2] <<  8 |
+            data_bytes[address + 3] <<  0;
+        top->data_ext_in_data = data_word;
+
+        if(beVerbose) {
+            std::cout << std::setfill('0');
+            std::cout << "Writing to data " << address << " value 0x" << std::hex << std::setw(8) << top->data_ext_in_data << std::dec << std::setw(0) << "\n";
+        }
+
+        // Toggle clock.
+        top->clock = top->clock ^ 1;
+
+        // Eval all Verilog code.
+        top->eval();
+
+        // Toggle clock.
+        top->clock = top->clock ^ 1;
+
+        // Eval all Verilog code.
+        top->eval();
+    }
 
     uint32_t counter = 0;
 
     while (!Verilated::gotFinish()) {
+
         if (!top->clock) {
-            // About to toggle high. Set up our inputs.
-            if (counter < 8) {
-                top->ext_address = counter;
-                top->ext_write = 1;
-                top->ext_in_data = counter*3 + 1;
-                std::cout << "Writing to " << counter << " value " << top->ext_in_data << "\n";
-            } else if (counter < 16) {
-                top->ext_address = counter - 8;
-                top->ext_write = 0;
+            if(counter < 16) {
+                top->inst_ext_address = counter;
+                top->inst_ext_write = 0;
+            } else if(counter < 32) {
+                top->data_ext_address = counter - 16;
+                top->data_ext_write = 0;
             } else {
                 break;
             }
+
         }
 
         // Toggle clock.
@@ -130,8 +157,12 @@ int main(int argc, char **argv) {
         if (top->clock) {
             std::cout << "LED: " << bool(top->led) << "\n";
 
-            if (counter >= 8) {
-                std::cout << "Reading " << (counter - 8) << " to get " << top->ext_out_data << "\n";
+            if(counter < 16) {
+                std::cout << std::setfill('0');
+                std::cout << "Reading " << counter << " to get inst value 0x" << std::hex << std::setw(8) << top->inst_ext_out_data << std::dec << std::setw(0) << "\n";
+            } else if(counter < 32) {
+                std::cout << std::setfill('0');
+                std::cout << "Reading " << (counter - 16) << " to get data value 0x" << std::hex << std::setw(8) << top->data_ext_out_data << std::dec << std::setw(0) << "\n";
             }
 
             counter++;

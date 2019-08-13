@@ -3,10 +3,15 @@ module Main(
     input wire clock,
     output wire led,
 
-    input wire [15:0] ext_address,
-    input wire ext_write,
-    input wire [31:0] ext_in_data,
-    output wire [31:0] ext_out_data
+    input wire [15:0] inst_ext_address,
+    input wire inst_ext_write,
+    input wire [31:0] inst_ext_in_data,
+    output wire [31:0] inst_ext_out_data,
+
+    input wire [15:0] data_ext_address,
+    input wire data_ext_write,
+    input wire [31:0] data_ext_in_data,
+    output wire [31:0] data_ext_out_data
 );
 
     // Toggle LED.
@@ -16,20 +21,36 @@ module Main(
     end
     assign led = counter[2];
 
+    // Instruction RAM
     // Connect block RAM to our own module's parameters.
-    wire [15:0] block_ram_address = ext_address;
-    wire [31:0] block_ram_in_data = ext_in_data;
-    wire block_ram_write = ext_write;
-    wire [31:0] block_ram_out_data;
-    assign ext_out_data = block_ram_out_data;
+    wire [15:0] inst_ram_address = inst_ext_address;
+    wire [31:0] inst_ram_in_data = inst_ext_in_data;
+    wire inst_ram_write = inst_ext_write;
+    wire [31:0] inst_ram_out_data;
+    assign inst_ext_out_data = inst_ram_out_data;
 
     BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
-        blockRam(
+        instRam(
             .clock(clock),
-            .address(block_ram_address),
-            .write(block_ram_write),
-            .in_data(block_ram_in_data),
-            .out_data(block_ram_out_data));
+            .address(inst_ram_address),
+            .write(inst_ram_write),
+            .in_data(inst_ram_in_data),
+            .out_data(inst_ram_out_data));
+
+    // Data RAM
+    wire [15:0] data_ram_address = data_ext_address;
+    wire [31:0] data_ram_in_data = data_ext_in_data;
+    wire data_ram_write = data_ext_write;
+    wire [31:0] data_ram_out_data;
+    assign data_ext_out_data = data_ram_out_data;
+
+    BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
+        dataRam(
+            .clock(clock),
+            .address(data_ram_address),
+            .write(data_ram_write),
+            .in_data(data_ram_in_data),
+            .out_data(data_ram_out_data));
 
 endmodule
 
