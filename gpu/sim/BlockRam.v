@@ -1,22 +1,41 @@
 
-// Single-ported block RAM.
+// True dual-ported block RAM.
 module BlockRam
     #(parameter WORD_WIDTH=32, ADDRESS_WIDTH) 
 (
     input wire clock,
-    input wire [ADDRESS_WIDTH-1:0] address,
+
+    // For writing:
+    input wire [ADDRESS_WIDTH-1:0] write_address,
     input wire write,
-    input wire [WORD_WIDTH-1:0] in_data,
-    output wire [WORD_WIDTH-1:0] out_data
+    input wire [WORD_WIDTH-1:0] write_data,
+
+    // For reading:
+    input wire [ADDRESS_WIDTH-1:0] read_address,
+    input wire read,
+    output reg [WORD_WIDTH-1:0] read_data
 );
 
     reg [WORD_WIDTH-1:0] memory [2**ADDRESS_WIDTH-1:0];
 
-    assign out_data = write ? in_data : memory[address];
-
     always @(posedge clock) begin
+        // Handle writes.
         if (write) begin
-            memory[address] <= in_data;
+            memory[write_address] <= write_data;
+        end
+
+        // Handle reads.
+        if (read) begin
+            if (write) begin
+                // Carefully read the Cyclone V behavior for read-during-write. It's
+                // configurable and complicated. I just did something simple here.
+                read_data <= write_data;
+            end else begin
+                read_data <= memory[read_address];
+            end
+        end else begin
+            // Or just let it latch?
+            read_data <= {WORD_WIDTH{1'b0}};
         end
     end
 

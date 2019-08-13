@@ -32,10 +32,12 @@ module Main(
     BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
         instRam(
             .clock(clock),
-            .address(inst_ram_address),
+            .write_address(inst_ram_address),
             .write(inst_ram_write),
-            .in_data(inst_ram_in_data),
-            .out_data(inst_ram_out_data));
+            .write_data(inst_ram_in_data),
+            .read_address(inst_ram_address),
+            .read(!inst_ram_write),
+            .read_data(inst_ram_out_data));
 
     // Data RAM
     wire [15:0] data_ram_address = data_ext_address;
@@ -47,10 +49,12 @@ module Main(
     BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
         dataRam(
             .clock(clock),
-            .address(data_ram_address),
+            .write_address(data_ram_address),
             .write(data_ram_write),
-            .in_data(data_ram_in_data),
-            .out_data(data_ram_out_data));
+            .write_data(data_ram_in_data),
+            .read_address(data_ram_address),
+            .read(!data_ram_write),
+            .read_data(data_ram_out_data));
 
 endmodule
 
