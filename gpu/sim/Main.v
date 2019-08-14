@@ -15,7 +15,10 @@ module Main(
 
     input wire [4:0] reg_ext_address,
     input wire reg_ext_read,
-    output wire [31:0] reg_ext_out_data
+    output wire [31:0] reg_ext_out_data,
+
+    input wire [31:0] insn_to_decode,
+    output wire is_opcode_ALU_reg_imm
 );
 
     // Toggle LED.
@@ -32,6 +35,13 @@ module Main(
     wire inst_ram_write = inst_ext_write;
     wire [31:0] inst_ram_out_data;
     assign inst_ext_out_data = inst_ram_out_data;
+
+    RISCVDecode #(.INSN_WIDTH(32))
+        insnDecode(
+            .clock(clock),
+            .insn(insn_to_decode),
+            .opcode_is_ALU_reg_imm(is_opcode_ALU_reg_imm)
+            );
 
     BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
         instRam(

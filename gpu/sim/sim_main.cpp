@@ -134,6 +134,22 @@ int main(int argc, char **argv) {
         top->eval();
     }
 
+    top->insn_to_decode = 0x13a00093; // addi    x1, x0, 314
+    /* I don't know if this actually needs to be clocked -grantham */
+    for(int i = 0; i < 2; i++) {
+        top->clock = top->clock ^ 1;
+        top->eval();
+    }
+    std::cout << "insn 0x" << std::hex << std::setw(8) << top->insn_to_decode << std::dec << " resulted in is_opcode_ALU_reg_imm " << (top->is_opcode_ALU_reg_imm ? "true" : "false") << "\n";
+
+    top->insn_to_decode = 0x73001000; // ebreak
+    /* I don't know if this actually needs to be clocked -grantham */
+    for(int i = 0; i < 2; i++) {
+        top->clock = top->clock ^ 1;
+        top->eval();
+    }
+    std::cout << "insn 0x" << std::hex << std::setw(8) << top->insn_to_decode << std::dec << " resulted in is_opcode_ALU_reg_imm " << (top->is_opcode_ALU_reg_imm ? "true" : "false") << "\n";
+
     uint32_t counter = 0;
 
     while (!Verilated::gotFinish()) {
