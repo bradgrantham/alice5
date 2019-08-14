@@ -81,10 +81,10 @@ int main(int argc, char **argv) {
         top->inst_ext_address = address / 4;
         top->inst_ext_write = 1;
         uint32_t inst_word = 
-            inst_bytes[address + 0] << 24 |
-            inst_bytes[address + 1] << 16 |
-            inst_bytes[address + 2] <<  8 |
-            inst_bytes[address + 3] <<  0;
+            inst_bytes[address + 0] <<  0 |
+            inst_bytes[address + 1] <<  8 |
+            inst_bytes[address + 2] << 16 |
+            inst_bytes[address + 3] << 24;
         top->inst_ext_in_data = inst_word;
 
         if(beVerbose) {
@@ -110,10 +110,10 @@ int main(int argc, char **argv) {
         top->data_ext_address = address;
         top->data_ext_write = 1;
         uint32_t data_word = 
-            data_bytes[address + 0] << 24 |
-            data_bytes[address + 1] << 16 |
-            data_bytes[address + 2] <<  8 |
-            data_bytes[address + 3] <<  0;
+            data_bytes[address + 0] <<  0 |
+            data_bytes[address + 1] <<  8 |
+            data_bytes[address + 2] << 16 |
+            data_bytes[address + 3] << 24;
         top->data_ext_in_data = data_word;
 
         if(beVerbose) {
@@ -134,21 +134,25 @@ int main(int argc, char **argv) {
         top->eval();
     }
 
-    top->insn_to_decode = 0x13a00093; // addi    x1, x0, 314
-    /* I don't know if this actually needs to be clocked -grantham */
-    for(int i = 0; i < 2; i++) {
-        top->clock = top->clock ^ 1;
-        top->eval();
+    // decode program instructions to see what decoder says
+    for(uint32_t address = 0; address < inst_bytes.size(); address += 4) {
+        uint32_t inst_word = 
+            inst_bytes[address + 0] <<  0 |
+            inst_bytes[address + 1] <<  8 |
+            inst_bytes[address + 2] << 16 |
+            inst_bytes[address + 3] << 24;
+        top->insn_to_decode = inst_word; // addi    x1, x0, 314
+        for(int i = 0; i < 2; i++) {
+            top->clock = top->clock ^ 1;
+            top->eval();
+        }
+        std::cout << std::setfill('0');
+        if(top->is_opcode_ALU_reg_imm)  {
+            std::cout << "insn 0x" << std::hex << std::setw(8) << top->insn_to_decode << std::dec << " resulted in is_opcode_ALU_reg_imm = true, rs1 = " << int(top->insn_rs1) << "\n";
+        } else {
+            std::cout << "insn 0x" << std::hex << std::setw(8) << top->insn_to_decode << std::dec << " resulted in is_opcode_ALU_reg_imm = false\n";
+        }
     }
-    std::cout << "insn 0x" << std::hex << std::setw(8) << top->insn_to_decode << std::dec << " resulted in is_opcode_ALU_reg_imm " << (top->is_opcode_ALU_reg_imm ? "true" : "false") << "\n";
-
-    top->insn_to_decode = 0x73001000; // ebreak
-    /* I don't know if this actually needs to be clocked -grantham */
-    for(int i = 0; i < 2; i++) {
-        top->clock = top->clock ^ 1;
-        top->eval();
-    }
-    std::cout << "insn 0x" << std::hex << std::setw(8) << top->insn_to_decode << std::dec << " resulted in is_opcode_ALU_reg_imm " << (top->is_opcode_ALU_reg_imm ? "true" : "false") << "\n";
 
     uint32_t counter = 0;
 

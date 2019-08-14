@@ -18,7 +18,8 @@ module Main(
     output wire [31:0] reg_ext_out_data,
 
     input wire [31:0] insn_to_decode,
-    output wire is_opcode_ALU_reg_imm
+    output wire is_opcode_ALU_reg_imm,
+    output wire [4:0] insn_rs1
 );
 
     // Toggle LED.
@@ -40,7 +41,8 @@ module Main(
         insnDecode(
             .clock(clock),
             .insn(insn_to_decode),
-            .opcode_is_ALU_reg_imm(is_opcode_ALU_reg_imm)
+            .opcode_is_ALU_reg_imm(is_opcode_ALU_reg_imm),
+            .rs1(insn_rs1)
             );
 
     BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))

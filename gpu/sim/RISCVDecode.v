@@ -14,7 +14,11 @@ module RISCVDecode
     output reg opcode_is_auipc,
     output reg opcode_is_load,
     output reg opcode_is_store,
-    output reg opcode_is_system
+    output reg opcode_is_system,
+
+    output reg rs1,
+    output reg rs2,
+    output reg rs3
 );
 
     wire [6:0] opcode;
@@ -35,5 +39,8 @@ module RISCVDecode
         opcode_is_system <= opcode == {5'h1c,2'h3};
         // And float operations
 
+        rs1 <= insn[19:15];
+        rs2 <= insn[24:20];
+        rs3 <= insn[31:27];
     end
 endmodule
