@@ -12,12 +12,10 @@ module Registers
 
     // For reading parameter 1:
     input wire [ADDRESS_WIDTH-1:0] read1_address,
-    input wire read1,
     output wire [WORD_WIDTH-1:0] read1_data,
 
     // For reading parameter 2:
     input wire [ADDRESS_WIDTH-1:0] read2_address,
-    input wire read2,
     output wire [WORD_WIDTH-1:0] read2_data
 );
 
@@ -28,7 +26,6 @@ module Registers
             .write(write),
             .write_data(write_data),
             .read_address(read1_address),
-            .read(read1),
             .read_data(read1_data));
 
     BlockRam #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
@@ -38,7 +35,6 @@ module Registers
             .write(write),
             .write_data(write_data),
             .read_address(read2_address),
-            .read(read2),
             .read_data(read2_data));
 
 endmodule

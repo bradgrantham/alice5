@@ -12,7 +12,6 @@ module BlockRam
 
     // For reading:
     input wire [ADDRESS_WIDTH-1:0] read_address,
-    input wire read,
     output reg [WORD_WIDTH-1:0] read_data
 );
 
@@ -24,19 +23,10 @@ module BlockRam
             memory[write_address] <= write_data;
         end
 
-        // Handle reads.
-        if (read) begin
-            if (write && write_address == read_address) begin
-                // Carefully read the Cyclone V behavior for read-during-write. It's
-                // configurable and complicated. I just did something simple here.
-                read_data <= write_data;
-            end else begin
-                read_data <= memory[read_address];
-            end
-        end else begin
-            // Or just let it latch?
-            read_data <= {WORD_WIDTH{1'b0}};
-        end
+        // Handle reads. This is "Old data read-during-write" behavior,
+        // as recommended by Altera in the "Recommended HDL Coding Style"
+        // document, page 13-20.
+        read_data <= memory[read_address];
     end
 
 endmodule

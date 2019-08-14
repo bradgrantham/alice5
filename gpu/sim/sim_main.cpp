@@ -167,7 +167,6 @@ int main(int argc, char **argv) {
                 top->data_ext_write = 0;
             } else if(counter < 64) {
                 top->reg_ext_address = counter - 32;
-                top->reg_ext_read = 1;
             } else {
                 break;
             }
@@ -204,7 +203,6 @@ int main(int argc, char **argv) {
                 << (int) top->Main->test_write << " "
                 << (int) top->Main->test_write_data << ", "
                 << (int) top->Main->test_read_address << " "
-                << (int) top->Main->test_read << " "
                 << (int) top->Main->test_read_data << ", "
                 << (int) top->Main->test_state << "\n";
             // Dump register contents.
