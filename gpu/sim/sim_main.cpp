@@ -147,10 +147,28 @@ int main(int argc, char **argv) {
             top->eval();
         }
         std::cout << std::setfill('0');
-        if(top->is_opcode_ALU_reg_imm)  {
-            std::cout << "insn 0x" << std::hex << std::setw(8) << top->insn_to_decode << std::dec << " resulted in is_opcode_ALU_reg_imm = true, rs1 = " << int(top->insn_rs1) << "\n";
+        if(top->decode_opcode_is_ALU_reg_imm)  {
+            printf("0x%08X : 0x%08X - opcode_is_ALU_reg_imm %d, %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
+        } else if(top->decode_opcode_is_branch) {
+            printf("0x%08X : 0x%08X - opcode_is_branch cmp %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3, top->decode_rs1, top->decode_rs2, top->decode_imm_branch);
+        } else if(top->decode_opcode_is_ALU_reg_reg) {
+            printf("0x%08X : 0x%08X - opcode_is_ALU_reg_reg op %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3, top->decode_rd, top->decode_rs1, top->decode_rs2);
+        } else if(top->decode_opcode_is_jal) {
+            printf("0x%08X : 0x%08X - opcode_is_jal %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_imm_jump);
+        } else if(top->decode_opcode_is_jalr) {
+            printf("0x%08X : 0x%08X - opcode_is_jalr %d, %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1, top->decode_imm_jump);
+        } else if(top->decode_opcode_is_lui) {
+            printf("0x%08X : 0x%08X - opcode_is_lui %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_imm_upper);
+        } else if(top->decode_opcode_is_auipc) {
+            printf("0x%08X : 0x%08X - opcode_is_auipc %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_imm_upper);
+        } else if(top->decode_opcode_is_load) {
+            printf("0x%08X : 0x%08X - opcode_is_load size %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
+        } else if(top->decode_opcode_is_store) {
+            printf("0x%08X : 0x%08X - opcode_is_store size %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3, top->decode_rs1, top->decode_rs2, top->decode_imm_store);
+        } else if(top->decode_opcode_is_system) {
+            printf("0x%08X : 0x%08X - opcode_is_system %d\n", address, top->insn_to_decode, top->decode_imm_alu_load);
         } else {
-            std::cout << "insn 0x" << std::hex << std::setw(8) << top->insn_to_decode << std::dec << " resulted in is_opcode_ALU_reg_imm = false\n";
+            printf("0x%08X : 0x%08X - undecoded instruction\n", address, top->insn_to_decode);
         }
     }
 

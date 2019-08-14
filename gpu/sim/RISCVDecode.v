@@ -16,9 +16,21 @@ module RISCVDecode
     output reg opcode_is_store,
     output reg opcode_is_system,
 
-    output reg rs1,
-    output reg rs2,
-    output reg rs3
+    output reg [4:0] rs1,
+    output reg [4:0] rs2,
+    output reg [4:0] rs3,
+    output reg [4:0] rd,
+    output reg [1:0] fmt,
+    output reg [2:0] funct3,
+    output reg [6:0] funct7,
+    output reg [4:0] funct5,
+    output reg [4:0] shamt,
+
+    output reg [31:0] imm_alu_load,
+    output reg [31:0] imm_store,
+    output reg [31:0] imm_branch,
+    output reg [31:0] imm_upper,
+    output reg [31:0] imm_jump
 );
 
     wire [6:0] opcode;
@@ -37,10 +49,23 @@ module RISCVDecode
         opcode_is_load <= opcode == {5'h00,2'h3};
         opcode_is_store <= opcode == {5'h08,2'h3};
         opcode_is_system <= opcode == {5'h1c,2'h3};
-        // And float operations
+        // TODO float operations
 
         rs1 <= insn[19:15];
         rs2 <= insn[24:20];
         rs3 <= insn[31:27];
+        rd <= insn[11:7];
+        fmt <= insn[26:25];
+        funct3 <= insn[14:12];
+        funct7 <= insn[31:25];
+        funct5 <= insn[31:27];
+        shamt <= insn[24:20];
+
+        // Replications of bit 31 in following are sign extensions
+        imm_alu_load <= {{20{insn[31]}}, insn[31:20]};
+        imm_store <= {{20{insn[31]}}, insn[31:25], insn[11:7]};
+        imm_branch <= {{19{insn[31]}}, insn[31], insn[7], insn[30:25], insn[11:8], 1'b0};
+        imm_upper <= {insn[31:12], 12'b0};
+        imm_jump <= {{11{insn[31]}}, insn[31], insn[19:12], insn[20], insn[30:21], 1'b0};
     end
 endmodule

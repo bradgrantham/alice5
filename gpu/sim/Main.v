@@ -17,8 +17,30 @@ module Main(
     output wire [31:0] reg_ext_out_data,
 
     input wire [31:0] insn_to_decode,
-    output wire is_opcode_ALU_reg_imm,
-    output wire [4:0] insn_rs1
+    output wire decode_opcode_is_branch,
+    output wire decode_opcode_is_ALU_reg_imm,
+    output wire decode_opcode_is_ALU_reg_reg,
+    output wire decode_opcode_is_jal,
+    output wire decode_opcode_is_jalr,
+    output wire decode_opcode_is_lui,
+    output wire decode_opcode_is_auipc,
+    output wire decode_opcode_is_load,
+    output wire decode_opcode_is_store,
+    output wire decode_opcode_is_system,
+    output wire [4:0] decode_rs1,
+    output wire [4:0] decode_rs2,
+    output wire [4:0] decode_rs3,
+    output wire [4:0] decode_rd,
+    output wire [1:0] decode_fmt,
+    output wire [2:0] decode_funct3,
+    output wire [6:0] decode_funct7,
+    output wire [4:0] decode_funct5,
+    output wire [4:0] decode_shamt,
+    output wire [31:0] decode_imm_alu_load,
+    output wire [31:0] decode_imm_store,
+    output wire [31:0] decode_imm_branch,
+    output wire [31:0] decode_imm_upper,
+    output wire [31:0] decode_imm_jump
 );
 
     // Toggle LED.
@@ -40,8 +62,30 @@ module Main(
         insnDecode(
             .clock(clock),
             .insn(insn_to_decode),
-            .opcode_is_ALU_reg_imm(is_opcode_ALU_reg_imm),
-            .rs1(insn_rs1)
+            .opcode_is_branch(decode_opcode_is_branch),
+            .opcode_is_ALU_reg_imm(decode_opcode_is_ALU_reg_imm),
+            .opcode_is_ALU_reg_reg(decode_opcode_is_ALU_reg_reg),
+            .opcode_is_jal(decode_opcode_is_jal),
+            .opcode_is_jalr(decode_opcode_is_jalr),
+            .opcode_is_lui(decode_opcode_is_lui),
+            .opcode_is_auipc(decode_opcode_is_auipc),
+            .opcode_is_load(decode_opcode_is_load),
+            .opcode_is_store(decode_opcode_is_store),
+            .opcode_is_system(decode_opcode_is_system),
+            .rs1(decode_rs1),
+            .rs2(decode_rs2),
+            .rs3(decode_rs3),
+            .rd(decode_rd),
+            .fmt(decode_fmt),
+            .funct3(decode_funct3),
+            .funct7(decode_funct7),
+            .funct5(decode_funct5),
+            .shamt(decode_shamt),
+            .imm_alu_load(decode_imm_alu_load),
+            .imm_store(decode_imm_store),
+            .imm_branch(decode_imm_branch),
+            .imm_upper(decode_imm_upper),
+            .imm_jump(decode_imm_jump)
             );
 
     BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
