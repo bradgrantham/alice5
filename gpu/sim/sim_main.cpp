@@ -139,7 +139,10 @@ int main(int argc, char **argv) {
 
     VMain *top = new VMain;
 
-    // Run one clock cycle with reset.
+    if(false)
+        std::cout << "clock " << int(top->clock) << ", should be 0\n";
+
+    // Run one clock cycle in reset to process STATE_INIT
     top->reset_n = 0;
     for(int i = 0; i < 2; i++) {
         top->clock = top->clock ^ 1;
@@ -147,19 +150,20 @@ int main(int argc, char **argv) {
     }
 
     // Write inst bytes to inst memory
-    for(uint32_t address = 0; address < inst_bytes.size(); address += 4) {
-        top->inst_ext_address = address / 4;
+    for(uint32_t byteaddr = 0; byteaddr < inst_bytes.size(); byteaddr += 4) {
         uint32_t inst_word = 
-            inst_bytes[address + 0] <<  0 |
-            inst_bytes[address + 1] <<  8 |
-            inst_bytes[address + 2] << 16 |
-            inst_bytes[address + 3] << 24;
+            inst_bytes[byteaddr + 0] <<  0 |
+            inst_bytes[byteaddr + 1] <<  8 |
+            inst_bytes[byteaddr + 2] << 16 |
+            inst_bytes[byteaddr + 3] << 24;
+
+        top->inst_ext_address = byteaddr;
         top->inst_ext_in_data = inst_word;
         top->inst_ext_write = 1;
 
         if(beVerbose) {
             std::cout << std::setfill('0');
-            std::cout << "Writing to inst " << address << " value 0x" << std::hex << std::setw(8) << top->inst_ext_in_data << std::dec << std::setw(0) << "\n";
+            std::cout << "Writing to inst " << byteaddr << " value 0x" << std::hex << std::setw(8) << top->inst_ext_in_data << std::dec << std::setw(0) << "\n";
         }
 
         // Toggle clock.
@@ -181,19 +185,20 @@ int main(int argc, char **argv) {
     top->data_ext_write = 0;
 
     // Write data bytes to data memory
-    for(uint32_t address = 0; address < data_bytes.size(); address += 4) {
-        top->data_ext_address = address;
+    for(uint32_t byteaddr = 0; byteaddr < data_bytes.size(); byteaddr += 4) {
         uint32_t data_word = 
-            data_bytes[address + 0] <<  0 |
-            data_bytes[address + 1] <<  8 |
-            data_bytes[address + 2] << 16 |
-            data_bytes[address + 3] << 24;
+            data_bytes[byteaddr + 0] <<  0 |
+            data_bytes[byteaddr + 1] <<  8 |
+            data_bytes[byteaddr + 2] << 16 |
+            data_bytes[byteaddr + 3] << 24;
+
+        top->data_ext_address = byteaddr;
         top->data_ext_in_data = data_word;
         top->data_ext_write = 1;
 
         if(beVerbose) {
             std::cout << std::setfill('0');
-            std::cout << "Writing to data " << address << " value 0x" << std::hex << std::setw(8) << top->data_ext_in_data << std::dec << std::setw(0) << "\n";
+            std::cout << "Writing to data " << byteaddr << " value 0x" << std::hex << std::setw(8) << top->data_ext_in_data << std::dec << std::setw(0) << "\n";
         }
 
         // Toggle clock.
@@ -211,8 +216,15 @@ int main(int argc, char **argv) {
     // Disable write to data memory
     top->data_ext_write = 0;
 
-    std::cout << std::setfill('0');
-    std::cout << "inst memory[0] = " << std::hex << std::setw(8) << top->Main->instRam->memory[0] << std::dec << std::setw(0) << "\n";
+    for(uint32_t byteaddr = 0; byteaddr < 16; byteaddr += 4) {
+        uint32_t inst_word = 
+            inst_bytes[byteaddr + 0] <<  0 |
+            inst_bytes[byteaddr + 1] <<  8 |
+            inst_bytes[byteaddr + 2] << 16 |
+            inst_bytes[byteaddr + 3] << 24;
+        std::cout << std::setfill('0');
+        std::cout << "inst memory[" << byteaddr << "] = " << std::hex << std::setw(8) << top->Main->instRam->memory[byteaddr >> 2] << std::dec << std::setw(0) << ", should be " << std::hex << std::setw(8) << inst_word << std::dec << std::setw(0) << "\n";
+    }
 
     bool test_decoder = true;
     if(test_decoder) {
@@ -231,6 +243,10 @@ int main(int argc, char **argv) {
             print_decoded_inst(address, inst_word, top);
         }
     }
+
+    std::cout << std::setfill('0');
+    std::cout << "inst memory[0] = " << std::hex << std::setw(8) << top->Main->instRam->memory[0] << std::dec << std::setw(0) << "\n";
+
 
     top->clock = top->clock ^ 1;
     top->eval();
