@@ -135,10 +135,10 @@ module Main(
     BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
         instRam(
             .clock(clock),
-            .write_address(inst_ram_address),
+            .write_address({2'b00, inst_ram_address[15:2]}),
             .write(inst_ram_write),
             .write_data(inst_ram_in_data),
-            .read_address(inst_ram_address),
+            .read_address({2'b00, inst_ram_address[15:2]}),
             .read_data(inst_ram_out_data));
 
     // Data RAM
@@ -151,10 +151,10 @@ module Main(
     BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
         dataRam(
             .clock(clock),
-            .write_address(data_ram_address),
+            .write_address({2'b00, data_ram_address[15:2]}),
             .write(data_ram_write),
             .write_data(data_ram_in_data),
-            .read_address(data_ram_address),
+            .read_address({2'b00, data_ram_address[15:2]}),
             .read_data(data_ram_out_data));
 
     // Register bank.
