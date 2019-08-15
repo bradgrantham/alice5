@@ -150,9 +150,9 @@ int main(int argc, char **argv) {
         if(top->decode_opcode_is_ALU_reg_imm)  {
             printf("0x%08X : 0x%08X - opcode_is_ALU_reg_imm %d, %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
         } else if(top->decode_opcode_is_branch) {
-            printf("0x%08X : 0x%08X - opcode_is_branch cmp %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3, top->decode_rs1, top->decode_rs2, top->decode_imm_branch);
+            printf("0x%08X : 0x%08X - opcode_is_branch cmp %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rs1, top->decode_rs2, top->decode_imm_branch);
         } else if(top->decode_opcode_is_ALU_reg_reg) {
-            printf("0x%08X : 0x%08X - opcode_is_ALU_reg_reg op %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3, top->decode_rd, top->decode_rs1, top->decode_rs2);
+            printf("0x%08X : 0x%08X - opcode_is_ALU_reg_reg op %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
         } else if(top->decode_opcode_is_jal) {
             printf("0x%08X : 0x%08X - opcode_is_jal %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_imm_jump);
         } else if(top->decode_opcode_is_jalr) {
@@ -162,11 +162,35 @@ int main(int argc, char **argv) {
         } else if(top->decode_opcode_is_auipc) {
             printf("0x%08X : 0x%08X - opcode_is_auipc %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_imm_upper);
         } else if(top->decode_opcode_is_load) {
-            printf("0x%08X : 0x%08X - opcode_is_load size %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
+            printf("0x%08X : 0x%08X - opcode_is_load size %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
         } else if(top->decode_opcode_is_store) {
-            printf("0x%08X : 0x%08X - opcode_is_store size %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3, top->decode_rs1, top->decode_rs2, top->decode_imm_store);
+            printf("0x%08X : 0x%08X - opcode_is_store size %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rs1, top->decode_rs2, top->decode_imm_store);
         } else if(top->decode_opcode_is_system) {
             printf("0x%08X : 0x%08X - opcode_is_system %d\n", address, top->insn_to_decode, top->decode_imm_alu_load);
+        } else if(top->decode_opcode_is_fadd) {
+            printf("0x%08X : 0x%08X - opcode_is_fadd rm %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
+        } else if(top->decode_opcode_is_fsub) {
+            printf("0x%08X : 0x%08X - opcode_is_fsub rm %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
+        } else if(top->decode_opcode_is_fmul) {
+            printf("0x%08X : 0x%08X - opcode_is_fmul rm %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
+        } else if(top->decode_opcode_is_fdiv) {
+            printf("0x%08X : 0x%08X - opcode_is_fdiv rm %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
+        } else if(top->decode_opcode_is_fsgnj) {
+            printf("0x%08X : 0x%08X - opcode_is_fsgnj mode %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
+        } else if(top->decode_opcode_is_fminmax) {
+            printf("0x%08X : 0x%08X - opcode_is_fminmax mode %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
+        } else if(top->decode_opcode_is_fsqrt) {
+            printf("0x%08X : 0x%08X - opcode_is_fsqrt rm %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
+        } else if(top->decode_opcode_is_fcmp) {
+            printf("0x%08X : 0x%08X - opcode_is_fcmp cmp %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
+        } else if(top->decode_opcode_is_fcvt_f2i) {
+            printf("0x%08X : 0x%08X - opcode_is_f2i type %d, rm %d, %d, %d\n", address, top->insn_to_decode, top->decode_shamt_ftype, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
+        } else if(top->decode_opcode_is_fmv_f2i) {
+            printf("0x%08X : 0x%08X - opcode_is_fmv_f2i funct3 %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
+        } else if(top->decode_opcode_is_fcvt_i2f) {
+            printf("0x%08X : 0x%08X - opcode_is_fcmp type %d, rm %d, %d, %d\n", address, top->insn_to_decode, top->decode_shamt_ftype, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
+        } else if(top->decode_opcode_is_fmv_i2f) {
+            printf("0x%08X : 0x%08X - opcode_is_fmv_i2f %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1);
         } else {
             printf("0x%08X : 0x%08X - undecoded instruction\n", address, top->insn_to_decode);
         }
