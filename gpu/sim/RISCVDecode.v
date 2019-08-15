@@ -3,7 +3,7 @@ module RISCVDecode
     #(parameter INSN_WIDTH=32) 
 (
     input wire clock,
-    input wire [INSN_WIDTH-1:0] insn,
+    input wire [INSN_WIDTH-1:0] inst,
 
     output reg opcode_is_branch,
     output reg opcode_is_ALU_reg_imm,
@@ -54,8 +54,8 @@ module RISCVDecode
     wire [6:0] opcode;
     wire [4:0] ffunct;
 
-    assign opcode = {insn[6:2],insn[1:0]};
-    assign ffunct = {insn[31:27]};
+    assign opcode = {inst[6:2],inst[1:0]};
+    assign ffunct = {inst[31:27]};
 
     always @(posedge clock) begin
 
@@ -70,15 +70,15 @@ module RISCVDecode
         opcode_is_store <= opcode == {5'h08,2'h3};
         opcode_is_system <= opcode == {5'h1c,2'h3};
 
-        rs1 <= insn[19:15];
-        rs2 <= insn[24:20];
-        rs3 <= insn[31:27];
-        rd <= insn[11:7];
-        fmt <= insn[26:25];
-        funct3_rm <= insn[14:12];
-        funct7 <= insn[31:25];
-        funct5 <= insn[31:27];
-        shamt_ftype <= insn[24:20];
+        rs1 <= inst[19:15];
+        rs2 <= inst[24:20];
+        rs3 <= inst[31:27];
+        rd <= inst[11:7];
+        fmt <= inst[26:25];
+        funct3_rm <= inst[14:12];
+        funct7 <= inst[31:25];
+        funct5 <= inst[31:27];
+        shamt_ftype <= inst[24:20];
 
         opcode_is_fadd <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h0}));
         opcode_is_fsub <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h1}));
@@ -99,12 +99,11 @@ module RISCVDecode
         opcode_is_fnmsub <= opcode == {5'h12,2'h3};
         opcode_is_fnmadd <= opcode == {5'h13,2'h3};
 
-
         // Replications of bit 31 in following are sign extensions
-        imm_alu_load <= {{20{insn[31]}}, insn[31:20]};
-        imm_store <= {{20{insn[31]}}, insn[31:25], insn[11:7]};
-        imm_branch <= {{19{insn[31]}}, insn[31], insn[7], insn[30:25], insn[11:8], 1'b0};
-        imm_upper <= {insn[31:12], 12'b0};
-        imm_jump <= {{11{insn[31]}}, insn[31], insn[19:12], insn[20], insn[30:21], 1'b0};
+        imm_alu_load <= {{20{inst[31]}}, inst[31:20]};
+        imm_store <= {{20{inst[31]}}, inst[31:25], inst[11:7]};
+        imm_branch <= {{19{inst[31]}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
+        imm_upper <= {inst[31:12], 12'b0};
+        imm_jump <= {{11{inst[31]}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0};
     end
 endmodule

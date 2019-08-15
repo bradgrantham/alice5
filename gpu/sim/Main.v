@@ -1,7 +1,7 @@
 
 module Main(
     input wire clock,
-    output wire led,
+    input wire reset_n,
 
     input wire [15:0] inst_ext_address,
     input wire inst_ext_write,
@@ -16,7 +16,7 @@ module Main(
     input wire [4:0] reg_ext_address,
     output wire [31:0] reg_ext_out_data,
 
-    input wire [31:0] insn_to_decode,
+    input wire [31:0] ext_inst_to_decode,
     output wire decode_opcode_is_branch,
     output wire decode_opcode_is_ALU_reg_imm,
     output wire decode_opcode_is_ALU_reg_reg,
@@ -61,25 +61,33 @@ module Main(
     output wire [31:0] decode_imm_jump
 );
 
-    // Toggle LED.
-    reg [2:0] counter;
-    always @(posedge clock) begin
-        counter <= counter + 1'b1;
-    end
-    assign led = counter[2];
+    // CPU State Machine
+    localparam STATE_INIT = 3'h00;
+    localparam STATE_FETCH1 = 3'h01;
+    localparam STATE_FETCH2 = 3'h02;
+    localparam STATE_DECODE = 3'h03;
+    localparam STATE_ALU = 3'h04;
+    localparam STATE_STEPLOADSTORE = 3'h05;
+    reg [2:0] state /* verilator public */;
+    reg [31:0] PC /* verilator public */;
+
+    reg [15:0] fetch_inst_address /* verilator public */;
+    reg [31:0] fetched_inst /* verilator public */;
+
+    wire [31:0] inst_to_decode = (state == STATE_INIT) ? ext_inst_to_decode : fetched_inst;
 
     // Instruction RAM
     // Connect block RAM to our own module's parameters.
-    wire [15:0] inst_ram_address = inst_ext_address;
+    wire [15:0] inst_ram_address = (state == STATE_INIT) ? inst_ext_address : fetch_inst_address;
     wire [31:0] inst_ram_in_data = inst_ext_in_data;
     wire inst_ram_write = inst_ext_write;
     wire [31:0] inst_ram_out_data;
     assign inst_ext_out_data = inst_ram_out_data;
 
     RISCVDecode #(.INSN_WIDTH(32))
-        insnDecode(
+        instDecode(
             .clock(clock),
-            .insn(insn_to_decode),
+            .inst(inst_to_decode),
             .opcode_is_branch(decode_opcode_is_branch),
             .opcode_is_ALU_reg_imm(decode_opcode_is_ALU_reg_imm),
             .opcode_is_ALU_reg_reg(decode_opcode_is_ALU_reg_reg),
@@ -195,5 +203,50 @@ module Main(
         test_state <= test_state + 1'b1;
     end
 
-endmodule
+    always @(posedge clock or negedge reset_n) begin
+        if(!reset_n) begin
 
+            // Enter INIT when we leave RESET
+            state <= STATE_INIT;
+            PC <= 32'b0;
+            // reset registers?  Could assume they're junk in the compiler and save gates
+
+        end else begin
+
+            case (state)
+                 STATE_INIT: begin
+                     state <= STATE_FETCH1;
+                 end
+                 STATE_FETCH1: begin
+                     // want PC to be settled here
+                     // get 32 bits from memory[PC]
+                     fetch_inst_address <= PC[15:0];
+                     state <= STATE_FETCH2;
+                 end
+                 STATE_FETCH2: begin
+                     // want output of RAM to be settled here
+                     fetched_inst <= inst_ram_out_data;
+                     state <= STATE_DECODE;
+                 end
+                 STATE_DECODE: begin
+                     // clock the 32 bits of instruction into decoded signals
+                     state <= STATE_ALU;
+                 end
+                 STATE_ALU: begin
+                     // want decode of instruction to be settled here
+                     // do ALU operation
+                     state <= STATE_STEPLOADSTORE;
+                 end
+                 STATE_STEPLOADSTORE: begin
+                     // want result of ALU to be settled here
+                     // Would be output of ALU for branch and jalr or route from imm20 for branch
+                     PC <= PC + 4;
+                     // load into registers?
+                     // store from registers - need to stall reads from data, don't need to stall inst reads
+                     state <= STATE_FETCH1;
+                 end
+            endcase
+        end
+    end
+
+endmodule
