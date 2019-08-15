@@ -27,6 +27,12 @@ module RISCVDecode
     output reg opcode_is_fmv_f2i,
     output reg opcode_is_fcvt_i2f,
     output reg opcode_is_fmv_i2f,
+    output reg opcode_is_flw,
+    output reg opcode_is_fsw,
+    output reg opcode_is_fmadd,
+    output reg opcode_is_fmsub,
+    output reg opcode_is_fnmsub,
+    output reg opcode_is_fnmadd,
 
     output reg [4:0] rs1,
     output reg [4:0] rs2,
@@ -46,8 +52,10 @@ module RISCVDecode
 );
 
     wire [6:0] opcode;
+    wire [4:0] ffunct;
 
     assign opcode = {insn[6:2],insn[1:0]};
+    assign ffunct = {insn[31:27]};
 
     always @(posedge clock) begin
 
@@ -62,20 +70,6 @@ module RISCVDecode
         opcode_is_store <= opcode == {5'h08,2'h3};
         opcode_is_system <= opcode == {5'h1c,2'h3};
 
-        opcode_is_fadd <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h0}));
-        opcode_is_fsub <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h1}));
-        opcode_is_fmul <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h2}));
-        opcode_is_fdiv <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h3}));
-        opcode_is_fsgnj <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h4}));
-        opcode_is_fminmax <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h5}));
-        opcode_is_fsqrt <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'hb}));
-        opcode_is_fcmp <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h14}));
-        opcode_is_fcvt_f2i <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h18}));
-        opcode_is_fmv_f2i <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h1c}));
-        opcode_is_fcvt_i2f <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h1a}));
-        opcode_is_fmv_i2f <= ((opcode == {5'h14,2'h3}) && (funct5 == {5'h1e}));
-
-
         rs1 <= insn[19:15];
         rs2 <= insn[24:20];
         rs3 <= insn[31:27];
@@ -85,6 +79,26 @@ module RISCVDecode
         funct7 <= insn[31:25];
         funct5 <= insn[31:27];
         shamt_ftype <= insn[24:20];
+
+        opcode_is_fadd <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h0}));
+        opcode_is_fsub <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h1}));
+        opcode_is_fmul <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h2}));
+        opcode_is_fdiv <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h3}));
+        opcode_is_fsgnj <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h4}));
+        opcode_is_fminmax <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h5}));
+        opcode_is_fsqrt <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'hb}));
+        opcode_is_fcmp <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h14}));
+        opcode_is_fcvt_f2i <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h18}));
+        opcode_is_fmv_f2i <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h1c}));
+        opcode_is_fcvt_i2f <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h1a}));
+        opcode_is_fmv_i2f <= ((opcode == {5'h14,2'h3}) && (ffunct == {5'h1e}));
+        opcode_is_flw <= opcode == {5'h01,2'h3};
+        opcode_is_fsw <= opcode == {5'h09,2'h3};
+        opcode_is_fmadd <= opcode == {5'h10,2'h3};
+        opcode_is_fmsub <= opcode == {5'h11,2'h3};
+        opcode_is_fnmsub <= opcode == {5'h12,2'h3};
+        opcode_is_fnmadd <= opcode == {5'h13,2'h3};
+
 
         // Replications of bit 31 in following are sign extensions
         imm_alu_load <= {{20{insn[31]}}, insn[31:20]};

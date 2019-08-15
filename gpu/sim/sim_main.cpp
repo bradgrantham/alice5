@@ -146,7 +146,6 @@ int main(int argc, char **argv) {
             top->clock = top->clock ^ 1;
             top->eval();
         }
-        std::cout << std::setfill('0');
         if(top->decode_opcode_is_ALU_reg_imm)  {
             printf("0x%08X : 0x%08X - opcode_is_ALU_reg_imm %d, %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
         } else if(top->decode_opcode_is_branch) {
@@ -188,9 +187,21 @@ int main(int argc, char **argv) {
         } else if(top->decode_opcode_is_fmv_f2i) {
             printf("0x%08X : 0x%08X - opcode_is_fmv_f2i funct3 %d, %d, %d\n", address, top->insn_to_decode, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
         } else if(top->decode_opcode_is_fcvt_i2f) {
-            printf("0x%08X : 0x%08X - opcode_is_fcmp type %d, rm %d, %d, %d\n", address, top->insn_to_decode, top->decode_shamt_ftype, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
+            printf("0x%08X : 0x%08X - opcode_is_fcvt_i2f type %d, rm %d, %d, %d\n", address, top->insn_to_decode, top->decode_shamt_ftype, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
         } else if(top->decode_opcode_is_fmv_i2f) {
             printf("0x%08X : 0x%08X - opcode_is_fmv_i2f %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1);
+        } else if(top->decode_opcode_is_flw) {
+            printf("0x%08X : 0x%08X - opcode_is_flw %d, %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
+        } else if(top->decode_opcode_is_fsw) {
+            printf("0x%08X : 0x%08X - opcode_is_fsw %d, %d, %d\n", address, top->insn_to_decode, top->decode_rs1, top->decode_rs2, top->decode_imm_store);
+        } else if(top->decode_opcode_is_fmadd) {
+            printf("0x%08X : 0x%08X - opcode_is_fmadd %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1, top->decode_rs2, top->decode_rs3);
+        } else if(top->decode_opcode_is_fmsub) {
+            printf("0x%08X : 0x%08X - opcode_is_fmsub %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1, top->decode_rs2, top->decode_rs3);
+        } else if(top->decode_opcode_is_fnmsub) {
+            printf("0x%08X : 0x%08X - opcode_is_fnmsub %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1, top->decode_rs2, top->decode_rs3);
+        } else if(top->decode_opcode_is_fnmadd) {
+            printf("0x%08X : 0x%08X - opcode_is_fnmadd %d, %d, %d, %d\n", address, top->insn_to_decode, top->decode_rd, top->decode_rs1, top->decode_rs2, top->decode_rs3);
         } else {
             printf("0x%08X : 0x%08X - undecoded instruction\n", address, top->insn_to_decode);
         }
