@@ -39,14 +39,14 @@ uint32_t floatToInt(float f) {
 // --- because these will be deleted when we move them to library.s      ---
 
 // Returns the value x clamped to the range minVal to maxVal per the GLSL docs.
-static float fclamp(float x, float minVal, float maxVal)
+static inline float fclamp(float x, float minVal, float maxVal)
 {
     return fminf(fmaxf(x, minVal), maxVal);
 }
 
 // Compute the smoothstep function per the GLSL docs. They say that the
 // results are undefined if edge0 >= edge1, but we allow edge0 > edge1.
-static float smoothstep(float edge0, float edge1, float x)
+static inline float smoothstep(float edge0, float edge1, float x)
 {
     if (edge0 == edge1) {
         return 0;
@@ -58,7 +58,7 @@ static float smoothstep(float edge0, float edge1, float x)
 }
 
 // Mixes between x and y according to a.
-static float fmix(float x, float y, float a)
+static inline float fmix(float x, float y, float a)
 {
     return x*(1.0 - a) + y*a;
 }

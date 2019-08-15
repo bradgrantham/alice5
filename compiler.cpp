@@ -1,5 +1,6 @@
 
 #include <iomanip>
+#include <sstream>
 
 #include "compiler.h"
 #include "risc-v.h"

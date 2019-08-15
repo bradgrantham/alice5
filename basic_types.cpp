@@ -1,5 +1,6 @@
 
 #include <iomanip>
+#include <sstream>
 
 #include "basic_types.h"
 #include "function.h"
