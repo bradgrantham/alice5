@@ -24,6 +24,19 @@ std::string to_hex(T i) {
     return stream.str();
 }
 
+const char *stateToString(int state)
+{
+    switch(state) {
+        case VMain_Main::STATE_INIT: return "STATE_INIT"; break;
+        case VMain_Main::STATE_FETCH: return "STATE_FETCH"; break;
+        case VMain_Main::STATE_FETCH2: return "STATE_FETCH2"; break;
+        case VMain_Main::STATE_DECODE: return "STATE_DECODE"; break;
+        case VMain_Main::STATE_ALU: return "STATE_ALU"; break;
+        case VMain_Main::STATE_STEPLOADSTORE: return "STATE_STEPLOADSTORE"; break;
+        default : return "unknown state"; break;
+    }
+}
+
 void print_decoded_inst(uint32_t address, uint32_t inst, VMain *top)
 {
     if(top->decode_opcode_is_ALU_reg_imm)  {
@@ -86,15 +99,6 @@ void print_decoded_inst(uint32_t address, uint32_t inst, VMain *top)
         printf("0x%08X : 0x%08X - undecoded instruction\n", address, inst);
     }
 }
-
-enum CPUState {
-    STATE_INIT = 0,
-    STATE_FETCH1 = 1,
-    STATE_FETCH2 = 2,
-    STATE_DECODE = 3,
-    STATE_ALU = 4,
-    STATE_STEPLOADSTORE = 5,
-};
 
 int main(int argc, char **argv) {
 
@@ -254,17 +258,39 @@ int main(int argc, char **argv) {
 
     uint32_t counter = 0;
 
+    std::string pad = "                     ";
+
+    top->inst_ext_address = 0x8;
+
     while (!Verilated::gotFinish()) {
 
-        if (top->clock) {
-            std::cout << "CPU in state " << int(top->Main->state) << "\n";
+        top->clock = 0;
+        top->eval();
 
-            std::cout << "fetch address 0x" << to_hex(top->Main->fetch_inst_address) << "\n";
-            std::cout << "fetched instruction 0x" << to_hex(top->Main->fetched_inst) << "\n";
-            if(top->Main->state == STATE_ALU) {
-                print_decoded_inst(top->Main->PC, top->Main->fetched_inst, top);
-            }
+        // right side of nonblocking assignments
+        std::cout << pad << "between clock 0 and clock 1\n";
+        std::cout << pad << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
+        std::cout << pad << "pc = 0x" << to_hex(top->Main->PC) << "\n";
+        std::cout << pad << "fetch_inst_address = 0x" << to_hex(top->Main->fetch_inst_address) << "\n";
+        std::cout << pad << "fetched_inst = 0x" << to_hex(top->Main->fetched_inst) << "\n";
+        std::cout << pad << "inst_ram_out = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
 
+        top->clock = 1;
+        top->eval();
+
+        // left side of nonblocking assignments
+        std::cout << "between clock 1 and clock 0\n";
+        std::cout << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
+        std::cout << "pc = 0x" << to_hex(top->Main->PC) << "\n";
+        std::cout << "fetch_inst_address = 0x" << to_hex(top->Main->fetch_inst_address) << "\n";
+        std::cout << "fetched_inst = 0x" << to_hex(top->Main->fetched_inst) << "\n";
+        std::cout << "inst_ram_out = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
+
+        if(top->Main->state == top->Main->STATE_ALU) {
+            print_decoded_inst(top->Main->PC, top->Main->fetched_inst, top);
+        }
+
+        if(false) {
             std::cout
                 << (int) top->Main->test_write_address << " "
                 << (int) top->Main->test_write << " "
@@ -287,13 +313,8 @@ int main(int argc, char **argv) {
             }
             std::cout << std::setfill('0');
             std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
-            std::cout << "---\n";
         }
-
-        top->clock = 0;
-        top->eval();
-        top->clock = 1;
-        top->eval();
+        std::cout << "---\n";
     }
 
     top->final();
