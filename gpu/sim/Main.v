@@ -62,11 +62,12 @@ module Main(
 );
 
     // CPU State Machine
-    localparam STATE_INIT = 3'h00;
-    localparam STATE_FETCH = 3'h01;
-    localparam STATE_DECODE = 3'h02;
-    localparam STATE_ALU = 3'h03;
-    localparam STATE_STEPLOADSTORE = 3'h04;
+    localparam STATE_INIT /* verilator public */ = 3'h00;
+    localparam STATE_FETCH /* verilator public */ = 3'h01;
+    localparam STATE_FETCH2 /* verilator public */ = 3'h02;
+    localparam STATE_DECODE /* verilator public */ = 3'h03;
+    localparam STATE_ALU /* verilator public */ = 3'h04;
+    localparam STATE_STEPLOADSTORE /* verilator public */ = 3'h05;
     reg [2:0] state /* verilator public */;
     reg [31:0] PC /* verilator public */;
 
@@ -81,7 +82,7 @@ module Main(
     wire [15:0] inst_ram_address = (state == STATE_INIT) ? inst_ext_address : fetch_inst_address;
     wire [31:0] inst_ram_in_data = inst_ext_in_data;
     wire inst_ram_write = inst_ext_write;
-    wire [31:0] inst_ram_out_data;
+    wire [31:0] inst_ram_out_data /* verilator public */;
     assign inst_ext_out_data = inst_ram_out_data;
 
     RISCVDecode #(.INSN_WIDTH(32))
@@ -213,6 +214,9 @@ module Main(
 
         end else begin
 
+            // fetch_inst_address <= fetch_inst_address;
+            // fetched_inst <= fetched_inst;
+
             case (state)
                 STATE_INIT: begin
                     state <= STATE_FETCH;
@@ -222,21 +226,25 @@ module Main(
                     // want PC to be settled here
                     // get 32 bits from memory[PC]
                     fetch_inst_address <= PC[15:0];
-                    // block here on RAM output and remove "FETCH2"
-                    state <= STATE_DECODE;
+                    state <= STATE_FETCH2;
                     PC <= PC;
+                end
+                STATE_FETCH2: begin
+                    fetch_inst_address <= PC[15:0];
+                    state <= STATE_DECODE;
                 end
                 STATE_DECODE: begin
                     // clock the 32 bits of instruction into decoded signals
+                    fetch_inst_address <= PC[15:0];
                     fetched_inst <= inst_ram_out_data;
-                    fetch_inst_address <= 16'bx;
                     state <= STATE_ALU;
                     PC <= PC;
                 end
                 STATE_ALU: begin
                     // want decode of instruction to be settled here
                     // do ALU operation
-                    fetch_inst_address <= 16'bx;
+                    fetch_inst_address <= PC[15:0];
+                    fetched_inst <= inst_ram_out_data;
                     state <= STATE_STEPLOADSTORE;
                     PC <= PC;
                 end
@@ -246,7 +254,6 @@ module Main(
                     PC <= PC + 4;
                     // load into registers?
                     // store from registers - need to stall reads from data, don't need to stall inst reads
-                    fetch_inst_address <= 16'bx;
                     state <= STATE_FETCH;
                 end
                 default: begin
