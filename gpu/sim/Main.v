@@ -203,7 +203,7 @@ module Main(
         test_state <= test_state + 1'b1;
     end
 
-    always @(posedge clock or negedge reset_n) begin
+    always @(posedge clock) begin
         if(!reset_n) begin
 
             // Enter INIT when we leave RESET

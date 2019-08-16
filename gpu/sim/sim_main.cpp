@@ -1,6 +1,7 @@
 #include <inttypes.h>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 
 #include "objectfile.h"
 
@@ -13,6 +14,14 @@
 void usage(const char* progname)
 {
     printf("usage: %s shader.bin\n", progname);
+}
+
+template<typename T>
+std::string to_hex(T i) {
+    std::stringstream stream;
+    stream << std::setfill('0') << std::setw(sizeof(T) * 2) << std::hex << std::uppercase;
+    stream << uint64_t(i);
+    return stream.str();
 }
 
 void print_decoded_inst(uint32_t address, uint32_t inst, VMain *top)
@@ -144,10 +153,14 @@ int main(int argc, char **argv) {
 
     // Run one clock cycle in reset to process STATE_INIT
     top->reset_n = 0;
-    for(int i = 0; i < 2; i++) {
-        top->clock = top->clock ^ 1;
-        top->eval();
-    }
+    top->inst_ext_write = 0;
+    top->data_ext_write = 0;
+    top->clock = 1;
+    top->eval();
+    top->clock = 0;
+    top->eval();
+    top->clock = 1;
+    top->eval();
 
     // Write inst bytes to inst memory
     for(uint32_t byteaddr = 0; byteaddr < inst_bytes.size(); byteaddr += 4) {
@@ -160,29 +173,17 @@ int main(int argc, char **argv) {
         top->inst_ext_address = byteaddr;
         top->inst_ext_in_data = inst_word;
         top->inst_ext_write = 1;
+        top->data_ext_write = 0;
 
         if(beVerbose) {
-            std::cout << std::setfill('0');
-            std::cout << "Writing to inst " << byteaddr << " value 0x" << std::hex << std::setw(8) << top->inst_ext_in_data << std::dec << std::setw(0) << "\n";
+            std::cout << "Writing to inst " << byteaddr << " value 0x" << to_hex(top->inst_ext_in_data) << "\n";
         }
 
-        // Toggle clock.
-        top->clock = top->clock ^ 1;
-
-        // Eval all Verilog code.
+        top->clock = 0;
         top->eval();
-
-        // Disable write
-        top->inst_ext_write = 0;
-
-        // Toggle clock.
-        top->clock = top->clock ^ 1;
-
-        // Eval all Verilog code.
+        top->clock = 1;
         top->eval();
     }
-    // Disable write to inst memory
-    top->data_ext_write = 0;
 
     // Write data bytes to data memory
     for(uint32_t byteaddr = 0; byteaddr < data_bytes.size(); byteaddr += 4) {
@@ -194,25 +195,21 @@ int main(int argc, char **argv) {
 
         top->data_ext_address = byteaddr;
         top->data_ext_in_data = data_word;
+        top->inst_ext_write = 0;
         top->data_ext_write = 1;
 
         if(beVerbose) {
-            std::cout << std::setfill('0');
-            std::cout << "Writing to data " << byteaddr << " value 0x" << std::hex << std::setw(8) << top->data_ext_in_data << std::dec << std::setw(0) << "\n";
+            std::cout << "Writing to data "
+                << byteaddr << " value 0x"
+                << to_hex(top->data_ext_in_data) << "\n";
         }
 
-        // Toggle clock.
-        top->clock = top->clock ^ 1;
-
-        // Eval all Verilog code.
+        top->clock = 0;
         top->eval();
-
-        // Toggle clock.
-        top->clock = top->clock ^ 1;
-
-        // Eval all Verilog code.
+        top->clock = 1;
         top->eval();
     }
+
     // Disable write to data memory
     top->data_ext_write = 0;
 
@@ -222,8 +219,9 @@ int main(int argc, char **argv) {
             inst_bytes[byteaddr + 1] <<  8 |
             inst_bytes[byteaddr + 2] << 16 |
             inst_bytes[byteaddr + 3] << 24;
-        std::cout << std::setfill('0');
-        std::cout << "inst memory[" << byteaddr << "] = " << std::hex << std::setw(8) << top->Main->instRam->memory[byteaddr >> 2] << std::dec << std::setw(0) << ", should be " << std::hex << std::setw(8) << inst_word << std::dec << std::setw(0) << "\n";
+        std::cout << "inst memory[" << byteaddr << "] = "
+            << to_hex(top->Main->instRam->memory[byteaddr >> 2]) << ", should be "
+            << to_hex(inst_word) << "\n";
     }
 
     bool test_decoder = true;
@@ -236,21 +234,19 @@ int main(int argc, char **argv) {
                 inst_bytes[address + 2] << 16 |
                 inst_bytes[address + 3] << 24;
             top->ext_inst_to_decode = inst_word; // addi    x1, x0, 314
-            for(int i = 0; i < 2; i++) {
-                top->clock = top->clock ^ 1;
-                top->eval();
-            }
+            top->clock = 0;
+            top->eval();
+            top->clock = 1;
+            top->eval();
             print_decoded_inst(address, inst_word, top);
         }
     }
 
-    std::cout << std::setfill('0');
-    std::cout << "inst memory[0] = " << std::hex << std::setw(8) << top->Main->instRam->memory[0] << std::dec << std::setw(0) << "\n";
+    std::cout << "inst memory[0] = " << to_hex(top->Main->instRam->memory[0]) << "\n";
 
-
-    top->clock = top->clock ^ 1;
+    top->clock = 0;
     top->eval();
-    top->clock = top->clock ^ 1;
+    top->clock = 1;
     top->eval();
 
     // Release reset
@@ -260,19 +256,15 @@ int main(int argc, char **argv) {
 
     while (!Verilated::gotFinish()) {
 
-        // Toggle clock and eval
-        top->clock = top->clock ^ 1;
-        top->eval();
-
         if (top->clock) {
             std::cout << "CPU in state " << int(top->Main->state) << "\n";
 
             if(top->Main->state == STATE_FETCH2) {
-                std::cout << "fetch address 0x" << std::hex << std::setw(8) << top->Main->fetch_inst_address << std::dec << std::setw(0) << "\n";
+                std::cout << "fetch address 0x" << to_hex(top->Main->fetch_inst_address) << "\n";
             }
 
             if(top->Main->state == STATE_DECODE) {
-                std::cout << "fetched instruction 0x" << std::hex << std::setw(8) << top->Main->fetched_inst << std::dec << std::setw(0) << "\n";
+                std::cout << "fetched instruction 0x" << to_hex(top->Main->fetched_inst) << "\n";
             }
 
             if(top->Main->state == STATE_ALU) {
@@ -293,16 +285,21 @@ int main(int argc, char **argv) {
                 // Draw in columns.
                 int r = i%4*8 + i/4;
                 std::cout << std::setfill('0');
-                std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x" << std::hex << std::setw(8)
-                    << top->Main->registers->bank1->memory[r] << std::dec << std::setw(0) << "   ";
+                std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
+                    << to_hex(top->Main->registers->bank1->memory[r]) << "   ";
                 if (i % 4 == 3) {
                     std::cout << "\n";
                 }
             }
             std::cout << std::setfill('0');
-            std::cout << " pc = 0x" << std::hex << std::setw(8) << top->Main->PC << std::dec << std::setw(0) << "\n";
+            std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
             std::cout << "---\n";
         }
+
+        top->clock = 0;
+        top->eval();
+        top->clock = 1;
+        top->eval();
     }
 
     top->final();
