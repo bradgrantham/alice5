@@ -7,8 +7,8 @@
 
 #include "VMain.h"
 #include "VMain_Main.h"
-// #include "VMain_Registers.h"
-// #include "VMain_BlockRam__A5.h"
+#include "VMain_Registers.h"
+#include "VMain_BlockRam__A5.h"
 #include "VMain_BlockRam__A10.h"
 
 void usage(const char* progname)
@@ -293,23 +293,23 @@ int main(int argc, char **argv) {
         top->eval();
 
         // right side of nonblocking assignments
-        std::cout << pad << "between clock 0 and clock 1\n";
-        std::cout << pad << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
-        std::cout << pad << "pc = 0x" << to_hex(top->Main->PC) << "\n";
-        std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
-        std::cout << pad << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
-        std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
-
-        top->clock = 1;
-        top->eval();
-
-        // left side of nonblocking assignments
-        std::cout << "between clock 1 and clock 0\n";
+        std::cout << "between clock 0 and clock 1\n";
         std::cout << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
         std::cout << "pc = 0x" << to_hex(top->Main->PC) << "\n";
         std::cout << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
         std::cout << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
         std::cout << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
+
+        top->clock = 1;
+        top->eval();
+
+        // left side of nonblocking assignments
+        std::cout << pad << "between clock 1 and clock 0\n";
+        std::cout << pad << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
+        std::cout << pad << "pc = 0x" << to_hex(top->Main->PC) << "\n";
+        std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
+        std::cout << pad << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
+        std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
 
         if(top->Main->state == top->Main->STATE_ALU) {
             print_decoded_inst(top->Main->PC, top->Main->inst_to_decode, top);
@@ -318,7 +318,6 @@ int main(int argc, char **argv) {
         if(false) {
 
             // Dump register contents.
-#if 0
             for (int i = 0; i < 32; i++) {
                 // Draw in columns.
                 int r = i%4*8 + i/4;
@@ -329,7 +328,6 @@ int main(int argc, char **argv) {
                     std::cout << "\n";
                 }
             }
-#endif
             std::cout << std::setfill('0');
             std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
         }

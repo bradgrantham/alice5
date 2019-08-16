@@ -104,7 +104,6 @@ module Main(
             .read_address({2'b00, data_ram_address[15:2]}),
             .read_data(data_ram_out_data));
 
-/* 
     // Register bank.
     wire [31:0] unused;
     Registers registers(
@@ -118,7 +117,7 @@ module Main(
         .read1_data(reg_ext_out_data),
 
         .read2_address(test_read_address),
-        .read2_data(test_read_data)); */
+        .read2_data(test_read_data));
 
     RISCVDecode #(.INSN_WIDTH(32))
         instDecode(
@@ -167,6 +166,37 @@ module Main(
             .imm_jump(decode_imm_jump)
             );
 
+// Test auto-increment of register x1.
+    reg [4:0] test_write_address /* verilator public */;
+    reg test_write /* verilator public */;
+    reg [31:0] test_write_data /* verilator public */;
+    reg [4:0] test_read_address /* verilator public */;
+    wire [31:0] test_read_data /* verilator public */;
+    reg [1:0] test_state /* verilator public */;
+    always @(posedge clock) begin
+        case (test_state)
+            0: begin
+                // Read register x1. Result will be ready next clock.
+                test_write <= 1'b0;
+                test_read_address <= 5'h1;
+            end
+            1: begin
+                // Wait.
+            end
+            2: begin
+                // Write new value x1.
+                test_write_address <= 5'h1;
+                test_write <= 1'b1;
+                test_write_data <= test_read_data + 32'h1;
+            end
+            3: begin
+                // Wait.
+            end
+        endcase
+
+        test_state <= test_state + 1'b1;
+    end
+
     always @(posedge clock) begin
         if(!reset_n) begin
 
@@ -204,10 +234,12 @@ module Main(
             end else begin
 
                 case (state)
+
                     STATE_INIT: begin
                         state <= STATE_FETCH;
-                        PC <= 32'bx;
+                        PC <= 0;
                     end
+
                     STATE_FETCH: begin
                         // want PC to be settled here
                         // get 32 bits from memory[PC]
@@ -215,21 +247,23 @@ module Main(
                         state <= STATE_FETCH2;
                         PC <= PC;
                     end
+
                     STATE_FETCH2: begin
                         state <= STATE_DECODE;
                     end
+
                     STATE_DECODE: begin
                         // clock the 32 bits of instruction into decoded signals
                         inst_to_decode <= inst_ram_out_data;
                         state <= STATE_ALU;
-                        PC <= PC;
                     end
+
                     STATE_ALU: begin
                         // want decode of instruction to be settled here
                         // do ALU operation
                         state <= STATE_STEPLOADSTORE;
-                        PC <= PC;
                     end
+
                     STATE_STEPLOADSTORE: begin
                         // want result of ALU to be settled here
                         // Would be output of ALU for branch and jalr or route from imm20 for branch
@@ -238,9 +272,12 @@ module Main(
                         // store from registers - need to stall reads from data, don't need to stall inst reads
                         state <= STATE_FETCH;
                     end
+
                     default: begin
+                        // error, just reset
                         state <= STATE_INIT;
                     end
+
                 endcase
             end
         end
