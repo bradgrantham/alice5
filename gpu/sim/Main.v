@@ -9,9 +9,6 @@ module Main(
     input wire ext_enable_write_inst,
     input wire ext_enable_write_data,
 
-    input wire [4:0] reg_ext_address,
-    output wire [31:0] reg_ext_out_data,
-
     input wire ext_decode_inst,
     input wire [31:0] ext_inst_to_decode,
     output wire decode_opcode_is_branch,
@@ -108,20 +105,21 @@ module Main(
     wire [31:0] rs2_value;
     reg [4:0] rd_address;
     reg [31:0] rd_value;
-    reg write_rd;
+    reg enable_write_rd;
+
     // Register bank.
     wire [31:0] unused;
     Registers registers(
         .clock(clock),
 
         .write_address(rd_address),
-        .write(write_rd),
+        .write(enable_write_rd),
         .write_data(rd_value),
 
-        .read1_address(decode_rs1[4:0]),
+        .read1_address(decode_rs1),
         .read1_data(rs1_value),
 
-        .read2_address(decode_rs2[4:0]),
+        .read2_address(decode_rs2),
         .read2_data(rs2_value));
 
     RISCVDecode #(.INSN_WIDTH(32))
@@ -178,7 +176,7 @@ module Main(
             PC <= 32'b0;
             inst_ram_write <= 0;
             data_ram_write <= 0;
-            write_rd <= 0;
+            enable_write_rd <= 0;
 
             // reset registers?  Could assume they're junk in the compiler and save gates
 
@@ -240,12 +238,12 @@ module Main(
                         if(decode_opcode_is_ALU_reg_imm) begin
                             // pretend all ops are add for now
                             rd_value <= rs1_value + decode_imm_alu_load;
-                            write_rd <= 1;
+                            enable_write_rd <= 1;
                             rd_address <= decode_rd;
                         end else if(decode_opcode_is_ALU_reg_reg) begin
                             // pretend all ops are add for now
-                            rd_value <= rs2_value + rs1_value;
-                            write_rd <= 1;
+                            rd_value <= rs1_value + rs2_value;
+                            enable_write_rd <= 1;
                             rd_address <= decode_rd;
                         end
 
@@ -255,7 +253,7 @@ module Main(
                     STATE_STEPLOADSTORE: begin
                         // want result of ALU to be settled here
                         // Would be output of ALU for branch and jalr or route from imm20 for branch
-                        write_rd <= 0;
+                        enable_write_rd <= 0;
                         PC <= PC + 4;
                         // load into registers?
                         // store from registers - need to stall reads from data, don't need to stall inst reads
