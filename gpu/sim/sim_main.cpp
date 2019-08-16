@@ -259,14 +259,8 @@ int main(int argc, char **argv) {
         if (top->clock) {
             std::cout << "CPU in state " << int(top->Main->state) << "\n";
 
-            if(top->Main->state == STATE_FETCH2) {
-                std::cout << "fetch address 0x" << to_hex(top->Main->fetch_inst_address) << "\n";
-            }
-
-            if(top->Main->state == STATE_DECODE) {
-                std::cout << "fetched instruction 0x" << to_hex(top->Main->fetched_inst) << "\n";
-            }
-
+            std::cout << "fetch address 0x" << to_hex(top->Main->fetch_inst_address) << "\n";
+            std::cout << "fetched instruction 0x" << to_hex(top->Main->fetched_inst) << "\n";
             if(top->Main->state == STATE_ALU) {
                 print_decoded_inst(top->Main->PC, top->Main->fetched_inst, top);
             }
