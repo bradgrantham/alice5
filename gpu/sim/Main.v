@@ -108,7 +108,6 @@ module Main(
     reg enable_write_rd;
 
     // Register bank.
-    wire [31:0] unused;
     Registers registers(
         .clock(clock),
 
@@ -232,19 +231,23 @@ module Main(
                     end
 
                     STATE_ALU: begin
-                        // want decode of instruction to be settled here
+                        // want decode of instruction and registers output to be settled here
                         // do ALU operation
 
                         if(decode_opcode_is_ALU_reg_imm) begin
+
                             // pretend all ops are add for now
                             rd_value <= rs1_value + decode_imm_alu_load;
                             enable_write_rd <= 1;
                             rd_address <= decode_rd;
+
                         end else if(decode_opcode_is_ALU_reg_reg) begin
+
                             // pretend all ops are add for now
                             rd_value <= rs1_value + rs2_value;
                             enable_write_rd <= 1;
                             rd_address <= decode_rd;
+
                         end
 
                         state <= STATE_STEPLOADSTORE;
