@@ -63,11 +63,10 @@ module Main(
 
     // CPU State Machine
     localparam STATE_INIT = 3'h00;
-    localparam STATE_FETCH1 = 3'h01;
-    localparam STATE_FETCH2 = 3'h02;
-    localparam STATE_DECODE = 3'h03;
-    localparam STATE_ALU = 3'h04;
-    localparam STATE_STEPLOADSTORE = 3'h05;
+    localparam STATE_FETCH = 3'h01;
+    localparam STATE_DECODE = 3'h02;
+    localparam STATE_ALU = 3'h03;
+    localparam STATE_STEPLOADSTORE = 3'h04;
     reg [2:0] state /* verilator public */;
     reg [31:0] PC /* verilator public */;
 
@@ -78,6 +77,7 @@ module Main(
 
     // Instruction RAM
     // Connect block RAM to our own module's parameters.
+    // wire state_is_init /* verilator public */ = (state == STATE_INIT);
     wire [15:0] inst_ram_address = (state == STATE_INIT) ? inst_ext_address : fetch_inst_address;
     wire [31:0] inst_ram_in_data = inst_ext_in_data;
     wire inst_ram_write = inst_ext_write;
@@ -214,37 +214,44 @@ module Main(
         end else begin
 
             case (state)
-                 STATE_INIT: begin
-                     state <= STATE_FETCH1;
-                 end
-                 STATE_FETCH1: begin
-                     // want PC to be settled here
-                     // get 32 bits from memory[PC]
-                     fetch_inst_address <= PC[15:0];
-                     state <= STATE_FETCH2;
-                 end
-                 STATE_FETCH2: begin
-                     // want output of RAM to be settled here
-                     fetched_inst <= inst_ram_out_data;
-                     state <= STATE_DECODE;
-                 end
-                 STATE_DECODE: begin
-                     // clock the 32 bits of instruction into decoded signals
-                     state <= STATE_ALU;
-                 end
-                 STATE_ALU: begin
-                     // want decode of instruction to be settled here
-                     // do ALU operation
-                     state <= STATE_STEPLOADSTORE;
-                 end
-                 STATE_STEPLOADSTORE: begin
-                     // want result of ALU to be settled here
-                     // Would be output of ALU for branch and jalr or route from imm20 for branch
-                     PC <= PC + 4;
-                     // load into registers?
-                     // store from registers - need to stall reads from data, don't need to stall inst reads
-                     state <= STATE_FETCH1;
-                 end
+                STATE_INIT: begin
+                    state <= STATE_FETCH;
+                    PC <= 32'bx;
+                end
+                STATE_FETCH: begin
+                    // want PC to be settled here
+                    // get 32 bits from memory[PC]
+                    fetch_inst_address <= PC[15:0];
+                    // block here on RAM output and remove "FETCH2"
+                    state <= STATE_DECODE;
+                    PC <= PC;
+                end
+                STATE_DECODE: begin
+                    // clock the 32 bits of instruction into decoded signals
+                    fetched_inst <= inst_ram_out_data;
+                    fetch_inst_address <= 16'bx;
+                    state <= STATE_ALU;
+                    PC <= PC;
+                end
+                STATE_ALU: begin
+                    // want decode of instruction to be settled here
+                    // do ALU operation
+                    fetch_inst_address <= 16'bx;
+                    state <= STATE_STEPLOADSTORE;
+                    PC <= PC;
+                end
+                STATE_STEPLOADSTORE: begin
+                    // want result of ALU to be settled here
+                    // Would be output of ALU for branch and jalr or route from imm20 for branch
+                    PC <= PC + 4;
+                    // load into registers?
+                    // store from registers - need to stall reads from data, don't need to stall inst reads
+                    fetch_inst_address <= 16'bx;
+                    state <= STATE_FETCH;
+                end
+                default: begin
+                    state <= STATE_INIT;
+                end
             endcase
         end
     end
