@@ -100,6 +100,47 @@ void print_decoded_inst(uint32_t address, uint32_t inst, VMain *top)
     }
 }
 
+void writeBytesToRam(const std::vector<uint8_t>& bytes, bool inst_not_data, VMain *top, bool beVerbose)
+{
+    // Write inst bytes to inst memory
+    for(uint32_t byteaddr = 0; byteaddr < bytes.size(); byteaddr += 4) {
+        uint32_t word = 
+            bytes[byteaddr + 0] <<  0 |
+            bytes[byteaddr + 1] <<  8 |
+            bytes[byteaddr + 2] << 16 |
+            bytes[byteaddr + 3] << 24;
+
+        top->ext_write_address = byteaddr;
+        top->ext_write_data = word;
+
+        if(inst_not_data) {
+            top->ext_enable_write_inst = 1;
+        } else {
+            top->ext_enable_write_data = 1;
+        }
+
+        if(beVerbose) {
+            std::cout << "Writing to " << (inst_not_data ? "inst" : "data") << " address " << byteaddr << " value 0x" << to_hex(top->ext_write_data) << "\n";
+        }
+
+        top->clock = 1;
+        top->eval();
+        top->clock = 0;
+        top->eval();
+
+        if(inst_not_data) {
+            top->ext_enable_write_inst = 0;
+        } else {
+            top->ext_enable_write_data = 0;
+        }
+
+        top->clock = 1;
+        top->eval();
+        top->clock = 0;
+        top->eval();
+    }
+}
+
 int main(int argc, char **argv) {
 
     bool beVerbose = false;
@@ -159,8 +200,8 @@ int main(int argc, char **argv) {
     top->reset_n = 0;
     top->run = 0;
 
-    top->data_ext_write = 0;
-    top->inst_ext_write = 0;
+    top->ext_enable_write_inst = 0;
+    top->ext_enable_write_data = 0;
     top->ext_decode_inst = 0;
 
     top->clock = 1;
@@ -177,73 +218,36 @@ int main(int argc, char **argv) {
     top->clock = 0;
     top->eval();
 
-    // Write inst bytes to inst memory
-    for(uint32_t byteaddr = 0; byteaddr < inst_bytes.size(); byteaddr += 4) {
-        uint32_t inst_word = 
-            inst_bytes[byteaddr + 0] <<  0 |
-            inst_bytes[byteaddr + 1] <<  8 |
-            inst_bytes[byteaddr + 2] << 16 |
-            inst_bytes[byteaddr + 3] << 24;
+    writeBytesToRam(inst_bytes, true, top, beVerbose);
 
-        top->inst_ext_address = byteaddr;
-        top->inst_ext_in_data = inst_word;
-        top->inst_ext_write = 1;
+    writeBytesToRam(data_bytes, false, top, beVerbose);
 
-        if(beVerbose) {
-            std::cout << "Writing to inst " << byteaddr << " value 0x" << to_hex(top->inst_ext_in_data) << "\n";
-        }
-
-        top->clock = 1;
-        top->eval();
-        top->clock = 0;
-        top->eval();
-
-        top->inst_ext_write = 0;
-
-        top->clock = 1;
-        top->eval();
-        top->clock = 0;
-        top->eval();
-    }
-
-    // Write data bytes to data memory
-    for(uint32_t byteaddr = 0; byteaddr < data_bytes.size(); byteaddr += 4) {
-        uint32_t data_word = 
-            data_bytes[byteaddr + 0] <<  0 |
-            data_bytes[byteaddr + 1] <<  8 |
-            data_bytes[byteaddr + 2] << 16 |
-            data_bytes[byteaddr + 3] << 24;
-
-        top->data_ext_address = byteaddr;
-        top->data_ext_in_data = data_word;
-        top->data_ext_write = 1;
-
-        if(beVerbose) {
-            std::cout << "Writing to data " << byteaddr << " value 0x" << to_hex(top->data_ext_in_data) << "\n";
-        }
-
-        top->clock = 1;
-        top->eval();
-        top->clock = 0;
-        top->eval();
-
-        top->data_ext_write = 0;
-
-        top->clock = 1;
-        top->eval();
-        top->clock = 0;
-        top->eval();
-    }
-
+    // check first 4 words written to inst memory
     for(uint32_t byteaddr = 0; byteaddr < 16; byteaddr += 4) {
         uint32_t inst_word = 
             inst_bytes[byteaddr + 0] <<  0 |
             inst_bytes[byteaddr + 1] <<  8 |
             inst_bytes[byteaddr + 2] << 16 |
             inst_bytes[byteaddr + 3] << 24;
-        std::cout << "inst memory[" << byteaddr << "] = "
-            << to_hex(top->Main->instRam->memory[byteaddr >> 2]) << ", should be "
-            << to_hex(inst_word) << "\n";
+        if(top->Main->instRam->memory[byteaddr >> 2] != inst_word) {
+            std::cout << "error: inst memory[" << byteaddr << "] = "
+                << to_hex(top->Main->instRam->memory[byteaddr >> 2]) << ", should be "
+                << to_hex(inst_word) << "\n";
+        }
+    }
+
+    // check first 4 words written to data memory
+    for(uint32_t byteaddr = 0; byteaddr < 16 && byteaddr < data_bytes.size(); byteaddr += 4) {
+        uint32_t data_word = 
+            data_bytes[byteaddr + 0] <<  0 |
+            data_bytes[byteaddr + 1] <<  8 |
+            data_bytes[byteaddr + 2] << 16 |
+            data_bytes[byteaddr + 3] << 24;
+        if(top->Main->dataRam->memory[byteaddr >> 2] != data_word) {
+            std::cout << "error: data memory[" << byteaddr << "] = "
+                << to_hex(top->Main->dataRam->memory[byteaddr >> 2]) << ", should be "
+                << to_hex(data_word) << "\n";
+        }
     }
 
     bool test_decoder = true;
