@@ -250,7 +250,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    bool test_decoder = true;
+    bool test_decoder = false;
     if(test_decoder) {
 
         // decode program instructions to see what decoder says
@@ -322,14 +322,15 @@ int main(int argc, char **argv) {
             std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
         }
 
-        if(false) {
+        if(beVerbose) {
             // right side of nonblocking assignments
             std::cout << "between clock 0 and clock 1\n";
             std::cout << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
-            std::cout << "pc = 0x" << to_hex(top->Main->PC) << "\n";
-            std::cout << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
-            std::cout << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
-            std::cout << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
+            if(false) {
+                std::cout << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
+                std::cout << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
+                std::cout << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
+            }
         }
 
         if(beVerbose && (top->Main->state == top->Main->STATE_ALU)) {
