@@ -4,13 +4,10 @@ module Main(
     input wire reset_n,
     input wire run, // hold low and release reset to write inst and data
 
-    input wire [15:0] inst_ext_address,
-    input wire [31:0] inst_ext_in_data,
-    input wire inst_ext_write,
-
-    input wire [15:0] data_ext_address,
-    input wire [31:0] data_ext_in_data,
-    input wire data_ext_write,
+    input wire [15:0] ext_write_address,
+    input wire [31:0] ext_write_data,
+    input wire ext_enable_write_inst,
+    input wire ext_enable_write_data,
 
     input wire [4:0] reg_ext_address,
     output wire [31:0] reg_ext_out_data,
@@ -188,17 +185,17 @@ module Main(
                     inst_to_decode <= ext_inst_to_decode;
                 end
 
-                if(inst_ext_write) begin
-                    inst_ram_address <= inst_ext_address;
-                    inst_ram_in_data <= inst_ext_in_data;
+                if(ext_enable_write_inst) begin
+                    inst_ram_address <= ext_write_address;
+                    inst_ram_in_data <= ext_write_data;
                     inst_ram_write <= 1;
                 end else begin
                     inst_ram_write <= 0;
                 end
 
-                if(data_ext_write) begin
-                    data_ram_address <= data_ext_address;
-                    data_ram_in_data <= data_ext_in_data;
+                if(ext_enable_write_data) begin
+                    data_ram_address <= ext_write_address;
+                    data_ram_in_data <= ext_write_data;
                     data_ram_write <= 1;
                 end else begin
                     data_ram_write <= 0;
