@@ -7,8 +7,8 @@
 
 #include "VMain.h"
 #include "VMain_Main.h"
-#include "VMain_Registers.h"
-#include "VMain_BlockRam__A5.h"
+// #include "VMain_Registers.h"
+// #include "VMain_BlockRam__A5.h"
 #include "VMain_BlockRam__A10.h"
 
 void usage(const char* progname)
@@ -157,13 +157,24 @@ int main(int argc, char **argv) {
 
     // Run one clock cycle in reset to process STATE_INIT
     top->reset_n = 0;
-    top->inst_ext_write = 0;
+    top->run = 0;
+
     top->data_ext_write = 0;
+    top->inst_ext_write = 0;
+    top->ext_decode_inst = 0;
+
     top->clock = 1;
     top->eval();
     top->clock = 0;
     top->eval();
+
+    // Release reset
+    top->reset_n = 1;
+
+    // run == 0, nothing should be happening here.
     top->clock = 1;
+    top->eval();
+    top->clock = 0;
     top->eval();
 
     // Write inst bytes to inst memory
@@ -177,15 +188,21 @@ int main(int argc, char **argv) {
         top->inst_ext_address = byteaddr;
         top->inst_ext_in_data = inst_word;
         top->inst_ext_write = 1;
-        top->data_ext_write = 0;
 
         if(beVerbose) {
             std::cout << "Writing to inst " << byteaddr << " value 0x" << to_hex(top->inst_ext_in_data) << "\n";
         }
 
+        top->clock = 1;
+        top->eval();
         top->clock = 0;
         top->eval();
+
+        top->inst_ext_write = 0;
+
         top->clock = 1;
+        top->eval();
+        top->clock = 0;
         top->eval();
     }
 
@@ -199,23 +216,24 @@ int main(int argc, char **argv) {
 
         top->data_ext_address = byteaddr;
         top->data_ext_in_data = data_word;
-        top->inst_ext_write = 0;
         top->data_ext_write = 1;
 
         if(beVerbose) {
-            std::cout << "Writing to data "
-                << byteaddr << " value 0x"
-                << to_hex(top->data_ext_in_data) << "\n";
+            std::cout << "Writing to data " << byteaddr << " value 0x" << to_hex(top->data_ext_in_data) << "\n";
         }
 
-        top->clock = 0;
-        top->eval();
         top->clock = 1;
         top->eval();
-    }
+        top->clock = 0;
+        top->eval();
 
-    // Disable write to data memory
-    top->data_ext_write = 0;
+        top->data_ext_write = 0;
+
+        top->clock = 1;
+        top->eval();
+        top->clock = 0;
+        top->eval();
+    }
 
     for(uint32_t byteaddr = 0; byteaddr < 16; byteaddr += 4) {
         uint32_t inst_word = 
@@ -230,37 +248,40 @@ int main(int argc, char **argv) {
 
     bool test_decoder = true;
     if(test_decoder) {
+
         // decode program instructions to see what decoder says
         for(uint32_t address = 0; address < inst_bytes.size(); address += 4) {
+
             uint32_t inst_word = 
                 inst_bytes[address + 0] <<  0 |
                 inst_bytes[address + 1] <<  8 |
                 inst_bytes[address + 2] << 16 |
                 inst_bytes[address + 3] << 24;
-            top->ext_inst_to_decode = inst_word; // addi    x1, x0, 314
-            top->clock = 0;
-            top->eval();
+
+            top->ext_inst_to_decode = inst_word;
+            top->ext_decode_inst = 1;
+
             top->clock = 1;
             top->eval();
+            top->clock = 0;
+            top->eval();
+
             print_decoded_inst(address, inst_word, top);
+
+            top->ext_decode_inst = 0;
+
+            top->clock = 1;
+            top->eval();
+            top->clock = 0;
+            top->eval();
+
         }
     }
 
-    std::cout << "inst memory[0] = " << to_hex(top->Main->instRam->memory[0]) << "\n";
-
-    top->clock = 0;
-    top->eval();
-    top->clock = 1;
-    top->eval();
-
-    // Release reset
-    top->reset_n = 1;
-
-    uint32_t counter = 0;
+    // Run
+    top->run = 1;
 
     std::string pad = "                     ";
-
-    top->inst_ext_address = 0x8;
 
     while (!Verilated::gotFinish()) {
 
@@ -271,9 +292,9 @@ int main(int argc, char **argv) {
         std::cout << pad << "between clock 0 and clock 1\n";
         std::cout << pad << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
         std::cout << pad << "pc = 0x" << to_hex(top->Main->PC) << "\n";
-        std::cout << pad << "fetch_inst_address = 0x" << to_hex(top->Main->fetch_inst_address) << "\n";
-        std::cout << pad << "fetched_inst = 0x" << to_hex(top->Main->fetched_inst) << "\n";
-        std::cout << pad << "inst_ram_out = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
+        std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
+        std::cout << pad << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
+        std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
 
         top->clock = 1;
         top->eval();
@@ -282,25 +303,18 @@ int main(int argc, char **argv) {
         std::cout << "between clock 1 and clock 0\n";
         std::cout << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
         std::cout << "pc = 0x" << to_hex(top->Main->PC) << "\n";
-        std::cout << "fetch_inst_address = 0x" << to_hex(top->Main->fetch_inst_address) << "\n";
-        std::cout << "fetched_inst = 0x" << to_hex(top->Main->fetched_inst) << "\n";
-        std::cout << "inst_ram_out = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
+        std::cout << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
+        std::cout << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
+        std::cout << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
 
         if(top->Main->state == top->Main->STATE_ALU) {
-            print_decoded_inst(top->Main->PC, top->Main->fetched_inst, top);
+            print_decoded_inst(top->Main->PC, top->Main->inst_to_decode, top);
         }
 
         if(false) {
-            std::cout
-                << (int) top->Main->test_write_address << " "
-                << (int) top->Main->test_write << " "
-                << (int) top->Main->test_write_data << ", "
-                << (int) top->Main->test_read_address << " "
-                << (int) top->Main->test_read_data << ", "
-                << (int) top->Main->test_state << "\n";
 
             // Dump register contents.
-
+#if 0
             for (int i = 0; i < 32; i++) {
                 // Draw in columns.
                 int r = i%4*8 + i/4;
@@ -311,6 +325,7 @@ int main(int argc, char **argv) {
                     std::cout << "\n";
                 }
             }
+#endif
             std::cout << std::setfill('0');
             std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
         }
