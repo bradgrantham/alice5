@@ -70,8 +70,10 @@ module Main(
     localparam STATE_STEPLOADSTORE /* verilator public */ = 4'h06;
     localparam STATE_HALTED /* verilator public */ = 4'h07;
     reg [3:0] state /* verilator public */;
+
     reg [ADDRESS_WIDTH-1:0] PC /* verilator public */;
 
+    // instruction latched for inst decoder
     reg [WORD_WIDTH-1:0] inst_to_decode /* verilator public */;
 
     // Instruction RAM write control
@@ -197,7 +199,7 @@ module Main(
         if(!reset_n) begin
 
             state <= STATE_INIT;
-            PC <= 16'b0;
+            PC <= 0;
             inst_ram_write <= 0;
             data_ram_write <= 0;
             enable_write_rd <= 0;
