@@ -33,7 +33,7 @@ const char *stateToString(int state)
         case VMain_Main::STATE_DECODE: return "STATE_DECODE"; break;
         case VMain_Main::STATE_REGISTERS: return "STATE_REGISTERS"; break;
         case VMain_Main::STATE_ALU: return "STATE_ALU"; break;
-        case VMain_Main::STATE_STEP: return "STATE_STEP"; break;
+        case VMain_Main::STATE_RETIRE: return "STATE_RETIRE"; break;
         case VMain_Main::STATE_LOAD: return "STATE_LOAD"; break;
         case VMain_Main::STATE_STORE: return "STATE_STORE"; break;
         case VMain_Main::STATE_HALTED: return "STATE_HALTED"; break;

@@ -67,7 +67,7 @@ module Main(
     localparam STATE_DECODE /* verilator public */ = 4'd03;
     localparam STATE_REGISTERS /* verilator public */ = 4'd04;
     localparam STATE_ALU /* verilator public */ = 4'd05;
-    localparam STATE_STEP /* verilator public */ = 4'd06;
+    localparam STATE_RETIRE /* verilator public */ = 4'd06;
     localparam STATE_LOAD /* verilator public */ = 4'd07;
     localparam STATE_LOAD2 /* verilator public */ = 4'd08;
     localparam STATE_STORE /* verilator public */ = 4'd09;
@@ -289,7 +289,7 @@ module Main(
                         state <= halted ? STATE_HALTED :
                             decode_opcode_is_load ? STATE_LOAD :
                             decode_opcode_is_store ? STATE_STORE :
-                            STATE_STEP;
+                            STATE_RETIRE;
                     end
 
                     STATE_LOAD: begin
@@ -300,7 +300,7 @@ module Main(
 
                     STATE_LOAD2: begin
                         // clock out load result
-                        state <= STATE_STEP;
+                        state <= STATE_RETIRE;
                     end
 
                     STATE_STORE: begin
@@ -308,10 +308,10 @@ module Main(
                         data_ram_address <= alu_result;
                         data_ram_in_data <= rs2_value;
                         data_ram_write <= 1;
-                        state <= STATE_STEP;
+                        state <= STATE_RETIRE;
                     end
 
-                    STATE_STEP: begin
+                    STATE_RETIRE: begin
                         data_ram_write <= 0;
                         // want result of ALU to be settled here
                         // Would be output of ALU for branch and jalr or route from imm20 for branch
