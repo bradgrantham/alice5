@@ -56,59 +56,63 @@ module Main(
     output wire [31:0] decode_imm_jump
 );
 
-    // CPU State Machine
-    localparam STATE_INIT /* verilator public */ = 3'h00;
-    localparam STATE_FETCH /* verilator public */ = 3'h01;
-    localparam STATE_FETCH2 /* verilator public */ = 3'h02;
-    localparam STATE_DECODE /* verilator public */ = 3'h03;
-    localparam STATE_REGISTERS /* verilator public */ = 3'h04;
-    localparam STATE_ALU /* verilator public */ = 3'h05;
-    localparam STATE_STEPLOADSTORE /* verilator public */ = 3'h06;
-    localparam STATE_HALTED /* verilator public */ = 3'h07;
-    reg [2:0] state /* verilator public */;
-    reg [31:0] PC /* verilator public */;
+    localparam WORD_WIDTH = 32;
+    localparam REGISTER_ADDRESS_WIDTH = 5;
+    localparam ADDRESS_WIDTH = 16;
 
-    reg [31:0] inst_to_decode /* verilator public */;
+    // CPU State Machine
+    localparam STATE_INIT /* verilator public */ = 4'h00;
+    localparam STATE_FETCH /* verilator public */ = 4'h01;
+    localparam STATE_FETCH2 /* verilator public */ = 4'h02;
+    localparam STATE_DECODE /* verilator public */ = 4'h03;
+    localparam STATE_REGISTERS /* verilator public */ = 4'h04;
+    localparam STATE_ALU /* verilator public */ = 4'h05;
+    localparam STATE_STEPLOADSTORE /* verilator public */ = 4'h06;
+    localparam STATE_HALTED /* verilator public */ = 4'h07;
+    reg [3:0] state /* verilator public */;
+    reg [ADDRESS_WIDTH-1:0] PC /* verilator public */;
+
+    reg [WORD_WIDTH-1:0] inst_to_decode /* verilator public */;
 
     // Instruction RAM write control
-    reg [15:0] inst_ram_address /* verilator public */;
-    reg [31:0] inst_ram_in_data /* verilator public */;
+    reg [ADDRESS_WIDTH-1:0] inst_ram_address /* verilator public */;
+    reg [WORD_WIDTH-1:0] inst_ram_in_data /* verilator public */;
     reg inst_ram_write;
 
     // Data RAM write control
-    reg [15:0] data_ram_address;
-    reg [31:0] data_ram_in_data;
+    reg [ADDRESS_WIDTH-1:0] data_ram_address;
+    reg [WORD_WIDTH-1:0] data_ram_in_data;
     reg data_ram_write;
 
     // Inst RAM read out
-    wire [31:0] inst_ram_out_data /* verilator public */;
+    wire [WORD_WIDTH-1:0] inst_ram_out_data /* verilator public */;
 
     // Data RAM read out
-    wire [31:0] data_ram_out_data;
+    wire [WORD_WIDTH-1:0] data_ram_out_data;
 
-    BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
+    BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(ADDRESS_WIDTH))
         instRam(
             .clock(clock),
-            .write_address({2'b00, inst_ram_address[15:2]}),
+            .write_address({2'b00, inst_ram_address[ADDRESS_WIDTH-1:2]}),
             .write(inst_ram_write),
             .write_data(inst_ram_in_data),
-            .read_address({2'b00, inst_ram_address[15:2]}),
+            .read_address({2'b00, inst_ram_address[ADDRESS_WIDTH-1:2]}),
             .read_data(inst_ram_out_data));
 
-    BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(16))
+    BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(ADDRESS_WIDTH))
         dataRam(
             .clock(clock),
-            .write_address({2'b00, data_ram_address[15:2]}),
+            .write_address({2'b00, data_ram_address[ADDRESS_WIDTH-1:2]}),
             .write(data_ram_write),
             .write_data(data_ram_in_data),
-            .read_address({2'b00, data_ram_address[15:2]}),
+            .read_address({2'b00, data_ram_address[ADDRESS_WIDTH-1:2]}),
             .read_data(data_ram_out_data));
 
-    wire [31:0] rs1_value /* verilator public */;
-    wire [31:0] rs2_value /* verilator public */;
-    reg [4:0] rd_address;
-    reg [31:0] alu_result;
-    wire [31:0] rd_value;
+    wire [WORD_WIDTH-1:0] rs1_value /* verilator public */;
+    wire [WORD_WIDTH-1:0] rs2_value /* verilator public */;
+    reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;
+    reg [WORD_WIDTH-1:0] alu_result;
+    wire [WORD_WIDTH-1:0] rd_value;
     reg enable_write_rd;
 
     assign rd_value = alu_result;
@@ -127,7 +131,7 @@ module Main(
         .read2_address(decode_rs2),
         .read2_data(rs2_value));
 
-    RISCVDecode #(.INSN_WIDTH(32))
+    RISCVDecode #(.INSN_WIDTH(WORD_WIDTH))
         instDecode(
             .inst(inst_to_decode),
             .opcode_is_branch(decode_opcode_is_branch),
@@ -174,12 +178,12 @@ module Main(
             .imm_jump(decode_imm_jump)
             );
 
-    wire [31:0] alu_op1 /* verilator public */ ;
-    wire [31:0] alu_op2 /* verilator public */ ;
+    wire [WORD_WIDTH-1:0] alu_op1 /* verilator public */ ;
+    wire [WORD_WIDTH-1:0] alu_op2 /* verilator public */ ;
 
     assign alu_op1 =
         decode_opcode_is_ALU_reg_imm ? rs1_value :
-        decode_opcode_is_ALU_reg_reg ? rs2_value :
+        decode_opcode_is_ALU_reg_reg ? rs1_value :
         decode_opcode_is_lui ? decode_imm_upper :
         32'hdeadbeef;
 
@@ -193,7 +197,7 @@ module Main(
         if(!reset_n) begin
 
             state <= STATE_INIT;
-            PC <= 32'b0;
+            PC <= 16'b0;
             inst_ram_write <= 0;
             data_ram_write <= 0;
             enable_write_rd <= 0;
@@ -237,8 +241,8 @@ module Main(
 
                     STATE_FETCH: begin
                         // want PC to be settled here
-                        // get 32 bits from memory[PC]
-                        inst_ram_address <= PC[15:0];
+                        // get instruction from memory[PC]
+                        inst_ram_address <= PC;
                         state <= STATE_FETCH2;
                         PC <= PC;
                     end
