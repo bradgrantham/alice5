@@ -114,10 +114,8 @@ module Main(
     wire [WORD_WIDTH-1:0] rs2_value /* verilator public */;
     reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;
     reg [WORD_WIDTH-1:0] alu_result;
-    wire [WORD_WIDTH-1:0] rd_value;
+    reg [WORD_WIDTH-1:0] rd_value;
     reg enable_write_rd;
-
-    assign rd_value = alu_result;
 
     // Register bank.
     Registers registers(
@@ -189,12 +187,14 @@ module Main(
         decode_opcode_is_ALU_reg_imm ? $signed(rs1_value) :
         decode_opcode_is_ALU_reg_reg ? $signed(rs1_value) :
         decode_opcode_is_lui ? $signed(decode_imm_upper) :
+        decode_opcode_is_jal ? $signed(PC) :
         $signed(32'hdeadbeef);
 
     assign alu_op2 =
         decode_opcode_is_ALU_reg_imm ? decode_imm_alu_load :
         decode_opcode_is_ALU_reg_reg ? $signed(rs2_value) :
         decode_opcode_is_lui ? 0 :
+        decode_opcode_is_jal ? $signed(decode_imm_jump) :
         $signed(32'hcafebabe);
 
     always @(posedge clock) begin
@@ -246,6 +246,7 @@ module Main(
                     STATE_FETCH: begin
                         // want PC to be settled here
                         // get instruction from memory[PC]
+                        enable_write_rd <= 0;
                         inst_ram_address <= PC;
                         state <= STATE_FETCH2;
                         PC <= PC;
@@ -272,12 +273,7 @@ module Main(
                         // do ALU operation
 
                         // pretend all ops are add for now
-                        alu_result <= 
-                            alu_op1 + alu_op2;
-
-                        enable_write_rd <= decode_opcode_is_ALU_reg_imm ||
-                            decode_opcode_is_ALU_reg_reg ||
-                            decode_opcode_is_lui;
+                        alu_result <= alu_op1 + alu_op2;
 
                         rd_address <= decode_rd;
 
@@ -287,8 +283,17 @@ module Main(
                     STATE_STEPLOADSTORE: begin
                         // want result of ALU to be settled here
                         // Would be output of ALU for branch and jalr or route from imm20 for branch
-                        enable_write_rd <= 0;
-                        PC <= PC + 4;
+
+                        enable_write_rd <= decode_opcode_is_ALU_reg_imm ||
+                            decode_opcode_is_ALU_reg_reg ||
+                            decode_opcode_is_lui ||
+                            decode_opcode_is_jal;
+                        rd_value <= decode_opcode_is_jal ? (PC + 4) :
+                            $unsigned(alu_result);
+
+                        PC <= decode_opcode_is_jal ? $unsigned(alu_result) :
+                            (PC + 4);
+
                         // load into registers?
                         // store from registers - need to stall reads from data, don't need to stall inst reads
                         state <= STATE_FETCH;
