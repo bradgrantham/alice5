@@ -61,14 +61,17 @@ module Main(
     localparam ADDRESS_WIDTH = 16;
 
     // CPU State Machine
-    localparam STATE_INIT /* verilator public */ = 4'h00;
-    localparam STATE_FETCH /* verilator public */ = 4'h01;
-    localparam STATE_FETCH2 /* verilator public */ = 4'h02;
-    localparam STATE_DECODE /* verilator public */ = 4'h03;
-    localparam STATE_REGISTERS /* verilator public */ = 4'h04;
-    localparam STATE_ALU /* verilator public */ = 4'h05;
-    localparam STATE_STEPLOADSTORE /* verilator public */ = 4'h06;
-    localparam STATE_HALTED /* verilator public */ = 4'h07;
+    localparam STATE_INIT /* verilator public */ = 4'd00;
+    localparam STATE_FETCH /* verilator public */ = 4'd01;
+    localparam STATE_FETCH2 /* verilator public */ = 4'd02;
+    localparam STATE_DECODE /* verilator public */ = 4'd03;
+    localparam STATE_REGISTERS /* verilator public */ = 4'd04;
+    localparam STATE_ALU /* verilator public */ = 4'd05;
+    localparam STATE_STEP /* verilator public */ = 4'd06;
+    localparam STATE_LOAD /* verilator public */ = 4'd07;
+    localparam STATE_LOAD2 /* verilator public */ = 4'd08;
+    localparam STATE_STORE /* verilator public */ = 4'd09;
+    localparam STATE_HALTED /* verilator public */ = 4'd10;
     reg [3:0] state /* verilator public */;
 
     reg [WORD_WIDTH-1:0] PC /* verilator public */;
@@ -79,18 +82,18 @@ module Main(
     // Instruction RAM write control
     reg [ADDRESS_WIDTH-1:0] inst_ram_address /* verilator public */;
     reg [WORD_WIDTH-1:0] inst_ram_in_data /* verilator public */;
-    reg inst_ram_write;
+    reg inst_ram_write /* verilator public */;
 
     // Data RAM write control
-    reg [ADDRESS_WIDTH-1:0] data_ram_address;
-    reg [WORD_WIDTH-1:0] data_ram_in_data;
-    reg data_ram_write;
+    reg [ADDRESS_WIDTH-1:0] data_ram_address /* verilator public */;
+    reg [WORD_WIDTH-1:0] data_ram_in_data /* verilator public */;
+    reg data_ram_write /* verilator public */;
 
     // Inst RAM read out
     wire [WORD_WIDTH-1:0] inst_ram_out_data /* verilator public */;
 
     // Data RAM read out
-    wire [WORD_WIDTH-1:0] data_ram_out_data;
+    wire [WORD_WIDTH-1:0] data_ram_out_data /* verilator public */;
 
     BlockRam #(.WORD_WIDTH(32), .ADDRESS_WIDTH(ADDRESS_WIDTH))
         instRam(
@@ -186,17 +189,21 @@ module Main(
     assign alu_op1 =
         (decode_opcode_is_ALU_reg_imm ||
            decode_opcode_is_ALU_reg_reg ||
-           decode_opcode_is_jalr) ? $signed(rs1_value) :
+           decode_opcode_is_jalr ||
+           decode_opcode_is_load ||
+           decode_opcode_is_store) ? $signed(rs1_value) :
         decode_opcode_is_lui ? $signed(decode_imm_upper) :
         decode_opcode_is_jal ? $signed(PC) :
         $signed(32'hdeadbeef);
 
     assign alu_op2 =
         (decode_opcode_is_ALU_reg_imm ||
+            decode_opcode_is_load ||
             decode_opcode_is_jalr) ? decode_imm_alu_load :
         decode_opcode_is_ALU_reg_reg ? $signed(rs2_value) :
         decode_opcode_is_lui ? 0 :
         decode_opcode_is_jal ? $signed(decode_imm_jump) :
+        decode_opcode_is_store ? decode_imm_store :
         $signed(32'hcafebabe);
 
     always @(posedge clock) begin
@@ -279,10 +286,33 @@ module Main(
 
                         rd_address <= decode_rd;
 
-                        state <= halted ? STATE_HALTED : STATE_STEPLOADSTORE;
+                        state <= halted ? STATE_HALTED :
+                            decode_opcode_is_load ? STATE_LOAD :
+                            decode_opcode_is_store ? STATE_STORE :
+                            STATE_STEP;
                     end
 
-                    STATE_STEPLOADSTORE: begin
+                    STATE_LOAD: begin
+                        // want result of ALU to be settled here
+                        data_ram_address <= alu_result;
+                        state <= STATE_LOAD2;
+                    end
+
+                    STATE_LOAD2: begin
+                        // clock out load result
+                        state <= STATE_STEP;
+                    end
+
+                    STATE_STORE: begin
+                        // want result of ALU to be settled here
+                        data_ram_address <= alu_result;
+                        data_ram_in_data <= rs2_value;
+                        data_ram_write <= 1;
+                        state <= STATE_STEP;
+                    end
+
+                    STATE_STEP: begin
+                        data_ram_write <= 0;
                         // want result of ALU to be settled here
                         // Would be output of ALU for branch and jalr or route from imm20 for branch
 
@@ -290,10 +320,12 @@ module Main(
                             decode_opcode_is_ALU_reg_reg ||
                             decode_opcode_is_lui ||
                             decode_opcode_is_jalr ||
-                            decode_opcode_is_jal) &&
+                            decode_opcode_is_jal ||
+                            decode_opcode_is_load) &&
                             (rd_address != 0);
                         rd_value <= 
                             (decode_opcode_is_jalr || decode_opcode_is_jal) ? (PC + 4) :
+                            decode_opcode_is_load ? data_ram_out_data : 
                             $unsigned(alu_result);
 
 			// We know the result of ALU for jal has

@@ -33,7 +33,9 @@ const char *stateToString(int state)
         case VMain_Main::STATE_DECODE: return "STATE_DECODE"; break;
         case VMain_Main::STATE_REGISTERS: return "STATE_REGISTERS"; break;
         case VMain_Main::STATE_ALU: return "STATE_ALU"; break;
-        case VMain_Main::STATE_STEPLOADSTORE: return "STATE_STEPLOADSTORE"; break;
+        case VMain_Main::STATE_STEP: return "STATE_STEP"; break;
+        case VMain_Main::STATE_LOAD: return "STATE_LOAD"; break;
+        case VMain_Main::STATE_STORE: return "STATE_STORE"; break;
         case VMain_Main::STATE_HALTED: return "STATE_HALTED"; break;
         default : return "unknown state"; break;
     }
@@ -302,6 +304,10 @@ int main(int argc, char **argv) {
             std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
             std::cout << pad << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
             std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
+            std::cout << pad << "data_ram_out_data = 0x" << to_hex(top->Main->data_ram_out_data) << "\n";
+            std::cout << pad << "data_ram_address = 0x" << to_hex(top->Main->data_ram_address) << "\n";
+            std::cout << pad << "data_ram_in_data = 0x" << to_hex(top->Main->data_ram_in_data) << "\n";
+            std::cout << pad << "data_ram_write = 0x" << to_hex(top->Main->data_ram_write) << "\n";
         }
 
         top->clock = 0;
@@ -313,14 +319,12 @@ int main(int argc, char **argv) {
             for (int i = 0; i < 32; i++) {
                 // Draw in columns.
                 int r = i%4*8 + i/4;
-                std::cout << std::setfill('0');
                 std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
                     << to_hex(top->Main->registers->bank1->memory[r]) << "   ";
                 if (i % 4 == 3) {
                     std::cout << "\n";
                 }
             }
-            std::cout << std::setfill('0');
             std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
         }
 
@@ -357,15 +361,27 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 32; i++) {
         // Draw in columns.
         int r = i%4*8 + i/4;
-        std::cout << std::setfill('0');
         std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
             << to_hex(top->Main->registers->bank1->memory[r]) << "   ";
         if (i % 4 == 3) {
             std::cout << "\n";
         }
     }
-    std::cout << std::setfill('0');
     std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
+    // Dump contents of beginning of memory
+    for (int i = 0; i < 16; i++) {
+        // Draw in columns.
+        bool start = (i % 4 == 0);
+        bool end = (i % 4 == 3);
+        if(start) {
+            std::cout << "0x" << to_hex(i) << " :";
+        }
+
+        std::cout << " " << to_hex(top->Main->dataRam->memory[i]) << "   ";
+        if (end) {
+            std::cout << "\n";
+        }
+    }
 
     top->final();
     delete top;
