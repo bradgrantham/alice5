@@ -71,7 +71,7 @@ module Main(
     localparam STATE_HALTED /* verilator public */ = 4'h07;
     reg [3:0] state /* verilator public */;
 
-    reg [ADDRESS_WIDTH-1:0] PC /* verilator public */;
+    reg [WORD_WIDTH-1:0] PC /* verilator public */;
 
     // instruction latched for inst decoder
     reg [WORD_WIDTH-1:0] inst_to_decode /* verilator public */;
@@ -184,14 +184,16 @@ module Main(
     // If all parameters are signed, shorter parameters will be
     // sign-extended, according to Pong
     assign alu_op1 =
-        decode_opcode_is_ALU_reg_imm ? $signed(rs1_value) :
-        decode_opcode_is_ALU_reg_reg ? $signed(rs1_value) :
+        (decode_opcode_is_ALU_reg_imm ||
+           decode_opcode_is_ALU_reg_reg ||
+           decode_opcode_is_jalr) ? $signed(rs1_value) :
         decode_opcode_is_lui ? $signed(decode_imm_upper) :
         decode_opcode_is_jal ? $signed(PC) :
         $signed(32'hdeadbeef);
 
     assign alu_op2 =
-        decode_opcode_is_ALU_reg_imm ? decode_imm_alu_load :
+        (decode_opcode_is_ALU_reg_imm ||
+            decode_opcode_is_jalr) ? decode_imm_alu_load :
         decode_opcode_is_ALU_reg_reg ? $signed(rs2_value) :
         decode_opcode_is_lui ? 0 :
         decode_opcode_is_jal ? $signed(decode_imm_jump) :
@@ -247,7 +249,7 @@ module Main(
                         // want PC to be settled here
                         // get instruction from memory[PC]
                         enable_write_rd <= 0;
-                        inst_ram_address <= PC;
+                        inst_ram_address <= PC[15:0];
                         state <= STATE_FETCH2;
                         PC <= PC;
                     end
@@ -284,14 +286,22 @@ module Main(
                         // want result of ALU to be settled here
                         // Would be output of ALU for branch and jalr or route from imm20 for branch
 
-                        enable_write_rd <= decode_opcode_is_ALU_reg_imm ||
+                        enable_write_rd <= (decode_opcode_is_ALU_reg_imm ||
                             decode_opcode_is_ALU_reg_reg ||
                             decode_opcode_is_lui ||
-                            decode_opcode_is_jal;
-                        rd_value <= decode_opcode_is_jal ? (PC + 4) :
+                            decode_opcode_is_jalr ||
+                            decode_opcode_is_jal) &&
+                            (rd_address != 0);
+                        rd_value <= 
+                            (decode_opcode_is_jalr || decode_opcode_is_jal) ? (PC + 4) :
                             $unsigned(alu_result);
 
-                        PC <= decode_opcode_is_jal ? $unsigned(alu_result) :
+			// We know the result of ALU for jal has
+			// LSB 0, so just ignore LSB for both jal and
+			// jalr
+                        PC <= 
+                            (decode_opcode_is_jal ||
+                                 decode_opcode_is_jalr) ? $unsigned({alu_result[31:1],1'b0}) :
                             (PC + 4);
 
                         // load into registers?
