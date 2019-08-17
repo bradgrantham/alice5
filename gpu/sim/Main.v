@@ -3,6 +3,7 @@ module Main(
     input wire clock,
     input wire reset_n,
     input wire run, // hold low and release reset to write inst and data
+    output reg halted,
 
     input wire [15:0] ext_write_address,
     input wire [31:0] ext_write_data,
@@ -60,8 +61,10 @@ module Main(
     localparam STATE_FETCH /* verilator public */ = 3'h01;
     localparam STATE_FETCH2 /* verilator public */ = 3'h02;
     localparam STATE_DECODE /* verilator public */ = 3'h03;
+    localparam STATE_REGISTERS /* verilator public */ = 3'h04;
     localparam STATE_ALU /* verilator public */ = 3'h05;
     localparam STATE_STEPLOADSTORE /* verilator public */ = 3'h06;
+    localparam STATE_HALTED /* verilator public */ = 3'h07;
     reg [2:0] state /* verilator public */;
     reg [31:0] PC /* verilator public */;
 
@@ -101,11 +104,14 @@ module Main(
             .read_address({2'b00, data_ram_address[15:2]}),
             .read_data(data_ram_out_data));
 
-    wire [31:0] rs1_value;
-    wire [31:0] rs2_value;
+    wire [31:0] rs1_value /* verilator public */;
+    wire [31:0] rs2_value /* verilator public */;
     reg [4:0] rd_address;
-    reg [31:0] rd_value;
+    reg [31:0] alu_result;
+    wire [31:0] rd_value;
     reg enable_write_rd;
+
+    assign rd_value = alu_result;
 
     // Register bank.
     Registers registers(
@@ -168,6 +174,21 @@ module Main(
             .imm_jump(decode_imm_jump)
             );
 
+    wire [31:0] alu_op1 /* verilator public */ ;
+    wire [31:0] alu_op2 /* verilator public */ ;
+
+    assign alu_op1 =
+        decode_opcode_is_ALU_reg_imm ? rs1_value :
+        decode_opcode_is_ALU_reg_reg ? rs2_value :
+        decode_opcode_is_lui ? decode_imm_upper :
+        32'hdeadbeef;
+
+    assign alu_op2 =
+        decode_opcode_is_ALU_reg_imm ? decode_imm_alu_load :
+        decode_opcode_is_ALU_reg_reg ? rs2_value :
+        decode_opcode_is_lui ? 32'h0 :
+        32'hcafebabe;
+
     always @(posedge clock) begin
         if(!reset_n) begin
 
@@ -176,6 +197,8 @@ module Main(
             inst_ram_write <= 0;
             data_ram_write <= 0;
             enable_write_rd <= 0;
+
+            halted <= 0;
 
             // reset registers?  Could assume they're junk in the compiler and save gates
 
@@ -227,6 +250,12 @@ module Main(
                     STATE_DECODE: begin
                         // clock the 32 bits of instruction into decoded signals
                         inst_to_decode <= inst_ram_out_data;
+                        state <= STATE_REGISTERS;
+                    end
+
+                    STATE_REGISTERS: begin
+                        halted <= decode_opcode_is_system &&
+                            (decode_imm_alu_load[11:0] == 12'd1);
                         state <= STATE_ALU;
                     end
 
@@ -234,23 +263,17 @@ module Main(
                         // want decode of instruction and registers output to be settled here
                         // do ALU operation
 
-                        if(decode_opcode_is_ALU_reg_imm) begin
+                        // pretend all ops are add for now
+                        alu_result <= 
+                            alu_op1 + alu_op2;
 
-                            // pretend all ops are add for now
-                            rd_value <= rs1_value + decode_imm_alu_load;
-                            enable_write_rd <= 1;
-                            rd_address <= decode_rd;
+                        enable_write_rd <= decode_opcode_is_ALU_reg_imm ||
+                            decode_opcode_is_ALU_reg_reg ||
+                            decode_opcode_is_lui;
 
-                        end else if(decode_opcode_is_ALU_reg_reg) begin
+                        rd_address <= decode_rd;
 
-                            // pretend all ops are add for now
-                            rd_value <= rs1_value + rs2_value;
-                            enable_write_rd <= 1;
-                            rd_address <= decode_rd;
-
-                        end
-
-                        state <= STATE_STEPLOADSTORE;
+                        state <= halted ? STATE_HALTED : STATE_STEPLOADSTORE;
                     end
 
                     STATE_STEPLOADSTORE: begin
@@ -261,6 +284,10 @@ module Main(
                         // load into registers?
                         // store from registers - need to stall reads from data, don't need to stall inst reads
                         state <= STATE_FETCH;
+                    end
+
+                    STATE_HALTED: begin
+                        state <= STATE_HALTED;
                     end
 
                     default: begin

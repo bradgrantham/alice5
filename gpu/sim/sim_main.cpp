@@ -31,8 +31,10 @@ const char *stateToString(int state)
         case VMain_Main::STATE_FETCH: return "STATE_FETCH"; break;
         case VMain_Main::STATE_FETCH2: return "STATE_FETCH2"; break;
         case VMain_Main::STATE_DECODE: return "STATE_DECODE"; break;
+        case VMain_Main::STATE_REGISTERS: return "STATE_REGISTERS"; break;
         case VMain_Main::STATE_ALU: return "STATE_ALU"; break;
         case VMain_Main::STATE_STEPLOADSTORE: return "STATE_STEPLOADSTORE"; break;
+        case VMain_Main::STATE_HALTED: return "STATE_HALTED"; break;
         default : return "unknown state"; break;
     }
 }
@@ -287,7 +289,7 @@ int main(int argc, char **argv) {
 
     std::string pad = "                     ";
 
-    while (!Verilated::gotFinish()) {
+    while (!Verilated::gotFinish() && !top->halted) {
 
         top->clock = 1;
         top->eval();
@@ -336,12 +338,34 @@ int main(int argc, char **argv) {
         if(beVerbose && (top->Main->state == top->Main->STATE_ALU)) {
             std::cout << "after DECODE - ";
             print_decoded_inst(top->Main->PC, top->Main->inst_to_decode, top);
+            // std::cout << "decode_rs1 = " << int(top->decode_rs1) << "\n";
+            // std::cout << "decode_rs2 = " << int(top->decode_rs2) << "\n";
+            // std::cout << "rs1_value = " << top->Main->rs1_value << "\n";
+            // std::cout << "rs2_value = " << top->Main->rs2_value << "\n";
+            // std::cout << "imm_alu_load = " << top->Main->decode_imm_alu_load << "\n";
+            // std::cout << "alu_op1 = " << top->Main->alu_op1 << "\n";
+            // std::cout << "alu_op2 = " << top->Main->alu_op2 << "\n";
         }
 
         if(beVerbose) {
             std::cout << "---\n";
         }
     }
+
+    std::cout << "halted.\n";
+    // Dump register contents.
+    for (int i = 0; i < 32; i++) {
+        // Draw in columns.
+        int r = i%4*8 + i/4;
+        std::cout << std::setfill('0');
+        std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
+            << to_hex(top->Main->registers->bank1->memory[r]) << "   ";
+        if (i % 4 == 3) {
+            std::cout << "\n";
+        }
+    }
+    std::cout << std::setfill('0');
+    std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
 
     top->final();
     delete top;
