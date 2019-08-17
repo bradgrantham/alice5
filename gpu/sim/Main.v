@@ -49,11 +49,11 @@ module Main(
     output wire [6:0] decode_funct7,
     output wire [4:0] decode_funct5,
     output wire [4:0] decode_shamt_ftype,
-    output wire [31:0] decode_imm_alu_load,
-    output wire [31:0] decode_imm_store,
-    output wire [31:0] decode_imm_branch,
-    output wire [31:0] decode_imm_upper,
-    output wire [31:0] decode_imm_jump
+    output wire signed [11:0] decode_imm_alu_load,
+    output wire signed [11:0] decode_imm_store,
+    output wire signed [12:0] decode_imm_branch,
+    output wire signed [31:0] decode_imm_upper,
+    output wire signed [20:0] decode_imm_jump
 );
 
     localparam WORD_WIDTH = 32;
@@ -180,20 +180,22 @@ module Main(
             .imm_jump(decode_imm_jump)
             );
 
-    wire [WORD_WIDTH-1:0] alu_op1 /* verilator public */ ;
-    wire [WORD_WIDTH-1:0] alu_op2 /* verilator public */ ;
+    wire signed [WORD_WIDTH-1:0] alu_op1 /* verilator public */ ;
+    wire signed [WORD_WIDTH-1:0] alu_op2 /* verilator public */ ;
 
+    // If all parameters are signed, shorter parameters will be
+    // sign-extended, according to Pong
     assign alu_op1 =
-        decode_opcode_is_ALU_reg_imm ? rs1_value :
-        decode_opcode_is_ALU_reg_reg ? rs1_value :
-        decode_opcode_is_lui ? decode_imm_upper :
-        32'hdeadbeef;
+        decode_opcode_is_ALU_reg_imm ? $signed(rs1_value) :
+        decode_opcode_is_ALU_reg_reg ? $signed(rs1_value) :
+        decode_opcode_is_lui ? $signed(decode_imm_upper) :
+        $signed(32'hdeadbeef);
 
     assign alu_op2 =
         decode_opcode_is_ALU_reg_imm ? decode_imm_alu_load :
-        decode_opcode_is_ALU_reg_reg ? rs2_value :
-        decode_opcode_is_lui ? 32'h0 :
-        32'hcafebabe;
+        decode_opcode_is_ALU_reg_reg ? $signed(rs2_value) :
+        decode_opcode_is_lui ? 0 :
+        $signed(32'hcafebabe);
 
     always @(posedge clock) begin
         if(!reset_n) begin
