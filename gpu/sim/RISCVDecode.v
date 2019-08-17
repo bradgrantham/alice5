@@ -43,11 +43,11 @@ module RISCVDecode
     output wire [4:0] funct5,
     output wire [4:0] shamt_ftype,
 
-    output wire [31:0] imm_alu_load,
-    output wire [31:0] imm_store,
-    output wire [31:0] imm_branch,
-    output wire [31:0] imm_upper,
-    output wire [31:0] imm_jump
+    output wire signed [11:0] imm_alu_load,
+    output wire signed [11:0] imm_store,
+    output wire signed [12:0] imm_branch,
+    output wire signed [31:0] imm_upper,
+    output wire signed [20:0] imm_jump
 );
 
     wire [6:0] opcode;
@@ -96,11 +96,10 @@ module RISCVDecode
     assign opcode_is_fnmsub = opcode == {5'h12,2'h3};
     assign opcode_is_fnmadd = opcode == {5'h13,2'h3};
 
-    // Replications of bit 31 in following are sign extensions
-    assign imm_alu_load = {{20{inst[31]}}, inst[31:20]};
-    assign imm_store = {{20{inst[31]}}, inst[31:25], inst[11:7]};
-    assign imm_branch = {{19{inst[31]}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
+    assign imm_alu_load = inst[31:20];
+    assign imm_store = {inst[31:25], inst[11:7]};
+    assign imm_branch = {inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
     assign imm_upper = {inst[31:12], 12'b0};
-    assign imm_jump = {{11{inst[31]}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0};
+    assign imm_jump = {inst[31], inst[19:12], inst[20], inst[30:21], 1'b0};
 
 endmodule
