@@ -14,6 +14,8 @@ module Main(
     input wire [31:0] ext_inst_to_decode,
     output wire decode_opcode_is_branch,
     output wire decode_opcode_is_ALU_reg_imm,
+    output wire decode_opcode_add_is_add,
+    output wire decode_opcode_shift_is_logical,
     output wire decode_opcode_is_ALU_reg_reg,
     output wire decode_opcode_is_jal,
     output wire decode_opcode_is_jalr,
@@ -139,6 +141,8 @@ module Main(
             .inst(inst_to_decode),
             .opcode_is_branch(decode_opcode_is_branch),
             .opcode_is_ALU_reg_imm(decode_opcode_is_ALU_reg_imm),
+            .opcode_add_is_add(decode_opcode_add_is_add),
+            .opcode_shift_is_logical(decode_opcode_shift_is_logical),
             .opcode_is_ALU_reg_reg(decode_opcode_is_ALU_reg_reg),
             .opcode_is_jal(decode_opcode_is_jal),
             .opcode_is_jalr(decode_opcode_is_jalr),
@@ -206,6 +210,7 @@ module Main(
 
     wire signed [WORD_WIDTH-1:0] alu_op1 /* verilator public */ ;
     wire signed [WORD_WIDTH-1:0] alu_op2 /* verilator public */ ;
+    wire signed [3:0] alu_operator /* verilator public */ ;
 
     // If all parameters are signed, shorter parameters will be
     // sign-extended, according to Pong
@@ -220,16 +225,84 @@ module Main(
         decode_opcode_is_branch ? $signed(PC) :
         $signed(32'hdeadbeef);
 
+    wire alu_op_is_shift = (decode_funct3_rm == 1) || (decode_funct3_rm == 5);
+
+/* verilator lint_off WIDTH */
+    /* skip extension warnings in alu_op2 below by extending everything */
+    wire signed [31:0] extended_shamt = decode_shamt_ftype;
+    wire signed [31:0] extended_imm_alu_load = decode_imm_alu_load;
+    wire signed [31:0] masked_rs2_value = rs2_value[4:0];
+    wire signed [31:0] extended_imm_jump = decode_imm_jump;
+    wire signed [31:0] extended_imm_store = decode_imm_store;
+    wire signed [31:0] extended_imm_branch = decode_imm_branch;
+/* verilator lint_on WIDTH */
+
     assign alu_op2 =
-        (decode_opcode_is_ALU_reg_imm ||
-            decode_opcode_is_load ||
-            decode_opcode_is_jalr) ? decode_imm_alu_load :
-        decode_opcode_is_ALU_reg_reg ? $signed(rs2_value) :
+        decode_opcode_is_ALU_reg_imm ? 
+            (alu_op_is_shift ? extended_shamt : extended_imm_alu_load) :
+        (decode_opcode_is_load ||
+            decode_opcode_is_jalr) ? extended_imm_alu_load :
+        decode_opcode_is_ALU_reg_reg ? 
+            (alu_op_is_shift ? masked_rs2_value : $signed(rs2_value)) :
         decode_opcode_is_lui ? 0 :
-        decode_opcode_is_jal ? $signed(decode_imm_jump) :
-        decode_opcode_is_store ? decode_imm_store :
-        decode_opcode_is_branch ? decode_imm_branch :
+        decode_opcode_is_jal ? extended_imm_jump :
+        decode_opcode_is_store ? extended_imm_store :
+        decode_opcode_is_branch ? extended_imm_branch :
         $signed(32'hcafebabe);
+
+    /* should get these from ALU.v somehow */
+    localparam ALU_OP_ADD = 4'd1;
+    localparam ALU_OP_SUB = 4'd2;
+    localparam ALU_OP_SLL = 4'd3;
+    localparam ALU_OP_SRL = 4'd4;
+    localparam ALU_OP_SRA = 4'd5;
+    localparam ALU_OP_XOR = 4'd6;
+    localparam ALU_OP_AND = 4'd7;
+    localparam ALU_OP_OR = 4'd8;
+    localparam ALU_OP_SLT = 4'd9;
+    localparam ALU_OP_SLTU = 4'd10;
+    localparam ALU_OP_NONE = 4'd11;
+
+    wire [3:0] alu_reg_imm_operator =
+        (decode_funct3_rm == 0) ? ALU_OP_ADD :
+        (decode_funct3_rm == 1) ? ALU_OP_SLL :
+        (decode_funct3_rm == 2) ? ALU_OP_SLT :
+        (decode_funct3_rm == 3) ? ALU_OP_SLTU :
+        (decode_funct3_rm == 4) ? ALU_OP_XOR :
+        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? ALU_OP_SRL : ALU_OP_SRA) :
+        (decode_funct3_rm == 6) ? ALU_OP_OR :
+        /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
+
+    wire [3:0] alu_reg_reg_operator =
+        (decode_funct3_rm == 0) ? (decode_opcode_add_is_add ? ALU_OP_ADD : ALU_OP_SUB) :
+        (decode_funct3_rm == 1) ? ALU_OP_SLL :
+        (decode_funct3_rm == 2) ? ALU_OP_SLT :
+        (decode_funct3_rm == 3) ? ALU_OP_SLTU :
+        (decode_funct3_rm == 4) ? ALU_OP_XOR :
+        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? ALU_OP_SRL : ALU_OP_SRA) :
+        (decode_funct3_rm == 6) ? ALU_OP_OR :
+        /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
+
+    assign alu_operator =
+        decode_opcode_is_ALU_reg_imm ? alu_reg_imm_operator :
+        decode_opcode_is_ALU_reg_reg ? alu_reg_reg_operator :
+        (   decode_opcode_is_branch ||
+            decode_opcode_is_jalr ||
+            decode_opcode_is_jal ||
+            decode_opcode_is_auipc ||
+            decode_opcode_is_lui ||
+            decode_opcode_is_load ||
+            decode_opcode_is_store ) ? ALU_OP_ADD :
+        ALU_OP_NONE;
+
+    ALU
+        alu(
+            .clock(clock),
+            .operand1(alu_op1),
+            .operand2(alu_op2),
+            .operator(alu_operator),
+            .result(alu_result)
+        );
 
     always @(posedge clock) begin
         if(!reset_n) begin
@@ -283,7 +356,6 @@ module Main(
                         enable_write_rd <= 0;
                         inst_ram_address <= PC[15:0];
                         state <= STATE_FETCH2;
-                        PC <= PC;
                     end
 
                     STATE_FETCH2: begin
@@ -304,10 +376,7 @@ module Main(
 
                     STATE_ALU: begin
                         // want decode of instruction and registers output to be settled here
-                        // do ALU operation
-
-                        // pretend all ops are add for now
-                        alu_result <= alu_op1 + alu_op2;
+                        // ALU operation occurs in alu instance
 
                         comparison_succeeded_reg <= comparison_succeeded;
 
@@ -321,7 +390,7 @@ module Main(
 
                     STATE_LOAD: begin
                         // want result of ALU to be settled here
-                        data_ram_address <= alu_result;
+                        data_ram_address <= alu_result[15:0];
                         state <= STATE_LOAD2;
                     end
 
@@ -332,7 +401,7 @@ module Main(
 
                     STATE_STORE: begin
                         // want result of ALU to be settled here
-                        data_ram_address <= alu_result;
+                        data_ram_address <= alu_result[15:0];
                         data_ram_in_data <= rs2_value;
                         data_ram_write <= 1;
                         state <= STATE_RETIRE;
@@ -369,7 +438,6 @@ module Main(
                     end
 
                     STATE_HALTED: begin
-                        state <= STATE_HALTED;
                     end
 
                     default: begin

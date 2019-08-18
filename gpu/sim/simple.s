@@ -21,6 +21,15 @@
         beq a0, a1, .skipped2
         addi a3, zero, 0x321 ; if branch works properly, a3 == 0x321
 .skipped2:
+        addi a0, zero, 0xff
+        addi a1, zero, 0xa5
+        and a2, a0, a1
+        or a3, a0, a1
+        xor a4, a0, a1
+        addi a1, zero, -10
+        slli a5, a1, 1
+        srli a6, a1, 1
+        srai a7, a1, 1
         ebreak                        
 
 subr:

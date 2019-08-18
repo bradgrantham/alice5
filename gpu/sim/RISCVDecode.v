@@ -6,6 +6,8 @@ module RISCVDecode
 
     output wire opcode_is_branch,
     output wire opcode_is_ALU_reg_imm,
+    output wire opcode_add_is_add,
+    output wire opcode_shift_is_logical,
     output wire opcode_is_ALU_reg_reg,
     output wire opcode_is_jal,
     output wire opcode_is_jalr,
@@ -66,6 +68,9 @@ module RISCVDecode
     assign opcode_is_load = opcode == {5'h00,2'h3};
     assign opcode_is_store = opcode == {5'h08,2'h3};
     assign opcode_is_system = opcode == {5'h1c,2'h3};
+
+    assign opcode_add_is_add = ~inst[30];
+    assign opcode_shift_is_logical = ~inst[30];
 
     assign rs1 = inst[19:15];
     assign rs2 = inst[24:20];
