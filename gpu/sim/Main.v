@@ -250,38 +250,25 @@ module Main(
         decode_opcode_is_branch ? extended_imm_branch :
         $signed(32'hcafebabe);
 
-    /* should get these from ALU.v somehow */
-    localparam ALU_OP_ADD = 4'd1;
-    localparam ALU_OP_SUB = 4'd2;
-    localparam ALU_OP_SLL = 4'd3;
-    localparam ALU_OP_SRL = 4'd4;
-    localparam ALU_OP_SRA = 4'd5;
-    localparam ALU_OP_XOR = 4'd6;
-    localparam ALU_OP_AND = 4'd7;
-    localparam ALU_OP_OR = 4'd8;
-    localparam ALU_OP_SLT = 4'd9;
-    localparam ALU_OP_SLTU = 4'd10;
-    localparam ALU_OP_NONE = 4'd11;
-
     wire [3:0] alu_reg_imm_operator =
-        (decode_funct3_rm == 0) ? ALU_OP_ADD :
-        (decode_funct3_rm == 1) ? ALU_OP_SLL :
-        (decode_funct3_rm == 2) ? ALU_OP_SLT :
-        (decode_funct3_rm == 3) ? ALU_OP_SLTU :
-        (decode_funct3_rm == 4) ? ALU_OP_XOR :
-        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? ALU_OP_SRL : ALU_OP_SRA) :
-        (decode_funct3_rm == 6) ? ALU_OP_OR :
-        /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
+        (decode_funct3_rm == 0) ? alu.ALU_OP_ADD :
+        (decode_funct3_rm == 1) ? alu.ALU_OP_SLL :
+        (decode_funct3_rm == 2) ? alu.ALU_OP_SLT :
+        (decode_funct3_rm == 3) ? alu.ALU_OP_SLTU :
+        (decode_funct3_rm == 4) ? alu.ALU_OP_XOR :
+        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? alu.ALU_OP_SRL : alu.ALU_OP_SRA) :
+        (decode_funct3_rm == 6) ? alu.ALU_OP_OR :
+        /* (decode_funct3_rm == 7) ? */ alu.ALU_OP_AND; // has to be AND
 
     wire [3:0] alu_reg_reg_operator =
-        (decode_funct3_rm == 0) ? (decode_opcode_add_is_add ? ALU_OP_ADD : ALU_OP_SUB) :
-        (decode_funct3_rm == 1) ? ALU_OP_SLL :
-        (decode_funct3_rm == 2) ? ALU_OP_SLT :
-        (decode_funct3_rm == 3) ? ALU_OP_SLTU :
-        (decode_funct3_rm == 4) ? ALU_OP_XOR :
-        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? ALU_OP_SRL : ALU_OP_SRA) :
-        (decode_funct3_rm == 6) ? ALU_OP_OR :
-        /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
+        (decode_funct3_rm == 0) ? (decode_opcode_add_is_add ? alu.ALU_OP_ADD : alu.ALU_OP_SUB) :
+        (decode_funct3_rm == 1) ? alu.ALU_OP_SLL :
+        (decode_funct3_rm == 2) ? alu.ALU_OP_SLT :
+        (decode_funct3_rm == 3) ? alu.ALU_OP_SLTU :
+        (decode_funct3_rm == 4) ? alu.ALU_OP_XOR :
+        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? alu.ALU_OP_SRL : alu.ALU_OP_SRA) :
+        (decode_funct3_rm == 6) ? alu.ALU_OP_OR :
+        /* (decode_funct3_rm == 7) ? */ alu.ALU_OP_AND; // has to be AND
 
     assign alu_operator =
         decode_opcode_is_ALU_reg_imm ? alu_reg_imm_operator :
@@ -292,8 +279,8 @@ module Main(
             decode_opcode_is_auipc ||
             decode_opcode_is_lui ||
             decode_opcode_is_load ||
-            decode_opcode_is_store ) ? ALU_OP_ADD :
-        ALU_OP_NONE;
+            decode_opcode_is_store ) ? alu.ALU_OP_ADD :
+        alu.ALU_OP_NONE;
 
     ALU
         alu(
