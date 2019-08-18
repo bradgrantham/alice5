@@ -9,6 +9,18 @@
         addi    a7, a6, 1
 	lui	a5,%hi(.result)
 	sw	a7,%lo(.result)(a5)
+        addi a2, zero, 0
+        addi a3, zero, 0
+        addi a0, zero, 1
+        addi a1, zero, 1
+        beq a0, a1, .skipped
+        addi a2, zero, 0x123 ; if branch works properly, a2 == 0
+.skipped:
+        addi a0, zero, 1
+        addi a1, zero, 2
+        beq a0, a1, .skipped2
+        addi a3, zero, 0x321 ; if branch works properly, a3 == 0x321
+.skipped2:
         ebreak                        
 
 subr:

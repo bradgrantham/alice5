@@ -181,6 +181,29 @@ module Main(
             .imm_jump(decode_imm_jump)
             );
 
+    wire decoded_beq = (decode_funct3_rm == 0);
+    wire decoded_bne = (decode_funct3_rm == 1);
+    wire decoded_blt = (decode_funct3_rm == 4);
+    wire decoded_bge = (decode_funct3_rm == 5);
+    wire decoded_bltu = (decode_funct3_rm == 6);
+    wire decoded_bgeu = (decode_funct3_rm == 7);
+
+    wire comparison_succeeded;
+    reg comparison_succeeded_reg;
+
+    Comparison
+        comparison(
+            .v1(rs1_value),
+            .v2(rs2_value),
+            .compare_equal(decoded_beq),
+            .compare_not_equal(decoded_bne),
+            .compare_less_than(decoded_blt),
+            .compare_greater_equal(decoded_bge),
+            .compare_less_than_unsigned(decoded_bltu),
+            .compare_greater_equal_unsigned(decoded_bgeu),
+            .result(comparison_succeeded)
+            );
+
     wire signed [WORD_WIDTH-1:0] alu_op1 /* verilator public */ ;
     wire signed [WORD_WIDTH-1:0] alu_op2 /* verilator public */ ;
 
@@ -194,6 +217,7 @@ module Main(
            decode_opcode_is_store) ? $signed(rs1_value) :
         decode_opcode_is_lui ? $signed(decode_imm_upper) :
         decode_opcode_is_jal ? $signed(PC) :
+        decode_opcode_is_branch ? $signed(PC) :
         $signed(32'hdeadbeef);
 
     assign alu_op2 =
@@ -204,6 +228,7 @@ module Main(
         decode_opcode_is_lui ? 0 :
         decode_opcode_is_jal ? $signed(decode_imm_jump) :
         decode_opcode_is_store ? decode_imm_store :
+        decode_opcode_is_branch ? decode_imm_branch :
         $signed(32'hcafebabe);
 
     always @(posedge clock) begin
@@ -284,6 +309,8 @@ module Main(
                         // pretend all ops are add for now
                         alu_result <= alu_op1 + alu_op2;
 
+                        comparison_succeeded_reg <= comparison_succeeded;
+
                         rd_address <= decode_rd;
 
                         state <= halted ? STATE_HALTED :
@@ -314,7 +341,6 @@ module Main(
                     STATE_RETIRE: begin
                         data_ram_write <= 0;
                         // want result of ALU to be settled here
-                        // Would be output of ALU for branch and jalr or route from imm20 for branch
 
                         enable_write_rd <= (decode_opcode_is_ALU_reg_imm ||
                             decode_opcode_is_ALU_reg_reg ||
@@ -334,6 +360,7 @@ module Main(
                         PC <= 
                             (decode_opcode_is_jal ||
                                  decode_opcode_is_jalr) ? $unsigned({alu_result[31:1],1'b0}) :
+                            (decode_opcode_is_branch && comparison_succeeded_reg) ? $unsigned(alu_result) :
                             (PC + 4);
 
                         // load into registers?
