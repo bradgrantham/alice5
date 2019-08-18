@@ -476,6 +476,7 @@ always @(posedge clk)
 	snan <= #1 snan_d;
 
 // synopsys translate_off
+`ifdef notdef
 wire		mul_uf_del;
 wire		uf2_del, ufb2_del, ufc2_del,  underflow_d_del;
 wire		co_del;
@@ -512,6 +513,7 @@ always @(test.error_event)
 			ldza_del, quo_del);
    end
 // synopsys translate_on
+`endif
 
 
 
