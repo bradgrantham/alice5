@@ -351,7 +351,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
     uint32_t rs3 = getBits(insn, 31, 27);
     uint32_t rm = getBits(insn, 14, 12);
     uint32_t immI = extendSign(getBits(insn, 31, 20), 12);
-    uint32_t shamt = getBits(insn, 34, 20);
+    uint32_t shamt = getBits(insn, 24, 20);
     uint32_t immS = extendSign(
         (getBits(insn, 31, 25) << 5) |
         getBits(insn, 11, 7),
