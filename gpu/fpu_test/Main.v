@@ -10,7 +10,12 @@ module Main(
     output wire ine,
     output wire overflow, underflow,
     output wire zero,
-    output wire div_by_zero
+    output wire div_by_zero,
+
+    input [31:0] cmp_opa, cmp_opb,
+    output cmp_unordered,
+    output cmp_altb, cmp_blta, cmp_aeqb,
+    output cmp_inf, cmp_zero
 );
 
 fpu fpu(
@@ -28,5 +33,15 @@ fpu fpu(
     .underflow(underflow),
     .zero(zero),
     .div_by_zero(div_by_zero));
+
+fcmp fcmp(
+    .opa(cmp_opa),
+    .opb(cmp_opb),
+    .unordered(cmp_unordered),
+    .altb(cmp_altb),
+    .blta(cmp_blta),
+    .aeqb(cmp_aeqb),
+    .inf(cmp_inf),
+    .zero(cmp_zero));
 
 endmodule

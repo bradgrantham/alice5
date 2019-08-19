@@ -39,6 +39,10 @@ float bits_to_float(uint32_t b) {
     return x.f;
 }
 
+float rand_float() {
+    return float(rand()) / RAND_MAX;
+}
+
 int main(int argc, char **argv) {
     Verilated::commandArgs(argc, argv);
     Verilated::debug(1);
@@ -63,6 +67,7 @@ int main(int argc, char **argv) {
     top->clock = 1;
     top->eval();
 
+    // Test basic operators.
     float opa = 123.456;
     float opb = 3.1415;
 
@@ -99,6 +104,33 @@ int main(int argc, char **argv) {
             << (top->underflow ? "underflow " : "")
             << (top->zero ? "zero " : "")
             << (top->div_by_zero ? "div_by_zero" : "") << "\n";
+    }
+
+    // Test comparison.
+    for (int i = 0; i < 10; i++) {
+        float opa = rand_float()*1000 - 500;
+        float opb = rand_float()*1000 - 500;
+        if (i == 5) {
+            opb = opa;
+        }
+
+        top->cmp_opa = float_to_bits(opa);
+        top->cmp_opb = float_to_bits(opb);
+
+        // Unclocked.
+        top->eval();
+
+        std::cout << opa
+            << (top->cmp_unordered ? " unordered " : "")
+            << (top->cmp_altb ? " < " : "")
+            << (top->cmp_blta ? " > " : "")
+            << (top->cmp_aeqb ? " == " : "")
+            << (top->cmp_inf ? " inf " : "")
+            << (top->cmp_zero ? " zero " : "")
+            << opb
+            << ", correct = "
+            << (opa < opb ? "<" : opa > opb ? ">" : opa == opb ? "==" : "?")
+            << "\n";
     }
 
     top->final();
