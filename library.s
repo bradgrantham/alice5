@@ -93,11 +93,13 @@
         ; fa2 = *(a1 + 4)
         flw     fa2,4(a1)
 
-        ; fa0 = fa2 * fa6
-        fmul.s    fa0,fa2,fa6
+        ; fa3 = fa2 * fa6
+        fmul.s    fa3,fa2,fa6
 
         ; fa0 = fa1 * fa4 + fa0
-        fmadd.s   fa0,fa1,fa4,fa0
+        ; for the following, would prefer: fmadd.s   fa0,fa1,fa4,fa3
+        fmul.s  fa2,fa1, fa4
+        fadd.s  fa0, fa2, fa3
 
         ; XXX debugging - multiply by .5
 	; lui	a5,%hi(.point5)
@@ -825,7 +827,10 @@ atanTable_f32:
 	flw	fa0,%lo(.one)(a0)       ; fa0 = 1.0
         fsub.s  fa1,fa0,fa3             ; fa1 = 1.0 - a
         fmul.s  fa0,fa4,fa1             ; fa0 = lower * (1.0 - a)
-        fmadd.s fa1,fa5,fa3,fa0         ; fa1 = higher * a + lower * (1.0 - a)
+
+        ; for the following, would prefer: fmadd.s fa1,fa5,fa3,fa0
+        fmul.s  fa2, fa5, fa3 ; fa1 = higher * a + lower * (1.0 - a)
+        fadd.s  fa1, fa2, fa0
 
         ; return f;
         fsw     fa1, 0(sp)
@@ -1040,7 +1045,10 @@ atanTable_f32:
         ; fa2<u> = fa0<x> * fa1<1 / (2 * pi)> + fa3(1/4)
 	lui	a5,%hi(.oneOverTwoPi)
 	flw	fa1,%lo(.oneOverTwoPi)(a5)
-        fmadd.s   fa2,fa0,fa1,fa3
+
+        ; for the following, would prefer: fmadd.s   fa2,fa0,fa1,fa3
+        fmul.s  fa4, fa0, fa1
+        fadd.s  fa2, fa4, fa3
 
         ; fa3<indexf> = fa2<u> * fa1<tablesize>
 	lui	a5,%hi(.sinTableSize)
@@ -1065,7 +1073,7 @@ atanTable_f32:
         ; a3<upper> = a2<lower> + imm<1>
         addi     a3,a2,1
 
-        ; ; fa0<result> = table[a2<lower>] * fa4<alpha> + table[a3<upper>] * fa6<beta>
+        ; fa0<result> = table[a2<lower>] * fa4<alpha> + table[a3<upper>] * fa6<beta>
         ; a1 = table + a2 * 4
         lui     a5,%hi(sinTable_f32)
         addi    a5,a5,%lo(sinTable_f32)
@@ -1085,11 +1093,13 @@ atanTable_f32:
         ; fa2 = *a4
         flw     fa2,0(a4)
 
-        ; fa0 = fa2 * fa6
-        fmul.s    fa0,fa2,fa6
+        ; fa3 = fa2 * fa6
+        fmul.s    fa3,fa2,fa6
 
         ; fa0 = fa1 * fa4 + fa0
-        fmadd.s   fa0,fa1,fa4,fa0
+        ; for the following, would prefer: fmadd.s   fa0,fa1,fa4,fa3
+        fmul.s  fa2, fa1, fa4
+        fadd.s  fa0, fa2, fa3
 
         ; XXX debugging - multiply by .5
 	; lui	a5,%hi(.point5)
@@ -1177,7 +1187,10 @@ atanTable_f32:
         flw     fa0, 0(sp)              ; fa0 = x = popf()
         fmul.s  fa1, fa0, fa0           ; fa1 = x * x
         flw     fa3, 4(sp)              ; fa3 = y = popf()
-        fmadd.s fa2, fa3, fa3, fa1      ; fa2 = x * x + y * y
+
+        ; for the following, would prefer: fmadd.s fa2, fa3, fa3, fa1
+        fmul.s  fa0, fa3, fa3; ; fa2 = x * x + y * y
+        fadd.s  fa2, fa0, fa1
 
         fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
 
@@ -1204,9 +1217,16 @@ atanTable_f32:
         flw     fa0, 0(sp)              ; fa0 = x = popf()
         fmul.s  fa1, fa0, fa0           ; fa1 = x * x
         flw     fa3, 4(sp)              ; fa3 = y = popf()
-        fmadd.s fa2, fa3, fa3, fa1      ; fa2 = x * x + y * y
+
+        ; for the following, would prefer: fmadd.s fa2, fa3, fa3, fa1
+        fmul.s  fa0, fa3, fa3 ; fa2 = x * x + y * y
+        fadd.s  fa2, fa0, fa1
+
         flw     fa0, 8(sp)              ; fa0 = z = popf()
-        fmadd.s fa1, fa0, fa0, fa2      ; fa1 = x * x + y * y + z * z
+
+        ; for the following, would prefer: fmadd.s fa1, fa0, fa0, fa2
+        fmul.s  fa3, fa0, fa0 ; fa1 = x * x + y * y + z * z
+        fadd.s  fa1, fa3, fa2
 
         fsqrt.s fa3, fa1                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
 
@@ -1233,11 +1253,22 @@ atanTable_f32:
         flw     fa0, 0(sp)              ; fa0 = x = popf()
         fmul.s  fa1, fa0, fa0           ; fa1 = x * x
         flw     fa3, 4(sp)              ; fa3 = y = popf()
-        fmadd.s fa2, fa3, fa3, fa1      ; fa2 = x * x + y * y
+
+        ; for the following, would prefer: fmadd.s fa2, fa3, fa3, fa1
+        fmul.s  fa0, fa3, fa3 ; fa2 = x * x + y * y
+        fadd.s  fa2, fa0, fa1
+
         flw     fa0, 8(sp)              ; fa0 = z = popf()
-        fmadd.s fa1, fa0, fa0, fa2      ; fa1 = x * x + y * y + z * z
+
+        ; for the following, would prefer: fmadd.s fa1, fa0, fa0, fa2
+        fmul.s  fa3, fa0, fa0 ; fa1 = x * x + y * y + z * z
+        fadd.s  fa1, fa3, fa2
+
         flw     fa3, 12(sp)             ; fa3 = w = popf()
-        fmadd.s fa2, fa3, fa3, fa1      ; fa2 = x * x + y * y + z * z + w * w
+
+        ; for the following, would prefer: fmadd.s fa2, fa3, fa3, fa1
+        fmul.s  fa0, fa3, fa3 ; fa2 = x * x + y * y + z * z + w * w
+        fadd.s  fa2, fa0, fa1
 
         fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
 
