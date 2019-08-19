@@ -30,6 +30,10 @@
         slli a5, a1, 1
         srli a6, a1, 1
         srai a7, a1, 1
+	lui	a5,%hi(.one)
+	flw	fa0,%lo(.one)(a5)
+	lui	a5,%hi(.tmp)
+	fsw	fa0,%lo(.tmp)(a5)
         ebreak                        
 
 subr:
@@ -39,3 +43,6 @@ subr:
 .segment data
 .pihex:     .word   0x31415927
 .result:     .word   0
+.one:
+        .word   1065353216      ; 1.0
+.tmp:     .word   0
