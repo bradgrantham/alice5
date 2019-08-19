@@ -117,10 +117,14 @@ module Main(
 
     wire [WORD_WIDTH-1:0] rs1_value /* verilator public */;
     wire [WORD_WIDTH-1:0] rs2_value /* verilator public */;
+    wire [WORD_WIDTH-1:0] float_rs1_value /* verilator public */;
+    wire [WORD_WIDTH-1:0] float_rs2_value /* verilator public */;
     reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;
     reg [WORD_WIDTH-1:0] alu_result;
     reg [WORD_WIDTH-1:0] rd_value;
+    reg [WORD_WIDTH-1:0] float_rd_value;
     reg enable_write_rd;
+    reg enable_write_float_rd;
 
     // Register bank.
     Registers registers(
@@ -135,6 +139,20 @@ module Main(
 
         .read2_address(decode_rs2),
         .read2_data(rs2_value));
+
+    // Register bank.
+    Registers float_registers(
+        .clock(clock),
+
+        .write_address(rd_address),
+        .write(enable_write_float_rd),
+        .write_data(float_rd_value),
+
+        .read1_address(decode_rs1),
+        .read1_data(float_rs1_value),
+
+        .read2_address(decode_rs2),
+        .read2_data(float_rs2_value));
 
     RISCVDecode #(.INSN_WIDTH(WORD_WIDTH))
         instDecode(
@@ -185,6 +203,23 @@ module Main(
             .imm_jump(decode_imm_jump)
             );
 
+    wire inst_has_float_dest =
+        decode_opcode_is_fadd ||
+        decode_opcode_is_fsub || 
+        decode_opcode_is_fmul || 
+        decode_opcode_is_fdiv || 
+        decode_opcode_is_fsgnj || 
+        decode_opcode_is_fminmax || 
+        decode_opcode_is_fsqrt || 
+        decode_opcode_is_fcmp || 
+        decode_opcode_is_fcvt_i2f ||
+        decode_opcode_is_fmv_i2f || 
+        decode_opcode_is_flw || 
+        decode_opcode_is_fmadd || 
+        decode_opcode_is_fmsub || 
+        decode_opcode_is_fnmsub || 
+        decode_opcode_is_fnmadd;
+
     wire decoded_beq = (decode_funct3_rm == 0);
     wire decoded_bne = (decode_funct3_rm == 1);
     wire decoded_blt = (decode_funct3_rm == 4);
@@ -219,6 +254,8 @@ module Main(
            decode_opcode_is_ALU_reg_reg ||
            decode_opcode_is_jalr ||
            decode_opcode_is_load ||
+           decode_opcode_is_flw ||
+           decode_opcode_is_fsw ||
            decode_opcode_is_store) ? $signed(rs1_value) :
         decode_opcode_is_lui ? $signed(decode_imm_upper) :
         decode_opcode_is_jal ? $signed(PC) :
@@ -241,12 +278,13 @@ module Main(
         decode_opcode_is_ALU_reg_imm ? 
             (alu_op_is_shift ? extended_shamt : extended_imm_alu_load) :
         (decode_opcode_is_load ||
+            decode_opcode_is_flw ||
             decode_opcode_is_jalr) ? extended_imm_alu_load :
         decode_opcode_is_ALU_reg_reg ? 
             (alu_op_is_shift ? masked_rs2_value : $signed(rs2_value)) :
         decode_opcode_is_lui ? 0 :
         decode_opcode_is_jal ? extended_imm_jump :
-        decode_opcode_is_store ? extended_imm_store :
+        (decode_opcode_is_store || decode_opcode_is_fsw) ? extended_imm_store :
         decode_opcode_is_branch ? extended_imm_branch :
         $signed(32'hcafebabe);
 
@@ -299,6 +337,7 @@ module Main(
             inst_ram_write <= 0;
             data_ram_write <= 0;
             enable_write_rd <= 0;
+            enable_write_float_rd <= 0;
 
             halted <= 0;
 
@@ -341,6 +380,7 @@ module Main(
                         // want PC to be settled here
                         // get instruction from memory[PC]
                         enable_write_rd <= 0;
+                        enable_write_float_rd <= 0;
                         inst_ram_address <= PC[15:0];
                         state <= STATE_FETCH2;
                     end
@@ -370,8 +410,8 @@ module Main(
                         rd_address <= decode_rd;
 
                         state <= halted ? STATE_HALTED :
-                            decode_opcode_is_load ? STATE_LOAD :
-                            decode_opcode_is_store ? STATE_STORE :
+                            (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
+                            (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
                             STATE_RETIRE;
                     end
 
@@ -389,7 +429,7 @@ module Main(
                     STATE_STORE: begin
                         // want result of ALU to be settled here
                         data_ram_address <= alu_result[15:0];
-                        data_ram_in_data <= rs2_value;
+                        data_ram_in_data <= decode_opcode_is_fsw ? float_rs2_value : rs2_value;
                         data_ram_write <= 1;
                         state <= STATE_RETIRE;
                     end
@@ -407,8 +447,14 @@ module Main(
                             (rd_address != 0);
                         rd_value <= 
                             (decode_opcode_is_jalr || decode_opcode_is_jal) ? (PC + 4) :
-                            decode_opcode_is_load ? data_ram_out_data : 
-                            $unsigned(alu_result);
+                            decode_opcode_is_load ? data_ram_out_data :
+-                            $unsigned(alu_result);
+
+                        enable_write_float_rd <= inst_has_float_dest;
+                        float_rd_value = 
+                            decode_opcode_is_flw ? data_ram_out_data :
+                            // float_alu_result;
+                            32'hbadf10a7; /* 'Bad Float' */
 
 			// We know the result of ALU for jal has
 			// LSB 0, so just ignore LSB for both jal and
