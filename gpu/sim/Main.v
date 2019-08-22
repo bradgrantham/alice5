@@ -8,54 +8,8 @@ module Main(
     input wire [15:0] ext_write_address,
     input wire [31:0] ext_write_data,
     input wire ext_enable_write_inst,
-    input wire ext_enable_write_data,
+    input wire ext_enable_write_data
 
-    input wire ext_decode_inst,
-    input wire [31:0] ext_inst_to_decode,
-    output wire decode_opcode_is_branch,
-    output wire decode_opcode_is_ALU_reg_imm,
-    output wire decode_opcode_add_is_add,
-    output wire decode_opcode_shift_is_logical,
-    output wire decode_opcode_is_ALU_reg_reg,
-    output wire decode_opcode_is_jal,
-    output wire decode_opcode_is_jalr,
-    output wire decode_opcode_is_lui,
-    output wire decode_opcode_is_auipc,
-    output wire decode_opcode_is_load,
-    output wire decode_opcode_is_store,
-    output wire decode_opcode_is_system,
-    output wire decode_opcode_is_fadd,
-    output wire decode_opcode_is_fsub,
-    output wire decode_opcode_is_fmul,
-    output wire decode_opcode_is_fdiv,
-    output wire decode_opcode_is_fsgnj,
-    output wire decode_opcode_is_fminmax,
-    output wire decode_opcode_is_fsqrt,
-    output wire decode_opcode_is_fcmp,
-    output wire decode_opcode_is_fcvt_f2i,
-    output wire decode_opcode_is_fmv_f2i,
-    output wire decode_opcode_is_fcvt_i2f,
-    output wire decode_opcode_is_fmv_i2f,
-    output wire decode_opcode_is_flw,
-    output wire decode_opcode_is_fsw,
-    output wire decode_opcode_is_fmadd,
-    output wire decode_opcode_is_fmsub,
-    output wire decode_opcode_is_fnmsub,
-    output wire decode_opcode_is_fnmadd,
-    output wire [4:0] decode_rs1,
-    output wire [4:0] decode_rs2,
-    output wire [4:0] decode_rs3,
-    output wire [4:0] decode_rd,
-    output wire [1:0] decode_fmt,
-    output wire [2:0] decode_funct3_rm,
-    output wire [6:0] decode_funct7,
-    output wire [4:0] decode_funct5,
-    output wire [4:0] decode_shamt_ftype,
-    output wire signed [11:0] decode_imm_alu_load,
-    output wire signed [11:0] decode_imm_store,
-    output wire signed [12:0] decode_imm_branch,
-    output wire signed [31:0] decode_imm_upper,
-    output wire signed [20:0] decode_imm_jump
 );
 
     localparam WORD_WIDTH = 32;
@@ -153,6 +107,51 @@ module Main(
 
         .read2_address(decode_rs2),
         .read2_data(float_rs2_value));
+
+    wire decode_opcode_is_branch;
+    wire decode_opcode_is_ALU_reg_imm;
+    wire decode_opcode_add_is_add;
+    wire decode_opcode_shift_is_logical;
+    wire decode_opcode_is_ALU_reg_reg;
+    wire decode_opcode_is_jal;
+    wire decode_opcode_is_jalr;
+    wire decode_opcode_is_lui;
+    wire decode_opcode_is_auipc;
+    wire decode_opcode_is_load;
+    wire decode_opcode_is_store;
+    wire decode_opcode_is_system;
+    wire decode_opcode_is_fadd;
+    wire decode_opcode_is_fsub;
+    wire decode_opcode_is_fmul;
+    wire decode_opcode_is_fdiv;
+    wire decode_opcode_is_fsgnj;
+    wire decode_opcode_is_fminmax;
+    wire decode_opcode_is_fsqrt;
+    wire decode_opcode_is_fcmp;
+    wire decode_opcode_is_fcvt_f2i;
+    wire decode_opcode_is_fmv_f2i;
+    wire decode_opcode_is_fcvt_i2f;
+    wire decode_opcode_is_fmv_i2f;
+    wire decode_opcode_is_flw;
+    wire decode_opcode_is_fsw;
+    wire decode_opcode_is_fmadd;
+    wire decode_opcode_is_fmsub;
+    wire decode_opcode_is_fnmsub;
+    wire decode_opcode_is_fnmadd;
+    wire [4:0] decode_rs1;
+    wire [4:0] decode_rs2;
+    wire [4:0] decode_rs3;
+    wire [4:0] decode_rd;
+    wire [1:0] decode_fmt;
+    wire [2:0] decode_funct3_rm;
+    wire [6:0] decode_funct7;
+    wire [4:0] decode_funct5;
+    wire [4:0] decode_shamt_ftype;
+    wire signed [11:0] decode_imm_alu_load;
+    wire signed [11:0] decode_imm_store;
+    wire signed [12:0] decode_imm_branch;
+    wire signed [31:0] decode_imm_upper;
+    wire signed [20:0] decode_imm_jump;
 
     RISCVDecode #(.INSN_WIDTH(WORD_WIDTH))
         instDecode(
@@ -266,12 +265,12 @@ module Main(
 
 /* verilator lint_off WIDTH */
     /* skip extension warnings in alu_op2 below by extending everything */
-    wire signed [31:0] extended_shamt = decode_shamt_ftype;
-    wire signed [31:0] extended_imm_alu_load = decode_imm_alu_load;
-    wire signed [31:0] masked_rs2_value = rs2_value[4:0];
-    wire signed [31:0] extended_imm_jump = decode_imm_jump;
-    wire signed [31:0] extended_imm_store = decode_imm_store;
-    wire signed [31:0] extended_imm_branch = decode_imm_branch;
+    wire signed [WORD_WIDTH-1:0] extended_shamt = decode_shamt_ftype;
+    wire signed [WORD_WIDTH-1:0] extended_imm_alu_load = decode_imm_alu_load;
+    wire signed [WORD_WIDTH-1:0] masked_rs2_value = rs2_value[4:0];
+    wire signed [WORD_WIDTH-1:0] extended_imm_jump = decode_imm_jump;
+    wire signed [WORD_WIDTH-1:0] extended_imm_store = decode_imm_store;
+    wire signed [WORD_WIDTH-1:0] extended_imm_branch = decode_imm_branch;
 /* verilator lint_on WIDTH */
 
     assign alu_op2 =
@@ -346,10 +345,6 @@ module Main(
         end else begin
 
             if(!run) begin
-
-                if(ext_decode_inst) begin
-                    inst_to_decode <= ext_inst_to_decode;
-                end
 
                 if(ext_enable_write_inst) begin
                     inst_ram_address <= ext_write_address;
@@ -451,7 +446,7 @@ module Main(
 -                            $unsigned(alu_result);
 
                         enable_write_float_rd <= inst_has_float_dest;
-                        float_rd_value = 
+                        float_rd_value <= 
                             decode_opcode_is_flw ? data_ram_out_data :
                             // float_alu_result;
                             32'hbadf10a7; /* 'Bad Float' */
@@ -461,7 +456,7 @@ module Main(
 			// jalr
                         PC <= 
                             (decode_opcode_is_jal ||
-                                 decode_opcode_is_jalr) ? $unsigned({alu_result[31:1],1'b0}) :
+                                 decode_opcode_is_jalr) ? $unsigned({alu_result[WORD_WIDTH-1:1],1'b0}) :
                             (decode_opcode_is_branch && comparison_succeeded_reg) ? $unsigned(alu_result) :
                             (PC + 4);
 
