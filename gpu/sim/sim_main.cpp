@@ -43,7 +43,7 @@ const char *stateToString(int state)
     }
 }
 
-void print_decoded_inst(uint32_t address, uint32_t inst, VMain *top)
+void printDecodedInst(uint32_t address, uint32_t inst, VMain *top)
 {
     const auto* core = top->Main->shaderCore;
     if(core->decode_opcode_is_ALU_reg_imm)  {
@@ -107,6 +107,56 @@ void print_decoded_inst(uint32_t address, uint32_t inst, VMain *top)
     }
 }
 
+// Union for converting from float to int and back.
+union FloatUint32 {
+    float f;
+    uint32_t i;
+};
+
+// Bit-wise conversion from int to float.
+float intToFloat(uint32_t i) {
+    FloatUint32 u;
+    u.i = i;
+    return u.f;
+}
+
+// Bit-wise conversion from float to int.
+uint32_t floatToInt(float f) {
+    FloatUint32 u;
+    u.f = f;
+    return u.i;
+}
+
+void dumpRegisters(VMain* top)
+{
+    // Dump register contents.
+    for (int i = 0; i < 32; i++) {
+        // Draw in columns.
+        int r = i%4*8 + i/4;
+        std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
+            << to_hex(top->Main->shaderCore->registers->bank1->memory[r]) << "   ";
+        if (i % 4 == 3) {
+            std::cout << "\n";
+        }
+    }
+    for (int i = 0; i < 32; i++) {
+        // Draw in columns.
+        int r = i%4*8 + i/4;
+        if(false) {
+            std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
+                << to_hex(top->Main->shaderCore->float_registers->bank1->memory[r]) << "   ";
+        } else {
+            std::cout << (r < 10 ? " " : "") << "f" << r << " = ";
+            std::cout << std::setprecision(5) << std::setw(10) <<
+                intToFloat(top->Main->shaderCore->float_registers->bank1->memory[r]);
+            std::cout << std::setw(0) << "   ";
+        }
+        if (i % 4 == 3) {
+            std::cout << "\n";
+        }
+    }
+    std::cout << " pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
+}
 
 void writeBytesToRam(const std::vector<uint8_t>& bytes, bool inst_not_data, VMain *top, bool beVerbose)
 {
@@ -278,7 +328,7 @@ int main(int argc, char **argv) {
             top->clock = 0;
             top->eval();
 
-            print_decoded_inst(address, inst_word, top);
+            printDecodedInst(address, inst_word, top);
 
             top->ext_decode_inst = 0;
 
@@ -319,17 +369,7 @@ int main(int argc, char **argv) {
 
         if(beVerbose) {
 
-            // Dump register contents.
-            for (int i = 0; i < 32; i++) {
-                // Draw in columns.
-                int r = i%4*8 + i/4;
-                std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
-                    << to_hex(top->Main->shaderCore->registers->bank1->memory[r]) << "   ";
-                if (i % 4 == 3) {
-                    std::cout << "\n";
-                }
-            }
-            std::cout << " pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
+            dumpRegisters(top);
         }
 
         if(beVerbose) {
@@ -344,7 +384,7 @@ int main(int argc, char **argv) {
 
         if(beVerbose && (top->Main->shaderCore->state == VMain_ShaderCore::STATE_ALU)) {
             std::cout << "after DECODE - ";
-            print_decoded_inst(top->Main->shaderCore->PC, top->Main->shaderCore->inst_to_decode, top);
+            printDecodedInst(top->Main->shaderCore->PC, top->Main->shaderCore->inst_to_decode, top);
         }
 
         if(beVerbose) {
@@ -353,17 +393,9 @@ int main(int argc, char **argv) {
     }
 
     std::cout << "halted.\n";
-    // Dump register contents.
-    for (int i = 0; i < 32; i++) {
-        // Draw in columns.
-        int r = i%4*8 + i/4;
-        std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
-            << to_hex(top->Main->shaderCore->registers->bank1->memory[r]) << "   ";
-        if (i % 4 == 3) {
-            std::cout << "\n";
-        }
-    }
-    std::cout << " pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
+
+    dumpRegisters(top);
+
     // Dump contents of beginning of memory
     for (int i = 0; i < 16; i++) {
         // Draw in columns.
