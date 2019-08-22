@@ -291,6 +291,8 @@ module ShaderCore
             decode_opcode_is_auipc ||
             decode_opcode_is_lui ||
             decode_opcode_is_load ||
+            decode_opcode_is_flw ||
+            decode_opcode_is_fsw ||
             decode_opcode_is_store ) ? alu.ALU_OP_ADD :
         alu.ALU_OP_NONE;
 
