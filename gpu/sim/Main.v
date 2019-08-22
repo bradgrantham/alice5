@@ -16,14 +16,14 @@ module Main(
     localparam ADDRESS_WIDTH = 16;
 
     // Instruction RAM write control
-    reg [ADDRESS_WIDTH-1:0] inst_ram_address /* verilator public */;
-    reg [WORD_WIDTH-1:0] inst_ram_write_data /* verilator public */;
-    reg inst_ram_write /* verilator public */;
+    wire [ADDRESS_WIDTH-1:0] inst_ram_address /* verilator public */;
+    wire [WORD_WIDTH-1:0] inst_ram_write_data /* verilator public */;
+    wire inst_ram_write /* verilator public */;
 
     // Data RAM write control
-    reg [ADDRESS_WIDTH-1:0] data_ram_address /* verilator public */;
-    reg [WORD_WIDTH-1:0] data_ram_write_data /* verilator public */;
-    reg data_ram_write /* verilator public */;
+    wire [ADDRESS_WIDTH-1:0] data_ram_address /* verilator public */;
+    wire [WORD_WIDTH-1:0] data_ram_write_data /* verilator public */;
+    wire data_ram_write /* verilator public */;
 
     // Inst RAM read out
     wire [WORD_WIDTH-1:0] inst_ram_out_data /* verilator public */;
@@ -52,7 +52,7 @@ module Main(
     reg [ADDRESS_WIDTH-1:0] shadercore_inst_address;
     reg [ADDRESS_WIDTH-1:0] shadercore_data_address;
     reg [WORD_WIDTH-1:0] shadercore_data_write_data;
-    reg shadercore_data_write_enable;
+    reg shadercore_enable_write_data;
 
     ShaderCore #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
         shaderCore(
@@ -63,47 +63,17 @@ module Main(
             .inst_ram_address(shadercore_inst_address),
             .data_ram_address(shadercore_data_address),
             .data_ram_write_data(shadercore_data_write_data),
-            .data_ram_write(shadercore_data_write_enable),
+            .data_ram_write(shadercore_enable_write_data),
             .inst_ram_read_result(inst_ram_out_data),
             .data_ram_read_result(data_ram_out_data)
             );
 
-    always @(posedge clock) begin
-        if(!reset_n) begin
+    assign inst_ram_write = !run ? ext_enable_write_inst : 0;
+    assign inst_ram_write_data = !run ? ext_write_data : 0;
+    assign inst_ram_address = !run ? ext_write_address : shadercore_inst_address;
 
-            inst_ram_write <= 0;
-            data_ram_write <= 0;
-
-        end else begin
-
-            if(!run) begin
-
-                if(ext_enable_write_inst) begin
-                    inst_ram_address <= ext_write_address;
-                    inst_ram_write_data <= ext_write_data;
-                    inst_ram_write <= 1;
-                end else begin
-                    inst_ram_write <= 0;
-                end
-
-                if(ext_enable_write_data) begin
-                    data_ram_address <= ext_write_address;
-                    data_ram_write_data <= ext_write_data;
-                    data_ram_write <= 1;
-                end else begin
-                    data_ram_write <= 0;
-                end
-
-            end else begin
-
-                inst_ram_address <= shadercore_inst_address;
-
-                data_ram_address <= shadercore_data_address;
-                data_ram_write_data <= shadercore_data_write_data;
-                data_ram_write <= shadercore_data_write_enable;
-
-            end
-        end
-    end
+    assign data_ram_write = !run ? ext_enable_write_data : shadercore_enable_write_data;
+    assign data_ram_write_data = !run ? ext_write_data : shadercore_data_write_data;
+    assign data_ram_address = !run ? ext_write_address : shadercore_data_address;
 
 endmodule

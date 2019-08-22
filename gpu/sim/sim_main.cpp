@@ -45,67 +45,66 @@ const char *stateToString(int state)
 
 void print_decoded_inst(uint32_t address, uint32_t inst, VMain *top)
 {
-#if 0
-    if(top->decode_opcode_is_ALU_reg_imm)  {
-        printf("0x%08X : 0x%08X - opcode_is_ALU_reg_imm %d, %d, %d\n", address, inst, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
-    } else if(top->decode_opcode_is_branch) {
-        printf("0x%08X : 0x%08X - opcode_is_branch cmp %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rs1, top->decode_rs2, top->decode_imm_branch);
-    } else if(top->decode_opcode_is_ALU_reg_reg) {
-        printf("0x%08X : 0x%08X - opcode_is_ALU_reg_reg op %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
-    } else if(top->decode_opcode_is_jal) {
-        printf("0x%08X : 0x%08X - opcode_is_jal %d, %d\n", address, inst, top->decode_rd, top->decode_imm_jump);
-    } else if(top->decode_opcode_is_jalr) {
-        printf("0x%08X : 0x%08X - opcode_is_jalr %d, %d, %d\n", address, inst, top->decode_rd, top->decode_rs1, top->decode_imm_jump);
-    } else if(top->decode_opcode_is_lui) {
-        printf("0x%08X : 0x%08X - opcode_is_lui %d, %d\n", address, inst, top->decode_rd, top->decode_imm_upper);
-    } else if(top->decode_opcode_is_auipc) {
-        printf("0x%08X : 0x%08X - opcode_is_auipc %d, %d\n", address, inst, top->decode_rd, top->decode_imm_upper);
-    } else if(top->decode_opcode_is_load) {
-        printf("0x%08X : 0x%08X - opcode_is_load size %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
-    } else if(top->decode_opcode_is_store) {
-        printf("0x%08X : 0x%08X - opcode_is_store size %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rs1, top->decode_rs2, top->decode_imm_store);
-    } else if(top->decode_opcode_is_system) {
-        printf("0x%08X : 0x%08X - opcode_is_system %d\n", address, inst, top->decode_imm_alu_load);
-    } else if(top->decode_opcode_is_fadd) {
-        printf("0x%08X : 0x%08X - opcode_is_fadd rm %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
-    } else if(top->decode_opcode_is_fsub) {
-        printf("0x%08X : 0x%08X - opcode_is_fsub rm %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
-    } else if(top->decode_opcode_is_fmul) {
-        printf("0x%08X : 0x%08X - opcode_is_fmul rm %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
-    } else if(top->decode_opcode_is_fdiv) {
-        printf("0x%08X : 0x%08X - opcode_is_fdiv rm %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
-    } else if(top->decode_opcode_is_fsgnj) {
-        printf("0x%08X : 0x%08X - opcode_is_fsgnj mode %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
-    } else if(top->decode_opcode_is_fminmax) {
-        printf("0x%08X : 0x%08X - opcode_is_fminmax mode %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
-    } else if(top->decode_opcode_is_fsqrt) {
-        printf("0x%08X : 0x%08X - opcode_is_fsqrt rm %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
-    } else if(top->decode_opcode_is_fcmp) {
-        printf("0x%08X : 0x%08X - opcode_is_fcmp cmp %d, %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1, top->decode_rs2);
-    } else if(top->decode_opcode_is_fcvt_f2i) {
-        printf("0x%08X : 0x%08X - opcode_is_f2i type %d, rm %d, %d, %d\n", address, inst, top->decode_shamt_ftype, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
-    } else if(top->decode_opcode_is_fmv_f2i) {
-        printf("0x%08X : 0x%08X - opcode_is_fmv_f2i funct3 %d, %d, %d\n", address, inst, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
-    } else if(top->decode_opcode_is_fcvt_i2f) {
-        printf("0x%08X : 0x%08X - opcode_is_fcvt_i2f type %d, rm %d, %d, %d\n", address, inst, top->decode_shamt_ftype, top->decode_funct3_rm, top->decode_rd, top->decode_rs1);
-    } else if(top->decode_opcode_is_fmv_i2f) {
-        printf("0x%08X : 0x%08X - opcode_is_fmv_i2f %d, %d\n", address, inst, top->decode_rd, top->decode_rs1);
-    } else if(top->decode_opcode_is_flw) {
-        printf("0x%08X : 0x%08X - opcode_is_flw %d, %d, %d\n", address, inst, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
-    } else if(top->decode_opcode_is_fsw) {
-        printf("0x%08X : 0x%08X - opcode_is_fsw %d, %d, %d\n", address, inst, top->decode_rs1, top->decode_rs2, top->decode_imm_store);
-    } else if(top->decode_opcode_is_fmadd) {
-        printf("0x%08X : 0x%08X - opcode_is_fmadd %d, %d, %d, %d\n", address, inst, top->decode_rd, top->decode_rs1, top->decode_rs2, top->decode_rs3);
-    } else if(top->decode_opcode_is_fmsub) {
-        printf("0x%08X : 0x%08X - opcode_is_fmsub %d, %d, %d, %d\n", address, inst, top->decode_rd, top->decode_rs1, top->decode_rs2, top->decode_rs3);
-    } else if(top->decode_opcode_is_fnmsub) {
-        printf("0x%08X : 0x%08X - opcode_is_fnmsub %d, %d, %d, %d\n", address, inst, top->decode_rd, top->decode_rs1, top->decode_rs2, top->decode_rs3);
-    } else if(top->decode_opcode_is_fnmadd) {
-        printf("0x%08X : 0x%08X - opcode_is_fnmadd %d, %d, %d, %d\n", address, inst, top->decode_rd, top->decode_rs1, top->decode_rs2, top->decode_rs3);
+    const auto* core = top->Main->shaderCore;
+    if(core->decode_opcode_is_ALU_reg_imm)  {
+        printf("0x%08X : 0x%08X - opcode_is_ALU_reg_imm %d, %d, %d\n", address, inst, core->decode_rd, core->decode_rs1, core->decode_imm_alu_load);
+    } else if(core->decode_opcode_is_branch) {
+        printf("0x%08X : 0x%08X - opcode_is_branch cmp %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rs1, core->decode_rs2, core->decode_imm_branch);
+    } else if(core->decode_opcode_is_ALU_reg_reg) {
+        printf("0x%08X : 0x%08X - opcode_is_ALU_reg_reg op %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1, core->decode_rs2);
+    } else if(core->decode_opcode_is_jal) {
+        printf("0x%08X : 0x%08X - opcode_is_jal %d, %d\n", address, inst, core->decode_rd, core->decode_imm_jump);
+    } else if(core->decode_opcode_is_jalr) {
+        printf("0x%08X : 0x%08X - opcode_is_jalr %d, %d, %d\n", address, inst, core->decode_rd, core->decode_rs1, core->decode_imm_jump);
+    } else if(core->decode_opcode_is_lui) {
+        printf("0x%08X : 0x%08X - opcode_is_lui %d, %d\n", address, inst, core->decode_rd, core->decode_imm_upper);
+    } else if(core->decode_opcode_is_auipc) {
+        printf("0x%08X : 0x%08X - opcode_is_auipc %d, %d\n", address, inst, core->decode_rd, core->decode_imm_upper);
+    } else if(core->decode_opcode_is_load) {
+        printf("0x%08X : 0x%08X - opcode_is_load size %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1, core->decode_imm_alu_load);
+    } else if(core->decode_opcode_is_store) {
+        printf("0x%08X : 0x%08X - opcode_is_store size %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rs1, core->decode_rs2, core->decode_imm_store);
+    } else if(core->decode_opcode_is_system) {
+        printf("0x%08X : 0x%08X - opcode_is_system %d\n", address, inst, core->decode_imm_alu_load);
+    } else if(core->decode_opcode_is_fadd) {
+        printf("0x%08X : 0x%08X - opcode_is_fadd rm %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1, core->decode_rs2);
+    } else if(core->decode_opcode_is_fsub) {
+        printf("0x%08X : 0x%08X - opcode_is_fsub rm %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1, core->decode_rs2);
+    } else if(core->decode_opcode_is_fmul) {
+        printf("0x%08X : 0x%08X - opcode_is_fmul rm %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1, core->decode_rs2);
+    } else if(core->decode_opcode_is_fdiv) {
+        printf("0x%08X : 0x%08X - opcode_is_fdiv rm %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1, core->decode_rs2);
+    } else if(core->decode_opcode_is_fsgnj) {
+        printf("0x%08X : 0x%08X - opcode_is_fsgnj mode %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1, core->decode_rs2);
+    } else if(core->decode_opcode_is_fminmax) {
+        printf("0x%08X : 0x%08X - opcode_is_fminmax mode %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1, core->decode_rs2);
+    } else if(core->decode_opcode_is_fsqrt) {
+        printf("0x%08X : 0x%08X - opcode_is_fsqrt rm %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1);
+    } else if(core->decode_opcode_is_fcmp) {
+        printf("0x%08X : 0x%08X - opcode_is_fcmp cmp %d, %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1, core->decode_rs2);
+    } else if(core->decode_opcode_is_fcvt_f2i) {
+        printf("0x%08X : 0x%08X - opcode_is_f2i type %d, rm %d, %d, %d\n", address, inst, core->decode_shamt_ftype, core->decode_funct3_rm, core->decode_rd, core->decode_rs1);
+    } else if(core->decode_opcode_is_fmv_f2i) {
+        printf("0x%08X : 0x%08X - opcode_is_fmv_f2i funct3 %d, %d, %d\n", address, inst, core->decode_funct3_rm, core->decode_rd, core->decode_rs1);
+    } else if(core->decode_opcode_is_fcvt_i2f) {
+        printf("0x%08X : 0x%08X - opcode_is_fcvt_i2f type %d, rm %d, %d, %d\n", address, inst, core->decode_shamt_ftype, core->decode_funct3_rm, core->decode_rd, core->decode_rs1);
+    } else if(core->decode_opcode_is_fmv_i2f) {
+        printf("0x%08X : 0x%08X - opcode_is_fmv_i2f %d, %d\n", address, inst, core->decode_rd, core->decode_rs1);
+    } else if(core->decode_opcode_is_flw) {
+        printf("0x%08X : 0x%08X - opcode_is_flw %d, %d, %d\n", address, inst, core->decode_rd, core->decode_rs1, core->decode_imm_alu_load);
+    } else if(core->decode_opcode_is_fsw) {
+        printf("0x%08X : 0x%08X - opcode_is_fsw %d, %d, %d\n", address, inst, core->decode_rs1, core->decode_rs2, core->decode_imm_store);
+    } else if(core->decode_opcode_is_fmadd) {
+        printf("0x%08X : 0x%08X - opcode_is_fmadd %d, %d, %d, %d\n", address, inst, core->decode_rd, core->decode_rs1, core->decode_rs2, core->decode_rs3);
+    } else if(core->decode_opcode_is_fmsub) {
+        printf("0x%08X : 0x%08X - opcode_is_fmsub %d, %d, %d, %d\n", address, inst, core->decode_rd, core->decode_rs1, core->decode_rs2, core->decode_rs3);
+    } else if(core->decode_opcode_is_fnmsub) {
+        printf("0x%08X : 0x%08X - opcode_is_fnmsub %d, %d, %d, %d\n", address, inst, core->decode_rd, core->decode_rs1, core->decode_rs2, core->decode_rs3);
+    } else if(core->decode_opcode_is_fnmadd) {
+        printf("0x%08X : 0x%08X - opcode_is_fnmadd %d, %d, %d, %d\n", address, inst, core->decode_rd, core->decode_rs1, core->decode_rs2, core->decode_rs3);
     } else {
         printf("0x%08X : 0x%08X - undecoded instruction\n", address, inst);
     }
-#endif
 }
 
 
@@ -307,13 +306,12 @@ int main(int argc, char **argv) {
             std::cout << pad << "between clock 1 and clock 0\n";
             std::cout << pad << "CPU in state " << stateToString(top->Main->shaderCore->state) << " (" << int(top->Main->shaderCore->state) << ")\n";
             std::cout << pad << "pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
-            // std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
-            // std::cout << pad << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
-            // std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
-            // std::cout << pad << "data_ram_out_data = 0x" << to_hex(top->Main->data_ram_out_data) << "\n";
-            // std::cout << pad << "data_ram_address = 0x" << to_hex(top->Main->data_ram_address) << "\n";
-            // std::cout << pad << "data_ram_in_data = 0x" << to_hex(top->Main->data_ram_in_data) << "\n";
-            // std::cout << pad << "data_ram_write = 0x" << to_hex(top->Main->data_ram_write) << "\n";
+            std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->shaderCore->inst_ram_address) << "\n";
+            std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->shaderCore->inst_to_decode) << "\n";
+            std::cout << pad << "data_ram_write_data = 0x" << to_hex(top->Main->shaderCore->data_ram_write_data) << "\n";
+            std::cout << pad << "data_ram_address = 0x" << to_hex(top->Main->shaderCore->data_ram_address) << "\n";
+            std::cout << pad << "data_ram_read_result = 0x" << to_hex(top->Main->shaderCore->data_ram_read_result) << "\n";
+            std::cout << pad << "data_ram_write = 0x" << to_hex(top->Main->shaderCore->data_ram_write) << "\n";
         }
 
         top->clock = 0;
@@ -339,18 +337,15 @@ int main(int argc, char **argv) {
             std::cout << "between clock 0 and clock 1\n";
             std::cout << "CPU in state " << stateToString(top->Main->shaderCore->state) << " (" << int(top->Main->shaderCore->state) << ")\n";
             if(false) {
-                // std::cout << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
-                // std::cout << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
-                // std::cout << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
+                std::cout << "inst_ram_address = 0x" << to_hex(top->Main->shaderCore->inst_ram_address) << "\n";
+                std::cout << "inst_to_decode = 0x" << to_hex(top->Main->shaderCore->inst_to_decode) << "\n";
             }
         }
 
-#if 0
-        if(beVerbose && (top->Main->state == top->Main->STATE_ALU)) {
+        if(beVerbose && (top->Main->shaderCore->state == VMain_ShaderCore::STATE_ALU)) {
             std::cout << "after DECODE - ";
-            print_decoded_inst(top->Main->shaderCore->PC, top->Main->inst_to_decode, top);
+            print_decoded_inst(top->Main->shaderCore->PC, top->Main->shaderCore->inst_to_decode, top);
         }
-#endif
 
         if(beVerbose) {
             std::cout << "---\n";

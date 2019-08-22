@@ -7,18 +7,18 @@ module ShaderCore
     output reg halted,
 
     // Instruction RAM write control
-    output reg [ADDRESS_WIDTH-1:0] inst_ram_address,
+    output reg [ADDRESS_WIDTH-1:0] inst_ram_address /* verilator public */,
 
     // Data RAM write control
-    output reg [ADDRESS_WIDTH-1:0] data_ram_address,
-    output reg [WORD_WIDTH-1:0] data_ram_write_data,
-    output reg data_ram_write,
+    output reg [ADDRESS_WIDTH-1:0] data_ram_address /* verilator public */,
+    output reg [WORD_WIDTH-1:0] data_ram_write_data /* verilator public */,
+    output reg data_ram_write /* verilator public */,
 
     // Inst RAM read out
-    input wire [WORD_WIDTH-1:0] inst_ram_read_result,
+    input wire [WORD_WIDTH-1:0] inst_ram_read_result /* verilator public */,
 
     // Data RAM read out
-    input wire [WORD_WIDTH-1:0] data_ram_read_result
+    input wire [WORD_WIDTH-1:0] data_ram_read_result /* verilator public */
 );
 
     localparam REGISTER_ADDRESS_WIDTH = 5;
@@ -81,52 +81,52 @@ module ShaderCore
         .read2_address(decode_rs2),
         .read2_data(float_rs2_value));
 
-    wire decode_opcode_is_branch;
-    wire decode_opcode_is_ALU_reg_imm;
-    wire decode_opcode_add_is_add;
-    wire decode_opcode_shift_is_logical;
-    wire decode_opcode_is_ALU_reg_reg;
-    wire decode_opcode_is_jal;
-    wire decode_opcode_is_jalr;
-    wire decode_opcode_is_lui;
-    wire decode_opcode_is_auipc;
-    wire decode_opcode_is_load;
-    wire decode_opcode_is_store;
-    wire decode_opcode_is_system;
-    wire decode_opcode_is_fadd;
-    wire decode_opcode_is_fsub;
-    wire decode_opcode_is_fmul;
-    wire decode_opcode_is_fdiv;
-    wire decode_opcode_is_fsgnj;
-    wire decode_opcode_is_fminmax;
-    wire decode_opcode_is_fsqrt;
-    wire decode_opcode_is_fcmp;
-    wire decode_opcode_is_fcvt_f2i;
-    wire decode_opcode_is_fmv_f2i;
-    wire decode_opcode_is_fcvt_i2f;
-    wire decode_opcode_is_fmv_i2f;
-    wire decode_opcode_is_flw;
-    wire decode_opcode_is_fsw;
-    wire decode_opcode_is_fmadd;
-    wire decode_opcode_is_fmsub;
-    wire decode_opcode_is_fnmsub;
-    wire decode_opcode_is_fnmadd;
-    wire [4:0] decode_rs1;
-    wire [4:0] decode_rs2;
+    wire decode_opcode_is_branch /* verilator public */;
+    wire decode_opcode_is_ALU_reg_imm /* verilator public */;
+    wire decode_opcode_add_is_add /* verilator public */;
+    wire decode_opcode_shift_is_logical /* verilator public */;
+    wire decode_opcode_is_ALU_reg_reg /* verilator public */;
+    wire decode_opcode_is_jal /* verilator public */;
+    wire decode_opcode_is_jalr /* verilator public */;
+    wire decode_opcode_is_lui /* verilator public */;
+    wire decode_opcode_is_auipc /* verilator public */;
+    wire decode_opcode_is_load /* verilator public */;
+    wire decode_opcode_is_store /* verilator public */;
+    wire decode_opcode_is_system /* verilator public */;
+    wire decode_opcode_is_fadd /* verilator public */;
+    wire decode_opcode_is_fsub /* verilator public */;
+    wire decode_opcode_is_fmul /* verilator public */;
+    wire decode_opcode_is_fdiv /* verilator public */;
+    wire decode_opcode_is_fsgnj /* verilator public */;
+    wire decode_opcode_is_fminmax /* verilator public */;
+    wire decode_opcode_is_fsqrt /* verilator public */;
+    wire decode_opcode_is_fcmp /* verilator public */;
+    wire decode_opcode_is_fcvt_f2i /* verilator public */;
+    wire decode_opcode_is_fmv_f2i /* verilator public */;
+    wire decode_opcode_is_fcvt_i2f /* verilator public */;
+    wire decode_opcode_is_fmv_i2f /* verilator public */;
+    wire decode_opcode_is_flw /* verilator public */;
+    wire decode_opcode_is_fsw /* verilator public */;
+    wire decode_opcode_is_fmadd /* verilator public */;
+    wire decode_opcode_is_fmsub /* verilator public */;
+    wire decode_opcode_is_fnmsub /* verilator public */;
+    wire decode_opcode_is_fnmadd /* verilator public */;
+    wire [4:0] decode_rs1 /* verilator public */;
+    wire [4:0] decode_rs2 /* verilator public */;
     /* verilator lint_off UNUSED */
-    wire [4:0] decode_rs3;
+    wire [4:0] decode_rs3 /* verilator public */;
     /* verilator lint_on UNUSED */
-    wire [4:0] decode_rd;
-    wire [1:0] decode_fmt;
-    wire [2:0] decode_funct3_rm;
-    wire [6:0] decode_funct7;
-    wire [4:0] decode_funct5;
-    wire [4:0] decode_shamt_ftype;
-    wire signed [11:0] decode_imm_alu_load;
-    wire signed [11:0] decode_imm_store;
-    wire signed [12:0] decode_imm_branch;
-    wire signed [31:0] decode_imm_upper;
-    wire signed [20:0] decode_imm_jump;
+    wire [4:0] decode_rd /* verilator public */;
+    wire [1:0] decode_fmt /* verilator public */;
+    wire [2:0] decode_funct3_rm /* verilator public */;
+    wire [6:0] decode_funct7 /* verilator public */;
+    wire [4:0] decode_funct5 /* verilator public */;
+    wire [4:0] decode_shamt_ftype /* verilator public */;
+    wire signed [11:0] decode_imm_alu_load /* verilator public */;
+    wire signed [11:0] decode_imm_store /* verilator public */;
+    wire signed [12:0] decode_imm_branch /* verilator public */;
+    wire signed [31:0] decode_imm_upper /* verilator public */;
+    wire signed [20:0] decode_imm_jump /* verilator public */;
 
     RISCVDecode #(.INSN_WIDTH(WORD_WIDTH))
         instDecode(
