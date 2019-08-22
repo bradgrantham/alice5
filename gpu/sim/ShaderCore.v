@@ -47,8 +47,8 @@ module ShaderCore
     wire [WORD_WIDTH-1:0] float_rs1_value /* verilator public */;
     wire [WORD_WIDTH-1:0] float_rs2_value /* verilator public */;
     reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;
-    reg [WORD_WIDTH-1:0] alu_result;
-    reg [WORD_WIDTH-1:0] rd_value;
+    reg [WORD_WIDTH-1:0] alu_result /* verilator public */ ;
+    reg [WORD_WIDTH-1:0] rd_value /* verilator public */;
     reg [WORD_WIDTH-1:0] float_rd_value;
     reg enable_write_rd;
     reg enable_write_float_rd;
@@ -222,7 +222,7 @@ module ShaderCore
     wire signed [3:0] alu_operator /* verilator public */ ;
 
     // If all parameters are signed, shorter parameters will be
-    // sign-extended, according to Pong
+    // sign-extended, but Verilator complains about smaller components
     assign alu_op1 =
         (decode_opcode_is_ALU_reg_imm ||
            decode_opcode_is_ALU_reg_reg ||
@@ -262,7 +262,7 @@ module ShaderCore
         decode_opcode_is_branch ? extended_imm_branch :
         $signed(32'hcafebabe);
 
-    wire [3:0] alu_reg_imm_operator =
+    wire [3:0] alu_reg_imm_operator /* verilator public */ =
         (decode_funct3_rm == 0) ? alu.ALU_OP_ADD :
         (decode_funct3_rm == 1) ? alu.ALU_OP_SLL :
         (decode_funct3_rm == 2) ? alu.ALU_OP_SLT :
@@ -404,7 +404,7 @@ module ShaderCore
                         rd_value <= 
                             (decode_opcode_is_jalr || decode_opcode_is_jal) ? (PC + 4) :
                             decode_opcode_is_load ? data_ram_read_result :
-    -                            $unsigned(alu_result);
+                                 $unsigned(alu_result);
 
                         enable_write_float_rd <= inst_has_float_dest;
                         float_rd_value <= 
