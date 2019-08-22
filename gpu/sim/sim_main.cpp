@@ -43,6 +43,7 @@ const char *stateToString(int state)
 
 void print_decoded_inst(uint32_t address, uint32_t inst, VMain *top)
 {
+#if 0
     if(top->decode_opcode_is_ALU_reg_imm)  {
         printf("0x%08X : 0x%08X - opcode_is_ALU_reg_imm %d, %d, %d\n", address, inst, top->decode_rd, top->decode_rs1, top->decode_imm_alu_load);
     } else if(top->decode_opcode_is_branch) {
@@ -102,7 +103,9 @@ void print_decoded_inst(uint32_t address, uint32_t inst, VMain *top)
     } else {
         printf("0x%08X : 0x%08X - undecoded instruction\n", address, inst);
     }
+#endif
 }
+
 
 void writeBytesToRam(const std::vector<uint8_t>& bytes, bool inst_not_data, VMain *top, bool beVerbose)
 {
@@ -206,7 +209,6 @@ int main(int argc, char **argv) {
 
     top->ext_enable_write_inst = 0;
     top->ext_enable_write_data = 0;
-    top->ext_decode_inst = 0;
 
     top->clock = 1;
     top->eval();
@@ -257,6 +259,7 @@ int main(int argc, char **argv) {
     bool test_decoder = false;
     if(test_decoder) {
 
+#if 0
         // decode program instructions to see what decoder says
         for(uint32_t address = 0; address < inst_bytes.size(); address += 4) {
 
@@ -284,6 +287,7 @@ int main(int argc, char **argv) {
             top->eval();
 
         }
+#endif
     }
 
     // Run
@@ -339,17 +343,12 @@ int main(int argc, char **argv) {
             }
         }
 
+#if 0
         if(beVerbose && (top->Main->state == top->Main->STATE_ALU)) {
             std::cout << "after DECODE - ";
             print_decoded_inst(top->Main->PC, top->Main->inst_to_decode, top);
-            // std::cout << "decode_rs1 = " << int(top->decode_rs1) << "\n";
-            // std::cout << "decode_rs2 = " << int(top->decode_rs2) << "\n";
-            // std::cout << "rs1_value = " << top->Main->rs1_value << "\n";
-            // std::cout << "rs2_value = " << top->Main->rs2_value << "\n";
-            // std::cout << "imm_alu_load = " << top->Main->decode_imm_alu_load << "\n";
-            // std::cout << "alu_op1 = " << top->Main->alu_op1 << "\n";
-            // std::cout << "alu_op2 = " << top->Main->alu_op2 << "\n";
         }
+#endif
 
         if(beVerbose) {
             std::cout << "---\n";
