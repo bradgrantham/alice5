@@ -241,7 +241,7 @@ module ShaderCore
 /* verilator lint_off WIDTH */
     /* skip extension warnings in alu_op2 below by extending everything */
     wire signed [WORD_WIDTH-1:0] extended_shamt = decode_shamt_ftype;
-    wire signed [WORD_WIDTH-1:0] extended_imm_alu_load = decode_imm_alu_load;
+    wire signed [WORD_WIDTH-1:0] extended_imm_alu_load /* verilator public */ = decode_imm_alu_load;
     wire signed [WORD_WIDTH-1:0] masked_rs2_value = rs2_value[4:0];
     wire signed [WORD_WIDTH-1:0] extended_imm_jump = decode_imm_jump;
     wire signed [WORD_WIDTH-1:0] extended_imm_store = decode_imm_store;
