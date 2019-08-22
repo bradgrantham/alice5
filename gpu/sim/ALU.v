@@ -1,11 +1,12 @@
 // ALU
 module ALU
+    #(parameter WORD_WIDTH=32) 
 (
     input wire clock,
-    input wire [31:0] operand1,
-    input wire [31:0] operand2,
+    input wire [WORD_WIDTH-1:0] operand1,
+    input wire [WORD_WIDTH-1:0] operand2,
     input wire [3:0] operator,
-    output reg [31:0] result
+    output reg [WORD_WIDTH-1:0] result
 );
 
     localparam ALU_OP_ADD = 4'd1;

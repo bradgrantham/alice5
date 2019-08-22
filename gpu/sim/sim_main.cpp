@@ -8,6 +8,7 @@
 #include "VMain.h"
 #include "VMain_Main.h"
 #include "VMain_Registers.h"
+#include "VMain_ShaderCore.h"
 #include "VMain_BlockRam__A5.h"
 #include "VMain_BlockRam__A10.h"
 
@@ -27,16 +28,17 @@ std::string to_hex(T i) {
 const char *stateToString(int state)
 {
     switch(state) {
-        case VMain_Main::STATE_INIT: return "STATE_INIT"; break;
-        case VMain_Main::STATE_FETCH: return "STATE_FETCH"; break;
-        case VMain_Main::STATE_FETCH2: return "STATE_FETCH2"; break;
-        case VMain_Main::STATE_DECODE: return "STATE_DECODE"; break;
-        case VMain_Main::STATE_REGISTERS: return "STATE_REGISTERS"; break;
-        case VMain_Main::STATE_ALU: return "STATE_ALU"; break;
-        case VMain_Main::STATE_RETIRE: return "STATE_RETIRE"; break;
-        case VMain_Main::STATE_LOAD: return "STATE_LOAD"; break;
-        case VMain_Main::STATE_STORE: return "STATE_STORE"; break;
-        case VMain_Main::STATE_HALTED: return "STATE_HALTED"; break;
+        case VMain_ShaderCore::STATE_INIT: return "STATE_INIT"; break;
+        case VMain_ShaderCore::STATE_FETCH: return "STATE_FETCH"; break;
+        case VMain_ShaderCore::STATE_FETCH2: return "STATE_FETCH2"; break;
+        case VMain_ShaderCore::STATE_DECODE: return "STATE_DECODE"; break;
+        case VMain_ShaderCore::STATE_REGISTERS: return "STATE_REGISTERS"; break;
+        case VMain_ShaderCore::STATE_ALU: return "STATE_ALU"; break;
+        case VMain_ShaderCore::STATE_RETIRE: return "STATE_RETIRE"; break;
+        case VMain_ShaderCore::STATE_LOAD: return "STATE_LOAD"; break;
+        case VMain_ShaderCore::STATE_LOAD2: return "STATE_LOAD2"; break;
+        case VMain_ShaderCore::STATE_STORE: return "STATE_STORE"; break;
+        case VMain_ShaderCore::STATE_HALTED: return "STATE_HALTED"; break;
         default : return "unknown state"; break;
     }
 }
@@ -303,15 +305,15 @@ int main(int argc, char **argv) {
         if(false) {
             // left side of nonblocking assignments
             std::cout << pad << "between clock 1 and clock 0\n";
-            std::cout << pad << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
-            std::cout << pad << "pc = 0x" << to_hex(top->Main->PC) << "\n";
-            std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
-            std::cout << pad << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
-            std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
-            std::cout << pad << "data_ram_out_data = 0x" << to_hex(top->Main->data_ram_out_data) << "\n";
-            std::cout << pad << "data_ram_address = 0x" << to_hex(top->Main->data_ram_address) << "\n";
-            std::cout << pad << "data_ram_in_data = 0x" << to_hex(top->Main->data_ram_in_data) << "\n";
-            std::cout << pad << "data_ram_write = 0x" << to_hex(top->Main->data_ram_write) << "\n";
+            std::cout << pad << "CPU in state " << stateToString(top->Main->shaderCore->state) << " (" << int(top->Main->shaderCore->state) << ")\n";
+            std::cout << pad << "pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
+            // std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
+            // std::cout << pad << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
+            // std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
+            // std::cout << pad << "data_ram_out_data = 0x" << to_hex(top->Main->data_ram_out_data) << "\n";
+            // std::cout << pad << "data_ram_address = 0x" << to_hex(top->Main->data_ram_address) << "\n";
+            // std::cout << pad << "data_ram_in_data = 0x" << to_hex(top->Main->data_ram_in_data) << "\n";
+            // std::cout << pad << "data_ram_write = 0x" << to_hex(top->Main->data_ram_write) << "\n";
         }
 
         top->clock = 0;
@@ -324,29 +326,29 @@ int main(int argc, char **argv) {
                 // Draw in columns.
                 int r = i%4*8 + i/4;
                 std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
-                    << to_hex(top->Main->registers->bank1->memory[r]) << "   ";
+                    << to_hex(top->Main->shaderCore->registers->bank1->memory[r]) << "   ";
                 if (i % 4 == 3) {
                     std::cout << "\n";
                 }
             }
-            std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
+            std::cout << " pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
         }
 
         if(beVerbose) {
             // right side of nonblocking assignments
             std::cout << "between clock 0 and clock 1\n";
-            std::cout << "CPU in state " << stateToString(top->Main->state) << " (" << int(top->Main->state) << ")\n";
+            std::cout << "CPU in state " << stateToString(top->Main->shaderCore->state) << " (" << int(top->Main->shaderCore->state) << ")\n";
             if(false) {
-                std::cout << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
-                std::cout << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
-                std::cout << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
+                // std::cout << "inst_ram_address = 0x" << to_hex(top->Main->inst_ram_address) << "\n";
+                // std::cout << "inst_ram_out_data = 0x" << to_hex(top->Main->inst_ram_out_data) << "\n";
+                // std::cout << "inst_to_decode = 0x" << to_hex(top->Main->inst_to_decode) << "\n";
             }
         }
 
 #if 0
         if(beVerbose && (top->Main->state == top->Main->STATE_ALU)) {
             std::cout << "after DECODE - ";
-            print_decoded_inst(top->Main->PC, top->Main->inst_to_decode, top);
+            print_decoded_inst(top->Main->shaderCore->PC, top->Main->inst_to_decode, top);
         }
 #endif
 
@@ -361,12 +363,12 @@ int main(int argc, char **argv) {
         // Draw in columns.
         int r = i%4*8 + i/4;
         std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
-            << to_hex(top->Main->registers->bank1->memory[r]) << "   ";
+            << to_hex(top->Main->shaderCore->registers->bank1->memory[r]) << "   ";
         if (i % 4 == 3) {
             std::cout << "\n";
         }
     }
-    std::cout << " pc = 0x" << to_hex(top->Main->PC) << "\n";
+    std::cout << " pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
     // Dump contents of beginning of memory
     for (int i = 0; i < 16; i++) {
         // Draw in columns.
