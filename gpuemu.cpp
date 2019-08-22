@@ -11,22 +11,8 @@
 #include <mutex>
 #include "gpuemu.h"
 #include "timer.h"
+#include "disassemble.h"
 
-extern "C" {
-#include "riscv-disas.h"
-}
-
-typedef std::map<uint32_t, std::string> AddressToSymbolMap;
-
-void print_inst(uint64_t pc, uint32_t inst, const AddressToSymbolMap& addressesToSymbols)
-{
-    char buf[80] = { 0 };
-    if(addressesToSymbols.find(pc) != addressesToSymbols.end())
-        printf("%s:\n", addressesToSymbols.at(pc).c_str());
-    disasm_inst(buf, sizeof(buf), rv64, pc, inst);
-    printf("        %08" PRIx64 ":  %s\n", pc, buf);
-}
-    
 void dumpGPUCore(const GPUCore& core)
 {
     std::cout << std::setfill('0');
@@ -527,8 +513,6 @@ int main(int argc, char **argv)
     tmpl.colorAddress = tmpl.data_symbols["color"];
     tmpl.iTimeAddress = tmpl.data_symbols["iTime"];
 
-    Timer frameElapsed;
-
     tmpl.startX = 0;
     tmpl.afterLastX = tmpl.imageWidth;
     tmpl.startY = 0;
@@ -550,6 +534,7 @@ int main(int argc, char **argv)
     }
 
     // Progress information.
+    Timer frameElapsed;
     shared.rowsLeft = tmpl.afterLastY - tmpl.startY;
     thread.push_back(new std::thread(showProgress, &tmpl, &shared, frameElapsed.startTime()));
 
