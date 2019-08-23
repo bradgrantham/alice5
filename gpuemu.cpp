@@ -118,7 +118,6 @@ struct ReadWriteMemory : public ReadOnlyMemory
     }
 };
 
-
 template <class MEMORY, class TYPE>
 void set(MEMORY& memory, uint32_t address, const TYPE& value)
 {
@@ -209,7 +208,7 @@ struct CoreShared
     uint64_t dispatchedCount = 0;
 };
 
-struct CoreTemplate
+struct CoreParameters
 {
     std::vector<uint8_t> text_bytes;
     std::vector<uint8_t> data_bytes;
@@ -227,13 +226,17 @@ struct CoreTemplate
     uint32_t gl_FragCoordAddress;
     uint32_t colorAddress;
     uint32_t iTimeAddress;
+};
+
+struct GPUEmuDebugOptions
+{
     bool printDisassembly = false;
     bool printMemoryAccess = false;
     bool printCoreDiff = false;
 };
 
 // Thread to show progress to the user.
-void showProgress(const CoreTemplate* tmpl, CoreShared* shared, std::chrono::time_point<std::chrono::steady_clock> startTime)
+void showProgress(const CoreParameters* tmpl, CoreShared* shared, std::chrono::time_point<std::chrono::steady_clock> startTime)
 {
     int totalRows = tmpl->afterLastY - tmpl->startY;
 
@@ -269,7 +272,7 @@ void showProgress(const CoreTemplate* tmpl, CoreShared* shared, std::chrono::tim
     std::cout << "                                                             \r";
 }
 
-void render(const CoreTemplate* tmpl, CoreShared* shared, int start_row, int skip_rows)
+void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, CoreShared* shared, int start_row, int skip_rows)
 {
     uint64_t coreDispatchedCount = 0;
 
@@ -304,25 +307,25 @@ void render(const CoreTemplate* tmpl, CoreShared* shared, int start_row, int ski
             core.regs.x[2] = tmpl->data_bytes.size(); // Set SP to end of memory 
             core.regs.pc = tmpl->initialPC;
 
-            if(tmpl->printDisassembly) {
+            if(debugOptions->printDisassembly) {
                 std::cout << "; pixel " << i << ", " << j << '\n';
             }
 
             try {
                 do {
-                    if(tmpl->printCoreDiff) {
+                    if(debugOptions->printCoreDiff) {
                         oldRegs = core.regs;
                     }
-                    if(tmpl->printDisassembly) {
+                    if(debugOptions->printDisassembly) {
                         print_inst(core.regs.pc, text_memory.read32(core.regs.pc), tmpl->textAddressesToSymbols);
                     }
-                    data_memory.verbose = tmpl->printMemoryAccess;
-                    text_memory.verbose = tmpl->printMemoryAccess;
+                    data_memory.verbose = debugOptions->printMemoryAccess;
+                    text_memory.verbose = debugOptions->printMemoryAccess;
                     status = core.step(text_memory, data_memory);
                     coreDispatchedCount ++;
                     data_memory.verbose = false;
                     text_memory.verbose = false;
-                    if(tmpl->printCoreDiff) {
+                    if(debugOptions->printCoreDiff) {
                         dumpRegsDiff(oldRegs, core.regs);
                     }
                 } while(core.regs.pc != 0xffffffff && status == GPUCore::RUNNING);
@@ -366,7 +369,8 @@ int main(int argc, char **argv)
     int specificPixelY = -1;
     int threadCount = std::thread::hardware_concurrency();
 
-    CoreTemplate tmpl;
+    GPUEmuDebugOptions debugOptions;
+    CoreParameters tmpl;
     CoreShared shared;
 
     char *progname = argv[0];
@@ -375,7 +379,7 @@ int main(int argc, char **argv)
     while(argc > 0 && argv[0][0] == '-') {
         if(strcmp(argv[0], "-v") == 0) {
 
-            tmpl.printMemoryAccess = true;
+            debugOptions.printMemoryAccess = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "--pixel") == 0) {
@@ -396,7 +400,7 @@ int main(int argc, char **argv)
 
         } else if(strcmp(argv[0], "--diff") == 0) {
 
-            tmpl.printCoreDiff = true;
+            debugOptions.printCoreDiff = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-j") == 0) {
@@ -415,7 +419,7 @@ int main(int argc, char **argv)
 
         } else if(strcmp(argv[0], "-S") == 0) {
 
-            tmpl.printDisassembly = true;
+            debugOptions.printDisassembly = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-f") == 0) {
@@ -530,7 +534,7 @@ int main(int argc, char **argv)
     std::vector<std::thread *> thread;
 
     for (int t = 0; t < threadCount; t++) {
-        thread.push_back(new std::thread(render, &tmpl, &shared, tmpl.startY + t, threadCount));
+        thread.push_back(new std::thread(render, &debugOptions, &tmpl, &shared, tmpl.startY + t, threadCount));
     }
 
     // Progress information.
