@@ -121,45 +121,45 @@ always @( qnan or snan or opa_inf or opb_inf or signa or signb or exp_eq or exp_
 	exp_lt or fract_eq or fract_gt or fract_lt or all_zero)
 
 	casex( {qnan, snan, opa_inf, opb_inf, signa, signb, exp_eq, exp_gt, exp_lt, fract_eq, fract_gt, fract_lt, all_zero})
-	   //13'b??_??_??_???_???_?: {altb, blta, aeqb} = 3'b000;
+	   //13'b??_??_??_???_???_?: {blta, altb, aeqb} = 3'b000;
 
-	   13'b1?_??_??_???_???_?: {altb, blta, aeqb} = 3'b000;	// qnan
-           13'b?1_??_??_???_???_?: {altb, blta, aeqb} = 3'b000;	// snan
+	   13'b1?_??_??_???_???_?: {blta, altb, aeqb} = 3'b000;	// qnan
+           13'b?1_??_??_???_???_?: {blta, altb, aeqb} = 3'b000;	// snan
 
-           13'b00_11_00_???_???_?: {altb, blta, aeqb} = 3'b001;	// both op INF comparisson
-           13'b00_11_01_???_???_?: {altb, blta, aeqb} = 3'b100;
-           13'b00_11_10_???_???_?: {altb, blta, aeqb} = 3'b010;
-           13'b00_11_11_???_???_?: {altb, blta, aeqb} = 3'b001;
+           13'b00_11_00_???_???_?: {blta, altb, aeqb} = 3'b001;	// both op INF comparisson
+           13'b00_11_01_???_???_?: {blta, altb, aeqb} = 3'b100;
+           13'b00_11_10_???_???_?: {blta, altb, aeqb} = 3'b010;
+           13'b00_11_11_???_???_?: {blta, altb, aeqb} = 3'b001;
 
-           13'b00_10_00_???_???_?: {altb, blta, aeqb} = 3'b100;	// opa INF comparisson
-           13'b00_10_01_???_???_?: {altb, blta, aeqb} = 3'b100;
-           13'b00_10_10_???_???_?: {altb, blta, aeqb} = 3'b010;
-           13'b00_10_11_???_???_?: {altb, blta, aeqb} = 3'b010;
+           13'b00_10_00_???_???_?: {blta, altb, aeqb} = 3'b100;	// opa INF comparisson
+           13'b00_10_01_???_???_?: {blta, altb, aeqb} = 3'b100;
+           13'b00_10_10_???_???_?: {blta, altb, aeqb} = 3'b010;
+           13'b00_10_11_???_???_?: {blta, altb, aeqb} = 3'b010;
 
-           13'b00_01_00_???_???_?: {altb, blta, aeqb} = 3'b010;	// opb INF comparisson
-           13'b00_01_01_???_???_?: {altb, blta, aeqb} = 3'b100;
-           13'b00_01_10_???_???_?: {altb, blta, aeqb} = 3'b010;
-           13'b00_01_11_???_???_?: {altb, blta, aeqb} = 3'b100;
+           13'b00_01_00_???_???_?: {blta, altb, aeqb} = 3'b010;	// opb INF comparisson
+           13'b00_01_01_???_???_?: {blta, altb, aeqb} = 3'b100;
+           13'b00_01_10_???_???_?: {blta, altb, aeqb} = 3'b010;
+           13'b00_01_11_???_???_?: {blta, altb, aeqb} = 3'b100;
 
-           13'b00_00_10_???_???_0: {altb, blta, aeqb} = 3'b010;	//compare base on sign
-           13'b00_00_01_???_???_0: {altb, blta, aeqb} = 3'b100;	//compare base on sign
+           13'b00_00_10_???_???_0: {blta, altb, aeqb} = 3'b010;	//compare base on sign
+           13'b00_00_01_???_???_0: {blta, altb, aeqb} = 3'b100;	//compare base on sign
 
-           13'b00_00_??_???_???_1: {altb, blta, aeqb} = 3'b001;	//compare base on sign both are zero
+           13'b00_00_??_???_???_1: {blta, altb, aeqb} = 3'b001;	//compare base on sign both are zero
 
-           13'b00_00_00_010_???_?: {altb, blta, aeqb} = 3'b100;	// cmp exp, equal sign
-           13'b00_00_00_001_???_?: {altb, blta, aeqb} = 3'b010;
-           13'b00_00_11_010_???_?: {altb, blta, aeqb} = 3'b010;
-           13'b00_00_11_001_???_?: {altb, blta, aeqb} = 3'b100;
+           13'b00_00_00_010_???_?: {blta, altb, aeqb} = 3'b100;	// cmp exp, equal sign
+           13'b00_00_00_001_???_?: {blta, altb, aeqb} = 3'b010;
+           13'b00_00_11_010_???_?: {blta, altb, aeqb} = 3'b010;
+           13'b00_00_11_001_???_?: {blta, altb, aeqb} = 3'b100;
 
-           13'b00_00_00_100_010_?: {altb, blta, aeqb} = 3'b100;	// compare fractions, equal sign, equal exp
-           13'b00_00_00_100_001_?: {altb, blta, aeqb} = 3'b010;
-           13'b00_00_11_100_010_?: {altb, blta, aeqb} = 3'b010;
-           13'b00_00_11_100_001_?: {altb, blta, aeqb} = 3'b100;
+           13'b00_00_00_100_010_?: {blta, altb, aeqb} = 3'b100;	// compare fractions, equal sign, equal exp
+           13'b00_00_00_100_001_?: {blta, altb, aeqb} = 3'b010;
+           13'b00_00_11_100_010_?: {blta, altb, aeqb} = 3'b010;
+           13'b00_00_11_100_001_?: {blta, altb, aeqb} = 3'b100;
 
-           13'b00_00_00_100_100_?: {altb, blta, aeqb} = 3'b001;
-           13'b00_00_11_100_100_?: {altb, blta, aeqb} = 3'b001;
+           13'b00_00_00_100_100_?: {blta, altb, aeqb} = 3'b001;
+           13'b00_00_11_100_100_?: {blta, altb, aeqb} = 3'b001;
 
-	   default: {altb, blta, aeqb} = 3'bxxx;
+	   default: {blta, altb, aeqb} = 3'bxxx;
 	endcase
 
 endmodule
