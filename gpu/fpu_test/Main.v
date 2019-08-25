@@ -12,10 +12,13 @@ module Main(
     output wire zero,
     output wire div_by_zero,
 
-    input [31:0] cmp_opa, cmp_opb,
-    output cmp_unordered,
-    output cmp_altb, cmp_blta, cmp_aeqb,
-    output cmp_inf, cmp_zero
+    input wire [31:0] cmp_opa, cmp_opb,
+    output wire cmp_unordered,
+    output wire cmp_altb, cmp_blta, cmp_aeqb,
+    output wire cmp_inf, cmp_zero,
+
+    input wire [31:0] float_to_int_op,
+    output wire [31:0] float_to_int_res
 );
 
 fpu fpu(
@@ -43,5 +46,9 @@ fcmp fcmp(
     .aeqb(cmp_aeqb),
     .inf(cmp_inf),
     .zero(cmp_zero));
+
+float_to_int float_to_int(
+    .op(float_to_int_op),
+    .res(float_to_int_res));
 
 endmodule

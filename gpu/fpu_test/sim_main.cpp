@@ -2,6 +2,8 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <cmath>
+#include <ctgmath>
 
 #include "VMain.h"
 
@@ -71,6 +73,8 @@ int main(int argc, char **argv) {
     float opa = 123.456;
     float opb = 3.1415;
 
+    std::cout << "--------------------------- Basic operators\n";
+
     for (int fpu_op = 0; fpu_op < 7; fpu_op++) {
         // Set input parameters.
         top->rmode = 0; // round_nearest_even
@@ -106,6 +110,8 @@ int main(int argc, char **argv) {
             << (top->div_by_zero ? "div_by_zero" : "") << "\n";
     }
 
+    std::cout << "--------------------------- Comparisons\n";
+
     // Test comparison.
     for (int i = 0; i < 10; i++) {
         float opa = rand_float()*1000 - 500;
@@ -128,8 +134,75 @@ int main(int argc, char **argv) {
             << (top->cmp_inf ? " inf " : "")
             << (top->cmp_zero ? " zero " : "")
             << opb
-            << ", correct = "
+            << ", should be "
             << (opa < opb ? "<" : opa > opb ? ">" : opa == opb ? "==" : "?")
+            << "\n";
+    }
+
+    std::cout << "--------------------------- Float to int\n";
+
+    // Test float-to-int.
+    for (int i = 0; i < 20; i++) {
+        float op;
+        switch (i) {
+            case 0:
+                op = NAN;
+                break;
+
+            case 1:
+                op = INFINITY;
+                break;
+
+            case 2:
+                op = -INFINITY;
+                break;
+
+            case 3:
+                // Overflow positive.
+                op = 2000.0*2000.0*2000.0;
+                break;
+
+            case 4:
+                // Overflow negative.
+                op = -2000.0*2000.0*2000.0;
+                break;
+
+            case 5:
+                // Underflow positive.
+                op = 0.1;
+                break;
+
+            case 6:
+                // Underflow negative.
+                op = -0.1;
+                break;
+
+            case 8:
+                // Positive zero.
+                op = 0.0;
+                break;
+
+            case 9:
+                // Negative zero.
+                op = -0.0;
+                break;
+
+            default:
+                op = rand_float()*1000 - 500;
+                break;
+        }
+
+        top->float_to_int_op = float_to_bits(op);
+
+        // Unclocked.
+        top->eval();
+
+        std::cout << op
+            << " -> "
+            << int32_t(top->float_to_int_res)
+            << " should be "
+            << int32_t(op)
+            << (int32_t(op) != int32_t(top->float_to_int_res) ? " WRONG!" : "")
             << "\n";
     }
 
