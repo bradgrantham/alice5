@@ -1,5 +1,5 @@
 
-// Converts 32-bit float to 32-bit int.
+// Converts 32-bit float to signed 32-bit int.
 module float_to_int(
     input wire [31:0] op,
     output wire [31:0] res);

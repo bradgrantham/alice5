@@ -41,6 +41,10 @@ float bits_to_float(uint32_t b) {
     return x.f;
 }
 
+bool floats_equal(float a, float b, float epsilon) {
+    return fabs(a - b) <= (fabs(a) < fabs(b) ? fabs(b) : fabs(a))*epsilon;
+}
+
 float rand_float() {
     return float(rand()) / RAND_MAX;
 }
@@ -204,6 +208,52 @@ int main(int argc, char **argv) {
             << int32_t(op)
             << (int32_t(op) != int32_t(top->float_to_int_res) ? " WRONG!" : "")
             << "\n";
+    }
+
+    std::cout << "--------------------------- Int to float\n";
+
+    // Test float-to-int.
+    for (int i = 0; i < 20; i++) {
+        int32_t op;
+        switch (i) {
+            case 0:
+                op = 0;
+                break;
+
+            case 1:
+                op = 1;
+                break;
+
+            case 2:
+                op = -1;
+                break;
+
+            case 3:
+                op = 0x80000000;
+                break;
+
+            case 4:
+                op = 0x7FFFFFFF;
+                break;
+
+            default:
+                op = int32_t(rand() % (1 << (rand()%29 + 2)));
+                if (rand() % 2 == 0) {
+                    op = -op;
+                }
+                break;
+        }
+
+        top->int_to_float_op = op;
+
+        // Unclocked.
+        top->eval();
+
+        printf("%12d -> %25.10f should be %25.10f%s\n",
+                op,
+                bits_to_float(top->int_to_float_res),
+                float(op),
+                (!floats_equal(op, bits_to_float(top->int_to_float_res), 0.0001) ? " WRONG!" : ""));
     }
 
     top->final();
