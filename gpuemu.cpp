@@ -214,7 +214,15 @@ struct CoreParameters
     std::vector<uint8_t> data_bytes;
     SymbolTable text_symbols;
     SymbolTable data_symbols;
+
+    AddressToSymbolMap textAddressesToSymbols;
+
+    uint32_t gl_FragCoordAddress;
+    uint32_t colorAddress;
+    uint32_t iTimeAddress;
+
     uint32_t initialPC;
+
     int imageWidth;
     int imageHeight;
     float frameTime;
@@ -222,10 +230,6 @@ struct CoreParameters
     int startY;
     int afterLastX;
     int afterLastY;
-    AddressToSymbolMap textAddressesToSymbols;
-    uint32_t gl_FragCoordAddress;
-    uint32_t colorAddress;
-    uint32_t iTimeAddress;
 };
 
 struct GPUEmuDebugOptions
