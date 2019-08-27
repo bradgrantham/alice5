@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <thread>
 #include <mutex>
+#include "risc-v.h"
 #include "gpuemu.h"
 #include "timer.h"
 #include "disassemble.h"
@@ -183,15 +184,17 @@ void usage(const char* progname)
 {
     printf("usage: %s [options] shader.blob\n", progname);
     printf("options:\n");
-    printf("\t-f N      Render frame N\n");
-    printf("\t-v        Print memory access\n");
-    printf("\t-S        show the disassembly of the SPIR-V code\n");
-    printf("\t--term    draw output image on terminal (in addition to file)\n");
-    printf("\t-d        print symbols\n");
-    printf("\t--header  print information about the object file and\n");
-    printf("\t          exit before emulation\n");
-    printf("\t-j N      Use N threads [%d]\n",
+    printf("\t-f N         Render frame N\n");
+    printf("\t-v           Print memory access\n");
+    printf("\t-S           Show the disassembly of the SPIR-V code\n");
+    printf("\t--term       Draw output image on terminal (in addition to file)\n");
+    printf("\t-d           Print symbols\n");
+    printf("\t--header     Print information about the object file and\n");
+    printf("\t             exit before emulation\n");
+    printf("\t-j N         Use N threads [%d]\n",
             int(std::thread::hardware_concurrency()));
+    printf("\t--pixel X Y  Render only pixel X and Y\n");
+    printf("\t--subst      Print which library functions were substituted\n");
 }
 
 struct CoreShared
@@ -307,8 +310,7 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
             if(false) // XXX TODO: when iTime is exported by compilation
                 set(data_memory, tmpl->iTimeAddress, tmpl->frameTime);
 
-            core.regs.x[1] = 0xffffffff; // Set PC to unlikely value to catch ret with no caller
-            core.regs.x[2] = tmpl->data_bytes.size(); // Set SP to end of memory 
+            core.regs.x[1] = 0xffffffff; // Set RA to unlikely value to catch ret with no caller
             core.regs.pc = tmpl->initialPC;
 
             if(debugOptions->printDisassembly) {
@@ -497,7 +499,11 @@ int main(int argc, char **argv)
     for(auto& [symbol, address]: tmpl.text_symbols)
         tmpl.textAddressesToSymbols[address] = symbol;
 
-    tmpl.data_bytes.resize(tmpl.data_bytes.size() + 0x10000);
+    assert(tmpl.data_bytes.size() < RiscVInitialStackPointer);
+    if(tmpl.data_bytes.size() > RiscVInitialStackPointer - 1024) {
+        std::cerr << "Warning: stack will be less than 1KiB with this binary's data segment.\n";
+    }
+    tmpl.data_bytes.resize(RiscVInitialStackPointer);
 
     tmpl.imageWidth = 320;
     tmpl.imageHeight = 180;

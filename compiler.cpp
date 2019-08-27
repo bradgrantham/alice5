@@ -28,20 +28,18 @@ void Compiler::compile() {
     // Perform physical register assignment.
     assignRegisters();
 
-    // The following constant loaded into SP depends on the RAM
-    // allocated per-core in hardware.
-    const uint32_t initialStackPointer = 0x10000;
-
     // Emit our header.
     outFile << ".segment text\n";
     std::ostringstream ss;
 
-    ss << "lui   sp, %hi(" << initialStackPointer << ")";
+    ss << "lui   sp, %hi(" << RiscVInitialStackPointer << ")";
     emit(ss.str(), "");
 
-    ss.str("");
-    ss << "addi   sp, sp, %lo(" << initialStackPointer << ")";
-    emit(ss.str(), "");
+    if((RiscVInitialStackPointer & 0x3FF) != 0) {
+        ss.str("");
+        ss << "addi   sp, sp, %lo(" << RiscVInitialStackPointer << ")";
+        emit(ss.str(), "");
+    }
 
     ss.str("");
     ss << "jal ra, " << pgm->functions.at(pgm->mainFunctionId)->cleanName;

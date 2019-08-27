@@ -282,4 +282,9 @@ struct RiscVPhi : public Instruction {
     }
 };
 
+// The following constant loaded into SP depends on the RAM
+// allocated per-core in hardware.
+const uint32_t RiscVInitialStackPointer = 0x10000;
+
+
 #endif // RISC_V_H
