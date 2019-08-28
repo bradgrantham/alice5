@@ -5,6 +5,7 @@ module ShaderCore
     input wire run,
     input wire reset_n,
     output reg halted,
+    output reg exception,
 
     // Instruction RAM write control
     output reg [ADDRESS_WIDTH-1:0] inst_ram_address /* verilator public */,
@@ -316,6 +317,7 @@ module ShaderCore
             enable_write_float_rd <= 0;
 
             halted <= 0;
+            exception <= 0;
 
             // reset registers?  Could assume they're junk in the compiler and save gates
 

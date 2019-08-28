@@ -4,6 +4,7 @@ module Main(
     input wire reset_n,
     input wire run, // hold low and release reset to write inst and data
     output reg halted,
+    output reg exception,
 
     input wire [15:0] ext_write_address,
     input wire [31:0] ext_write_data,
@@ -60,6 +61,7 @@ module Main(
             .reset_n(reset_n),
             .run(run),
             .halted(halted),
+            .exception(exception),
             .inst_ram_address(shadercore_inst_address),
             .data_ram_address(shadercore_data_address),
             .data_ram_write_data(shadercore_data_write_data),
