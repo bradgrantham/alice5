@@ -222,6 +222,15 @@ module ShaderCore
             .result(comparison_succeeded)
             );
 
+// fle.s 14..12=0
+// flt.s 14..12=1
+// feq.s 14..12=2
+    wire fcmp_succeeded =
+        (decode_funct3_rm == 0) ? (fcmp_altb || fcmp_aeqb) :
+        (decode_funct3_rm == 1) ? (fcmp_altb) :
+        (decode_funct3_rm == 2) ? (fcmp_aeqb) :
+        0;
+
     wire signed [WORD_WIDTH-1:0] alu_op1 /* verilator public */ ;
     wire signed [WORD_WIDTH-1:0] alu_op2 /* verilator public */ ;
     wire signed [3:0] alu_operator /* verilator public */ ;
@@ -352,6 +361,25 @@ module ShaderCore
             .div_by_zero(fpu_div_by_zero)
         );
 
+    wire fcmp_unordered;
+    wire fcmp_altb;
+    wire fcmp_blta;
+    wire fcmp_aeqb;
+    wire fcmp_inf;
+    wire fcmp_zero;
+    fcmp
+        fcmp
+        (
+            .opa(float_rs1_value),
+            .opb(float_rs2_value),
+            .unordered(fcmp_unordered),
+            .altb(fcmp_altb),
+            .blta(fcmp_blta),
+            .aeqb(fcmp_aeqb),
+            .inf(fcmp_inf),
+            .zero(fcmp_zero)
+        );
+
     always @(posedge clock) begin
         if(!reset_n) begin
 
@@ -434,7 +462,10 @@ module ShaderCore
                     STATE_ALU: begin
                         // want decode of instruction and registers output to be settled here
                         // ALU operation occurs in alu instance
-                        comparison_succeeded_reg <= comparison_succeeded;
+
+                        comparison_succeeded_reg <= 
+                            decode_opcode_is_fcmp ? fcmp_succeeded : 
+                            comparison_succeeded;
 
                         rd_address <= decode_rd;
 
@@ -472,12 +503,14 @@ module ShaderCore
                             decode_opcode_is_lui ||
                             decode_opcode_is_jalr ||
                             decode_opcode_is_jal ||
-                            decode_opcode_is_load) &&
+                            decode_opcode_is_load ||
+                            decode_opcode_is_fcmp) &&
                             (rd_address != 0);
                         rd_value <= 
                             (decode_opcode_is_jalr || decode_opcode_is_jal) ? (PC + 4) :
+                            decode_opcode_is_fcmp ? (comparison_succeeded_reg ? 32'b1 : 32'b0) :
                             decode_opcode_is_load ? data_ram_read_result :
-                                 $unsigned(alu_result);
+                                $unsigned(alu_result);
 
                         enable_write_float_rd <= inst_has_float_dest;
                         float_rd_value <= 

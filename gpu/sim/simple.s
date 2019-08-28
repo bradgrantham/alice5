@@ -40,6 +40,16 @@
         fdiv.s    fa3, fa0, fa1
         fadd.s    fa4, fa0, fa1
         fsub.s    fa5, fa0, fa1
+        addi    t0, zero, 0x1ff
+        addi    t1, zero, 0x1ff
+        addi    t2, zero, 0x1ff
+        addi    t3, zero, 0x1ff
+        addi    t4, zero, 0x1ff
+        flt.s     t0, fa0, fa1  ; should be 0
+        fle.s     t1, fa0, fa1  ; should be 0
+        feq.s     t2, fa0, fa1  ; should be 0
+        fle.s     t3, fa0, fa0  ; should be 1
+        feq.s     t4, fa0, fa0  ; should be 1
         ebreak                        
 
 subr:
