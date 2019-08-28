@@ -34,6 +34,12 @@
 	flw	fa0,%lo(.one)(a5)
 	lui	a5,%hi(.tmp)
 	fsw	fa0,%lo(.tmp)(a5)
+	lui	a5,%hi(.point5)
+	flw	fa1,%lo(.point5)(a5)
+        fmul.s    fa2, fa0, fa1
+        fdiv.s    fa3, fa0, fa1
+        fadd.s    fa4, fa0, fa1
+        fsub.s    fa5, fa0, fa1
         ebreak                        
 
 subr:
@@ -46,3 +52,6 @@ subr:
 .one:
         .word   1065353216      ; 1.0
 .tmp:     .word   0
+.point5:
+        .word   1056964608      ; .5
+

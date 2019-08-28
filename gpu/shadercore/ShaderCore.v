@@ -31,6 +31,10 @@ module ShaderCore
     localparam STATE_DECODE /* verilator public */ = 4'd03;
     localparam STATE_REGISTERS /* verilator public */ = 4'd04;
     localparam STATE_ALU /* verilator public */ = 4'd05;
+    localparam STATE_FPU1 /* verilator public */ = 4'd11;
+    localparam STATE_FPU2 /* verilator public */ = 4'd12;
+    localparam STATE_FPU3 /* verilator public */ = 4'd13;
+    localparam STATE_FPU4 /* verilator public */ = 4'd14;
     localparam STATE_RETIRE /* verilator public */ = 4'd06;
     localparam STATE_LOAD /* verilator public */ = 4'd07;
     localparam STATE_LOAD2 /* verilator public */ = 4'd08;
@@ -307,6 +311,47 @@ module ShaderCore
             .result(alu_result)
         );
 
+    wire [1:0] rmode = 3; // XXX use mode from inst
+    wire opcode_uses_fpu =
+        decode_opcode_is_fadd ||
+        decode_opcode_is_fsub ||
+        decode_opcode_is_fmul ||
+        decode_opcode_is_fdiv;
+        // XXX decode_opcode_is_fsgnj
+        // XXX decode_opcode_is_fminmax
+        // XXX decode_opcode_is_fsqrt
+        // XXX decode_opcode_is_fcmp
+        // XXX decode_opcode_is_fcvt_f2i
+        // XXX decode_opcode_is_fcvt_i2f
+    reg [2:0] fpu_op;
+    wire [31:0] fpu_result;
+    wire fpu_inf;
+    wire fpu_snan;
+    wire fpu_qnan;
+    wire fpu_ine;
+    wire fpu_overflow;
+    wire fpu_underflow;
+    wire fpu_zero;
+    wire fpu_div_by_zero;
+    fpu
+        fpu
+        (
+            .clk(clock),
+            .rmode(rmode),
+            .fpu_op(fpu_op),
+            .opa(float_rs1_value),
+            .opb(float_rs2_value),
+            .out(fpu_result),
+            .inf(fpu_inf),
+            .snan(fpu_snan),
+            .qnan(fpu_qnan),
+            .ine(fpu_ine),
+            .overflow(fpu_overflow),
+            .underflow(fpu_underflow),
+            .zero(fpu_zero),
+            .div_by_zero(fpu_div_by_zero)
+        );
+
     always @(posedge clock) begin
         if(!reset_n) begin
 
@@ -358,13 +403,37 @@ module ShaderCore
                     STATE_REGISTERS: begin
                         halted <= decode_opcode_is_system &&
                             (decode_imm_alu_load[11:0] == 12'd1);
-                        state <= STATE_ALU;
+
+                        fpu_op <=
+                            decode_opcode_is_fadd ? 0 :
+                            decode_opcode_is_fsub ? 1 :
+                            decode_opcode_is_fmul ? 2 :
+                            decode_opcode_is_fdiv ? 3 :
+                            7; /* XXX undefined */
+
+                        state <= opcode_uses_fpu ? STATE_FPU1 : STATE_ALU;
+                    end
+
+                    STATE_FPU1: begin
+                        state <= STATE_FPU2;
+                    end
+
+                    STATE_FPU2: begin
+                        state <= STATE_FPU3;
+                    end
+
+                    STATE_FPU3: begin
+                        state <= STATE_FPU4;
+                    end
+
+                    STATE_FPU4: begin
+                        rd_address <= decode_rd;
+                        state <= STATE_RETIRE;
                     end
 
                     STATE_ALU: begin
                         // want decode of instruction and registers output to be settled here
                         // ALU operation occurs in alu instance
-
                         comparison_succeeded_reg <= comparison_succeeded;
 
                         rd_address <= decode_rd;
@@ -413,8 +482,7 @@ module ShaderCore
                         enable_write_float_rd <= inst_has_float_dest;
                         float_rd_value <= 
                             decode_opcode_is_flw ? data_ram_read_result :
-                            // float_alu_result;
-                            32'hbadf10a7; /* 'Bad Float' */
+                            fpu_result;
 
                         // We know the result of ALU for jal has
                         // LSB 0, so just ignore LSB for both jal and
