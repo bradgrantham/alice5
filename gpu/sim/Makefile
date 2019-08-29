@@ -15,7 +15,7 @@ build: verilate
 .PHONY: verilate
 verilate:
 	if [ -d $(OBJ_DIR) ]; then rm -r $(OBJ_DIR); fi
-	verilator -y ../fpu -v ../fpu/primitives.v -y ../shadercore -Wall -Wno-fatal -CFLAGS "-I../../.. --std=c++17" --cc $(MAIN).v --exe ../../riscv-disas.c $(MAIN_CPP).cpp
+	verilator -y ../fpu -v ../fpu/primitives.v -y ../shadercore -Wall -Wno-fatal -CFLAGS "-I../../.. -O2 --std=c++17" --cc $(MAIN).v --exe ../../riscv-disas.c $(MAIN_CPP).cpp
 
 simple.o: simple.s
 	../../as -v -o simple.o simple.s > simple.lst
