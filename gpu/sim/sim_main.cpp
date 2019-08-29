@@ -625,6 +625,9 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
             shadeOnePixel(debugOptions, params, top, &clocks, &insts);
 
+            /* return to STATE_INIT so we can drive ext memory access */
+            top->run = 0;
+
             v3float rgb = {1, 0, 0};
             if(params->colorAddress != 0xFFFFFFFF)
                 get(top, params->colorAddress, rgb);
