@@ -406,40 +406,6 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     top->clock = 0;
     top->eval();
     (*clocks)++;
-
-    // TODO - should we count clocks issued here?
-    writeBytesToRam(params->inst_bytes, true, debugOptions->dumpState, top);
-
-    writeBytesToRam(params->data_bytes, false, debugOptions->dumpState, top);
-
-    // check first 4 words written to inst memory
-    for(uint32_t byteaddr = 0; byteaddr < 16; byteaddr += 4) {
-        uint32_t inst_word = 
-            params->inst_bytes[byteaddr + 0] <<  0 |
-            params->inst_bytes[byteaddr + 1] <<  8 |
-            params->inst_bytes[byteaddr + 2] << 16 |
-            params->inst_bytes[byteaddr + 3] << 24;
-        if(top->Main->instRam->memory[byteaddr >> 2] != inst_word) {
-            std::cout << "error: inst memory[" << byteaddr << "] = "
-                << to_hex(top->Main->instRam->memory[byteaddr >> 2]) << ", should be "
-                << to_hex(inst_word) << "\n";
-        }
-    }
-
-    // check first 4 words written to data memory
-    for(uint32_t byteaddr = 0; byteaddr < 16 && byteaddr < params->data_bytes.size(); byteaddr += 4) {
-        uint32_t data_word = 
-            params->data_bytes[byteaddr + 0] <<  0 |
-            params->data_bytes[byteaddr + 1] <<  8 |
-            params->data_bytes[byteaddr + 2] << 16 |
-            params->data_bytes[byteaddr + 3] << 24;
-        if(top->Main->dataRam->memory[byteaddr >> 2] != data_word) {
-            std::cout << "error: data memory[" << byteaddr << "] = "
-                << to_hex(top->Main->dataRam->memory[byteaddr >> 2]) << ", should be "
-                << to_hex(data_word) << "\n";
-        }
-    }
-
     // Run
     top->run = 1;
 
@@ -537,6 +503,64 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     if (params->data_symbols.find(".anonymous") != params->data_symbols.end()) {
         set(top, params->data_symbols.find(".anonymous")->second, v3float{fw, fh, one});
         set(top, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime);
+    }
+
+    // Set up inst Ram
+    // Run one clock cycle in reset to process STATE_INIT
+    top->reset_n = 0;
+    top->run = 0;
+
+    top->ext_enable_write_inst = 0;
+    top->ext_enable_write_data = 0;
+
+    top->clock = 1;
+    top->eval();
+    top->clock = 0;
+    top->eval();
+    clocks++;
+
+    // Release reset
+    top->reset_n = 1;
+
+    // run == 0, nothing should be happening here.
+    top->clock = 1;
+    top->eval();
+    top->clock = 0;
+    top->eval();
+    clocks++;
+
+    // TODO - should we count clocks issued here?
+    writeBytesToRam(params->inst_bytes, true, debugOptions->dumpState, top);
+
+    // TODO - should we count clocks issued here?
+    writeBytesToRam(params->data_bytes, false, debugOptions->dumpState, top);
+
+    // check first 4 words written to inst memory
+    for(uint32_t byteaddr = 0; byteaddr < 16; byteaddr += 4) {
+        uint32_t inst_word = 
+            params->inst_bytes[byteaddr + 0] <<  0 |
+            params->inst_bytes[byteaddr + 1] <<  8 |
+            params->inst_bytes[byteaddr + 2] << 16 |
+            params->inst_bytes[byteaddr + 3] << 24;
+        if(top->Main->instRam->memory[byteaddr >> 2] != inst_word) {
+            std::cout << "error: inst memory[" << byteaddr << "] = "
+                << to_hex(top->Main->instRam->memory[byteaddr >> 2]) << ", should be "
+                << to_hex(inst_word) << "\n";
+        }
+    }
+
+    // check first 4 words written to data memory
+    for(uint32_t byteaddr = 0; byteaddr < 16 && byteaddr < params->data_bytes.size(); byteaddr += 4) {
+        uint32_t data_word = 
+            params->data_bytes[byteaddr + 0] <<  0 |
+            params->data_bytes[byteaddr + 1] <<  8 |
+            params->data_bytes[byteaddr + 2] << 16 |
+            params->data_bytes[byteaddr + 3] << 24;
+        if(top->Main->dataRam->memory[byteaddr >> 2] != data_word) {
+            std::cout << "error: data memory[" << byteaddr << "] = "
+                << to_hex(top->Main->dataRam->memory[byteaddr >> 2]) << ", should be "
+                << to_hex(data_word) << "\n";
+        }
     }
 
     for(int j = start_row; j < params->afterLastY; j += skip_rows) {
