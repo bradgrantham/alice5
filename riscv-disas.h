@@ -33,6 +33,10 @@
 #include <inttypes.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* types */
 
 typedef uint64_t rv_inst;
@@ -515,5 +519,10 @@ typedef struct {
 
 size_t inst_length(rv_inst inst);
 void disasm_inst(char *buf, size_t buflen, rv_isa isa, uint64_t pc, rv_inst inst);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
 
 #endif

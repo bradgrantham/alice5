@@ -205,7 +205,7 @@ uint32_t readWordFromRam(uint32_t byteaddr, bool inst_not_data, VMain *top)
         return top->Main->dataRam->memory[byteaddr / 4];
 }
 
-void writeBytesToRam(const std::vector<uint8_t>& bytes, bool inst_not_data, bool beVerbose, VMain *top)
+void writeBytesToRam(const std::vector<uint8_t>& bytes, bool inst_not_data, bool dumpState, VMain *top)
 {
     // Write inst bytes to inst memory
     for(uint32_t byteaddr = 0; byteaddr < bytes.size(); byteaddr += 4) {
@@ -216,7 +216,7 @@ void writeBytesToRam(const std::vector<uint8_t>& bytes, bool inst_not_data, bool
             bytes[byteaddr + 3] << 24;
 
         writeWordToRam(word, byteaddr, inst_not_data, top);
-        if(beVerbose)
+        if(dumpState)
             std::cout << "Writing to " << (inst_not_data ? "inst" : "data") << " address " << byteaddr << " value 0x" << to_hex(top->ext_write_data) << "\n";
 
     }
@@ -342,7 +342,7 @@ struct SimDebugOptions
     bool printDisassembly = false;
     bool printMemoryAccess = false;
     bool printCoreDiff = false;
-    bool beVerbose = false;
+    bool dumpState = false;
 };
 
 // Thread to show progress to the user.
@@ -408,9 +408,9 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     (*clocks)++;
 
     // TODO - should we count clocks issued here?
-    writeBytesToRam(params->inst_bytes, true, debugOptions->beVerbose, top);
+    writeBytesToRam(params->inst_bytes, true, debugOptions->dumpState, top);
 
-    writeBytesToRam(params->data_bytes, false, debugOptions->beVerbose, top);
+    writeBytesToRam(params->data_bytes, false, debugOptions->dumpState, top);
 
     // check first 4 words written to inst memory
     for(uint32_t byteaddr = 0; byteaddr < 16; byteaddr += 4) {
@@ -466,12 +466,12 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
         top->clock = 0;
         top->eval();
 
-        if(debugOptions->beVerbose) {
+        if(debugOptions->dumpState) {
 
             dumpRegisters(top);
         }
 
-        if(debugOptions->beVerbose) {
+        if(debugOptions->dumpState) {
             // right side of nonblocking assignments
             std::cout << "between clock 0 and clock 1\n";
             std::cout << "CPU in state " << stateToString(top->Main->shaderCore->state) << " (" << int(top->Main->shaderCore->state) << ")\n";
@@ -485,18 +485,23 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
             (*insts)++;
         }
 
-        if(debugOptions->beVerbose && (top->Main->shaderCore->state == VMain_ShaderCore::STATE_ALU)) {
-            std::cout << "after DECODE - ";
-            printDecodedInst(top->Main->shaderCore->PC, top->Main->shaderCore->inst_to_decode, top->Main->shaderCore);
+        if(top->Main->shaderCore->state == VMain_ShaderCore::STATE_ALU) {
+            if(debugOptions->dumpState) {
+                std::cout << "after DECODE - ";
+                printDecodedInst(top->Main->shaderCore->PC, top->Main->shaderCore->inst_to_decode, top->Main->shaderCore);
+            }
+            if(debugOptions->printDisassembly) {
+                print_inst(top->Main->shaderCore->PC, top->Main->instRam->memory[top->Main->shaderCore->PC / 4], params->textAddressesToSymbols);
+            }
         }
 
-        if(debugOptions->beVerbose) {
+        if(debugOptions->dumpState) {
             std::cout << "---\n";
         }
         (*clocks)++;
     }
 
-    if(debugOptions->beVerbose) {
+    if(debugOptions->dumpState) {
         std::cout << "halted.\n";
 
         dumpRegisters(top);
@@ -588,7 +593,7 @@ int main(int argc, char **argv)
     CoreParameters params;
     CoreShared shared;
 
-    debugOptions.beVerbose = false;
+    debugOptions.dumpState = false;
 
     Verilated::commandArgs(argc, argv);
     Verilated::debug(1);
@@ -600,7 +605,11 @@ int main(int argc, char **argv)
         if(strcmp(argv[0], "-v") == 0) {
 
             debugOptions.printMemoryAccess = true;
-            debugOptions.beVerbose = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "--dump") == 0) {
+
+            debugOptions.dumpState = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "--pixel") == 0) {
