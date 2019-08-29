@@ -234,7 +234,7 @@ void set(VMain *top, uint32_t address, const std::array<TYPE, N>& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
     for(unsigned long i = 0; i < N; i++)
-        writeWordToRam(*reinterpret_cast<const uint32_t*>(&value), address + i * sizeof(uint32_t), false, top);
+        writeWordToRam(*reinterpret_cast<const uint32_t*>(&value[i]), address + i * sizeof(uint32_t), false, top);
 }
 
 template <class TYPE, unsigned long N>
@@ -382,6 +382,30 @@ void showProgress(const CoreParameters* params, CoreShared* shared, std::chrono:
     std::cout << "                                                             \r";
 }
 
+void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_t prevF[32], VMain *top)
+{
+    std::cout << std::setfill('0');
+    if(prevPC != top->Main->shaderCore->PC) {
+        std::cout << "pc changed to " << std::hex << std::setw(8) << top->Main->shaderCore->PC << std::dec << '\n';
+    }
+    for(int i = 0; i < 32; i++) {
+        if(prevX[i] != top->Main->shaderCore->registers->bank1->memory[i]) {
+            std::cout << "x" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << top->Main->shaderCore->registers->bank1->memory[i] << std::dec << '\n';
+        }
+    }
+    for(int i = 0; i < 32; i++) {
+        float cur = intToFloat(top->Main->shaderCore->float_registers->bank1->memory[i]);
+        float prev = intToFloat(prevF[i]);
+        bool bothnan = std::isnan(cur) && std::isnan(prev);
+        if((prev != cur) && !bothnan) { // if both NaN, equality test still fails)
+            uint32_t x = floatToInt(cur);
+            std::cout << "f" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << x << std::dec << "(" << cur << ")\n";
+        }
+    }
+    std::cout << std::setfill(' ');
+}
+
+
 void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *params, VMain *top, uint32_t *clocks, uint32_t *insts)
 {
     // Run one clock cycle in reset to process STATE_INIT
@@ -410,6 +434,13 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     top->run = 1;
 
     std::string pad = "                     ";
+
+    uint32_t oldXRegs[32];
+    uint32_t oldFRegs[32];
+    uint32_t oldPC;
+    for(int i = 0; i < 32; i++) oldXRegs[i] = top->Main->shaderCore->registers->bank1->memory[i];
+    for(int i = 0; i < 32; i++) oldFRegs[i] = top->Main->shaderCore->float_registers->bank1->memory[i];
+    oldPC = top->Main->shaderCore->PC;
 
     while (!Verilated::gotFinish() && !top->halted) {
 
@@ -451,7 +482,9 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
             (*insts)++;
         }
 
-        if(top->Main->shaderCore->state == VMain_ShaderCore::STATE_ALU) {
+        if((top->Main->shaderCore->state == VMain_ShaderCore::STATE_ALU) ||
+            (top->Main->shaderCore->state == VMain_ShaderCore::STATE_FPU1)
+            ) {
             if(debugOptions->dumpState) {
                 std::cout << "after DECODE - ";
                 printDecodedInst(top->Main->shaderCore->PC, top->Main->shaderCore->inst_to_decode, top->Main->shaderCore);
@@ -460,6 +493,17 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
                 print_inst(top->Main->shaderCore->PC, top->Main->instRam->memory[top->Main->shaderCore->PC / 4], params->textAddressesToSymbols);
             }
         }
+
+        // if(top->Main->shaderCore->state == VMain_ShaderCore::STATE_FETCH) {
+            if(debugOptions->printCoreDiff) {
+
+                dumpRegsDiff(oldPC, oldXRegs, oldFRegs, top);
+
+                for(int i = 0; i < 32; i++) oldXRegs[i] = top->Main->shaderCore->registers->bank1->memory[i];
+                for(int i = 0; i < 32; i++) oldFRegs[i] = top->Main->shaderCore->float_registers->bank1->memory[i];
+                oldPC = top->Main->shaderCore->PC;
+            }
+        // }
 
         if(debugOptions->dumpState) {
             std::cout << "---\n";
@@ -496,15 +540,6 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     uint32_t clocks = 0;
     uint32_t insts = 0;
 
-    const float fw = params->imageWidth;
-    const float fh = params->imageHeight;
-    const float one = 1.0;
-
-    if (params->data_symbols.find(".anonymous") != params->data_symbols.end()) {
-        set(top, params->data_symbols.find(".anonymous")->second, v3float{fw, fh, one});
-        set(top, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime);
-    }
-
     // Set up inst Ram
     // Run one clock cycle in reset to process STATE_INIT
     top->reset_n = 0;
@@ -535,8 +570,8 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     // TODO - should we count clocks issued here?
     writeBytesToRam(params->data_bytes, false, debugOptions->dumpState, top);
 
-    // check first 4 words written to inst memory
-    for(uint32_t byteaddr = 0; byteaddr < 16; byteaddr += 4) {
+    // check words written to inst memory
+    for(uint32_t byteaddr = 0; byteaddr < params->inst_bytes.size(); byteaddr += 4) {
         uint32_t inst_word = 
             params->inst_bytes[byteaddr + 0] <<  0 |
             params->inst_bytes[byteaddr + 1] <<  8 |
@@ -549,8 +584,8 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         }
     }
 
-    // check first 4 words written to data memory
-    for(uint32_t byteaddr = 0; byteaddr < 16 && byteaddr < params->data_bytes.size(); byteaddr += 4) {
+    // check words written to data memory
+    for(uint32_t byteaddr = 0; byteaddr < params->data_bytes.size(); byteaddr += 4) {
         uint32_t data_word = 
             params->data_bytes[byteaddr + 0] <<  0 |
             params->data_bytes[byteaddr + 1] <<  8 |
@@ -561,6 +596,15 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                 << to_hex(top->Main->dataRam->memory[byteaddr >> 2]) << ", should be "
                 << to_hex(data_word) << "\n";
         }
+    }
+
+    const float fw = params->imageWidth;
+    const float fh = params->imageHeight;
+    const float one = 1.0;
+
+    if (params->data_symbols.find(".anonymous") != params->data_symbols.end()) {
+        set(top, params->data_symbols.find(".anonymous")->second, v3float{fw, fh, one});
+        set(top, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime);
     }
 
     for(int j = start_row; j < params->afterLastY; j += skip_rows) {
