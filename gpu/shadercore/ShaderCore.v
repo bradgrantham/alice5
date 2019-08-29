@@ -380,6 +380,26 @@ module ShaderCore
             .zero(fcmp_zero)
         );
 
+    reg opcode_is_fcvt_w_s;
+    reg opcode_is_fcvt_s_w;
+    wire [WORD_WIDTH-1:0] float_to_int_result;
+    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
+    float_to_int
+        float_to_int
+        (
+            .op(float_rs1_value),
+            .res(float_to_int_result)
+        );
+
+    wire [WORD_WIDTH-1:0] int_to_float_result;
+    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
+    int_to_float
+        int_to_float
+        (
+            .op(rs1_value),
+            .res(int_to_float_result)
+        );
+
     always @(posedge clock) begin
         if(!reset_n) begin
 
@@ -431,7 +451,7 @@ module ShaderCore
                     STATE_REGISTERS: begin
                         halted <= decode_opcode_is_system &&
                             (decode_imm_alu_load[11:0] == 12'd1);
-
+                            
                         fpu_op <=
                             decode_opcode_is_fadd ? 0 :
                             decode_opcode_is_fsub ? 1 :
@@ -504,17 +524,20 @@ module ShaderCore
                             decode_opcode_is_jalr ||
                             decode_opcode_is_jal ||
                             decode_opcode_is_load ||
+                            decode_opcode_is_fcvt_f2i ||
                             decode_opcode_is_fcmp) &&
                             (rd_address != 0);
                         rd_value <= 
                             (decode_opcode_is_jalr || decode_opcode_is_jal) ? (PC + 4) :
                             decode_opcode_is_fcmp ? (comparison_succeeded_reg ? 32'b1 : 32'b0) :
+                            decode_opcode_is_fcvt_f2i ? float_to_int_result :
                             decode_opcode_is_load ? data_ram_read_result :
                                 $unsigned(alu_result);
 
                         enable_write_float_rd <= inst_has_float_dest;
                         float_rd_value <= 
                             decode_opcode_is_flw ? data_ram_read_result :
+                            decode_opcode_is_fcvt_i2f ? int_to_float_result :
                             fpu_result;
 
                         // We know the result of ALU for jal has

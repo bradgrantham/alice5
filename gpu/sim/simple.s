@@ -50,6 +50,10 @@
         feq.s     t2, fa0, fa1  ; should be 0
         fle.s     t3, fa0, fa0  ; should be 1
         feq.s     t4, fa0, fa0  ; should be 1
+	lui	a5,%hi(.number511point5)
+	flw	fa6,%lo(.number511point5)(a5)
+        fcvt.w.s  t5, fa6, rdn  ; t5 should become 511
+        fcvt.s.w  fa7, t5, rdn  ; fa7 should become 511.0
         ebreak                        
 
 subr:
@@ -64,4 +68,6 @@ subr:
 .tmp:     .word   0
 .point5:
         .word   1056964608      ; .5
+.number511point5:
+        .word   1140834304      ; 0x43ffc000 = 511.5
 
