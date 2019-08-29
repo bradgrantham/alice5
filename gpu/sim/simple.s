@@ -54,6 +54,9 @@
 	flw	fa6,%lo(.number511point5)(a5)
         fcvt.w.s  t5, fa6, rdn  ; t5 should become 511
         fcvt.s.w  fa7, t5, rdn  ; fa7 should become 511.0
+        fsgnjn.s  ft0, fa7, fa7 ; should be -511
+        fsgnjx.s  ft1, ft0, ft0 ; should be 511
+        fsgnj.s   ft2, fa1, ft0 ; should be -.5
         ebreak                        
 
 subr:

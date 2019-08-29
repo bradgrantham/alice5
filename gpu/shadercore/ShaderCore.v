@@ -400,6 +400,10 @@ module ShaderCore
             .res(int_to_float_result)
         );
 
+    wire [31:0] fsgnj_result /* verilator public */ = {float_rs2_value[31], float_rs1_value[30:0]};
+    wire [31:0] fsgnjn_result /* verilator public */ = {~float_rs2_value[31], float_rs1_value[30:0]};
+    wire [31:0] fsgnjx_result /* verilator public */ = {float_rs1_value[31] ^ float_rs2_value[31], float_rs1_value[30:0]};
+
     always @(posedge clock) begin
         if(!reset_n) begin
 
@@ -538,6 +542,11 @@ module ShaderCore
                         float_rd_value <= 
                             decode_opcode_is_flw ? data_ram_read_result :
                             decode_opcode_is_fcvt_i2f ? int_to_float_result :
+                            decode_opcode_is_fsgnj ? (
+                                (decode_funct3_rm == 0) ? fsgnj_result :
+                                (decode_funct3_rm == 1) ? fsgnjn_result :
+                                /* (decode_funct3_rm == 2) ? */ fsgnjx_result
+                            ) :
                             fpu_result;
 
                         // We know the result of ALU for jal has
