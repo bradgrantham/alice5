@@ -24,6 +24,16 @@ simple.o: simple.s
 simple: build simple.o
 	./$(OBJ_DIR)/V$(MAIN) simple.o
 
+red_green.s: ../../shaders/red_green.frag
+	(cd ../.. && ./shade -c -O -o gpu/sim/red_green.s -v -S shaders/red_green.frag > out)
+
+red_green.o: red_green.s
+	../../as -v -o red_green.o red_green.s > red_green.lst
+
+.PHONY: red_green
+red_green: build red_green.o
+	./$(OBJ_DIR)/V$(MAIN) -j 1 --term red_green.o
+
 .PHONY: clean
 clean:
 	rm -rf $(OBJ_DIR)

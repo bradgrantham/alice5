@@ -14,7 +14,7 @@ fi
 
 if [ "$1" == "" ]
 then
-    shaders="func_test creation define wavy dans_drews_poster lk wetrock flirt"
+    shaders="red_green func_test creation define wavy dans_drews_poster lk wetrock flirt"
 else
     shaders="$*"
 fi
