@@ -59,6 +59,8 @@
         fsgnj.s   ft2, fa1, ft0 ; should be -.5
         fmv.x.s   t6, ft0
         fmv.s.x   ft3, t6
+        fmin.s    ft4, ft1, ft2 ; should be -.5
+        fmax.s    ft5, ft1, ft2 ; should be 511
         ebreak                        
 
 subr:

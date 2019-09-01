@@ -229,6 +229,9 @@ module ShaderCore
         (decode_funct3_rm == 1) ? (fcmp_altb) :
         (decode_funct3_rm == 2) ? (fcmp_aeqb) :
         0;
+    wire fminmax_choose_rs1 =
+        (decode_funct3_rm == 0) ? fcmp_altb :
+        /* (decode_funct3_rm == 1) ? */  !fcmp_altb;
 
     wire signed [WORD_WIDTH-1:0] alu_op1 /* verilator public */ ;
     wire signed [WORD_WIDTH-1:0] alu_op2 /* verilator public */ ;
@@ -488,6 +491,7 @@ module ShaderCore
 
                         comparison_succeeded_reg <= 
                             decode_opcode_is_fcmp ? fcmp_succeeded : 
+                            decode_opcode_is_fminmax ? fminmax_choose_rs1 : 
                             comparison_succeeded;
 
                         rd_address <= decode_rd;
@@ -544,6 +548,9 @@ module ShaderCore
                             decode_opcode_is_flw ? data_ram_read_result :
                             decode_opcode_is_fcvt_i2f ? int_to_float_result :
                             decode_opcode_is_fmv_i2f ? rs1_value :
+                            decode_opcode_is_fminmax ? (
+                                comparison_succeeded_reg ? float_rs1_value : float_rs2_value
+                            ) :
                             decode_opcode_is_fsgnj ? (
                                 (decode_funct3_rm == 0) ? fsgnj_result :
                                 (decode_funct3_rm == 1) ? fsgnjn_result :
