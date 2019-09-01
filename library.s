@@ -7,6 +7,10 @@
 ; some useful constants
 
 .segment data
+
+.NaN:
+        .word   0xffc00000      ; quiet? NaN result of sqrt(-1)
+
 .one:
         .word   1065353216      ; 1.0
 
@@ -25,7 +29,338 @@
 .pi:
         .word   1078530011      ; 0x40490fdb = pi
 
+.sqrtTable:
+        .word   0 ; 0x00000000 = 0 (sqrt(0))
+        .word   536870912 ; 0x20000000 = 1.0842e-19 (sqrt(1.17549e-38))
+        .word   540345587 ; 0x203504F3 = 1.53329e-19 (sqrt(2.35099e-38))
+        .word   545259520 ; 0x20800000 = 2.1684e-19 (sqrt(4.70198e-38))
+        .word   548734195 ; 0x20B504F3 = 3.06659e-19 (sqrt(9.40395e-38))
+        .word   553648128 ; 0x21000000 = 4.33681e-19 (sqrt(1.88079e-37))
+        .word   557122803 ; 0x213504F3 = 6.13317e-19 (sqrt(3.76158e-37))
+        .word   562036736 ; 0x21800000 = 8.67362e-19 (sqrt(7.52316e-37))
+        .word   565511411 ; 0x21B504F3 = 1.22663e-18 (sqrt(1.50463e-36))
+        .word   570425344 ; 0x22000000 = 1.73472e-18 (sqrt(3.00927e-36))
+        .word   573900019 ; 0x223504F3 = 2.45327e-18 (sqrt(6.01853e-36))
+        .word   578813952 ; 0x22800000 = 3.46945e-18 (sqrt(1.20371e-35))
+        .word   582288627 ; 0x22B504F3 = 4.90654e-18 (sqrt(2.40741e-35))
+        .word   587202560 ; 0x23000000 = 6.93889e-18 (sqrt(4.81482e-35))
+        .word   590677235 ; 0x233504F3 = 9.81308e-18 (sqrt(9.62965e-35))
+        .word   595591168 ; 0x23800000 = 1.38778e-17 (sqrt(1.92593e-34))
+        .word   599065843 ; 0x23B504F3 = 1.96262e-17 (sqrt(3.85186e-34))
+        .word   603979776 ; 0x24000000 = 2.77556e-17 (sqrt(7.70372e-34))
+        .word   607454451 ; 0x243504F3 = 3.92523e-17 (sqrt(1.54074e-33))
+        .word   612368384 ; 0x24800000 = 5.55112e-17 (sqrt(3.08149e-33))
+        .word   615843059 ; 0x24B504F3 = 7.85046e-17 (sqrt(6.16298e-33))
+        .word   620756992 ; 0x25000000 = 1.11022e-16 (sqrt(1.2326e-32))
+        .word   624231667 ; 0x253504F3 = 1.57009e-16 (sqrt(2.46519e-32))
+        .word   629145600 ; 0x25800000 = 2.22045e-16 (sqrt(4.93038e-32))
+        .word   632620275 ; 0x25B504F3 = 3.14018e-16 (sqrt(9.86076e-32))
+        .word   637534208 ; 0x26000000 = 4.44089e-16 (sqrt(1.97215e-31))
+        .word   641008883 ; 0x263504F3 = 6.28037e-16 (sqrt(3.9443e-31))
+        .word   645922816 ; 0x26800000 = 8.88178e-16 (sqrt(7.88861e-31))
+        .word   649397491 ; 0x26B504F3 = 1.25607e-15 (sqrt(1.57772e-30))
+        .word   654311424 ; 0x27000000 = 1.77636e-15 (sqrt(3.15544e-30))
+        .word   657786099 ; 0x273504F3 = 2.51215e-15 (sqrt(6.31089e-30))
+        .word   662700032 ; 0x27800000 = 3.55271e-15 (sqrt(1.26218e-29))
+        .word   666174707 ; 0x27B504F3 = 5.0243e-15 (sqrt(2.52435e-29))
+        .word   671088640 ; 0x28000000 = 7.10543e-15 (sqrt(5.04871e-29))
+        .word   674563315 ; 0x283504F3 = 1.00486e-14 (sqrt(1.00974e-28))
+        .word   679477248 ; 0x28800000 = 1.42109e-14 (sqrt(2.01948e-28))
+        .word   682951923 ; 0x28B504F3 = 2.00972e-14 (sqrt(4.03897e-28))
+        .word   687865856 ; 0x29000000 = 2.84217e-14 (sqrt(8.07794e-28))
+        .word   691340531 ; 0x293504F3 = 4.01944e-14 (sqrt(1.61559e-27))
+        .word   696254464 ; 0x29800000 = 5.68434e-14 (sqrt(3.23117e-27))
+        .word   699729139 ; 0x29B504F3 = 8.03887e-14 (sqrt(6.46235e-27))
+        .word   704643072 ; 0x2A000000 = 1.13687e-13 (sqrt(1.29247e-26))
+        .word   708117747 ; 0x2A3504F3 = 1.60777e-13 (sqrt(2.58494e-26))
+        .word   713031680 ; 0x2A800000 = 2.27374e-13 (sqrt(5.16988e-26))
+        .word   716506355 ; 0x2AB504F3 = 3.21555e-13 (sqrt(1.03398e-25))
+        .word   721420288 ; 0x2B000000 = 4.54747e-13 (sqrt(2.06795e-25))
+        .word   724894963 ; 0x2B3504F3 = 6.4311e-13 (sqrt(4.1359e-25))
+        .word   729808896 ; 0x2B800000 = 9.09495e-13 (sqrt(8.27181e-25))
+        .word   733283571 ; 0x2BB504F3 = 1.28622e-12 (sqrt(1.65436e-24))
+        .word   738197504 ; 0x2C000000 = 1.81899e-12 (sqrt(3.30872e-24))
+        .word   741672179 ; 0x2C3504F3 = 2.57244e-12 (sqrt(6.61744e-24))
+        .word   746586112 ; 0x2C800000 = 3.63798e-12 (sqrt(1.32349e-23))
+        .word   750060787 ; 0x2CB504F3 = 5.14488e-12 (sqrt(2.64698e-23))
+        .word   754974720 ; 0x2D000000 = 7.27596e-12 (sqrt(5.29396e-23))
+        .word   758449395 ; 0x2D3504F3 = 1.02898e-11 (sqrt(1.05879e-22))
+        .word   763363328 ; 0x2D800000 = 1.45519e-11 (sqrt(2.11758e-22))
+        .word   766838003 ; 0x2DB504F3 = 2.05795e-11 (sqrt(4.23516e-22))
+        .word   771751936 ; 0x2E000000 = 2.91038e-11 (sqrt(8.47033e-22))
+        .word   775226611 ; 0x2E3504F3 = 4.1159e-11 (sqrt(1.69407e-21))
+        .word   780140544 ; 0x2E800000 = 5.82077e-11 (sqrt(3.38813e-21))
+        .word   783615219 ; 0x2EB504F3 = 8.23181e-11 (sqrt(6.77626e-21))
+        .word   788529152 ; 0x2F000000 = 1.16415e-10 (sqrt(1.35525e-20))
+        .word   792003827 ; 0x2F3504F3 = 1.64636e-10 (sqrt(2.71051e-20))
+        .word   796917760 ; 0x2F800000 = 2.32831e-10 (sqrt(5.42101e-20))
+        .word   800392435 ; 0x2FB504F3 = 3.29272e-10 (sqrt(1.0842e-19))
+        .word   805306368 ; 0x30000000 = 4.65661e-10 (sqrt(2.1684e-19))
+        .word   808781043 ; 0x303504F3 = 6.58544e-10 (sqrt(4.33681e-19))
+        .word   813694976 ; 0x30800000 = 9.31323e-10 (sqrt(8.67362e-19))
+        .word   817169651 ; 0x30B504F3 = 1.31709e-09 (sqrt(1.73472e-18))
+        .word   822083584 ; 0x31000000 = 1.86265e-09 (sqrt(3.46945e-18))
+        .word   825558259 ; 0x313504F3 = 2.63418e-09 (sqrt(6.93889e-18))
+        .word   830472192 ; 0x31800000 = 3.72529e-09 (sqrt(1.38778e-17))
+        .word   833946867 ; 0x31B504F3 = 5.26836e-09 (sqrt(2.77556e-17))
+        .word   838860800 ; 0x32000000 = 7.45058e-09 (sqrt(5.55112e-17))
+        .word   842335475 ; 0x323504F3 = 1.05367e-08 (sqrt(1.11022e-16))
+        .word   847249408 ; 0x32800000 = 1.49012e-08 (sqrt(2.22045e-16))
+        .word   850724083 ; 0x32B504F3 = 2.10734e-08 (sqrt(4.44089e-16))
+        .word   855638016 ; 0x33000000 = 2.98023e-08 (sqrt(8.88178e-16))
+        .word   859112691 ; 0x333504F3 = 4.21468e-08 (sqrt(1.77636e-15))
+        .word   864026624 ; 0x33800000 = 5.96046e-08 (sqrt(3.55271e-15))
+        .word   867501299 ; 0x33B504F3 = 8.42937e-08 (sqrt(7.10543e-15))
+        .word   872415232 ; 0x34000000 = 1.19209e-07 (sqrt(1.42109e-14))
+        .word   875889907 ; 0x343504F3 = 1.68587e-07 (sqrt(2.84217e-14))
+        .word   880803840 ; 0x34800000 = 2.38419e-07 (sqrt(5.68434e-14))
+        .word   884278515 ; 0x34B504F3 = 3.37175e-07 (sqrt(1.13687e-13))
+        .word   889192448 ; 0x35000000 = 4.76837e-07 (sqrt(2.27374e-13))
+        .word   892667123 ; 0x353504F3 = 6.7435e-07 (sqrt(4.54747e-13))
+        .word   897581056 ; 0x35800000 = 9.53674e-07 (sqrt(9.09495e-13))
+        .word   901055731 ; 0x35B504F3 = 1.3487e-06 (sqrt(1.81899e-12))
+        .word   905969664 ; 0x36000000 = 1.90735e-06 (sqrt(3.63798e-12))
+        .word   909444339 ; 0x363504F3 = 2.6974e-06 (sqrt(7.27596e-12))
+        .word   914358272 ; 0x36800000 = 3.8147e-06 (sqrt(1.45519e-11))
+        .word   917832947 ; 0x36B504F3 = 5.3948e-06 (sqrt(2.91038e-11))
+        .word   922746880 ; 0x37000000 = 7.62939e-06 (sqrt(5.82077e-11))
+        .word   926221555 ; 0x373504F3 = 1.07896e-05 (sqrt(1.16415e-10))
+        .word   931135488 ; 0x37800000 = 1.52588e-05 (sqrt(2.32831e-10))
+        .word   934610163 ; 0x37B504F3 = 2.15792e-05 (sqrt(4.65661e-10))
+        .word   939524096 ; 0x38000000 = 3.05176e-05 (sqrt(9.31323e-10))
+        .word   942998771 ; 0x383504F3 = 4.31584e-05 (sqrt(1.86265e-09))
+        .word   947912704 ; 0x38800000 = 6.10352e-05 (sqrt(3.72529e-09))
+        .word   951387379 ; 0x38B504F3 = 8.63167e-05 (sqrt(7.45058e-09))
+        .word   956301312 ; 0x39000000 = 0.00012207 (sqrt(1.49012e-08))
+        .word   959775987 ; 0x393504F3 = 0.000172633 (sqrt(2.98023e-08))
+        .word   964689920 ; 0x39800000 = 0.000244141 (sqrt(5.96046e-08))
+        .word   968164595 ; 0x39B504F3 = 0.000345267 (sqrt(1.19209e-07))
+        .word   973078528 ; 0x3A000000 = 0.000488281 (sqrt(2.38419e-07))
+        .word   976553203 ; 0x3A3504F3 = 0.000690534 (sqrt(4.76837e-07))
+        .word   981467136 ; 0x3A800000 = 0.000976562 (sqrt(9.53674e-07))
+        .word   984941811 ; 0x3AB504F3 = 0.00138107 (sqrt(1.90735e-06))
+        .word   989855744 ; 0x3B000000 = 0.00195312 (sqrt(3.8147e-06))
+        .word   993330419 ; 0x3B3504F3 = 0.00276214 (sqrt(7.62939e-06))
+        .word   998244352 ; 0x3B800000 = 0.00390625 (sqrt(1.52588e-05))
+        .word   1001719027 ; 0x3BB504F3 = 0.00552427 (sqrt(3.05176e-05))
+        .word   1006632960 ; 0x3C000000 = 0.0078125 (sqrt(6.10352e-05))
+        .word   1010107635 ; 0x3C3504F3 = 0.0110485 (sqrt(0.00012207))
+        .word   1015021568 ; 0x3C800000 = 0.015625 (sqrt(0.000244141))
+        .word   1018496243 ; 0x3CB504F3 = 0.0220971 (sqrt(0.000488281))
+        .word   1023410176 ; 0x3D000000 = 0.03125 (sqrt(0.000976562))
+        .word   1026884851 ; 0x3D3504F3 = 0.0441942 (sqrt(0.00195312))
+        .word   1031798784 ; 0x3D800000 = 0.0625 (sqrt(0.00390625))
+        .word   1035273459 ; 0x3DB504F3 = 0.0883883 (sqrt(0.0078125))
+        .word   1040187392 ; 0x3E000000 = 0.125 (sqrt(0.015625))
+        .word   1043662067 ; 0x3E3504F3 = 0.176777 (sqrt(0.03125))
+        .word   1048576000 ; 0x3E800000 = 0.25 (sqrt(0.0625))
+        .word   1052050675 ; 0x3EB504F3 = 0.353553 (sqrt(0.125))
+        .word   1056964608 ; 0x3F000000 = 0.5 (sqrt(0.25))
+        .word   1060439283 ; 0x3F3504F3 = 0.707107 (sqrt(0.5))
+        .word   1065353216 ; 0x3F800000 = 1 (sqrt(1))
+        .word   1068827891 ; 0x3FB504F3 = 1.41421 (sqrt(2))
+        .word   1073741824 ; 0x40000000 = 2 (sqrt(4))
+        .word   1077216499 ; 0x403504F3 = 2.82843 (sqrt(8))
+        .word   1082130432 ; 0x40800000 = 4 (sqrt(16))
+        .word   1085605107 ; 0x40B504F3 = 5.65685 (sqrt(32))
+        .word   1090519040 ; 0x41000000 = 8 (sqrt(64))
+        .word   1093993715 ; 0x413504F3 = 11.3137 (sqrt(128))
+        .word   1098907648 ; 0x41800000 = 16 (sqrt(256))
+        .word   1102382323 ; 0x41B504F3 = 22.6274 (sqrt(512))
+        .word   1107296256 ; 0x42000000 = 32 (sqrt(1024))
+        .word   1110770931 ; 0x423504F3 = 45.2548 (sqrt(2048))
+        .word   1115684864 ; 0x42800000 = 64 (sqrt(4096))
+        .word   1119159539 ; 0x42B504F3 = 90.5097 (sqrt(8192))
+        .word   1124073472 ; 0x43000000 = 128 (sqrt(16384))
+        .word   1127548147 ; 0x433504F3 = 181.019 (sqrt(32768))
+        .word   1132462080 ; 0x43800000 = 256 (sqrt(65536))
+        .word   1135936755 ; 0x43B504F3 = 362.039 (sqrt(131072))
+        .word   1140850688 ; 0x44000000 = 512 (sqrt(262144))
+        .word   1144325363 ; 0x443504F3 = 724.077 (sqrt(524288))
+        .word   1149239296 ; 0x44800000 = 1024 (sqrt(1.04858e+06))
+        .word   1152713971 ; 0x44B504F3 = 1448.15 (sqrt(2.09715e+06))
+        .word   1157627904 ; 0x45000000 = 2048 (sqrt(4.1943e+06))
+        .word   1161102579 ; 0x453504F3 = 2896.31 (sqrt(8.38861e+06))
+        .word   1166016512 ; 0x45800000 = 4096 (sqrt(1.67772e+07))
+        .word   1169491187 ; 0x45B504F3 = 5792.62 (sqrt(3.35544e+07))
+        .word   1174405120 ; 0x46000000 = 8192 (sqrt(6.71089e+07))
+        .word   1177879795 ; 0x463504F3 = 11585.2 (sqrt(1.34218e+08))
+        .word   1182793728 ; 0x46800000 = 16384 (sqrt(2.68435e+08))
+        .word   1186268403 ; 0x46B504F3 = 23170.5 (sqrt(5.36871e+08))
+        .word   1191182336 ; 0x47000000 = 32768 (sqrt(1.07374e+09))
+        .word   1194657011 ; 0x473504F3 = 46340.9 (sqrt(2.14748e+09))
+        .word   1199570944 ; 0x47800000 = 65536 (sqrt(4.29497e+09))
+        .word   1203045619 ; 0x47B504F3 = 92681.9 (sqrt(8.58993e+09))
+        .word   1207959552 ; 0x48000000 = 131072 (sqrt(1.71799e+10))
+        .word   1211434227 ; 0x483504F3 = 185364 (sqrt(3.43597e+10))
+        .word   1216348160 ; 0x48800000 = 262144 (sqrt(6.87195e+10))
+        .word   1219822835 ; 0x48B504F3 = 370728 (sqrt(1.37439e+11))
+        .word   1224736768 ; 0x49000000 = 524288 (sqrt(2.74878e+11))
+        .word   1228211443 ; 0x493504F3 = 741455 (sqrt(5.49756e+11))
+        .word   1233125376 ; 0x49800000 = 1.04858e+06 (sqrt(1.09951e+12))
+        .word   1236600051 ; 0x49B504F3 = 1.48291e+06 (sqrt(2.19902e+12))
+        .word   1241513984 ; 0x4A000000 = 2.09715e+06 (sqrt(4.39805e+12))
+        .word   1244988659 ; 0x4A3504F3 = 2.96582e+06 (sqrt(8.79609e+12))
+        .word   1249902592 ; 0x4A800000 = 4.1943e+06 (sqrt(1.75922e+13))
+        .word   1253377267 ; 0x4AB504F3 = 5.93164e+06 (sqrt(3.51844e+13))
+        .word   1258291200 ; 0x4B000000 = 8.38861e+06 (sqrt(7.03687e+13))
+        .word   1261765875 ; 0x4B3504F3 = 1.18633e+07 (sqrt(1.40737e+14))
+        .word   1266679808 ; 0x4B800000 = 1.67772e+07 (sqrt(2.81475e+14))
+        .word   1270154483 ; 0x4BB504F3 = 2.37266e+07 (sqrt(5.6295e+14))
+        .word   1275068416 ; 0x4C000000 = 3.35544e+07 (sqrt(1.1259e+15))
+        .word   1278543091 ; 0x4C3504F3 = 4.74531e+07 (sqrt(2.2518e+15))
+        .word   1283457024 ; 0x4C800000 = 6.71089e+07 (sqrt(4.5036e+15))
+        .word   1286931699 ; 0x4CB504F3 = 9.49063e+07 (sqrt(9.0072e+15))
+        .word   1291845632 ; 0x4D000000 = 1.34218e+08 (sqrt(1.80144e+16))
+        .word   1295320307 ; 0x4D3504F3 = 1.89813e+08 (sqrt(3.60288e+16))
+        .word   1300234240 ; 0x4D800000 = 2.68435e+08 (sqrt(7.20576e+16))
+        .word   1303708915 ; 0x4DB504F3 = 3.79625e+08 (sqrt(1.44115e+17))
+        .word   1308622848 ; 0x4E000000 = 5.36871e+08 (sqrt(2.8823e+17))
+        .word   1312097523 ; 0x4E3504F3 = 7.5925e+08 (sqrt(5.76461e+17))
+        .word   1317011456 ; 0x4E800000 = 1.07374e+09 (sqrt(1.15292e+18))
+        .word   1320486131 ; 0x4EB504F3 = 1.5185e+09 (sqrt(2.30584e+18))
+        .word   1325400064 ; 0x4F000000 = 2.14748e+09 (sqrt(4.61169e+18))
+        .word   1328874739 ; 0x4F3504F3 = 3.037e+09 (sqrt(9.22337e+18))
+        .word   1333788672 ; 0x4F800000 = 4.29497e+09 (sqrt(1.84467e+19))
+        .word   1337263347 ; 0x4FB504F3 = 6.074e+09 (sqrt(3.68935e+19))
+        .word   1342177280 ; 0x50000000 = 8.58993e+09 (sqrt(7.3787e+19))
+        .word   1345651955 ; 0x503504F3 = 1.2148e+10 (sqrt(1.47574e+20))
+        .word   1350565888 ; 0x50800000 = 1.71799e+10 (sqrt(2.95148e+20))
+        .word   1354040563 ; 0x50B504F3 = 2.4296e+10 (sqrt(5.90296e+20))
+        .word   1358954496 ; 0x51000000 = 3.43597e+10 (sqrt(1.18059e+21))
+        .word   1362429171 ; 0x513504F3 = 4.8592e+10 (sqrt(2.36118e+21))
+        .word   1367343104 ; 0x51800000 = 6.87195e+10 (sqrt(4.72237e+21))
+        .word   1370817779 ; 0x51B504F3 = 9.7184e+10 (sqrt(9.44473e+21))
+        .word   1375731712 ; 0x52000000 = 1.37439e+11 (sqrt(1.88895e+22))
+        .word   1379206387 ; 0x523504F3 = 1.94368e+11 (sqrt(3.77789e+22))
+        .word   1384120320 ; 0x52800000 = 2.74878e+11 (sqrt(7.55579e+22))
+        .word   1387594995 ; 0x52B504F3 = 3.88736e+11 (sqrt(1.51116e+23))
+        .word   1392508928 ; 0x53000000 = 5.49756e+11 (sqrt(3.02231e+23))
+        .word   1395983603 ; 0x533504F3 = 7.77472e+11 (sqrt(6.04463e+23))
+        .word   1400897536 ; 0x53800000 = 1.09951e+12 (sqrt(1.20893e+24))
+        .word   1404372211 ; 0x53B504F3 = 1.55494e+12 (sqrt(2.41785e+24))
+        .word   1409286144 ; 0x54000000 = 2.19902e+12 (sqrt(4.8357e+24))
+        .word   1412760819 ; 0x543504F3 = 3.10989e+12 (sqrt(9.67141e+24))
+        .word   1417674752 ; 0x54800000 = 4.39805e+12 (sqrt(1.93428e+25))
+        .word   1421149427 ; 0x54B504F3 = 6.21978e+12 (sqrt(3.86856e+25))
+        .word   1426063360 ; 0x55000000 = 8.79609e+12 (sqrt(7.73713e+25))
+        .word   1429538035 ; 0x553504F3 = 1.24396e+13 (sqrt(1.54743e+26))
+        .word   1434451968 ; 0x55800000 = 1.75922e+13 (sqrt(3.09485e+26))
+        .word   1437926643 ; 0x55B504F3 = 2.48791e+13 (sqrt(6.1897e+26))
+        .word   1442840576 ; 0x56000000 = 3.51844e+13 (sqrt(1.23794e+27))
+        .word   1446315251 ; 0x563504F3 = 4.97582e+13 (sqrt(2.47588e+27))
+        .word   1451229184 ; 0x56800000 = 7.03687e+13 (sqrt(4.95176e+27))
+        .word   1454703859 ; 0x56B504F3 = 9.95164e+13 (sqrt(9.90352e+27))
+        .word   1459617792 ; 0x57000000 = 1.40737e+14 (sqrt(1.9807e+28))
+        .word   1463092467 ; 0x573504F3 = 1.99033e+14 (sqrt(3.96141e+28))
+        .word   1468006400 ; 0x57800000 = 2.81475e+14 (sqrt(7.92282e+28))
+        .word   1471481075 ; 0x57B504F3 = 3.98066e+14 (sqrt(1.58456e+29))
+        .word   1476395008 ; 0x58000000 = 5.6295e+14 (sqrt(3.16913e+29))
+        .word   1479869683 ; 0x583504F3 = 7.96131e+14 (sqrt(6.33825e+29))
+        .word   1484783616 ; 0x58800000 = 1.1259e+15 (sqrt(1.26765e+30))
+        .word   1488258291 ; 0x58B504F3 = 1.59226e+15 (sqrt(2.5353e+30))
+        .word   1493172224 ; 0x59000000 = 2.2518e+15 (sqrt(5.0706e+30))
+        .word   1496646899 ; 0x593504F3 = 3.18453e+15 (sqrt(1.01412e+31))
+        .word   1501560832 ; 0x59800000 = 4.5036e+15 (sqrt(2.02824e+31))
+        .word   1505035507 ; 0x59B504F3 = 6.36905e+15 (sqrt(4.05648e+31))
+        .word   1509949440 ; 0x5A000000 = 9.0072e+15 (sqrt(8.11296e+31))
+        .word   1513424115 ; 0x5A3504F3 = 1.27381e+16 (sqrt(1.62259e+32))
+        .word   1518338048 ; 0x5A800000 = 1.80144e+16 (sqrt(3.24519e+32))
+        .word   1521812723 ; 0x5AB504F3 = 2.54762e+16 (sqrt(6.49037e+32))
+        .word   1526726656 ; 0x5B000000 = 3.60288e+16 (sqrt(1.29807e+33))
+        .word   1530201331 ; 0x5B3504F3 = 5.09524e+16 (sqrt(2.59615e+33))
+        .word   1535115264 ; 0x5B800000 = 7.20576e+16 (sqrt(5.1923e+33))
+        .word   1538589939 ; 0x5BB504F3 = 1.01905e+17 (sqrt(1.03846e+34))
+        .word   1543503872 ; 0x5C000000 = 1.44115e+17 (sqrt(2.07692e+34))
+        .word   1546978547 ; 0x5C3504F3 = 2.0381e+17 (sqrt(4.15384e+34))
+        .word   1551892480 ; 0x5C800000 = 2.8823e+17 (sqrt(8.30767e+34))
+        .word   1555367155 ; 0x5CB504F3 = 4.07619e+17 (sqrt(1.66153e+35))
+        .word   1560281088 ; 0x5D000000 = 5.76461e+17 (sqrt(3.32307e+35))
+        .word   1563755763 ; 0x5D3504F3 = 8.15239e+17 (sqrt(6.64614e+35))
+        .word   1568669696 ; 0x5D800000 = 1.15292e+18 (sqrt(1.32923e+36))
+        .word   1572144371 ; 0x5DB504F3 = 1.63048e+18 (sqrt(2.65846e+36))
+        .word   1577058304 ; 0x5E000000 = 2.30584e+18 (sqrt(5.31691e+36))
+        .word   1580532979 ; 0x5E3504F3 = 3.26095e+18 (sqrt(1.06338e+37))
+        .word   1585446912 ; 0x5E800000 = 4.61169e+18 (sqrt(2.12676e+37))
+        .word   1588921587 ; 0x5EB504F3 = 6.52191e+18 (sqrt(4.25353e+37))
+        .word   1593835520 ; 0x5F000000 = 9.22337e+18 (sqrt(8.50706e+37))
+        .word   1597310195 ; 0x5F3504F3 = 1.30438e+19 (sqrt(1.70141e+38))
+
 .segment text
+
+.sqrt:
+        ; Doesn't honor IEEE 754; will return NaN for sqrt(-0).
+        ; save registers here
+        sw      a0, -4(sp)
+        sw      a1, -8(sp)
+        sw      a2, -12(sp)
+        fsw     fa0, -16(sp)
+        fsw     fa1, -20(sp)
+        fsw     fa2, -24(sp)
+        fsw     fa3, -28(sp)
+        fsw     fa4, -32(sp)
+        fsw     fa5, -36(sp)
+
+        flw     fa0, 0(sp)       ; load first parameter ("x"), doesn't have to be into fa0
+
+        ; if(x < 0)
+        ;     return nan;
+
+        fmv.s.x fa1, zero   ; fa1 = 0.0
+        flt.s   a0, fa0, fa1
+        beq     a0, zero, .sqrtNonNegative
+	lui	a1, %hi(.NaN)
+	flw	fa0, %lo(.NaN)(a1)
+        jal     zero, .sqrtFinish   ; goto .sqrtFinish
+
+.sqrtNonNegative:
+        feq.s   a0, fa0, fa1
+        beq     a0, zero, .sqrtPositive
+        fmv.s.x fa0, zero   ; fa1 = 0.0
+        jal     zero, .sqrtFinish   ; goto .sqrtFinish
+
+.sqrtPositive:
+        ; use exponent to make an initial guess as if it was 1.0^2exp
+        fmv.x.s a0, fa0         ; uint32_t xi = floatToInt(x);
+        srli    a1, a0, 23      ; uint32_t xi23 = xi >> 23;
+
+        ; float x0 = .sqrtTable[ex2];
+        slli    a2, a1, 2                     ; a2 = byte offset of guess in sqrtTable
+        lui     a0, %hi(.sqrtTable)           ; a0 = high address of sqrtTable
+        add     a1, a0, a2                    ; a1 = %hi(sqrtTable) + byte offset of guess
+        flw     fa1, %lo(.sqrtTable)(a1)      ; fa0 = *(%hi(sqrtTable) + %lo(sqrtTable) + byte offset of guess)
+
+        ; Use three steps of Newton's method from
+        ; https://en.wikipedia.org/wiki/Newton%27s_method#Square_root_of_a_number
+        ; This gives < .1% error for the test range below.
+        ; float x1 = x0 - (x0 * x0 - x) / (2 * x0);
+        fmul.s  fa5, fa1, fa1   ; fa5 = x0 * x0
+        fadd.s  fa4, fa1, fa1   ; fa4 = x0 * 2
+        fsub.s  fa2, fa5, fa0   ; fa2 = x0 * x0 - x
+        fdiv.s  fa3, fa2, fa4   ; fa3 = (x0 * x0 - x) / (2 * x0)
+        fsub.s  fa4, fa1, fa3   ; fa4 = x - (x0 * x0 - x) / (2 * x0)
+        ; float x2 = x1 - (x1 * x1 - x) / (2 * x1);
+        ; float x3 = x2 - (x2 * x2 - x) / (2 * x2);
+
+        fsgnj.s fa0, fa4, fa4   ; set fa0 to last term's result
+
+.sqrtFinish:
+        ; return result;
+        fsw     fa0, 0(sp)      ; store return value
+
+        ; restore registers here
+        lw      a0, -4(sp)
+        lw      a1, -8(sp)
+        lw      a2, -12(sp)
+        flw     fa0, -16(sp)
+        flw     fa1, -20(sp)
+        flw     fa2, -24(sp)
+        flw     fa3, -28(sp)
+        flw     fa4, -32(sp)
+        flw     fa5, -36(sp)
+
+        jalr x0, ra, 0                
+
 .sin:
         ; XXX this is different enough from emulation that it causes substantial visual differences between wetrock and flirt 
 
@@ -106,7 +441,7 @@
 	; flw	fa1,%lo(.point5)(a5)
         ; fmul.s    fa0,fa0,fa1
 
-        fsw     fa0, 0(sp)      ; store return value ("x"), doesn't have to be fa0
+        fsw     fa0, 0(sp)      ; store return value
         ; restore registers here, e.g.
         lw      a0,-4(sp)
         lw      a1,-8(sp)
@@ -1106,7 +1441,7 @@ atanTable_f32:
 	; flw	fa1,%lo(.point5)(a5)
         ; fmul.s    fa0,fa0,fa1
 
-        fsw     fa0, 0(sp)      ; store return value ("x"), doesn't have to be fa0
+        fsw     fa0, 0(sp)      ; store return value
         ; restore registers here, e.g.
         lw      a0,-4(sp)
         lw      a1,-8(sp)
@@ -1192,7 +1527,18 @@ atanTable_f32:
         fmul.s  fa0, fa3, fa3; ; fa2 = x * x + y * y
         fadd.s  fa2, fa0, fa1
 
-        fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
+        ; fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y)
+        ; begin call to sqrt in place of fsqrt.s instruction
+        addi    sp, sp, -8      ; Make room on stack
+        sw      ra, 4(sp)       ; Save return address
+        fsw     fa2, 0(sp)      ; Store parameter
+
+        jal     ra, .sqrt   
+
+        flw     fa0, 0(sp)      ; Pop result
+        lw      ra, 4(sp)       ; Restore return address
+        addi    sp, sp, 8       ; Restore stack
+        ; end of call to sqrt
 
         fsw     fa0, 4(sp)             ; pushf(d) 
 
@@ -1228,7 +1574,18 @@ atanTable_f32:
         fmul.s  fa3, fa0, fa0 ; fa1 = x * x + y * y + z * z
         fadd.s  fa1, fa3, fa2
 
-        fsqrt.s fa3, fa1                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
+        ; fsqrt.s fa3, fa1                ; fa0 = d = sqrtf(x * x + y * y + z * z)
+        ; begin call to sqrt in place of fsqrt.s instruction
+        addi    sp, sp, -8      ; Make room on stack
+        sw      ra, 4(sp)       ; Save return address
+        fsw     fa1, 0(sp)      ; Store parameter
+
+        jal     ra, .sqrt   
+
+        flw     fa3, 0(sp)      ; Pop result
+        lw      ra, 4(sp)       ; Restore return address
+        addi    sp, sp, 8       ; Restore stack
+        ; end of call to sqrt
 
         fsw     fa3, 8(sp)             ; pushf(d) 
 
@@ -1270,7 +1627,18 @@ atanTable_f32:
         fmul.s  fa0, fa3, fa3 ; fa2 = x * x + y * y + z * z + w * w
         fadd.s  fa2, fa0, fa1
 
-        fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
+        ; fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
+        ; begin call to sqrt in place of fsqrt.s instruction
+        addi    sp, sp, -8      ; Make room on stack
+        sw      ra, 4(sp)       ; Save return address
+        fsw     fa2, 0(sp)      ; Store parameter
+
+        jal     ra, .sqrt   
+
+        flw     fa0, 0(sp)      ; Pop result
+        lw      ra, 4(sp)       ; Restore return address
+        addi    sp, sp, 8       ; Restore stack
+        ; end of call to sqrt
 
         fsw     fa0, 12(sp)             ; pushf(d) 
 
@@ -1414,7 +1782,7 @@ atanTable_f32:
 .atan2_finish:
 
         addi    sp,sp,32        ; pop saved registers
-        fsw     fa0, 4(sp)      ; store return value ("x")
+        fsw     fa0, 4(sp)      ; store return value
 
         ; restore registers
         flw     fa0, -4(sp)
