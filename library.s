@@ -338,21 +338,21 @@
         fadd.s  fa4, fa1, fa1   ; fa4 = x0 * 2
         fsub.s  fa2, fa5, fa0   ; fa2 = x0 * x0 - x
         fdiv.s  fa3, fa2, fa4   ; fa3 = (x0 * x0 - x) / (2 * x0)
-        fsub.s  fa1, fa1, fa3   ; fa4 = x - (x0 * x0 - x) / (2 * x0)
+        fsub.s  fa1, fa1, fa3   ; fa1 = x - (x0 * x0 - x) / (2 * x0)
 
         ; float x2 = x1 - (x1 * x1 - x) / (2 * x1);
         fmul.s  fa5, fa1, fa1   ; fa5 = x1 * x1
         fadd.s  fa4, fa1, fa1   ; fa4 = x1 * 2
         fsub.s  fa2, fa5, fa0   ; fa2 = x1 * x1 - x
         fdiv.s  fa3, fa2, fa4   ; fa3 = (x1 * x1 - x) / (2 * x1)
-        fsub.s  fa1, fa1, fa3   ; fa4 = x - (x1 * x1 - x) / (2 * x1)
+        fsub.s  fa1, fa1, fa3   ; fa1 = x - (x1 * x1 - x) / (2 * x1)
 
         ; float x3 = x2 - (x2 * x2 - x) / (2 * x2);
         fmul.s  fa5, fa1, fa1   ; fa5 = x2 * x2
         fadd.s  fa4, fa1, fa1   ; fa4 = x2 * 2
         fsub.s  fa2, fa5, fa0   ; fa2 = x2 * x2 - x
         fdiv.s  fa3, fa2, fa4   ; fa3 = (x2 * x2 - x) / (2 * x2)
-        fsub.s  fa1, fa1, fa3   ; fa4 = x - (x2 * x2 - x) / (2 * x2)
+        fsub.s  fa1, fa1, fa3   ; fa1 = x - (x2 * x2 - x) / (2 * x2)
 
         fsgnj.s fa0, fa1, fa1   ; set fa0 to last term's result
 
@@ -1541,7 +1541,7 @@ atanTable_f32:
 
         ; fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y)
         ; begin call to sqrt in place of fsqrt.s instruction
-        addi    sp, sp, -8      ; Make room on stack
+        addi    sp, sp, -28      ; Make room on stack (20 saved for this frame plus need 8 for next frame)
         sw      ra, 4(sp)       ; Save return address
         fsw     fa2, 0(sp)      ; Store parameter
 
@@ -1549,7 +1549,7 @@ atanTable_f32:
 
         flw     fa0, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
-        addi    sp, sp, 8       ; Restore stack
+        addi    sp, sp, 28       ; Restore stack
         ; end of call to sqrt
 
         fsw     fa0, 4(sp)             ; pushf(d) 
@@ -1588,7 +1588,7 @@ atanTable_f32:
 
         ; fsqrt.s fa3, fa1                ; fa0 = d = sqrtf(x * x + y * y + z * z)
         ; begin call to sqrt in place of fsqrt.s instruction
-        addi    sp, sp, -8      ; Make room on stack
+        addi    sp, sp, -28      ; Make room on stack (20 saved for this frame plus need 8 for next frame)
         sw      ra, 4(sp)       ; Save return address
         fsw     fa1, 0(sp)      ; Store parameter
 
@@ -1596,7 +1596,7 @@ atanTable_f32:
 
         flw     fa3, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
-        addi    sp, sp, 8       ; Restore stack
+        addi    sp, sp, 28       ; Restore stack
         ; end of call to sqrt
 
         fsw     fa3, 8(sp)             ; pushf(d) 
@@ -1641,7 +1641,7 @@ atanTable_f32:
 
         ; fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
         ; begin call to sqrt in place of fsqrt.s instruction
-        addi    sp, sp, -8      ; Make room on stack
+        addi    sp, sp, -28      ; Make room on stack (20 saved for this frame plus need 8 for next frame)
         sw      ra, 4(sp)       ; Save return address
         fsw     fa2, 0(sp)      ; Store parameter
 
@@ -1649,7 +1649,7 @@ atanTable_f32:
 
         flw     fa0, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
-        addi    sp, sp, 8       ; Restore stack
+        addi    sp, sp, 28       ; Restore stack
         ; end of call to sqrt
 
         fsw     fa0, 12(sp)             ; pushf(d) 
