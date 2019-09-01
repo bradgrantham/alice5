@@ -190,7 +190,6 @@ module ShaderCore
         decode_opcode_is_fsgnj || 
         decode_opcode_is_fminmax || 
         decode_opcode_is_fsqrt || 
-        decode_opcode_is_fcmp || 
         decode_opcode_is_fcvt_i2f ||
         decode_opcode_is_fmv_i2f || 
         decode_opcode_is_flw || 
