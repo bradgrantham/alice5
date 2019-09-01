@@ -467,6 +467,20 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                         break;
                     }
 
+                    // fmv.x.w   rd rs1 24..20=0 31..27=0x1C 14..12=0 26..25=0 6..2=0x14 1..0=3
+                    case 0x1C: {
+                        if(funct3 == 0) {
+                            if(fmt == 0) {
+                                regs.x[rd] = floatToInt(regs.f[rs1]);
+                            } else {
+                                unimpl(insn, status);
+                            }
+                        } else {
+                            unimpl(insn, status);
+                        }
+                        break;
+                    }
+
                     case 0x1A: {
                         if(rs2 == 0) {          // fcvt.s.w
                             if(fmt == 0) {
@@ -522,7 +536,6 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
             break;
         }
 
-        // fmv.x.w   rd rs1 24..20=0 31..27=0x1C 14..12=0 26..25=0 6..2=0x14 1..0=3
         // fmv.x.s
         // fclass.s
 
@@ -665,6 +678,18 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                     case 2: regs.x[rd] = int32_t(regs.x[rs1]) < int32_t(immI); break; // slti
                     case 3: regs.x[rd] = regs.x[rs1] < immI; break;     // sltiu
                     case 4: regs.x[rd] = regs.x[rs1] ^ immI; break;     // xori
+                    case 5:
+                        // regs.x[rd] = regs.x[rs1] >> shamt; break;   // srli, srai
+                        if(funct7 == 0) {
+                            regs.x[rd] = regs.x[rs1] >> (shamt); break;        // srli
+                        } else if(funct7 == 32) {
+                            // whether right-shifting a negative signed
+                            // int extends the sign bit is implementation
+                            // defined in C but I'll risk it.
+                            regs.x[rd] = ((int32_t)regs.x[rs1]) >> (shamt); break;     // srai
+                        } else {
+                            unimpl(insn, status);
+                        }
                     case 6: regs.x[rd] = regs.x[rs1] | immI; break;     // ori
                     case 7: regs.x[rd] = regs.x[rs1] & immI; break;     // andi
                     default: unimpl(insn, status); break;
