@@ -529,12 +529,14 @@ module ShaderCore
                             decode_opcode_is_jal ||
                             decode_opcode_is_load ||
                             decode_opcode_is_fcvt_f2i ||
+                            decode_opcode_is_fmv_f2i ||
                             decode_opcode_is_fcmp) &&
                             (rd_address != 0);
                         rd_value <= 
                             (decode_opcode_is_jalr || decode_opcode_is_jal) ? (PC + 4) :
                             decode_opcode_is_fcmp ? (comparison_succeeded_reg ? 32'b1 : 32'b0) :
                             decode_opcode_is_fcvt_f2i ? float_to_int_result :
+                            decode_opcode_is_fmv_f2i ? float_rs1_value :
                             decode_opcode_is_load ? data_ram_read_result :
                                 $unsigned(alu_result);
 
@@ -542,6 +544,7 @@ module ShaderCore
                         float_rd_value <= 
                             decode_opcode_is_flw ? data_ram_read_result :
                             decode_opcode_is_fcvt_i2f ? int_to_float_result :
+                            decode_opcode_is_fmv_i2f ? rs1_value :
                             decode_opcode_is_fsgnj ? (
                                 (decode_funct3_rm == 0) ? fsgnj_result :
                                 (decode_funct3_rm == 1) ? fsgnjn_result :
