@@ -30,7 +30,7 @@ do
     if [ "$compile" = true ]; then
         ./shade -c -O -o x.s shaders/$shader.frag > /dev/null && \
             ./as x.s && \
-            ./gpuemu -f 90 --term x.o && \
+            ./gpuemu --subst -f 90 --term x.o && \
             mv emulated.ppm $shader-compile.ppm
     fi
 done

@@ -1895,20 +1895,112 @@ atanTable_f32:
         jalr x0, ra, 0
 
 .dot1:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; save registers
+        fsw     fa0, -4(sp)
+        fsw     fa1, -8(sp)
+
+        flw     fa0, 0(sp)      ; x1
+        flw     fa1, 8(sp)      ; x2
+        fmul.s  fa0, fa0, fa1   ; x1*x2
+
+        fsw     fa0, 8(sp)      ; return value
+
+        ; restore registers
+        flw     fa0, -4(sp)
+        flw     fa1, -8(sp)
+
+        addi    sp, sp, 4       ; we took two parameters and return one, so fix up stack
+        jalr    x0, ra, 0       ; return
 
 .dot2:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; save registers
+        fsw     fa0, -4(sp)
+        fsw     fa1, -8(sp)
+        fsw     fa2, -12(sp)
+
+        flw     fa0, 0(sp)      ; x1
+        flw     fa1, 8(sp)      ; x2
+        fmul.s  fa2, fa0, fa1   ; x1*x2
+
+        flw     fa0, 4(sp)      ; y1
+        flw     fa1, 12(sp)     ; y2
+        fmul.s  fa0, fa0, fa1   ; y1*y2
+
+        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2
+        fsw     fa2, 12(sp)     ; return value
+
+        ; restore registers
+        flw     fa0, -4(sp)
+        flw     fa1, -8(sp)
+        flw     fa2, -12(sp)
+
+        addi    sp, sp, 12      ; we took four parameters and return one, so fix up stack
+        jalr    x0, ra, 0       ; return
 
 .dot3:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; save registers
+        fsw     fa0, -4(sp)
+        fsw     fa1, -8(sp)
+        fsw     fa2, -12(sp)
+
+        flw     fa0, 0(sp)      ; x1
+        flw     fa1, 12(sp)     ; x2
+        fmul.s  fa2, fa0, fa1   ; x1*x2
+
+        flw     fa0, 4(sp)      ; y1
+        flw     fa1, 16(sp)     ; y2
+        fmul.s  fa0, fa0, fa1   ; y1*y2
+        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2
+
+        flw     fa0, 8(sp)      ; z1
+        flw     fa1, 20(sp)     ; z2
+        fmul.s  fa0, fa0, fa1   ; z1*z2
+        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2 + z1*z2
+
+        fsw     fa2, 20(sp)     ; return value
+
+        ; restore registers
+        flw     fa0, -4(sp)
+        flw     fa1, -8(sp)
+        flw     fa2, -12(sp)
+
+        addi    sp, sp, 20      ; we took six parameters and return one, so fix up stack
+        jalr    x0, ra, 0       ; return
 
 .dot4:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; save registers
+        fsw     fa0, -4(sp)
+        fsw     fa1, -8(sp)
+        fsw     fa2, -12(sp)
+
+        flw     fa0, 0(sp)      ; x1
+        flw     fa1, 16(sp)     ; x2
+        fmul.s  fa2, fa0, fa1   ; x1*x2
+
+        flw     fa0, 4(sp)      ; y1
+        flw     fa1, 20(sp)     ; y2
+        fmul.s  fa0, fa0, fa1   ; y1*y2
+        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2
+
+        flw     fa0, 8(sp)      ; z1
+        flw     fa1, 24(sp)     ; z2
+        fmul.s  fa0, fa0, fa1   ; z1*z2
+        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2 + z1*z2
+
+        flw     fa0, 12(sp)     ; w1
+        flw     fa1, 28(sp)     ; w2
+        fmul.s  fa0, fa0, fa1   ; w1*w2
+        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2 + z1*z2 + w1*w2
+
+        fsw     fa2, 28(sp)     ; return value
+
+        ; restore registers
+        flw     fa0, -4(sp)
+        flw     fa1, -8(sp)
+        flw     fa2, -12(sp)
+
+        addi    sp, sp, 28      ; we took eight parameters and return one, so fix up stack
+        jalr    x0, ra, 0       ; return
 
 .any1:
         ; addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
