@@ -322,7 +322,10 @@ module ShaderCore
             .result(alu_result)
         );
 
-    wire [1:0] rmode = 3; // XXX use mode from inst
+    // RISC-V rounding modes in order are RNE, RTZ, RDN, RUP
+    // RDN and RUP
+    reg [1:0] rounding_mode_reg;
+
     wire opcode_uses_fpu =
         decode_opcode_is_fadd ||
         decode_opcode_is_fsub ||
@@ -464,6 +467,12 @@ module ShaderCore
                             decode_opcode_is_fmul ? 2 :
                             decode_opcode_is_fdiv ? 3 :
                             7; /* XXX undefined */
+
+                        rounding_mode_reg <=
+                            (decode_funct3_rm == 0) ? 0 :
+                            (decode_funct3_rm == 1) ? 1 :
+                            (decode_funct3_rm == 2) ? 3 :
+                            /* (decode_funct3_rm == 3) ? */ 2;
 
                         state <= opcode_uses_fpu ? STATE_FPU1 : STATE_ALU;
                     end
