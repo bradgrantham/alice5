@@ -972,6 +972,21 @@ struct InsnGLSLstd450Exp : public Instruction {
     virtual void emit(Compiler *compiler);
 };
 
+// GLSLstd450Log instruction (code 28).
+struct InsnGLSLstd450Log : public Instruction {
+    InsnGLSLstd450Log(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
+        addResult(resultId);
+        addParameter(xId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Log(*this); }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Log; }
+    virtual std::string name() const { return "GLSLstd450Log"; }
+    virtual void emit(Compiler *compiler);
+};
+
 // GLSLstd450Exp2 instruction (code 29).
 struct InsnGLSLstd450Exp2 : public Instruction {
     InsnGLSLstd450Exp2(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
@@ -984,6 +999,21 @@ struct InsnGLSLstd450Exp2 : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Exp2(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Exp2; }
     virtual std::string name() const { return "GLSLstd450Exp2"; }
+    virtual void emit(Compiler *compiler);
+};
+
+// GLSLstd450Log2 instruction (code 30).
+struct InsnGLSLstd450Log2 : public Instruction {
+    InsnGLSLstd450Log2(const LineInfo& lineInfo, uint32_t type, uint32_t resultId, uint32_t xId) : Instruction(lineInfo), type(type) {
+        addResult(resultId);
+        addParameter(xId);
+    }
+    uint32_t type; // result type
+    uint32_t resultId() const { return resIdList[0]; } // SSA register for result value
+    uint32_t xId() const { return argIdList[0]; } // operand from register
+    virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Log2(*this); }
+    virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Log2; }
+    virtual std::string name() const { return "GLSLstd450Log2"; }
     virtual void emit(Compiler *compiler);
 };
 

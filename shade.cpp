@@ -654,6 +654,16 @@ void InsnGLSLstd450Pow::emit(Compiler *compiler)
     compiler->emitBinCall(".pow", resultId(), xId(), yId());
 }
 
+void InsnGLSLstd450Log::emit(Compiler *compiler)
+{
+    compiler->emitUniCall(".log", resultId(), xId());
+}
+
+void InsnGLSLstd450Log2::emit(Compiler *compiler)
+{
+    compiler->emitUniCall(".log2", resultId(), xId());
+}
+
 void InsnGLSLstd450FClamp::emit(Compiler *compiler)
 {
     compiler->emitTerCall(".clamp", resultId(), xId(), minValId(), maxValId());

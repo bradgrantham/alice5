@@ -1238,12 +1238,46 @@ case GLSLstd450Exp: {
     break;
 }
 
+case GLSLstd450Log: {
+    uint32_t xId = nextu();
+    pgm->currentBlock->instructions.push_back(std::make_shared<InsnGLSLstd450Log>(pgm->currentLine, type, resultId, xId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Log";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
 case GLSLstd450Exp2: {
     uint32_t xId = nextu();
     pgm->currentBlock->instructions.push_back(std::make_shared<InsnGLSLstd450Exp2>(pgm->currentLine, type, resultId, xId));
     pgm->resultTypes[resultId] = type;
     if(pgm->verbose) {
         std::cout << "GLSLstd450Exp2";
+        std::cout << " type ";
+        std::cout << type;
+        std::cout << " resultId ";
+        std::cout << resultId;
+        std::cout << " xId ";
+        std::cout << xId;
+        std::cout << "\n";
+    }
+    break;
+}
+
+case GLSLstd450Log2: {
+    uint32_t xId = nextu();
+    pgm->currentBlock->instructions.push_back(std::make_shared<InsnGLSLstd450Log2>(pgm->currentLine, type, resultId, xId));
+    pgm->resultTypes[resultId] = type;
+    if(pgm->verbose) {
+        std::cout << "GLSLstd450Log2";
         std::cout << " type ";
         std::cout << type;
         std::cout << " resultId ";

@@ -1493,16 +1493,6 @@ void Interpreter::stepGLSLstd450Atanh(const InsnGLSLstd450Atanh& insn)
     std::cerr << "stepGLSLstd450Atanh() not implemented\n";
 }
 
-void Interpreter::stepGLSLstd450Log(const InsnGLSLstd450Log& insn)
-{
-    std::cerr << "stepGLSLstd450Log() not implemented\n";
-}
-
-void Interpreter::stepGLSLstd450Log2(const InsnGLSLstd450Log2& insn)
-{
-    std::cerr << "stepGLSLstd450Log2() not implemented\n";
-}
-
 void Interpreter::stepGLSLstd450InverseSqrt(const InsnGLSLstd450InverseSqrt& insn)
 {
     std::cerr << "stepGLSLstd450InverseSqrt() not implemented\n";

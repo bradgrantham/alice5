@@ -889,6 +889,14 @@ void Program::expandVectorsInBlock(Block *block) {
                  expandVectorsUniOp<InsnGLSLstd450Exp>(instruction, newList, replaced);
                  break;
 
+            case 0x10000 | GLSLstd450Log:
+                 expandVectorsUniOp<InsnGLSLstd450Log>(instruction, newList, replaced);
+                 break;
+
+            case 0x10000 | GLSLstd450Log2:
+                 expandVectorsUniOp<InsnGLSLstd450Log2>(instruction, newList, replaced);
+                 break;
+
             case 0x10000 | GLSLstd450Reflect: {
                 InsnGLSLstd450Reflect *insn = dynamic_cast<InsnGLSLstd450Reflect *>(instruction);
 

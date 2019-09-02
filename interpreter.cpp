@@ -1249,6 +1249,42 @@ void Interpreter::stepGLSLstd450Exp2(const InsnGLSLstd450Exp2& insn)
     }
 }
 
+void Interpreter::stepGLSLstd450Log(const InsnGLSLstd450Log& insn)
+{
+    const Type *type = pgm->types.at(insn.type).get();
+
+    if (type->op() == SpvOpTypeVector) {
+        const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
+
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
+        for(uint32_t i = 0; i < typeVector->count; i++) {
+            result[i] = logf(x[i]);
+        }
+    } else {
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = logf(x);
+    }
+}
+
+void Interpreter::stepGLSLstd450Log2(const InsnGLSLstd450Log2& insn)
+{
+    const Type *type = pgm->types.at(insn.type).get();
+
+    if (type->op() == SpvOpTypeVector) {
+        const TypeVector *typeVector = dynamic_cast<const TypeVector *>(type);
+
+        const float* x = &fromRegister<float>(insn.xId());
+        float* result = &toRegister<float>(insn.resultId());
+        for(uint32_t i = 0; i < typeVector->count; i++) {
+            result[i] = log2f(x[i]);
+        }
+    } else {
+        float x = fromRegister<float>(insn.xId());
+        toRegister<float>(insn.resultId()) = log2f(x);
+    }
+}
+
 void Interpreter::stepGLSLstd450Floor(const InsnGLSLstd450Floor& insn)
 {
     const Type *type = pgm->types.at(insn.type).get();
