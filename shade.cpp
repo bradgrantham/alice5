@@ -633,12 +633,20 @@ void InsnGLSLstd450Step::emit(Compiler *compiler)
 
 void InsnGLSLstd450FMin::emit(Compiler *compiler)
 {
-    compiler->emitBinCall(".min", resultId(), xId(), yId());
+    std::ostringstream ss;
+    ss << "fmin.s " << compiler->reg(resultId())
+        << ", " << compiler->reg(xId())
+        << ", " << compiler->reg(yId());
+    compiler->emit(ss.str(), "");
 }
 
 void InsnGLSLstd450FMax::emit(Compiler *compiler)
 {
-    compiler->emitBinCall(".max", resultId(), xId(), yId());
+    std::ostringstream ss;
+    ss << "fmax.s " << compiler->reg(resultId())
+        << ", " << compiler->reg(xId())
+        << ", " << compiler->reg(yId());
+    compiler->emit(ss.str(), "");
 }
 
 void InsnGLSLstd450Pow::emit(Compiler *compiler)
