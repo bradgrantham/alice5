@@ -310,7 +310,7 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
             if(false) // XXX TODO: when iTime is exported by compilation
                 set(data_memory, tmpl->iTimeAddress, tmpl->frameTime);
 
-            core.regs.x[1] = 0xffffffff; // Set RA to unlikely value to catch ret with no caller
+            core.regs.x[1] = 0xfffffffe; // Set RA to unlikely value to catch ret with no caller
             core.regs.pc = tmpl->initialPC;
 
             if(debugOptions->printDisassembly) {
@@ -334,7 +334,7 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
                     if(debugOptions->printCoreDiff) {
                         dumpRegsDiff(oldRegs, core.regs);
                     }
-                } while(core.regs.pc != 0xffffffff && status == GPUCore::RUNNING);
+                } while(core.regs.pc != 0xfffffffe && status == GPUCore::RUNNING);
             } catch(const std::exception& e) {
                 std::cerr << "core " << start_row << ", " << e.what() << '\n';
                 dumpGPUCore(core);
@@ -365,11 +365,172 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
     }
 }
 
+static float MIN_FLOAT_NORMAL = 0x1.0p-126f;
+static float MAX_FLOAT_VALUE = 0x1.fffffep127;
+
+/**
+ * Compare two floats to see if they are nearly equal.
+ */
+static bool nearlyEqual(float a, float b, float epsilon) {
+    float absA = fabsf(a);
+    float absB = fabsf(b);
+    float diff = fabsf(a - b);
+
+    if (isnan(a) || isnan(b)) {
+        return isnan(a) && isnan(b);
+    } else if (a == b) {
+        // Shortcut, handles infinities.
+        return true;
+    } else if (a == 0 || b == 0 || (absA + absB < MIN_FLOAT_NORMAL)) {
+        // a or b is zero or both are extremely close to it.
+        // Relative error is less meaningful here.
+        return diff < epsilon*MIN_FLOAT_NORMAL;
+    } else {
+        // Use relative error.
+        return diff / fmin((absA + absB), MAX_FLOAT_VALUE) < epsilon;
+    }
+}
+
+/**
+ * Run the specified math function. The parameters are in normal parameter order (i.e.,
+ * in the order they'd be passed in C code).
+ */
+static float runMathFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *tmpl,
+        const std::string &funcName, const std::vector<float> &params) {
+
+    ReadWriteMemory data_memory(tmpl->data_bytes, false);
+    ReadOnlyMemory text_memory(tmpl->text_bytes, false);
+
+    GPUCore core(tmpl->text_symbols);
+    GPUCore::Status status;
+
+    // Find address of function.
+    auto itr = tmpl->text_symbols.find(funcName);
+    if (itr == tmpl->text_symbols.end()) {
+        std::cerr << "Error: Can't find function \"" << funcName << ".\"\n";
+        exit(EXIT_FAILURE);
+    }
+    core.regs.pc = itr->second;
+
+    // Set up the stack.
+    core.regs.x[2] = RiscVInitialStackPointer;
+
+    // Push parameters in reverse order.
+    for (auto itr = params.rbegin(); itr != params.rend(); ++itr) {
+        float param = *itr;
+        core.regs.x[2] -= 4;
+        data_memory.writef(core.regs.x[2], param);
+    }
+
+    // Set RA to catch final return.
+    core.regs.x[1] = 0xfffffffe;
+
+    GPUCore::Registers oldRegs;
+    try {
+        do {
+            if(debugOptions->printCoreDiff) {
+                oldRegs = core.regs;
+            }
+            if(debugOptions->printDisassembly) {
+                print_inst(core.regs.pc,
+                        text_memory.read32(core.regs.pc),
+                        tmpl->textAddressesToSymbols);
+            }
+            data_memory.verbose = debugOptions->printMemoryAccess;
+            text_memory.verbose = debugOptions->printMemoryAccess;
+            status = core.step(text_memory, data_memory);
+            data_memory.verbose = false;
+            text_memory.verbose = false;
+            if(debugOptions->printCoreDiff) {
+                dumpRegsDiff(oldRegs, core.regs);
+            }
+        } while(core.regs.pc != 0xfffffffe && status == GPUCore::RUNNING);
+    } catch(const std::exception& e) {
+        std::cerr << "Exception running step: " << e.what() << '\n';
+        dumpGPUCore(core);
+        exit(EXIT_FAILURE);
+    }
+
+    if(status != GPUCore::RUNNING) {
+        std::cerr << "Unexpected core step status " << status << '\n';
+        dumpGPUCore(core);
+        exit(EXIT_FAILURE);
+    }
+
+    // Pop result off the stack.
+    return data_memory.readf(core.regs.x[2]);
+}
+
+/**
+ * Test a library unary function against its C++ math library counterpart.
+ */
+static void tryUnaryFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *tmpl,
+        const std::string &funcName, float (*func)(float), float param, int &errors) {
+
+    // Function parameters.
+    std::vector<float> params;
+    params.push_back(param);
+
+    float expectedValue = func(param);
+    float actualValue = runMathFunction(debugOptions, tmpl, funcName, params);
+
+    if (!nearlyEqual(expectedValue, actualValue, 0.0001)) {
+        std::cout << funcName << "(" << param << ") = "
+            << actualValue << " instead of " << expectedValue << "\n";
+        errors++;
+    }
+}
+
+/**
+ * Run a set of regression tests on our standard library. To run this,
+ * first assemble the library:
+ *
+ *     % ./as library.s
+ *     % ./gpuemu --test library.o
+ *
+ */
+static void runLibraryTest(GPUEmuDebugOptions *debugOptions, CoreParameters *tmpl) {
+    int errors = 0;
+
+    // .exp
+    tryUnaryFunction(debugOptions, tmpl, ".exp", expf, -1.23, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".exp", expf, 0.0, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".exp", expf, 1.23, errors);
+    for (float x = -150.329; x < 150; x++) {
+        tryUnaryFunction(debugOptions, tmpl, ".exp", expf, x, errors);
+    }
+
+    // .exp2
+    tryUnaryFunction(debugOptions, tmpl, ".exp2", exp2f, -1.23, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".exp2", exp2f, 0.0, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".exp2", exp2f, 1.23, errors);
+    for (float x = -150.329; x < 150; x++) {
+        tryUnaryFunction(debugOptions, tmpl, ".exp2", exp2f, x, errors);
+    }
+
+    // .log
+    tryUnaryFunction(debugOptions, tmpl, ".log", logf, -1.23, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".log", logf, 0.0, errors);
+    for (float x = 0.329; x < 150; x++) {
+        tryUnaryFunction(debugOptions, tmpl, ".log", logf, x, errors);
+    }
+
+    // .log2
+    tryUnaryFunction(debugOptions, tmpl, ".log2", log2f, -1.23, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".log2", log2f, 0.0, errors);
+    for (float x = 0.329; x < 150; x++) {
+        tryUnaryFunction(debugOptions, tmpl, ".log2", log2f, x, errors);
+    }
+
+    std::cout << errors << " test errors.\n";
+}
+
 int main(int argc, char **argv)
 {
     bool imageToTerminal = false;
     bool printSymbols = false;
     bool printSubstitutions = false;
+    bool runTest = false;
     bool printHeaderInfo = false;
     int specificPixelX = -1;
     int specificPixelY = -1;
@@ -448,6 +609,11 @@ int main(int argc, char **argv)
             printSubstitutions = true;
             argv++; argc--;
 
+        } else if(strcmp(argv[0], "--test") == 0) {
+
+            runTest = true;
+            argv++; argc--;
+
         } else if(strcmp(argv[0], "-h") == 0) {
 
             usage(progname);
@@ -504,6 +670,11 @@ int main(int argc, char **argv)
         std::cerr << "Warning: stack will be less than 1KiB with this binary's data segment.\n";
     }
     tmpl.data_bytes.resize(RiscVInitialStackPointer);
+
+    if (runTest) {
+        runLibraryTest(&debugOptions, &tmpl);
+        exit(EXIT_SUCCESS);
+    }
 
     tmpl.imageWidth = 320;
     tmpl.imageHeight = 180;
