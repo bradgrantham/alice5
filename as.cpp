@@ -30,6 +30,20 @@ enum Segment {
     SEG_DATA,
 };
 
+// Utility for converting a float to its bits.
+union FloatBits {
+    float f;
+    uint32_t b;
+};
+
+uint32_t float_to_bits(float f) {
+    FloatBits x;
+
+    x.f = f;
+
+    return x.b;
+}
+
 // Whether to output color codes in errors. We send errors to stderr, so use that.
 static bool useColors() {
     return isatty(fileno(stderr));
@@ -617,6 +631,14 @@ private:
                 }
                 int32_t imm = readExpression(32, SEG_DATA);
                 emitData(imm);
+            } else if (opOrLabel == ".fword") {
+                if (!inDataSegment) {
+                    s = previousToken;
+                    error("can only declare float data in data segment");
+                }
+                float value = readFloat();
+                uint32_t imm = float_to_bits(value);
+                emitData(imm);
             } else if (opOrLabel == ".segment") {
                 std::string segmentType = readIdentifier();
                 if (segmentType == "text") {
@@ -631,7 +653,7 @@ private:
                 }
             } else {
                 if (inDataSegment) {
-                    error("can only have instructions in text segment");
+                    error("can't have instructions in data segment");
                 }
                 parseOperator(opOrLabel);
             }
@@ -695,6 +717,22 @@ private:
         skipWhitespace();
 
         return id;
+    }
+
+    // Read a floating point literal.
+    float readFloat() {
+        char *end;
+
+        float value = strtof(s, &end);
+        if (end == s) {
+            // Parsing error.
+            error("can't parse float");
+        }
+
+        s = end;
+        skipWhitespace();
+
+        return value;
     }
 
     // Read a signed integer immediate value. Skips subsequent whitespace. The immediate
