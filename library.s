@@ -11,23 +11,48 @@
 .NaN:
         .word   0xffc00000      ; quiet? NaN result of sqrt(-1)
 
+.zero:
+        .fword  0.0
+
 .one:
-        .word   1065353216      ; 1.0
+        .fword  1.0
 
 .point5:
-        .word   1056964608      ; .5
+        .fword  0.5
 
 .point25:
-        .word   1048576000      ; 0x3e800000 = .25
+        .fword  0.25
 
-.oneOverTwoPi:
-        .word   1042479491      ; 1.0 / 2pi
+.oneOverTwoPi:      ; 1.0 / 2pi
+        .fword  0.1591549431
 
 .halfPi:
-        .word   1070141403      ; 0x3fc90fdb = pi / 2
+        .fword  1.5707963268
 
 .pi:
-        .word   1078530011      ; 0x40490fdb = pi
+        .fword  3.1415926536
+
+.posInf:
+        .word   0x7F800000
+
+; Polynomial coefficients for exp2() function.
+.exp2_0:
+        .fword  1.535336188319500e-4
+.exp2_1:
+        .fword  1.339887440266574e-3
+.exp2_2:
+        .fword  9.618437357674640e-3
+.exp2_3:
+        .fword  5.550332471162809e-2
+.exp2_4:
+        .fword  2.402264791363012e-1
+.exp2_5:
+        .fword  6.931472028550421e-1
+.exp2_6:
+        .fword  1.000000000000000
+
+.log2e:
+        .fword  1.4426950408889634074
 
 .sqrtTable:
         .word   0 ; 0x00000000 = 0 (sqrt(0))
@@ -1471,14 +1496,127 @@ atanTable_f32:
 
         jalr x0, ra, 0                
 
-
 .log2:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
 
-.exp:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+.exp2:
+        ; Save registers.
+        sw      a0, -4(sp)
+        sw      a1, -8(sp)
+        fsw     fa0, -12(sp)
+        fsw     fa1, -16(sp)
+        fsw     fa2, -20(sp)
+
+        ; Fetch parameter.
+        flw     fa0, 0(sp)
+
+        ; Round to nearest.
+        ; XXX rne isn't yet implemented in Verilog. See issue #6.
+        ;; fcvt.w.s a0, fa0, rne
+        flw     fa1, .point5(x0)
+        fadd.s  fa2, fa0, fa1
+        fcvt.w.s a0, fa2, rdn
+
+        ; Check for overflow (exponent > 128).
+        addi    a1, x0, 128
+        bge     a1, a0, .exp2_not_overflow
+        flw     fa0, .posInf(x0)
+        jal     x0, .exp2_ret
+
+.exp2_not_overflow:
+        ; Check for underflow (exponent < -127).
+        addi    a1, x0, -127
+        bge     a0, a1, .exp2_not_underflow
+        flw     fa0, .zero(x0)
+        jal     x0, .exp2_ret
+
+.exp2_not_underflow:
+        ; Convert back to float so we can compute fractional part.
+        fcvt.s.w fa1, a0, rtz
+        fsub.s  fa0, fa0, fa1
+
+        ; Shift integer part into the exponent.
+        addi    a0, a0, 127
+        slli    a0, a0, 23
+
+        ; Evaluate polynomial for fractional part.
+        flw     fa2, .exp2_0(x0)
+
+        fmul.s  fa2, fa2, fa0
+        flw     fa1, .exp2_1(x0)
+        fadd.s  fa2, fa2, fa1
+
+        fmul.s  fa2, fa2, fa0
+        flw     fa1, .exp2_2(x0)
+        fadd.s  fa2, fa2, fa1
+
+        fmul.s  fa2, fa2, fa0
+        flw     fa1, .exp2_3(x0)
+        fadd.s  fa2, fa2, fa1
+
+        fmul.s  fa2, fa2, fa0
+        flw     fa1, .exp2_4(x0)
+        fadd.s  fa2, fa2, fa1
+
+        fmul.s  fa2, fa2, fa0
+        flw     fa1, .exp2_5(x0)
+        fadd.s  fa2, fa2, fa1
+
+        fmul.s  fa2, fa2, fa0
+        flw     fa1, .exp2_6(x0)
+        fadd.s  fa2, fa2, fa1
+
+        ; Multiply integer part (already in exponent) and fraction.
+        fmv.s.x fa0, a0
+        fmul.s  fa0, fa0, fa2
+
+.exp2_ret:
+        ; Return value.
+        fsw     fa0, 0(sp)
+
+        ; Restore registers.
+        lw      a0, -4(sp)
+        lw      a1, -8(sp)
+        flw     fa0, -12(sp)
+        flw     fa1, -16(sp)
+        flw     fa2, -20(sp)
+
+        ; Return.
         jalr x0, ra, 0
+
+.exp:
+        ; Save registers.
+        sw      ra, -4(sp)
+        fsw     fa0, -8(sp)
+        fsw     fa1, -12(sp)
+
+        ; Fetch parameter.
+        flw     fa0, 0(sp)
+
+        ; exp(x) = exp2(x*log2(e))
+        flw     fa1, .log2e(x0)
+        fmul.s  fa0, fa0, fa1
+
+        addi    sp, sp, -16     ; Make room on stack
+        fsw     fa0, 0(sp)      ; Store parameter
+
+        ; Call our exp2 function.
+        jal     ra, .exp2
+
+        flw     fa0, 0(sp)      ; Pop result
+        addi    sp, sp, 16      ; Restore stack
+
+        ; Return value.
+        fsw     fa0, 0(sp)
+
+        ; Restore registers.
+        lw      ra, -4(sp)
+        flw     fa0, -8(sp)
+        flw     fa1, -12(sp)
+
+        ; Return.
+        jalr    x0, ra, 0
 
 .mod:
         ; save registers
@@ -1727,10 +1865,6 @@ atanTable_f32:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
 
-.exp2:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
-
 .tan:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
         jalr x0, ra, 0
@@ -1853,7 +1987,7 @@ atanTable_f32:
         ; a0<wholei> = ifloorf(fa0<x>)
 	fcvt.w.s a0,fa0,rdn
 
-        ; fa1<fract> = fa0<x> - fa1<float(wholei)>
+        ; convert back to float.
         fcvt.s.w fa1,a0,rtz
 
         fsw      fa1, 0(sp)     ; return(fract)
