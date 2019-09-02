@@ -315,135 +315,135 @@
 
 .sqrt:
         ; Doesn't honor IEEE 754; will return NaN for sqrt(-0).
-        ; save registers here
+        ; save registers
         sw      a0, -4(sp)
         sw      a1, -8(sp)
         sw      a2, -12(sp)
-        fsw     fa0, -16(sp)
-        fsw     fa1, -20(sp)
-        fsw     fa2, -24(sp)
-        fsw     fa3, -28(sp)
-        fsw     fa4, -32(sp)
-        fsw     fa5, -36(sp)
+        fsw     ft0, -16(sp)
+        fsw     ft1, -20(sp)
+        fsw     ft2, -24(sp)
+        fsw     ft3, -28(sp)
+        fsw     ft4, -32(sp)
+        fsw     ft5, -36(sp)
 
-        flw     fa0, 0(sp)       ; load first parameter ("x"), doesn't have to be into fa0
+        flw     ft0, 0(sp)       ; load first parameter ("x"), doesn't have to be into ft0
 
         ; if(x < 0)
         ;     return nan;
 
-        fmv.s.x fa1, zero   ; fa1 = 0.0
-        flt.s   a0, fa0, fa1
+        fmv.s.x ft1, zero   ; ft1 = 0.0
+        flt.s   a0, ft0, ft1
         beq     a0, zero, .sqrtNonNegative
 	lui	a1, %hi(.NaN)
-	flw	fa0, %lo(.NaN)(a1)
+	flw	ft0, %lo(.NaN)(a1)
         jal     zero, .sqrtFinish   ; goto .sqrtFinish
 
 .sqrtNonNegative:
-        feq.s   a0, fa0, fa1
+        feq.s   a0, ft0, ft1
         beq     a0, zero, .sqrtPositive
-        fmv.s.x fa0, zero   ; fa1 = 0.0
+        fmv.s.x ft0, zero   ; ft1 = 0.0
         jal     zero, .sqrtFinish   ; goto .sqrtFinish
 
 .sqrtPositive:
         ; use exponent to make an initial guess as if it was 1.0^2exp
-        fmv.x.s a0, fa0         ; uint32_t xi = floatToInt(x);
+        fmv.x.s a0, ft0         ; uint32_t xi = floatToInt(x);
         srli    a1, a0, 23      ; uint32_t xi23 = xi >> 23;
 
         ; float x0 = .sqrtTable[ex2];
         slli    a2, a1, 2                     ; a2 = byte offset of guess in sqrtTable
         lui     a0, %hi(.sqrtTable)           ; a0 = high address of sqrtTable
         add     a1, a0, a2                    ; a1 = %hi(sqrtTable) + byte offset of guess
-        flw     fa1, %lo(.sqrtTable)(a1)      ; fa0 = *(%hi(sqrtTable) + %lo(sqrtTable) + byte offset of guess)
+        flw     ft1, %lo(.sqrtTable)(a1)      ; ft0 = *(%hi(sqrtTable) + %lo(sqrtTable) + byte offset of guess)
 
         ; Use three steps of Newton's method from
         ; https://en.wikipedia.org/wiki/Newton%27s_method#Square_root_of_a_number
         ; This gives < .1% error for the test range below.
         ; float x1 = x0 - (x0 * x0 - x) / (2 * x0);
-        fmul.s  fa5, fa1, fa1   ; fa5 = x0 * x0
-        fadd.s  fa4, fa1, fa1   ; fa4 = x0 * 2
-        fsub.s  fa2, fa5, fa0   ; fa2 = x0 * x0 - x
-        fdiv.s  fa3, fa2, fa4   ; fa3 = (x0 * x0 - x) / (2 * x0)
-        fsub.s  fa1, fa1, fa3   ; fa1 = x - (x0 * x0 - x) / (2 * x0)
+        fmul.s  ft5, ft1, ft1   ; ft5 = x0 * x0
+        fadd.s  ft4, ft1, ft1   ; ft4 = x0 * 2
+        fsub.s  ft2, ft5, ft0   ; ft2 = x0 * x0 - x
+        fdiv.s  ft3, ft2, ft4   ; ft3 = (x0 * x0 - x) / (2 * x0)
+        fsub.s  ft1, ft1, ft3   ; ft1 = x - (x0 * x0 - x) / (2 * x0)
 
         ; float x2 = x1 - (x1 * x1 - x) / (2 * x1);
-        fmul.s  fa5, fa1, fa1   ; fa5 = x1 * x1
-        fadd.s  fa4, fa1, fa1   ; fa4 = x1 * 2
-        fsub.s  fa2, fa5, fa0   ; fa2 = x1 * x1 - x
-        fdiv.s  fa3, fa2, fa4   ; fa3 = (x1 * x1 - x) / (2 * x1)
-        fsub.s  fa1, fa1, fa3   ; fa1 = x - (x1 * x1 - x) / (2 * x1)
+        fmul.s  ft5, ft1, ft1   ; ft5 = x1 * x1
+        fadd.s  ft4, ft1, ft1   ; ft4 = x1 * 2
+        fsub.s  ft2, ft5, ft0   ; ft2 = x1 * x1 - x
+        fdiv.s  ft3, ft2, ft4   ; ft3 = (x1 * x1 - x) / (2 * x1)
+        fsub.s  ft1, ft1, ft3   ; ft1 = x - (x1 * x1 - x) / (2 * x1)
 
         ; float x3 = x2 - (x2 * x2 - x) / (2 * x2);
-        fmul.s  fa5, fa1, fa1   ; fa5 = x2 * x2
-        fadd.s  fa4, fa1, fa1   ; fa4 = x2 * 2
-        fsub.s  fa2, fa5, fa0   ; fa2 = x2 * x2 - x
-        fdiv.s  fa3, fa2, fa4   ; fa3 = (x2 * x2 - x) / (2 * x2)
-        fsub.s  fa1, fa1, fa3   ; fa1 = x - (x2 * x2 - x) / (2 * x2)
+        fmul.s  ft5, ft1, ft1   ; ft5 = x2 * x2
+        fadd.s  ft4, ft1, ft1   ; ft4 = x2 * 2
+        fsub.s  ft2, ft5, ft0   ; ft2 = x2 * x2 - x
+        fdiv.s  ft3, ft2, ft4   ; ft3 = (x2 * x2 - x) / (2 * x2)
+        fsub.s  ft1, ft1, ft3   ; ft1 = x - (x2 * x2 - x) / (2 * x2)
 
-        fsgnj.s fa0, fa1, fa1   ; set fa0 to last term's result
+        fsgnj.s ft0, ft1, ft1   ; set ft0 to last term's result
 
 .sqrtFinish:
         ; return result;
-        fsw     fa0, 0(sp)      ; store return value
+        fsw     ft0, 0(sp)      ; store return value
 
-        ; restore registers here
+        ; restore registers
         lw      a0, -4(sp)
         lw      a1, -8(sp)
         lw      a2, -12(sp)
-        flw     fa0, -16(sp)
-        flw     fa1, -20(sp)
-        flw     fa2, -24(sp)
-        flw     fa3, -28(sp)
-        flw     fa4, -32(sp)
-        flw     fa5, -36(sp)
+        flw     ft0, -16(sp)
+        flw     ft1, -20(sp)
+        flw     ft2, -24(sp)
+        flw     ft3, -28(sp)
+        flw     ft4, -32(sp)
+        flw     ft5, -36(sp)
 
         jalr x0, ra, 0                
 
 .sin:
         ; XXX this is different enough from emulation that it causes substantial visual differences between wetrock and flirt 
 
-        ; save registers here
+        ; save registers
         sw      a0,-4(sp)
         sw      a1,-8(sp)
         sw      a2,-12(sp)
         sw      a3,-16(sp)
         sw      a4,-20(sp)
         sw      a5,-24(sp)
-        fsw     fa0,-28(sp)
-        fsw     fa1,-32(sp)
-        fsw     fa2,-36(sp)
-        fsw     fa3,-40(sp)
-        fsw     fa4,-44(sp)
-        fsw     fa5,-48(sp)
-        fsw     fa6,-52(sp)
+        fsw     ft0,-28(sp)
+        fsw     ft1,-32(sp)
+        fsw     ft2,-36(sp)
+        fsw     ft3,-40(sp)
+        fsw     ft4,-44(sp)
+        fsw     ft5,-48(sp)
+        fsw     ft6,-52(sp)
 
-        flw     fa0, 0(sp)       ; load first parameter ("x"), doesn't have to be into fa0
+        flw     ft0, 0(sp)       ; load first parameter ("x"), doesn't have to be into ft0
 
         ; .oneOverTwoPi is 1/(2pi)
         ; .sinTableSize is 512.0
         ; .one is 1.0
         ; sinTable_f32 is 513 long
 
-        ; fa2<u> = fa0<x> * fa1<1 / (2 * pi)>
+        ; ft2<u> = ft0<x> * ft1<1 / (2 * pi)>
 	lui	a5,%hi(.oneOverTwoPi)
-	flw	fa1,%lo(.oneOverTwoPi)(a5)
-	fmul.s	fa2,fa0,fa1
+	flw	ft1,%lo(.oneOverTwoPi)(a5)
+	fmul.s	ft2,ft0,ft1
 
-        ; fa3<indexf> = fa2<u> * fa1<tablesize>
+        ; ft3<indexf> = ft2<u> * ft1<tablesize>
 	lui	a5,%hi(.sinTableSize)
-	flw	fa1,%lo(.sinTableSize)(a5)
-	fmul.s	fa3,fa2,fa1
+	flw	ft1,%lo(.sinTableSize)(a5)
+	fmul.s	ft3,ft2,ft1
 
-        ; a1<index> = ifloorf(fa3<indexf>)
-	fcvt.w.s a1,fa3,rdn
+        ; a1<index> = ifloorf(ft3<indexf>)
+	fcvt.w.s a1,ft3,rdn
 
-        ; fa6<beta> = fa3<indexf> - fa4<float(index)>
-        fcvt.s.w fa4,a1,rtz
-	fsub.s	fa6,fa3,fa4
+        ; ft6<beta> = ft3<indexf> - ft4<float(index)>
+        fcvt.s.w ft4,a1,rtz
+	fsub.s	ft6,ft3,ft4
 
-        ; fa4<alpha> = fa5<1.0f> - fa6<beta>
+        ; ft4<alpha> = ft5<1.0f> - ft6<beta>
 	lui	a5,%hi(.one)
-	flw	fa5,%lo(.one)(a5)
-        fsub.s fa4,fa5,fa6
+	flw	ft5,%lo(.one)(a5)
+        fsub.s ft4,ft5,ft6
 
         ; a2<lower> = a1<index> & imm<tablemask>
 	andi	a2,a1,511
@@ -451,7 +451,7 @@
         ; a3<upper> = a2<lower> + imm<1>
         addi     a3,a2,1
 
-        ; ; fa0<result> = table[a2<lower>] * fa4<alpha> + table[a3<upper>] * fa6<beta>
+        ; ; ft0<result> = table[a2<lower>] * ft4<alpha> + table[a3<upper>] * ft6<beta>
         ; a1 = table + a2 * 4
         lui     a5,%hi(sinTable_f32)
         addi    a5,a5,%lo(sinTable_f32)
@@ -459,40 +459,40 @@
         slli    a4,a2,2
         add    a1,a5,a4
 
-        ; fa1 = *a1
-        flw     fa1,0(a1)
+        ; ft1 = *a1
+        flw     ft1,0(a1)
 
-        ; fa2 = *(a1 + 4)
-        flw     fa2,4(a1)
+        ; ft2 = *(a1 + 4)
+        flw     ft2,4(a1)
 
-        ; fa3 = fa2 * fa6
-        fmul.s    fa3,fa2,fa6
+        ; ft3 = ft2 * ft6
+        fmul.s    ft3,ft2,ft6
 
-        ; fa0 = fa1 * fa4 + fa0
-        ; for the following, would prefer: fmadd.s   fa0,fa1,fa4,fa3
-        fmul.s  fa2,fa1, fa4
-        fadd.s  fa0, fa2, fa3
+        ; ft0 = ft1 * ft4 + ft0
+        ; for the following, would prefer: fmadd.s   ft0,ft1,ft4,ft3
+        fmul.s  ft2,ft1, ft4
+        fadd.s  ft0, ft2, ft3
 
         ; XXX debugging - multiply by .5
 	; lui	a5,%hi(.point5)
-	; flw	fa1,%lo(.point5)(a5)
-        ; fmul.s    fa0,fa0,fa1
+	; flw	ft1,%lo(.point5)(a5)
+        ; fmul.s    ft0,ft0,ft1
 
-        fsw     fa0, 0(sp)      ; store return value
-        ; restore registers here, e.g.
+        fsw     ft0, 0(sp)      ; store return value
+        ; restore registers
         lw      a0,-4(sp)
         lw      a1,-8(sp)
         lw      a2,-12(sp)
         lw      a3,-16(sp)
         lw      a4,-20(sp)
         lw      a5,-24(sp)
-        flw     fa0,-28(sp)
-        flw     fa1,-32(sp)
-        flw     fa2,-36(sp)
-        flw     fa3,-40(sp)
-        flw     fa4,-44(sp)
-        flw     fa5,-48(sp)
-        flw     fa6,-52(sp)
+        flw     ft0,-28(sp)
+        flw     ft1,-32(sp)
+        flw     ft2,-36(sp)
+        flw     ft3,-40(sp)
+        flw     ft4,-44(sp)
+        flw     ft5,-48(sp)
+        flw     ft6,-52(sp)
 
         jalr x0, ra, 0                
 
@@ -1151,34 +1151,34 @@ atanTable_f32:
 .segment text
 .atan_0_1:
 
-        fsw     fa0, -4(sp)
-        fsw     fa1, -8(sp)
-        fsw     fa2, -12(sp)
-        fsw     fa3, -16(sp)
-        fsw     fa4, -20(sp)
-        fsw     fa5, -24(sp)
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
+        fsw     ft3, -16(sp)
+        fsw     ft4, -20(sp)
+        fsw     ft5, -24(sp)
         sw     a0, -28(sp)
         sw     a1, -32(sp)
         sw     a2, -36(sp)
 
         ; atan_0_1(float z) { }
-        flw     fa0, 0(sp)              ; fa0 = z
+        flw     ft0, 0(sp)              ; ft0 = z
 
         ; int i = z * TABLE_POW2;
 	lui	a1,%hi(.atanTableSize)  ; a1 = hi part of address of TABLE_POW2
-	flw	fa1,%lo(.atanTableSize)(a1)      ; fa1 = TABLE_POW2
+	flw	ft1,%lo(.atanTableSize)(a1)      ; ft1 = TABLE_POW2
         ; a1 is available after this line
-        fmul.s    fa2, fa0, fa1         ; fa2 = z * TABLE_POW2
-	fcvt.w.s        a0,fa2,rdn      ; a0 = ifloor(z * TABLE_POW2)
-        ; fa1 is available after this line
-        ; fa0 is available after this line
+        fmul.s    ft2, ft0, ft1         ; ft2 = z * TABLE_POW2
+	fcvt.w.s        a0,ft2,rdn      ; a0 = ifloor(z * TABLE_POW2)
+        ; ft1 is available after this line
+        ; ft0 is available after this line
 
         ; float a = z * TABLE_POW2 - i;
-        ; fa3 = a
-        fcvt.s.w fa0,a0,rne             ; fa0 = float(a0)
-        fsub.s fa3,fa2,fa0            ; fa3 = z * TABLE_POW2 - float(floori(z * TABLE_POW2))
-        ; fa0 is available after this line
-        ; fa2 is available after this line
+        ; ft3 = a
+        fcvt.s.w ft0,a0,rne             ; ft0 = float(a0)
+        fsub.s ft3,ft2,ft0            ; ft3 = z * TABLE_POW2 - float(floori(z * TABLE_POW2))
+        ; ft0 is available after this line
+        ; ft2 is available after this line
 
         ; float lower = atanTable[i];
         lui     a1,%hi(atanTable_f32)   ; a1 = hi part of address of atanTable
@@ -1189,31 +1189,31 @@ atanTable_f32:
         ; a0 is available after this line
         add     a0, a1, a2              ; a0 = ifloor(z * TABLE_POW2) * 4 + atanTable
         ; a1 is available after this line
-        flw     fa4, 0(a0)              ; fa4 = lower = atanTable[z * TABLE_POW2]
+        flw     ft4, 0(a0)              ; ft4 = lower = atanTable[z * TABLE_POW2]
         ; float higher = atanTable[i + 1];
-        flw     fa5, 4(a0)              ; fa5 = higher = atanTable[z * TABLE_POW2 + 1]
+        flw     ft5, 4(a0)              ; ft5 = higher = atanTable[z * TABLE_POW2 + 1]
         ; a0 is available after this line
 
         ; float f = lower * (1 - a) + higher * a;
 	lui	a0,%hi(.one)            ; a0 = hi part of .one
-	flw	fa0,%lo(.one)(a0)       ; fa0 = 1.0
-        fsub.s  fa1,fa0,fa3             ; fa1 = 1.0 - a
-        fmul.s  fa0,fa4,fa1             ; fa0 = lower * (1.0 - a)
+	flw	ft0,%lo(.one)(a0)       ; ft0 = 1.0
+        fsub.s  ft1,ft0,ft3             ; ft1 = 1.0 - a
+        fmul.s  ft0,ft4,ft1             ; ft0 = lower * (1.0 - a)
 
-        ; for the following, would prefer: fmadd.s fa1,fa5,fa3,fa0
-        fmul.s  fa2, fa5, fa3 ; fa1 = higher * a + lower * (1.0 - a)
-        fadd.s  fa1, fa2, fa0
+        ; for the following, would prefer: fmadd.s ft1,ft5,ft3,ft0
+        fmul.s  ft2, ft5, ft3 ; ft1 = higher * a + lower * (1.0 - a)
+        fadd.s  ft1, ft2, ft0
 
         ; return f;
-        fsw     fa1, 0(sp)
+        fsw     ft1, 0(sp)
 
         ; restore registers
-        flw     fa0, -4(sp)
-        flw     fa1, -8(sp)
-        flw     fa2, -12(sp)
-        flw     fa3, -16(sp)
-        flw     fa4, -20(sp)
-        flw     fa5, -24(sp)
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
+        flw     ft3, -16(sp)
+        flw     ft4, -20(sp)
+        flw     ft5, -24(sp)
         lw     a0, -28(sp)
         lw     a1, -32(sp)
         lw     a2, -36(sp)
@@ -1224,62 +1224,62 @@ atanTable_f32:
         ; save registers
         sw      a0, -4(sp)
         sw      a1, -8(sp)
-        fsw     fa0, -12(sp)
-        fsw     fa1, -16(sp)
-        fsw     fa2, -20(sp)
-        fsw     fa3, -24(sp)
-        fsw     fa4, -28(sp)
-        fsw     fa5, -32(sp)
-        fsw     fa6, -36(sp)
+        fsw     ft0, -12(sp)
+        fsw     ft1, -16(sp)
+        fsw     ft2, -20(sp)
+        fsw     ft3, -24(sp)
+        fsw     ft4, -28(sp)
+        fsw     ft5, -32(sp)
+        fsw     ft6, -36(sp)
 
         ; load parameter
-        ; begin using fa0
-        flw     fa0, 0(sp)      ; float atan(float y_x) {}
+        ; begin using ft0
+        flw     ft0, 0(sp)      ; float atan(float y_x) {}
 
-        addi    sp,sp,-32        ; push saved registers
+        addi    sp,sp,-36        ; push saved registers
 
-        ; begin using fa2
-        fsgnjx.s fa2, fa0, fa0     ; float fa2 = fabs_y_x = fabs(y_x)
+        ; begin using ft2
+        fsgnjx.s ft2, ft0, ft0     ; float ft2 = fabs_y_x = fabs(y_x)
 
         ; if(fabsf(y_x) > 1.0) {
 	lui	a0,%hi(.one)
-	flw	fa1,%lo(.one)(a0)       ; fa1 = 1.0
+	flw	ft1,%lo(.one)(a0)       ; ft1 = 1.0
         ; begin using a1
-        fle.s   a1,fa2,fa1              ; a1 = (fabs_y_x <= 1.0)
+        fle.s   a1,ft2,ft1              ; a1 = (fabs_y_x <= 1.0)
         bne     a1,zero,.atan_small_y_x ; if(fabs_y_x <= 1.0) goto atan_small_y_x
         ; a1 is available after this line
 
         ;     return copysign(M_PI / 2.0, y_x) + -copysign(brad_atan_0_1(1.0 / fabs(y_x)), y_x);
-        ; begin using fa3
-        fdiv.s  fa3, fa1, fa2
+        ; begin using ft3
+        fdiv.s  ft3, ft1, ft2
 
         addi    sp, sp, -8      ; Make room on stack
         sw      ra, 4(sp)       ; Save return address
-        fsw     fa3, 0(sp)      ; Store parameter
-        ; fa3 is available after this line
+        fsw     ft3, 0(sp)      ; Store parameter
+        ; ft3 is available after this line
 
         jal     ra, .atan_0_1   
 
-        ; begin using fa3
-        flw     fa3, 0(sp)      ; Pop result
+        ; begin using ft3
+        flw     ft3, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
         addi    sp, sp, 8       ; Restore stack
 
 	lui	a0,%hi(.halfPi)
-        ; begin using fa4
-	flw	fa4,%lo(.halfPi)(a0)
-        ; begin using fa5
-        fsgnj.s   fa5, fa4, fa0
-        ; fa4 is available after this line
+        ; begin using ft4
+	flw	ft4,%lo(.halfPi)(a0)
+        ; begin using ft5
+        fsgnj.s   ft5, ft4, ft0
+        ; ft4 is available after this line
 
-        ; begin using fa6
-        fsgnjn.s fa6, fa3, fa0
-        ; fa3 is available after this line
+        ; begin using ft6
+        fsgnjn.s ft6, ft3, ft0
+        ; ft3 is available after this line
 
-        ; begin using fa4
-        fadd.s  fa4, fa5, fa6
-        ; fa6 is available after this line
-        ; fa5 is available after this line
+        ; begin using ft4
+        fadd.s  ft4, ft5, ft6
+        ; ft6 is available after this line
+        ; ft5 is available after this line
 
         jal zero, .atan_finish   ; goto .atan_finish
 
@@ -1287,39 +1287,39 @@ atanTable_f32:
 
         addi    sp, sp, -8      ; Make room on stack
         sw      ra, 4(sp)       ; Save return address
-        fsw     fa2, 0(sp)      ; Store parameter
-        ; fa2 is available after this line
+        fsw     ft2, 0(sp)      ; Store parameter
+        ; ft2 is available after this line
 
         jal     ra, .atan_0_1   
 
-        ; begin using fa2
-        flw     fa2, 0(sp)      ; Pop result
+        ; begin using ft2
+        flw     ft2, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
         addi    sp, sp, 8       ; Restore stack
 
-        ; begin using fa4
-        fsgnj.s   fa4, fa2, fa0
-        ; fa2 is available after this line
-        ; fa0 is available after this line
+        ; begin using ft4
+        fsgnj.s   ft4, ft2, ft0
+        ; ft2 is available after this line
+        ; ft0 is available after this line
         
 .atan_finish:
 
-        addi    sp,sp,32        ; pop saved registers
+        addi    sp,sp,36        ; pop saved registers
 
         ; store return value
-        fsw     fa4, 0(sp)
-        ; fa4 is available after this line
+        fsw     ft4, 0(sp)
+        ; ft4 is available after this line
 
         ; restore registers
         lw      a0, -4(sp)
         lw      a1, -8(sp)
-        flw     fa0, -12(sp)
-        flw     fa1, -16(sp)
-        flw     fa2, -20(sp)
-        flw     fa3, -24(sp)
-        flw     fa4, -28(sp)
-        flw     fa5, -32(sp)
-        flw     fa6, -36(sp)
+        flw     ft0, -12(sp)
+        flw     ft1, -16(sp)
+        flw     ft2, -20(sp)
+        flw     ft3, -24(sp)
+        flw     ft4, -28(sp)
+        flw     ft5, -32(sp)
+        flw     ft6, -36(sp)
 
         ; return
         jalr x0, ra, 0
@@ -1395,15 +1395,15 @@ atanTable_f32:
         sw      a3,-16(sp)
         sw      a4,-20(sp)
         sw      a5,-24(sp)
-        fsw     fa0,-28(sp)
-        fsw     fa1,-32(sp)
-        fsw     fa2,-36(sp)
-        fsw     fa3,-40(sp)
-        fsw     fa4,-44(sp)
-        fsw     fa5,-48(sp)
-        fsw     fa6,-52(sp)
+        fsw     ft0,-28(sp)
+        fsw     ft1,-32(sp)
+        fsw     ft2,-36(sp)
+        fsw     ft3,-40(sp)
+        fsw     ft4,-44(sp)
+        fsw     ft5,-48(sp)
+        fsw     ft6,-52(sp)
 
-        flw     fa0, 0(sp)       ; load first parameter ("x"), doesn't have to be into fa0
+        flw     ft0, 0(sp)       ; load first parameter ("x"), doesn't have to be into ft0
 
         ; .oneOverTwoPi is 1/(2pi)
         ; .sinTableSize is 512.0
@@ -1412,32 +1412,32 @@ atanTable_f32:
 
         ; accomplish adding pi / 2 by adding 1/4 to the normalized angle in the fmadd below
 	lui	a5,%hi(.point25)
-	flw	fa3,%lo(.point25)(a5)
+	flw	ft3,%lo(.point25)(a5)
 
-        ; fa2<u> = fa0<x> * fa1<1 / (2 * pi)> + fa3(1/4)
+        ; ft2<u> = ft0<x> * ft1<1 / (2 * pi)> + ft3(1/4)
 	lui	a5,%hi(.oneOverTwoPi)
-	flw	fa1,%lo(.oneOverTwoPi)(a5)
+	flw	ft1,%lo(.oneOverTwoPi)(a5)
 
-        ; for the following, would prefer: fmadd.s   fa2,fa0,fa1,fa3
-        fmul.s  fa4, fa0, fa1
-        fadd.s  fa2, fa4, fa3
+        ; for the following, would prefer: fmadd.s   ft2,ft0,ft1,ft3
+        fmul.s  ft4, ft0, ft1
+        fadd.s  ft2, ft4, ft3
 
-        ; fa3<indexf> = fa2<u> * fa1<tablesize>
+        ; ft3<indexf> = ft2<u> * ft1<tablesize>
 	lui	a5,%hi(.sinTableSize)
-	flw	fa1,%lo(.sinTableSize)(a5)
-	fmul.s	fa3,fa2,fa1
+	flw	ft1,%lo(.sinTableSize)(a5)
+	fmul.s	ft3,ft2,ft1
 
-        ; a1<index> = ifloorf(fa3<indexf>)
-	fcvt.w.s a1,fa3,rdn
+        ; a1<index> = ifloorf(ft3<indexf>)
+	fcvt.w.s a1,ft3,rdn
 
-        ; fa6<beta> = fa3<indexf> - fa4<float(index)>
-        fcvt.s.w fa4,a1,rtz
-	fsub.s	fa6,fa3,fa4
+        ; ft6<beta> = ft3<indexf> - ft4<float(index)>
+        fcvt.s.w ft4,a1,rtz
+	fsub.s	ft6,ft3,ft4
 
-        ; fa4<alpha> = fa5<1.0f> - fa6<beta>
+        ; ft4<alpha> = ft5<1.0f> - ft6<beta>
 	lui	a5,%hi(.one)
-	flw	fa5,%lo(.one)(a5)
-        fsub.s fa4,fa5,fa6
+	flw	ft5,%lo(.one)(a5)
+        fsub.s ft4,ft5,ft6
 
         ; a2<lower> = a1<index> & imm<tablemask>
 	andi	a2,a1,511
@@ -1445,7 +1445,7 @@ atanTable_f32:
         ; a3<upper> = a2<lower> + imm<1>
         addi     a3,a2,1
 
-        ; fa0<result> = table[a2<lower>] * fa4<alpha> + table[a3<upper>] * fa6<beta>
+        ; ft0<result> = table[a2<lower>] * ft4<alpha> + table[a3<upper>] * ft6<beta>
         ; a1 = table + a2 * 4
         lui     a5,%hi(sinTable_f32)
         addi    a5,a5,%lo(sinTable_f32)
@@ -1453,8 +1453,8 @@ atanTable_f32:
         slli    a4,a2,2
         add    a1,a5,a4
 
-        ; fa1 = *a1
-        flw     fa1,0(a1)
+        ; ft1 = *a1
+        flw     ft1,0(a1)
 
         ; a4 = table + a3 * 4
         lui     a5,%hi(sinTable_f32)
@@ -1462,37 +1462,37 @@ atanTable_f32:
         slli    a1,a3,2
         add    a4,a5,a1
 
-        ; fa2 = *a4
-        flw     fa2,0(a4)
+        ; ft2 = *a4
+        flw     ft2,0(a4)
 
-        ; fa3 = fa2 * fa6
-        fmul.s    fa3,fa2,fa6
+        ; ft3 = ft2 * ft6
+        fmul.s    ft3,ft2,ft6
 
-        ; fa0 = fa1 * fa4 + fa0
-        ; for the following, would prefer: fmadd.s   fa0,fa1,fa4,fa3
-        fmul.s  fa2, fa1, fa4
-        fadd.s  fa0, fa2, fa3
+        ; ft0 = ft1 * ft4 + ft0
+        ; for the following, would prefer: fmadd.s   ft0,ft1,ft4,ft3
+        fmul.s  ft2, ft1, ft4
+        fadd.s  ft0, ft2, ft3
 
         ; XXX debugging - multiply by .5
 	; lui	a5,%hi(.point5)
-	; flw	fa1,%lo(.point5)(a5)
-        ; fmul.s    fa0,fa0,fa1
+	; flw	ft1,%lo(.point5)(a5)
+        ; fmul.s    ft0,ft0,ft1
 
-        fsw     fa0, 0(sp)      ; store return value
-        ; restore registers here, e.g.
+        fsw     ft0, 0(sp)      ; store return value
+        ; restore registers
         lw      a0,-4(sp)
         lw      a1,-8(sp)
         lw      a2,-12(sp)
         lw      a3,-16(sp)
         lw      a4,-20(sp)
         lw      a5,-24(sp)
-        flw     fa0,-28(sp)
-        flw     fa1,-32(sp)
-        flw     fa2,-36(sp)
-        flw     fa3,-40(sp)
-        flw     fa4,-44(sp)
-        flw     fa5,-48(sp)
-        flw     fa6,-52(sp)
+        flw     ft0,-28(sp)
+        flw     ft1,-32(sp)
+        flw     ft2,-36(sp)
+        flw     ft3,-40(sp)
+        flw     ft4,-44(sp)
+        flw     ft5,-48(sp)
+        flw     ft6,-52(sp)
 
         jalr x0, ra, 0                
 
@@ -1504,83 +1504,83 @@ atanTable_f32:
         ; Save registers.
         sw      a0, -4(sp)
         sw      a1, -8(sp)
-        fsw     fa0, -12(sp)
-        fsw     fa1, -16(sp)
-        fsw     fa2, -20(sp)
+        fsw     ft0, -12(sp)
+        fsw     ft1, -16(sp)
+        fsw     ft2, -20(sp)
 
         ; Fetch parameter.
-        flw     fa0, 0(sp)
+        flw     ft0, 0(sp)
 
         ; Round to nearest.
         ; XXX rne isn't yet implemented in Verilog. See issue #6.
-        ;; fcvt.w.s a0, fa0, rne
-        flw     fa1, .point5(x0)
-        fadd.s  fa2, fa0, fa1
-        fcvt.w.s a0, fa2, rdn
+        ;; fcvt.w.s a0, ft0, rne
+        flw     ft1, .point5(x0)
+        fadd.s  ft2, ft0, ft1
+        fcvt.w.s a0, ft2, rdn
 
         ; Check for overflow (exponent > 128).
         addi    a1, x0, 128
         bge     a1, a0, .exp2_not_overflow
-        flw     fa0, .posInf(x0)
+        flw     ft0, .posInf(x0)
         jal     x0, .exp2_ret
 
 .exp2_not_overflow:
         ; Check for underflow (exponent < -127).
         addi    a1, x0, -127
         bge     a0, a1, .exp2_not_underflow
-        flw     fa0, .zero(x0)
+        flw     ft0, .zero(x0)
         jal     x0, .exp2_ret
 
 .exp2_not_underflow:
         ; Convert back to float so we can compute fractional part.
-        fcvt.s.w fa1, a0, rtz
-        fsub.s  fa0, fa0, fa1
+        fcvt.s.w ft1, a0, rtz
+        fsub.s  ft0, ft0, ft1
 
         ; Shift integer part into the exponent.
         addi    a0, a0, 127
         slli    a0, a0, 23
 
         ; Evaluate polynomial for fractional part.
-        flw     fa2, .exp2_0(x0)
+        flw     ft2, .exp2_0(x0)
 
-        fmul.s  fa2, fa2, fa0
-        flw     fa1, .exp2_1(x0)
-        fadd.s  fa2, fa2, fa1
+        fmul.s  ft2, ft2, ft0
+        flw     ft1, .exp2_1(x0)
+        fadd.s  ft2, ft2, ft1
 
-        fmul.s  fa2, fa2, fa0
-        flw     fa1, .exp2_2(x0)
-        fadd.s  fa2, fa2, fa1
+        fmul.s  ft2, ft2, ft0
+        flw     ft1, .exp2_2(x0)
+        fadd.s  ft2, ft2, ft1
 
-        fmul.s  fa2, fa2, fa0
-        flw     fa1, .exp2_3(x0)
-        fadd.s  fa2, fa2, fa1
+        fmul.s  ft2, ft2, ft0
+        flw     ft1, .exp2_3(x0)
+        fadd.s  ft2, ft2, ft1
 
-        fmul.s  fa2, fa2, fa0
-        flw     fa1, .exp2_4(x0)
-        fadd.s  fa2, fa2, fa1
+        fmul.s  ft2, ft2, ft0
+        flw     ft1, .exp2_4(x0)
+        fadd.s  ft2, ft2, ft1
 
-        fmul.s  fa2, fa2, fa0
-        flw     fa1, .exp2_5(x0)
-        fadd.s  fa2, fa2, fa1
+        fmul.s  ft2, ft2, ft0
+        flw     ft1, .exp2_5(x0)
+        fadd.s  ft2, ft2, ft1
 
-        fmul.s  fa2, fa2, fa0
-        flw     fa1, .exp2_6(x0)
-        fadd.s  fa2, fa2, fa1
+        fmul.s  ft2, ft2, ft0
+        flw     ft1, .exp2_6(x0)
+        fadd.s  ft2, ft2, ft1
 
         ; Multiply integer part (already in exponent) and fraction.
-        fmv.s.x fa0, a0
-        fmul.s  fa0, fa0, fa2
+        fmv.s.x ft0, a0
+        fmul.s  ft0, ft0, ft2
 
 .exp2_ret:
         ; Return value.
-        fsw     fa0, 0(sp)
+        fsw     ft0, 0(sp)
 
         ; Restore registers.
         lw      a0, -4(sp)
         lw      a1, -8(sp)
-        flw     fa0, -12(sp)
-        flw     fa1, -16(sp)
-        flw     fa2, -20(sp)
+        flw     ft0, -12(sp)
+        flw     ft1, -16(sp)
+        flw     ft2, -20(sp)
 
         ; Return.
         jalr x0, ra, 0
@@ -1588,61 +1588,61 @@ atanTable_f32:
 .exp:
         ; Save registers.
         sw      ra, -4(sp)
-        fsw     fa0, -8(sp)
-        fsw     fa1, -12(sp)
+        fsw     ft0, -8(sp)
+        fsw     ft1, -12(sp)
 
         ; Fetch parameter.
-        flw     fa0, 0(sp)
+        flw     ft0, 0(sp)
 
         ; exp(x) = exp2(x*log2(e))
-        flw     fa1, .log2e(x0)
-        fmul.s  fa0, fa0, fa1
+        flw     ft1, .log2e(x0)
+        fmul.s  ft0, ft0, ft1
 
         addi    sp, sp, -16     ; Make room on stack
-        fsw     fa0, 0(sp)      ; Store parameter
+        fsw     ft0, 0(sp)      ; Store parameter
 
         ; Call our exp2 function.
         jal     ra, .exp2
 
-        flw     fa0, 0(sp)      ; Pop result
+        flw     ft0, 0(sp)      ; Pop result
         addi    sp, sp, 16      ; Restore stack
 
         ; Return value.
-        fsw     fa0, 0(sp)
+        fsw     ft0, 0(sp)
 
         ; Restore registers.
         lw      ra, -4(sp)
-        flw     fa0, -8(sp)
-        flw     fa1, -12(sp)
+        flw     ft0, -8(sp)
+        flw     ft1, -12(sp)
 
         ; Return.
         jalr    x0, ra, 0
 
 .mod:
         ; save registers
-        fsw     fa0,-4(sp)
-        fsw     fa1,-8(sp)
-        fsw     fa2,-12(sp)
-        fsw     fa3,-16(sp)
-        fsw     fa4,-20(sp)
+        fsw     ft0,-4(sp)
+        fsw     ft1,-8(sp)
+        fsw     ft2,-12(sp)
+        fsw     ft3,-16(sp)
+        fsw     ft4,-20(sp)
         sw     a0,-24(sp)
 
-        flw     fa0, 0(sp)              ; fa0 = x = popf()
-        flw     fa1, 4(sp)              ; fa1 = y = popf()
-        fdiv.s  fa2, fa0, fa1, rdn      ; fa2 = t1 = x/y;
-	fcvt.w.s a0,fa2,rdn             ; a0 = i = floori(t1)
-        fcvt.s.w fa4,a0,rne             ; fa4 = q = floorf(i)
-        fmul.s  fa3, fa4, fa1           ; fa3 = t2 = q*y
-        fsub.s  fa1, fa0, fa3           ; fa1 = r = x - t2 = x - q*y
+        flw     ft0, 0(sp)              ; ft0 = x = popf()
+        flw     ft1, 4(sp)              ; ft1 = y = popf()
+        fdiv.s  ft2, ft0, ft1, rdn      ; ft2 = t1 = x/y;
+	fcvt.w.s a0,ft2,rdn             ; a0 = i = floori(t1)
+        fcvt.s.w ft4,a0,rne             ; ft4 = q = floorf(i)
+        fmul.s  ft3, ft4, ft1           ; ft3 = t2 = q*y
+        fsub.s  ft1, ft0, ft3           ; ft1 = r = x - t2 = x - q*y
 
-        fsw     fa1, 4(sp)             ; pushf(r)
+        fsw     ft1, 4(sp)             ; pushf(r)
 
         ; restore registers
-        flw     fa0,-4(sp)
-        flw     fa1,-8(sp)
-        flw     fa2,-12(sp)
-        flw     fa3,-16(sp)
-        flw     fa4,-20(sp)
+        flw     ft0,-4(sp)
+        flw     ft1,-8(sp)
+        flw     ft2,-12(sp)
+        flw     ft3,-16(sp)
+        flw     ft4,-20(sp)
         lw     a0,-24(sp)
 
         ; set stack pointer as if pops and pushes had occured
@@ -1664,39 +1664,39 @@ atanTable_f32:
 
 .length2:
         ; save registers
-        fsw     fa0,-4(sp)
-        fsw     fa1,-8(sp)
-        fsw     fa2,-12(sp)
-        fsw     fa3,-16(sp)
+        fsw     ft0,-4(sp)
+        fsw     ft1,-8(sp)
+        fsw     ft2,-12(sp)
+        fsw     ft3,-16(sp)
 
-        flw     fa0, 0(sp)              ; fa0 = x = popf()
-        fmul.s  fa1, fa0, fa0           ; fa1 = x * x
-        flw     fa3, 4(sp)              ; fa3 = y = popf()
+        flw     ft0, 0(sp)              ; ft0 = x = popf()
+        fmul.s  ft1, ft0, ft0           ; ft1 = x * x
+        flw     ft3, 4(sp)              ; ft3 = y = popf()
 
-        ; for the following, would prefer: fmadd.s fa2, fa3, fa3, fa1
-        fmul.s  fa0, fa3, fa3; ; fa2 = x * x + y * y
-        fadd.s  fa2, fa0, fa1
+        ; for the following, would prefer: fmadd.s ft2, ft3, ft3, ft1
+        fmul.s  ft0, ft3, ft3; ; ft2 = x * x + y * y
+        fadd.s  ft2, ft0, ft1
 
-        ; fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y)
+        ; fsqrt.s ft0, ft2                ; ft0 = d = sqrtf(x * x + y * y)
         ; begin call to sqrt in place of fsqrt.s instruction
         addi    sp, sp, -28      ; Make room on stack (20 saved for this frame plus need 8 for next frame)
         sw      ra, 4(sp)       ; Save return address
-        fsw     fa2, 0(sp)      ; Store parameter
+        fsw     ft2, 0(sp)      ; Store parameter
 
         jal     ra, .sqrt   
 
-        flw     fa0, 0(sp)      ; Pop result
+        flw     ft0, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
         addi    sp, sp, 28       ; Restore stack
         ; end of call to sqrt
 
-        fsw     fa0, 4(sp)             ; pushf(d) 
+        fsw     ft0, 4(sp)             ; pushf(d) 
 
         ; restore registers
-        flw     fa0,-4(sp)
-        flw     fa1,-8(sp)
-        flw     fa2,-12(sp)
-        flw     fa3,-16(sp)
+        flw     ft0,-4(sp)
+        flw     ft1,-8(sp)
+        flw     ft2,-12(sp)
+        flw     ft3,-16(sp)
 
         ; set stack pointer as if pops and pushes had occured
         addi    sp, sp, 4
@@ -1705,45 +1705,45 @@ atanTable_f32:
 
 .length3:
         ; save registers
-        fsw     fa0,-4(sp)
-        fsw     fa1,-8(sp)
-        fsw     fa2,-12(sp)
-        fsw     fa3,-16(sp)
+        fsw     ft0,-4(sp)
+        fsw     ft1,-8(sp)
+        fsw     ft2,-12(sp)
+        fsw     ft3,-16(sp)
 
-        flw     fa0, 0(sp)              ; fa0 = x = popf()
-        fmul.s  fa1, fa0, fa0           ; fa1 = x * x
-        flw     fa3, 4(sp)              ; fa3 = y = popf()
+        flw     ft0, 0(sp)              ; ft0 = x = popf()
+        fmul.s  ft1, ft0, ft0           ; ft1 = x * x
+        flw     ft3, 4(sp)              ; ft3 = y = popf()
 
-        ; for the following, would prefer: fmadd.s fa2, fa3, fa3, fa1
-        fmul.s  fa0, fa3, fa3 ; fa2 = x * x + y * y
-        fadd.s  fa2, fa0, fa1
+        ; for the following, would prefer: fmadd.s ft2, ft3, ft3, ft1
+        fmul.s  ft0, ft3, ft3 ; ft2 = x * x + y * y
+        fadd.s  ft2, ft0, ft1
 
-        flw     fa0, 8(sp)              ; fa0 = z = popf()
+        flw     ft0, 8(sp)              ; ft0 = z = popf()
 
-        ; for the following, would prefer: fmadd.s fa1, fa0, fa0, fa2
-        fmul.s  fa3, fa0, fa0 ; fa1 = x * x + y * y + z * z
-        fadd.s  fa1, fa3, fa2
+        ; for the following, would prefer: fmadd.s ft1, ft0, ft0, ft2
+        fmul.s  ft3, ft0, ft0 ; ft1 = x * x + y * y + z * z
+        fadd.s  ft1, ft3, ft2
 
-        ; fsqrt.s fa3, fa1                ; fa0 = d = sqrtf(x * x + y * y + z * z)
+        ; fsqrt.s ft3, ft1                ; ft0 = d = sqrtf(x * x + y * y + z * z)
         ; begin call to sqrt in place of fsqrt.s instruction
         addi    sp, sp, -28      ; Make room on stack (20 saved for this frame plus need 8 for next frame)
         sw      ra, 4(sp)       ; Save return address
-        fsw     fa1, 0(sp)      ; Store parameter
+        fsw     ft1, 0(sp)      ; Store parameter
 
         jal     ra, .sqrt   
 
-        flw     fa3, 0(sp)      ; Pop result
+        flw     ft3, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
         addi    sp, sp, 28       ; Restore stack
         ; end of call to sqrt
 
-        fsw     fa3, 8(sp)             ; pushf(d) 
+        fsw     ft3, 8(sp)             ; pushf(d) 
 
         ; restore registers
-        flw     fa0,-4(sp)
-        flw     fa1,-8(sp)
-        flw     fa2,-12(sp)
-        flw     fa3,-16(sp)
+        flw     ft0,-4(sp)
+        flw     ft1,-8(sp)
+        flw     ft2,-12(sp)
+        flw     ft3,-16(sp)
 
         ; set stack pointer as if pops and pushes had occured
         addi    sp, sp, 8
@@ -1752,51 +1752,51 @@ atanTable_f32:
 
 .length4:
         ; save registers
-        fsw     fa0,-4(sp)
-        fsw     fa1,-8(sp)
-        fsw     fa2,-12(sp)
-        fsw     fa3,-16(sp)
+        fsw     ft0,-4(sp)
+        fsw     ft1,-8(sp)
+        fsw     ft2,-12(sp)
+        fsw     ft3,-16(sp)
 
-        flw     fa0, 0(sp)              ; fa0 = x = popf()
-        fmul.s  fa1, fa0, fa0           ; fa1 = x * x
-        flw     fa3, 4(sp)              ; fa3 = y = popf()
+        flw     ft0, 0(sp)              ; ft0 = x = popf()
+        fmul.s  ft1, ft0, ft0           ; ft1 = x * x
+        flw     ft3, 4(sp)              ; ft3 = y = popf()
 
-        ; for the following, would prefer: fmadd.s fa2, fa3, fa3, fa1
-        fmul.s  fa0, fa3, fa3 ; fa2 = x * x + y * y
-        fadd.s  fa2, fa0, fa1
+        ; for the following, would prefer: fmadd.s ft2, ft3, ft3, ft1
+        fmul.s  ft0, ft3, ft3 ; ft2 = x * x + y * y
+        fadd.s  ft2, ft0, ft1
 
-        flw     fa0, 8(sp)              ; fa0 = z = popf()
+        flw     ft0, 8(sp)              ; ft0 = z = popf()
 
-        ; for the following, would prefer: fmadd.s fa1, fa0, fa0, fa2
-        fmul.s  fa3, fa0, fa0 ; fa1 = x * x + y * y + z * z
-        fadd.s  fa1, fa3, fa2
+        ; for the following, would prefer: fmadd.s ft1, ft0, ft0, ft2
+        fmul.s  ft3, ft0, ft0 ; ft1 = x * x + y * y + z * z
+        fadd.s  ft1, ft3, ft2
 
-        flw     fa3, 12(sp)             ; fa3 = w = popf()
+        flw     ft3, 12(sp)             ; ft3 = w = popf()
 
-        ; for the following, would prefer: fmadd.s fa2, fa3, fa3, fa1
-        fmul.s  fa0, fa3, fa3 ; fa2 = x * x + y * y + z * z + w * w
-        fadd.s  fa2, fa0, fa1
+        ; for the following, would prefer: fmadd.s ft2, ft3, ft3, ft1
+        fmul.s  ft0, ft3, ft3 ; ft2 = x * x + y * y + z * z + w * w
+        fadd.s  ft2, ft0, ft1
 
-        ; fsqrt.s fa0, fa2                ; fa0 = d = sqrtf(x * x + y * y + z * z + w * w)
+        ; fsqrt.s ft0, ft2                ; ft0 = d = sqrtf(x * x + y * y + z * z + w * w)
         ; begin call to sqrt in place of fsqrt.s instruction
         addi    sp, sp, -28      ; Make room on stack (20 saved for this frame plus need 8 for next frame)
         sw      ra, 4(sp)       ; Save return address
-        fsw     fa2, 0(sp)      ; Store parameter
+        fsw     ft2, 0(sp)      ; Store parameter
 
         jal     ra, .sqrt   
 
-        flw     fa0, 0(sp)      ; Pop result
+        flw     ft0, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
         addi    sp, sp, 28       ; Restore stack
         ; end of call to sqrt
 
-        fsw     fa0, 12(sp)             ; pushf(d) 
+        fsw     ft0, 12(sp)             ; pushf(d) 
 
         ; restore registers
-        flw     fa0,-4(sp)
-        flw     fa1,-8(sp)
-        flw     fa2,-12(sp)
-        flw     fa3,-16(sp)
+        flw     ft0,-4(sp)
+        flw     ft1,-8(sp)
+        flw     ft2,-12(sp)
+        flw     ft3,-16(sp)
 
         ; set stack pointer as if pops and pushes had occured
         addi    sp, sp, 12
@@ -1806,26 +1806,26 @@ atanTable_f32:
 .fract:
         ; save registers
         sw      a0, -4(sp)
-        fsw     fa0, -8(sp)
-        fsw     fa1, -12(sp)
-        fsw     fa2, -16(sp)
+        fsw     ft0, -8(sp)
+        fsw     ft1, -12(sp)
+        fsw     ft2, -16(sp)
 
-        flw      fa0, 0(sp)      ; a0 = x
+        flw      ft0, 0(sp)      ; a0 = x
 
-        ; a0<wholei> = ifloorf(fa0<x>)
-	fcvt.w.s a0,fa0,rdn
+        ; a0<wholei> = ifloorf(ft0<x>)
+	fcvt.w.s a0,ft0,rdn
 
-        ; fa1<fract> = fa0<x> - fa1<float(wholei)>
-        fcvt.s.w fa1,a0,rtz
-	fsub.s	fa2,fa0,fa1
+        ; ft1<fract> = ft0<x> - ft1<float(wholei)>
+        fcvt.s.w ft1,a0,rtz
+	fsub.s	ft2,ft0,ft1
 
-        fsw      fa2, 0(sp)     ; return(x)
+        fsw      ft2, 0(sp)     ; return(x)
 
         ; restore registers
         lw      a0, -4(sp)
-        flw     fa0, -8(sp)
-        flw     fa1, -12(sp)
-        flw     fa2, -16(sp)
+        flw     ft0, -8(sp)
+        flw     ft1, -12(sp)
+        flw     ft2, -16(sp)
 
         jalr x0, ra, 0
 
@@ -1871,32 +1871,32 @@ atanTable_f32:
 
 .atan2:
         ; save registers
-        fsw     fa0, -4(sp)
-        fsw     fa1, -8(sp)
-        fsw     fa2, -12(sp)
-        fsw     fa3, -16(sp)
-        fsw     fa4, -20(sp)
-        fsw     fa5, -24(sp)
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
+        fsw     ft3, -16(sp)
+        fsw     ft4, -20(sp)
+        fsw     ft5, -24(sp)
         sw      a0, -28(sp)
         sw      a1, -32(sp)
 
-        flw     fa1, 0(sp)      ; fa1 = y
-        flw     fa0, 4(sp)      ; fa0 = x
+        flw     ft1, 0(sp)      ; ft1 = y
+        flw     ft0, 4(sp)      ; ft0 = x
         addi    sp,sp,-32        ; push saved registers
 
-        fdiv.s          fa3, fa1, fa0   ; z = y / x
+        fdiv.s          ft3, ft1, ft0   ; z = y / x
 
-        fcvt.s.w        fa2,zero,rtz    ; fa2 = 0.0
-        flt.s           a1,fa0,fa2      ; a1 = (x < 0)
+        fcvt.s.w        ft2,zero,rtz    ; ft2 = 0.0
+        flt.s           a1,ft0,ft2      ; a1 = (x < 0)
         bne             a1,zero,.atan2_neg_x     ; if(x < 0) goto .atan2_neg_x;
 
         addi    sp, sp, -8      ; Make room on stack
         sw      ra, 4(sp)       ; Save return address
-        fsw     fa3, 0(sp)      ; Store parameter
+        fsw     ft3, 0(sp)      ; Store parameter
 
-        jal     ra, .atan       ; fa0 = a = atan(z)     ; XXX OPT could restore regs and jump to .atan
+        jal     ra, .atan       ; ft0 = a = atan(z)     ; XXX OPT could restore regs and jump to .atan
 
-        flw     fa0, 0(sp)      ; Pop result
+        flw     ft0, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
         addi    sp, sp, 8       ; Restore stack
 
@@ -1905,38 +1905,38 @@ atanTable_f32:
 .atan2_neg_x:
         ; x < 0
 
-        fsgnjn.s fa4, fa3, fa1  ; float z2 = copysign(z, -y);
+        fsgnjn.s ft4, ft3, ft1  ; float z2 = copysign(z, -y);
 
         addi    sp, sp, -8      ; Make room on stack
         sw      ra, 4(sp)       ; Save return address
-        fsw     fa4, 0(sp)      ; Store parameter
+        fsw     ft4, 0(sp)      ; Store parameter
 
-        jal     ra, .atan       ; fa0 = a = atan(z2)
+        jal     ra, .atan       ; ft0 = a = atan(z2)
 
-        flw     fa4, 0(sp)      ; Pop result
+        flw     ft4, 0(sp)      ; Pop result
         lw      ra, 4(sp)       ; Restore return address
         addi    sp, sp, 8       ; Restore stack
 
-        fsgnjn.s fa2, fa4, fa1  ; float a = copysign(brad_atan(z2), -y);
+        fsgnjn.s ft2, ft4, ft1  ; float a = copysign(brad_atan(z2), -y);
 
 	lui	a0,%hi(.pi)
-	flw	fa5,%lo(.pi)(a0)        ; float pi = 3.14159
+	flw	ft5,%lo(.pi)(a0)        ; float pi = 3.14159
 
-        fsgnj.s fa3, fa5, fa1   ; sign_y_pi = copysign(pi, y)
-        fadd.s  fa0, fa3, fa2   ; v = copysign(M_PI, y) + a;
+        fsgnj.s ft3, ft5, ft1   ; sign_y_pi = copysign(pi, y)
+        fadd.s  ft0, ft3, ft2   ; v = copysign(M_PI, y) + a;
 
 .atan2_finish:
 
         addi    sp,sp,32        ; pop saved registers
-        fsw     fa0, 4(sp)      ; store return value
+        fsw     ft0, 4(sp)      ; store return value
 
         ; restore registers
-        flw     fa0, -4(sp)
-        flw     fa1, -8(sp)
-        flw     fa2, -12(sp)
-        flw     fa3, -16(sp)
-        flw     fa4, -20(sp)
-        flw     fa5, -24(sp)
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
+        flw     ft3, -16(sp)
+        flw     ft4, -20(sp)
+        flw     ft5, -24(sp)
         lw      a0, -28(sp)
         lw      a1, -32(sp)
 
@@ -1979,50 +1979,50 @@ atanTable_f32:
 .floor:
         ; save registers
         sw      a0, -4(sp)
-        fsw     fa0, -8(sp)
-        fsw     fa1, -12(sp)
+        fsw     ft0, -8(sp)
+        fsw     ft1, -12(sp)
 
-        flw      fa0, 0(sp)      ; a0 = x
+        flw      ft0, 0(sp)      ; a0 = x
 
-        ; a0<wholei> = ifloorf(fa0<x>)
-	fcvt.w.s a0,fa0,rdn
+        ; a0<wholei> = ifloorf(ft0<x>)
+	fcvt.w.s a0,ft0,rdn
 
         ; convert back to float.
-        fcvt.s.w fa1,a0,rtz
+        fcvt.s.w ft1,a0,rtz
 
-        fsw      fa1, 0(sp)     ; return(fract)
+        fsw      ft1, 0(sp)     ; return(fract)
 
         ; restore registers
         lw      a0, -4(sp)
-        flw     fa0, -8(sp)
-        flw     fa1, -12(sp)
+        flw     ft0, -8(sp)
+        flw     ft1, -12(sp)
 
         jalr x0, ra, 0
 
 .step:
         sw      a0, -4(sp)
-        fsw     fa0, -8(sp)
-        fsw     fa1, -12(sp)
-        fsw     fa2, -16(sp)
+        fsw     ft0, -8(sp)
+        fsw     ft1, -12(sp)
+        fsw     ft2, -16(sp)
 
         ; float edge = popf();
-        flw      fa0, 0(sp)      ; fa0 = edge = pop()
+        flw      ft0, 0(sp)      ; ft0 = edge = pop()
 
         ; float x = popf();
-        flw      fa1, 4(sp)      ; fa1 = x = pop()
+        flw      ft1, 4(sp)      ; ft1 = x = pop()
 
         ; float y = (x < edge) ? 0.0f : 1.0f;
-        fle.s     a0, fa0, fa1
+        fle.s     a0, ft0, ft1
 
-        fcvt.s.w fa2,a0,rtz
+        fcvt.s.w ft2,a0,rtz
 
         ; pushf(y);
-        fsw     fa2, 4(sp)
+        fsw     ft2, 4(sp)
 
         lw      a0, -4(sp)
-        flw     fa0, -8(sp)
-        flw     fa1, -12(sp)
-        flw     fa2, -16(sp)
+        flw     ft0, -8(sp)
+        flw     ft1, -12(sp)
+        flw     ft2, -16(sp)
 
         addi    sp, sp, 4       ; We took two parameters and return one, so fix up stack
 
@@ -2030,108 +2030,108 @@ atanTable_f32:
 
 .dot1:
         ; save registers
-        fsw     fa0, -4(sp)
-        fsw     fa1, -8(sp)
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
 
-        flw     fa0, 0(sp)      ; x1
-        flw     fa1, 8(sp)      ; x2
-        fmul.s  fa0, fa0, fa1   ; x1*x2
+        flw     ft0, 0(sp)      ; x1
+        flw     ft1, 8(sp)      ; x2
+        fmul.s  ft0, ft0, ft1   ; x1*x2
 
-        fsw     fa0, 8(sp)      ; return value
+        fsw     ft0, 8(sp)      ; return value
 
         ; restore registers
-        flw     fa0, -4(sp)
-        flw     fa1, -8(sp)
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
 
         addi    sp, sp, 4       ; we took two parameters and return one, so fix up stack
         jalr    x0, ra, 0       ; return
 
 .dot2:
         ; save registers
-        fsw     fa0, -4(sp)
-        fsw     fa1, -8(sp)
-        fsw     fa2, -12(sp)
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
 
-        flw     fa0, 0(sp)      ; x1
-        flw     fa1, 8(sp)      ; x2
-        fmul.s  fa2, fa0, fa1   ; x1*x2
+        flw     ft0, 0(sp)      ; x1
+        flw     ft1, 8(sp)      ; x2
+        fmul.s  ft2, ft0, ft1   ; x1*x2
 
-        flw     fa0, 4(sp)      ; y1
-        flw     fa1, 12(sp)     ; y2
-        fmul.s  fa0, fa0, fa1   ; y1*y2
+        flw     ft0, 4(sp)      ; y1
+        flw     ft1, 12(sp)     ; y2
+        fmul.s  ft0, ft0, ft1   ; y1*y2
 
-        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2
-        fsw     fa2, 12(sp)     ; return value
+        fadd.s  ft2, ft0, ft2   ; x1*x2 + y1*y2
+        fsw     ft2, 12(sp)     ; return value
 
         ; restore registers
-        flw     fa0, -4(sp)
-        flw     fa1, -8(sp)
-        flw     fa2, -12(sp)
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
 
         addi    sp, sp, 12      ; we took four parameters and return one, so fix up stack
         jalr    x0, ra, 0       ; return
 
 .dot3:
         ; save registers
-        fsw     fa0, -4(sp)
-        fsw     fa1, -8(sp)
-        fsw     fa2, -12(sp)
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
 
-        flw     fa0, 0(sp)      ; x1
-        flw     fa1, 12(sp)     ; x2
-        fmul.s  fa2, fa0, fa1   ; x1*x2
+        flw     ft0, 0(sp)      ; x1
+        flw     ft1, 12(sp)     ; x2
+        fmul.s  ft2, ft0, ft1   ; x1*x2
 
-        flw     fa0, 4(sp)      ; y1
-        flw     fa1, 16(sp)     ; y2
-        fmul.s  fa0, fa0, fa1   ; y1*y2
-        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2
+        flw     ft0, 4(sp)      ; y1
+        flw     ft1, 16(sp)     ; y2
+        fmul.s  ft0, ft0, ft1   ; y1*y2
+        fadd.s  ft2, ft0, ft2   ; x1*x2 + y1*y2
 
-        flw     fa0, 8(sp)      ; z1
-        flw     fa1, 20(sp)     ; z2
-        fmul.s  fa0, fa0, fa1   ; z1*z2
-        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2 + z1*z2
+        flw     ft0, 8(sp)      ; z1
+        flw     ft1, 20(sp)     ; z2
+        fmul.s  ft0, ft0, ft1   ; z1*z2
+        fadd.s  ft2, ft0, ft2   ; x1*x2 + y1*y2 + z1*z2
 
-        fsw     fa2, 20(sp)     ; return value
+        fsw     ft2, 20(sp)     ; return value
 
         ; restore registers
-        flw     fa0, -4(sp)
-        flw     fa1, -8(sp)
-        flw     fa2, -12(sp)
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
 
         addi    sp, sp, 20      ; we took six parameters and return one, so fix up stack
         jalr    x0, ra, 0       ; return
 
 .dot4:
         ; save registers
-        fsw     fa0, -4(sp)
-        fsw     fa1, -8(sp)
-        fsw     fa2, -12(sp)
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
 
-        flw     fa0, 0(sp)      ; x1
-        flw     fa1, 16(sp)     ; x2
-        fmul.s  fa2, fa0, fa1   ; x1*x2
+        flw     ft0, 0(sp)      ; x1
+        flw     ft1, 16(sp)     ; x2
+        fmul.s  ft2, ft0, ft1   ; x1*x2
 
-        flw     fa0, 4(sp)      ; y1
-        flw     fa1, 20(sp)     ; y2
-        fmul.s  fa0, fa0, fa1   ; y1*y2
-        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2
+        flw     ft0, 4(sp)      ; y1
+        flw     ft1, 20(sp)     ; y2
+        fmul.s  ft0, ft0, ft1   ; y1*y2
+        fadd.s  ft2, ft0, ft2   ; x1*x2 + y1*y2
 
-        flw     fa0, 8(sp)      ; z1
-        flw     fa1, 24(sp)     ; z2
-        fmul.s  fa0, fa0, fa1   ; z1*z2
-        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2 + z1*z2
+        flw     ft0, 8(sp)      ; z1
+        flw     ft1, 24(sp)     ; z2
+        fmul.s  ft0, ft0, ft1   ; z1*z2
+        fadd.s  ft2, ft0, ft2   ; x1*x2 + y1*y2 + z1*z2
 
-        flw     fa0, 12(sp)     ; w1
-        flw     fa1, 28(sp)     ; w2
-        fmul.s  fa0, fa0, fa1   ; w1*w2
-        fadd.s  fa2, fa0, fa2   ; x1*x2 + y1*y2 + z1*z2 + w1*w2
+        flw     ft0, 12(sp)     ; w1
+        flw     ft1, 28(sp)     ; w2
+        fmul.s  ft0, ft0, ft1   ; w1*w2
+        fadd.s  ft2, ft0, ft2   ; x1*x2 + y1*y2 + z1*z2 + w1*w2
 
-        fsw     fa2, 28(sp)     ; return value
+        fsw     ft2, 28(sp)     ; return value
 
         ; restore registers
-        flw     fa0, -4(sp)
-        flw     fa1, -8(sp)
-        flw     fa2, -12(sp)
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
 
         addi    sp, sp, 28      ; we took eight parameters and return one, so fix up stack
         jalr    x0, ra, 0       ; return
