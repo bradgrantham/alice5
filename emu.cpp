@@ -10,7 +10,7 @@
 #include <thread>
 #include <mutex>
 #include "risc-v.h"
-#include "gpuemu.h"
+#include "emu.h"
 #include "timer.h"
 #include "disassemble.h"
 
@@ -486,7 +486,7 @@ static void tryUnaryFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *t
  * first assemble the library:
  *
  *     % ./as library.s
- *     % ./gpuemu --test library.o
+ *     % ./emu --test library.o
  *
  */
 static void runLibraryTest(GPUEmuDebugOptions *debugOptions, CoreParameters *tmpl) {

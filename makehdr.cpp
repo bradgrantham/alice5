@@ -4,7 +4,7 @@
 #include <iomanip>
 #include <cassert>
 #include <cstdlib>
-#include "gpuemu.h"
+#include "emu.h"
 
 int main(int argc, char **argv)
 {
