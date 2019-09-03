@@ -25,7 +25,7 @@ SHADE_OBJS      =      $(SHADE_SRCS:.cpp=.o)
 DEPS            = $(SHADE_OBJS:.o=.d)
 
 .PHONY: all
-all: shade as gpuemu pcopy_test
+all: shade as emu pcopy_test
 
 -include $(DEPS)
 
@@ -40,15 +40,15 @@ shade: $(SHADE_OBJS)
 as: as.cpp $(DIS_OBJ)
 	$(CXX) --std=c++17 -Wall as.cpp $(DIS_OBJ) -o $@
 
-gpuemu: gpuemu.cpp $(DIS_OBJ) gpuemu.h
-	$(CXX) $(CXXFLAGS) --std=c++17 -Wall gpuemu.cpp $(DIS_OBJ) -lpthread -o $@
+emu: emu.cpp $(DIS_OBJ) emu.h
+	$(CXX) $(CXXFLAGS) --std=c++17 -Wall emu.cpp $(DIS_OBJ) -lpthread -o $@
 
 pcopy_test: pcopy_test.cpp pcopy.cpp pcopy.h
 	$(CXX) $(CXXFLAGS) --std=c++17 -Wall pcopy_test.cpp pcopy.cpp -o $@
 
 .PHONY: lib_test
-lib_test: library.o gpuemu
-	./gpuemu --test library.o
+lib_test: library.o emu
+	./emu --test library.o
 
 library.o: library.s as
 	./as library.s

@@ -16,7 +16,7 @@
 extern "C" {
 #include "riscv-disas.h"
 }
-#include "gpuemu.h"
+#include "emu.h"
 
 enum MessageCategory {
     CAT_INFO,

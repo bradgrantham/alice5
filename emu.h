@@ -467,11 +467,52 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                         break;
                     }
 
-                    // fmv.x.w   rd rs1 24..20=0 31..27=0x1C 14..12=0 26..25=0 6..2=0x14 1..0=3
                     case 0x1C: {
                         if(funct3 == 0) {
+                            // fmv.x.w   rd rs1 24..20=0 31..27=0x1C 14..12=0 26..25=0 6..2=0x14 1..0=3
                             if(fmt == 0) {
                                 regs.x[rd] = floatToInt(regs.f[rs1]);
+                            } else {
+                                unimpl(insn, status);
+                            }
+                        } else if(funct3 == 1) {
+                            // fclass.s  rd rs1 24..20=0 31..27=0x1C 14..12=1 26..25=0 6..2=0x14 1..0=3
+                            if(fmt == 0) {
+                                float f = regs.f[rs1];
+                                uint32_t bits = floatToInt(f);
+
+                                int is_negative = bits & 0x80000000;
+                                int is_positive = !(bits & 0x80000000);
+
+                                // emulate our Verilog FPU:
+                                // assign qnan_a =  fracta[22];
+                                // assign snan_a = !fracta[22] & |fracta[21:0];
+                                int qnan_bits = (bits & (1 << 22));
+                                int snan_bits = (bits & ((1 << 22) - 1));
+
+                                int is_neg_inf = isinf(f) && is_negative;
+                                int is_neg_normal = isfinite(f) && isnormal(f) && is_negative;
+                                int is_neg_subnormal = isfinite(f) && (f != 0.0f) && (!isnormal(f)) && is_negative;
+                                int is_neg_zero = (f == 0.0f) && is_negative;
+                                int is_pos_zero = (f == 0.0f) && is_positive;
+                                int is_pos_subnormal = isfinite(f) && (f != 0.0f) && (!isnormal(f)) && is_positive;
+                                int is_pos_normal = isfinite(f) && isnormal(f) && is_positive;
+                                int is_pos_inf = isinf(f) && is_positive;
+
+                                int is_qnan = isnan(f) && qnan_bits && (!snan_bits);
+                                int is_snan = isnan(f) && (!qnan_bits) && snan_bits;
+
+                                regs.x[rd] =
+                                        (is_neg_inf << 0) |
+                                        (is_neg_normal << 1) |
+                                        (is_neg_subnormal << 2) |
+                                        (is_neg_zero << 3) |
+                                        (is_pos_zero << 4) |
+                                        (is_pos_subnormal << 5) |
+                                        (is_pos_normal << 6) |
+                                        (is_pos_inf << 7) |
+                                        (is_qnan << 8) |
+                                        (is_snan << 9);
                             } else {
                                 unimpl(insn, status);
                             }
@@ -537,7 +578,6 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
         }
 
         // fmv.x.s
-        // fclass.s
 
         case makeOpcode(0, 0x1C, 3): { // ebreak
             if(dump) std::cout << "ebreak\n";
