@@ -474,7 +474,7 @@ static void tryUnaryFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *t
     float expectedValue = func(param);
     float actualValue = runMathFunction(debugOptions, tmpl, funcName, params);
 
-    if (!nearlyEqual(expectedValue, actualValue, 0.0001)) {
+    if (!nearlyEqual(expectedValue, actualValue, 0.000001)) {
         std::cout << funcName << "(" << param << ") = "
             << actualValue << " instead of " << expectedValue << "\n";
         errors++;
@@ -510,14 +510,16 @@ static void runLibraryTest(GPUEmuDebugOptions *debugOptions, CoreParameters *tmp
 
     // .log
     tryUnaryFunction(debugOptions, tmpl, ".log", logf, -1.23, errors);
-    tryUnaryFunction(debugOptions, tmpl, ".log", logf, 0.0, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".log", logf, -0.0, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".log", logf, +0.0, errors);
     for (float x = 0.329; x < 150; x++) {
         tryUnaryFunction(debugOptions, tmpl, ".log", logf, x, errors);
     }
 
     // .log2
     tryUnaryFunction(debugOptions, tmpl, ".log2", log2f, -1.23, errors);
-    tryUnaryFunction(debugOptions, tmpl, ".log2", log2f, 0.0, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".log2", log2f, -0.0, errors);
+    tryUnaryFunction(debugOptions, tmpl, ".log2", log2f, +0.0, errors);
     for (float x = 0.329; x < 150; x++) {
         tryUnaryFunction(debugOptions, tmpl, ".log2", log2f, x, errors);
     }

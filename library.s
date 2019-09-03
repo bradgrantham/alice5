@@ -11,9 +11,6 @@
 .NaN:
         .word   0xffc00000      ; quiet? NaN result of sqrt(-1)
 
-.zero:
-        .fword  0.0
-
 .one:
         .fword  1.0
 
@@ -33,7 +30,10 @@
         .fword  3.1415926536
 
 .posInf:
-        .word   0x7F800000
+        .fword  infinity
+
+.negInf:
+        .fword  -infinity
 
 ; Polynomial coefficients for exp2() function.
 .exp2_0:
@@ -51,7 +51,7 @@
 .exp2_6:
         .fword  1.000000000000000
 
-.log2e:
+.log2_of_e:
         .fword  1.4426950408889634074
 
 .sqrtTable:
@@ -310,6 +310,146 @@
         .word   1588921587 ; 0x5EB504F3 = 6.52191e+18 (sqrt(4.25353e+37))
         .word   1593835520 ; 0x5F000000 = 9.22337e+18 (sqrt(8.50706e+37))
         .word   1597310195 ; 0x5F3504F3 = 1.30438e+19 (sqrt(1.70141e+38))
+
+.log2dinv:
+        .fword  6.4000000000e+01
+
+.log2dsq6:
+        .fword  4.0690105379e-05
+
+.log2TableQ1:
+        .fword  0.0000000000e+00
+        .fword  1.5504186973e-02
+        .fword  3.0771657825e-02
+        .fword  4.5809537172e-02
+        .fword  6.0624621809e-02
+        .fword  7.5223423541e-02
+        .fword  8.9612156153e-02
+        .fword  1.0379679501e-01
+        .fword  1.1778303236e-01
+        .fword  1.3157635927e-01
+        .fword  1.4518201351e-01
+        .fword  1.5860502422e-01
+        .fword  1.7185026407e-01
+        .fword  1.8492233753e-01
+        .fword  1.9782574475e-01
+        .fword  2.1056476235e-01
+        .fword  2.2314354777e-01
+        .fword  2.3556606472e-01
+        .fword  2.4783615768e-01
+        .fword  2.5995752215e-01
+        .fword  2.7193370461e-01
+        .fword  2.8376817703e-01
+        .fword  2.9546421766e-01
+        .fword  3.0702504516e-01
+        .fword  3.1845372915e-01
+        .fword  3.2975327969e-01
+        .fword  3.4092658758e-01
+        .fword  3.5197642446e-01
+        .fword  3.6290550232e-01
+        .fword  3.7371641397e-01
+        .fword  3.8441169262e-01
+        .fword  3.9499381185e-01
+        .fword  4.0546509624e-01
+        .fword  4.1582790017e-01
+        .fword  4.2608439922e-01
+        .fword  4.3623676896e-01
+        .fword  4.4628709555e-01
+        .fword  4.5623743534e-01
+        .fword  4.6608972549e-01
+        .fword  4.7584590316e-01
+        .fword  4.8550781608e-01
+        .fword  4.9507725239e-01
+        .fword  5.0455600023e-01
+        .fword  5.1394575834e-01
+        .fword  5.2324813604e-01
+        .fword  5.3246480227e-01
+        .fword  5.4159730673e-01
+        .fword  5.5064713955e-01
+        .fword  5.5961579084e-01
+        .fword  5.6850475073e-01
+        .fword  5.7731539011e-01
+        .fword  5.8604902029e-01
+        .fword  5.9470713139e-01
+        .fword  6.0329085588e-01
+        .fword  6.1180156469e-01
+        .fword  6.2024039030e-01
+        .fword  6.2860864401e-01
+        .fword  6.3690745831e-01
+        .fword  6.4513796568e-01
+        .fword  6.5330129862e-01
+        .fword  6.6139847040e-01
+        .fword  6.6943067312e-01
+        .fword  6.7739880085e-01
+        .fword  6.8530398607e-01
+        .fword  6.9314718246e-01
+
+.log2TableQ2:
+        .fword  -9.9986231327e-01
+        .fword  -9.6937632561e-01
+        .fword  -9.4016802311e-01
+        .fword  -9.1239231825e-01
+        .fword  -8.8566547632e-01
+        .fword  -8.6031460762e-01
+        .fword  -8.3573484421e-01
+        .fword  -8.1255424023e-01
+        .fword  -7.8996384144e-01
+        .fword  -7.6855713129e-01
+        .fword  -7.4805134535e-01
+        .fword  -7.2788482904e-01
+        .fword  -7.0930588245e-01
+        .fword  -6.9062888622e-01
+        .fword  -6.7332005501e-01
+        .fword  -6.5613007545e-01
+        .fword  -6.4002591372e-01
+        .fword  -6.2422031164e-01
+        .fword  -6.0906451941e-01
+        .fword  -5.9467309713e-01
+        .fword  -5.8023625612e-01
+        .fword  -5.6704795361e-01
+        .fword  -5.5367153883e-01
+        .fword  -5.4126393795e-01
+        .fword  -5.2883124352e-01
+        .fword  -5.1699501276e-01
+        .fword  -5.0572794676e-01
+        .fword  -4.9451699853e-01
+        .fword  -4.8397746682e-01
+        .fword  -4.7362583876e-01
+        .fword  -4.6331596375e-01
+        .fword  -4.5411628485e-01
+        .fword  -4.4409587979e-01
+        .fword  -4.3551570177e-01
+        .fword  -4.2639014125e-01
+        .fword  -4.1800573468e-01
+        .fword  -4.0939944983e-01
+        .fword  -4.0167182684e-01
+        .fword  -3.9358118176e-01
+        .fword  -3.8606393337e-01
+        .fword  -3.7881350517e-01
+        .fword  -3.7138715386e-01
+        .fword  -3.6439764500e-01
+        .fword  -3.5803401470e-01
+        .fword  -3.5092726350e-01
+        .fword  -3.4470224380e-01
+        .fword  -3.3862310648e-01
+        .fword  -3.3254361153e-01
+        .fword  -3.2631972432e-01
+        .fword  -3.2067367435e-01
+        .fword  -3.1579026580e-01
+        .fword  -3.0874338746e-01
+        .fword  -3.0519321561e-01
+        .fword  -2.9860872030e-01
+        .fword  -2.9480555654e-01
+        .fword  -2.8877067566e-01
+        .fword  -2.8448674083e-01
+        .fword  -2.7982532978e-01
+        .fword  -2.7492287755e-01
+        .fword  -2.7136212587e-01
+        .fword  -2.6560515165e-01
+        .fword  -2.6289695501e-01
+        .fword  -2.5751405954e-01
+        .fword  -2.5392177701e-01
+        .fword  -2.5023636222e-01
 
 .segment text
 
@@ -1497,7 +1637,148 @@ atanTable_f32:
         jalr x0, ra, 0                
 
 .log2:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; Save registers.
+        sw      a0, -4(sp)
+        sw      a1, -8(sp)
+        fsw     ft0, -12(sp)
+        fsw     ft1, -16(sp)
+        fsw     ft2, -20(sp)
+
+        ; Fetch parameter.
+        flw     ft0, 0(sp)
+
+        ; Check for negative. Log of any negative value is undefined.
+        ; XXX Should use fclass.s here.
+        fmv.s.x ft1, zero
+        flt.s   a0, ft0, ft1
+        beq     a0, zero, .log2_not_negative
+        flw     ft0, .NaN(x0)
+        jal     x0, .log2_ret
+
+.log2_not_negative:
+        ; Check for positive and negative zero. We return negative infinity
+        ; to match the behavior of the standard math library.
+        ; XXX Should use fclass.s here.
+        fmv.x.s a0, ft0
+        slli    a0, a0, 1                   ; Lose sign bit.
+        bne     a0, zero, .log2_not_zero
+        flw     ft0, .negInf(x0)
+        jal     x0, .log2_ret
+
+.log2_not_zero:
+        ; This algorithm and its tables are based on the code from:
+        ;
+        ;     https://github.com/akohlmey/fastermath
+        ;
+        ; We use this property of logarithms:
+        ;
+        ;     log2(a*b) = log2(a) + log2(b)
+        ;
+        ; and the fact that floats are represented as:
+        ;
+        ;     significand * 2^exponent
+        ;
+        ; to get:
+        ;
+        ;     log2(significand * 2^exponent)
+        ;        = log2(significand) + log2(2^exponent)
+        ;        = log2(significand) + exponent
+        ;
+        ; We'll extract the exponent and use it directly,
+        ; and add to that the log2 of the significand.
+
+        fmv.x.s a0, ft0                     ; Convert to bits.
+
+        ; Compute integer part of result. We can get this right from
+        ; the floating point exponent.
+        srli    a1, a0, 23                  ; Lose significand (keep exponent).
+        addi    a1, a1, -127                ; Remove offset. We're now signed.
+        fcvt.s.w ft0, a1, rne               ; Convert to float.
+
+        ; We now want to extract the significand so we can compute its
+        ; log2. We do this by stripping out the existing exponent and replacing
+        ; it with a value that means 2^0. Since the hidden bit is to the left
+        ; of the binary point, this represents a number in the range [1.0, 2.0).
+        slli    a0, a0, 9                   ; Lose exponent.
+        srli    a0, a0, 9                   ; Move back into position.
+        lui     a1, 0x3f800                 ; Exponent for 2^0.
+        or      a2, a0, a1                  ; Original value but with 2^0 exponent.
+        fmv.s.x ft1, a2                     ; Convert to float in range [1.0, 2.0).
+
+        ; We now have the value that we want to take the log2 of. We'll do this
+        ; with two table lookups, one linear step for the rough answer and one
+        ; cubic spline for the fine adjustment.
+
+        ; It's a 64-entry table, so pick out the top six bits of the significand.
+        ; No need to take into account the hidden bit, we'd have to subtract it
+        ; out anyway.
+        srli    a0, a0, 17                  ; Index into table (23 - 16 = 6 bits = 64 entries).
+
+        ; Now we want the fractional part between the table entries. That's
+        ; the 17 bits we lost above. To get this as a float, convert the
+        ; clipped-off significand back into a float, subtract it from
+        ; the original computed significand, and multiply it by 64 to
+        ; put it in the range [0.0, 1.0).
+        slli    a3, a0, 17                  ; Convert back to significand.
+        or      a3, a3, a1                  ; Exponent for 2^0.
+        fmv.s.x ft2, a3                     ; Convert to float in range [1.0, 2.0).
+        fsub.s  ft1, ft1, ft2               ; Error between original significand and clipped-off.
+        flw     ft2, .log2dinv(x0)          ; 64 = 2^6, since 6 bits are the table index.
+        fmul.s  ft2, ft1, ft2               ; Multiply by 64 to get [0.0, 1.0) value = b.
+
+        ; The value b is what we'll use to interpolate between the two table
+        ; entries. Also compute a = 1.0 - b for the linear interpolation.
+        flw     ft1, .one(x0)
+        fsub.s  ft1, ft1, ft2               ; a = 1.0 - b
+
+        ; Compute the rough value with linear interpolation using the first table.
+        slli    a0, a0, 2                   ; Byte offset into table.
+        flw     ft3, .log2TableQ1(a0)       ; Table value.
+        fmul.s  ft3, ft3, ft1               ; a*table[a0]
+        flw     ft4, .log2TableQ1 + 4(a0)   ; Next table value (table has 65 entries).
+        fmul.s  ft4, ft4, ft2               ; b*table[a0 + 1]
+        fadd.s  ft5, ft3, ft4               ; a*table[a0] + b*table[a0 + 1]
+
+        ; Now refine the rough value with a spline-interpolated secondary table.
+        fmul.s  ft4, ft1, ft1               ; a*a
+        fmul.s  ft4, ft4, ft1               ; a*a*a
+        fsub.s  ft1, ft4, ft1               ; a*a*a - a
+        flw     ft3, .log2TableQ2(a0)       ; Table value.
+        fmul.s  ft3, ft3, ft1               ; (a*a*a - a)*table[a0]
+        fmul.s  ft4, ft2, ft2               ; b*b
+        fmul.s  ft4, ft4, ft2               ; b*b*b
+        fsub.s  ft2, ft4, ft2               ; b*b*b - b
+        flw     ft4, .log2TableQ2 + 4(a0)   ; Next table value (table has 65 entries).
+        fmul.s  ft4, ft4, ft2               ; (b*b*b - b)*table[a0 + 1]
+        fadd.s  ft3, ft3, ft4               ; (a*a*a - a)*table[a0] + (b*b*b - b)*table[a0 + 1]
+
+        ; Divide the fine adjustment down.
+        flw     ft4, .log2dsq6(zero)
+        fmul.s  ft3, ft3, ft4
+
+        ; Add to rough estimate.
+        fadd.s  ft3, ft5, ft3
+
+        ; Our table actually has the natural log, so convert it to log2 with
+        ; a multiplication.
+        flw     ft1, .log2_of_e(zero)
+        fmul.s  ft1, ft3, ft1
+
+        ; Add it to the original integer part.
+        fadd.s  ft0, ft0, ft1
+
+.log2_ret:
+        ; Return value.
+        fsw     ft0, 0(sp)
+
+        ; Restore registers.
+        lw      a0, -4(sp)
+        lw      a1, -8(sp)
+        flw     ft0, -12(sp)
+        flw     ft1, -16(sp)
+        flw     ft2, -20(sp)
+
+        ; Return.
         jalr x0, ra, 0
 
 .exp2:
@@ -1528,7 +1809,7 @@ atanTable_f32:
         ; Check for underflow (exponent < -127).
         addi    a1, x0, -127
         bge     a0, a1, .exp2_not_underflow
-        flw     ft0, .zero(x0)
+        fmv.s.x ft0, x0
         jal     x0, .exp2_ret
 
 .exp2_not_underflow:
@@ -1595,7 +1876,7 @@ atanTable_f32:
         flw     ft0, 0(sp)
 
         ; exp(x) = exp2(x*log2(e))
-        flw     ft1, .log2e(x0)
+        flw     ft1, .log2_of_e(x0)
         fmul.s  ft0, ft0, ft1
 
         addi    sp, sp, -16     ; Make room on stack
