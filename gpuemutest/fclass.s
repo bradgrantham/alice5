@@ -2,17 +2,6 @@
 
 .segment data
 
-color:
-        .word   0
-        .word   1
-        .word   2
-        .word   3
-gl_FragCoord:
-        .word   0
-        .word   1
-        .word   2
-        .word   3
-
 .NaN:
         .word   0x7fc00000      ; quiet? NaN result of sqrt(-1)
 .sNaN:
