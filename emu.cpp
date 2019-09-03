@@ -142,6 +142,13 @@ void get(MEMORY& memory, uint32_t address, std::array<TYPE, N>& value)
         *reinterpret_cast<uint32_t*>(&value[i]) = memory.read32(address + i * sizeof(uint32_t));
 }
 
+template <class MEMORY, class TYPE>
+void get(MEMORY& memory, uint32_t address, TYPE& value)
+{
+    static_assert(sizeof(TYPE) == sizeof(uint32_t));
+    *reinterpret_cast<uint32_t*>(&value) = memory.read32(address);
+}
+
 typedef std::array<float,1> v1float;
 typedef std::array<uint32_t,1> v1uint;
 typedef std::array<int32_t,1> v1int;
@@ -194,6 +201,8 @@ void usage(const char* progname)
     printf("\t-j N         Use N threads [%d]\n",
             int(std::thread::hardware_concurrency()));
     printf("\t--pixel X Y  Render only pixel X and Y\n");
+    printf("\t--dumpmem addr[,addr[,...]\n");
+    printf("\t             dump out memory from addresses in this list\n");
     printf("\t--subst      Print which library functions were substituted\n");
 }
 
@@ -217,6 +226,7 @@ struct CoreParameters
     std::vector<uint8_t> data_bytes;
     SymbolTable text_symbols;
     SymbolTable data_symbols;
+    std::vector<uint32_t> memoryLocationsToDump;
 
     AddressToSymbolMap textAddressesToSymbols;
 
@@ -253,7 +263,10 @@ void showProgress(const CoreParameters* tmpl, CoreShared* shared, std::chrono::t
             break;
         }
 
-        std::cout << left << " rows left of " << totalRows;
+        {
+            std::scoped_lock l(shared->rendererMutex);
+            std::cout << left << " rows left of " << totalRows;
+        }
 
         // Estimate time left.
         if (left != totalRows) {
@@ -264,7 +277,10 @@ void showProgress(const CoreParameters* tmpl, CoreShared* shared, std::chrono::t
                 std::chrono::steady_clock::period::den;
             auto secondsLeft = elapsedSeconds*left/(totalRows - left);
 
-            std::cout << " (" << int(secondsLeft) << " seconds left)   ";
+            {
+                std::scoped_lock l(shared->rendererMutex);
+                std::cout << " (" << int(secondsLeft) << " seconds left)   ";
+            }
         }
         std::cout << "\r";
         std::cout.flush();
@@ -349,6 +365,17 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
                 dumpGPUCore(core);
                 shared->coreHadAnException = true;
                 return;
+            }
+
+            {
+                std::scoped_lock l(shared->rendererMutex);
+                std::cout << "\n";
+                for(uint32_t addr: tmpl->memoryLocationsToDump) {
+                    uint32_t value;
+                    get(data_memory, addr, value);
+                    std::cout << std::setfill('0');
+                    std::cout << "memory," << addr << ",0x" << std::setw(8) << std::hex << value << std::dec << std::setw(0) << "\n";
+                }
             }
 
             v3float rgb = {1, 0, 0};
@@ -622,6 +649,17 @@ static void runLibraryTest(GPUEmuDebugOptions *debugOptions, CoreParameters *tmp
     std::cout << errors << " test errors.\n";
 }
 
+// Adapted from https://www.techiedelight.com/split-string-cpp-using-delimiter/
+void tokenizeToNumbers(std::string const &str, std::vector<uint32_t> &out)
+{
+    char *token = strtok(const_cast<char*>(str.c_str()), ",");
+    while (token != nullptr)
+    {
+        out.push_back(std::stoul(token));
+        token = strtok(nullptr, ",");
+    }
+}
+
 int main(int argc, char **argv)
 {
     bool imageToTerminal = false;
@@ -646,9 +684,19 @@ int main(int argc, char **argv)
             debugOptions.printMemoryAccess = true;
             argv++; argc--;
 
-        } else if(strcmp(argv[0], "--pixel") == 0) {
+        } else if(strcmp(argv[0], "--dumpmem") == 0) {
 
             if(argc < 2) {
+                std::cerr << "Expected comma-delimited list of addresses for \"--dumpmem\"\n";
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            tokenizeToNumbers(argv[1], tmpl.memoryLocationsToDump);
+            argv+=2; argc-=2;
+
+        } else if(strcmp(argv[0], "--pixel") == 0) {
+
+            if(argc < 3) {
                 std::cerr << "Expected pixel X and Y for \"--pixel\"\n";
                 usage(progname);
                 exit(EXIT_FAILURE);
@@ -818,7 +866,7 @@ int main(int argc, char **argv)
         tmpl.afterLastY = specificPixelY + 1;
     }
 
-    std::cout << "Using " << threadCount << " threads.\n";
+    std::cout << "Using " << threadCount << " threads.\n" << std::flush;
 
     std::vector<std::thread *> thread;
 
@@ -871,4 +919,5 @@ int main(int argc, char **argv)
             << tmpl.imageHeight << "px;inline=1:"
             << base64Encode(ss.str()) << "\007\n";
     }
+
 }
