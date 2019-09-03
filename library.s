@@ -1481,7 +1481,52 @@ atanTable_f32:
         jalr x0, ra, 0
 
 .pow:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; This functions makes use of this equivalence:
+        ;
+        ;     pow(a, b) = exp2(b*log2(a))
+        ;
+        ; There are some cases that should work but don't. For
+        ; example, pow(-3, 2) should return 9 but can't because
+        ; log2(-3) is not defined. I'm guessing shaders don't take
+        ; advantage of that. If they do, we'll have to modify this
+        ; to detect integer b when a < 0. See "man powf" for a full
+        ; list of the special cases.
+
+        ; Save registers.
+        sw      ra, -4(sp)
+        fsw     ft0, -8(sp)
+        fsw     ft1, -12(sp)
+
+        flw     ft0, 0(sp)                  ; Parameter a.
+        flw     ft1, 4(sp)                  ; Parameter b.
+
+        ; Compute log2(a).
+        addi    sp, sp, -16                 ; Make room on stack.
+        fsw     ft0, 0(sp)                  ; Store parameter.
+        jal     ra, .log2                   ; Call our log2 function.
+        flw     ft0, 0(sp)                  ; Pop result.
+
+        ; Multiply by parameter b.
+        fmul.s  ft1, ft1, ft0
+
+        ; Compute exp2(b*log2(a)).
+        fsw     ft1, 0(sp)                  ; Store parameter.
+        jal     ra, .exp2                   ; Call our exp2 function.
+        flw     ft1, 0(sp)                  ; Pop result.
+        addi    sp, sp, 16                  ; Restore stack.
+
+        ; Return value.
+        fsw     ft1, 4(sp)
+
+        ; Restore registers.
+        lw      ra, -4(sp)
+        flw     ft0, -8(sp)
+        flw     ft1, -12(sp)
+
+        ; We took two parameters and return one, so fix up stack.
+        addi    sp, sp, 4
+
+        ; Return.
         jalr x0, ra, 0
 
 .max:

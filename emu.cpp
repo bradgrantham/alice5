@@ -502,6 +502,28 @@ static void tryUnaryFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *t
 }
 
 /**
+ * Test a library binary function against its C++ math library counterpart.
+ */
+static void tryBinaryFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *tmpl,
+        const std::string &funcName, float (*func)(float,float),
+        float param1, float param2, int &errors) {
+
+    // Function parameters.
+    std::vector<float> params;
+    params.push_back(param1);
+    params.push_back(param2);
+
+    float expectedValue = func(param1, param2);
+    float actualValue = runMathFunction(debugOptions, tmpl, funcName, params);
+
+    if (!nearlyEqual(expectedValue, actualValue, 0.000001)) {
+        std::cout << funcName << "(" << param1 << ", " << param2 << ") = "
+            << actualValue << " instead of " << expectedValue << "\n";
+        errors++;
+    }
+}
+
+/**
  * Run a set of regression tests on our standard library. To run this,
  * first assemble the library:
  *
@@ -543,6 +565,14 @@ static void runLibraryTest(GPUEmuDebugOptions *debugOptions, CoreParameters *tmp
     for (float x = 0.329; x < 150; x++) {
         tryUnaryFunction(debugOptions, tmpl, ".log2", log2f, x, errors);
     }
+
+    // .pow
+    tryBinaryFunction(debugOptions, tmpl, ".pow", powf, 0.0, 2.0, errors);
+    tryBinaryFunction(debugOptions, tmpl, ".pow", powf, 2.0, 1.0, errors);
+    tryBinaryFunction(debugOptions, tmpl, ".pow", powf, 2.123, 12.8, errors);
+    tryBinaryFunction(debugOptions, tmpl, ".pow", powf, 2.123, -12.8, errors);
+    tryBinaryFunction(debugOptions, tmpl, ".pow", powf, 21.23, 1.22, errors);
+    tryBinaryFunction(debugOptions, tmpl, ".pow", powf, 21.23192, 1.221938, errors);
 
     std::cout << errors << " test errors.\n";
 }

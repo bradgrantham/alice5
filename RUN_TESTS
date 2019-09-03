@@ -29,7 +29,7 @@ do
     fi
     if [ "$compile" = true ]; then
         ./shade -c -O -o x.s shaders/$shader.frag > /dev/null && \
-            ./as x.s && \
+            ./as -v x.s > x.lst && \
             ./emu -j 1 --subst -f 90 --term x.o && \
             mv emulated.ppm $shader-compile.ppm
     fi
