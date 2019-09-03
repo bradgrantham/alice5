@@ -1542,7 +1542,34 @@ atanTable_f32:
         jalr x0, ra, 0
 
 .mix:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
+        ; Mixes between x and y according to a: x*(1.0 - a) + y*a
+
+        ; Save registers.
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -16(sp)
+
+        flw     ft1, 4(sp)                  ; Parameter y.
+        flw     ft2, 8(sp)                  ; Parameter a.
+        fmul.s  ft1, ft1, ft2               ; y*a
+        flw     ft0, .one(zero)             ; 1.0
+        fsub.s  ft2, ft0, ft2               ; 1.0 - a
+        flw     ft0, 0(sp)                  ; Parameter x.
+        fmul.s  ft0, ft0, ft2               ; x*(1.0 - a)
+        fadd.s  ft0, ft0, ft1               ; x*(1.0 - a) + y*a
+
+        ; Return value.
+        fsw     ft0, 8(sp)
+
+        ; Restore registers.
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -16(sp)
+
+        ; We took three parameters and return one, so fix up stack.
+        addi    sp, sp, 8
+
+        ; Return.
         jalr x0, ra, 0
 
 .smoothstep:
