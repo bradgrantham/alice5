@@ -86,8 +86,6 @@ struct GPUCore
         SUBST_REFLECT3,
         SUBST_REFLECT4,
         SUBST_POW,
-        SUBST_MAX,
-        SUBST_MIN,
         SUBST_CLAMP,
         SUBST_MIX,
         SUBST_SMOOTHSTEP,
@@ -160,8 +158,6 @@ struct GPUCore
             { ".reflect3", SUBST_REFLECT3 },
             { ".reflect4", SUBST_REFLECT4 },
             { ".pow", SUBST_POW },
-            { ".max", SUBST_MAX },
-            { ".min", SUBST_MIN },
             { ".clamp", SUBST_CLAMP },
             { ".mix", SUBST_MIX },
             { ".smoothstep", SUBST_SMOOTHSTEP },
@@ -751,18 +747,6 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
                                 float x = popf(data_memory);
                                 float y = popf(data_memory);
                                 pushf(data_memory, powf(x, y));
-                                break;
-                            }
-                            case SUBST_MAX: {
-                                float x = popf(data_memory);
-                                float y = popf(data_memory);
-                                pushf(data_memory, x > y ? x : y);
-                                break;
-                            }
-                            case SUBST_MIN: {
-                                float x = popf(data_memory);
-                                float y = popf(data_memory);
-                                pushf(data_memory, x < y ? x : y);
                                 break;
                             }
                             case SUBST_CLAMP: {
