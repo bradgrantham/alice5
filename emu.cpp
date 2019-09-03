@@ -305,8 +305,10 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
             if(shared->coreHadAnException)
                 return;
 
-            set(data_memory, tmpl->gl_FragCoordAddress, v4float{i + 0.5f, j + 0.5f, 0, 0});
-            set(data_memory, tmpl->colorAddress, v4float{1, 1, 1, 1});
+            if(tmpl->gl_FragCoordAddress != 0xFFFFFFFF)
+                set(data_memory, tmpl->gl_FragCoordAddress, v4float{i + 0.5f, j + 0.5f, 0, 0});
+            if(tmpl->colorAddress != 0xFFFFFFFF)
+                set(data_memory, tmpl->colorAddress, v4float{1, 1, 1, 1});
             if(false) // XXX TODO: when iTime is exported by compilation
                 set(data_memory, tmpl->iTimeAddress, tmpl->frameTime);
 
@@ -349,8 +351,9 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
                 return;
             }
 
-            v3float rgb;
-            get(data_memory, tmpl->colorAddress, rgb);
+            v3float rgb = {1, 0, 0};
+            if(tmpl->colorAddress != 0xFFFFFFFF)
+                get(data_memory, tmpl->colorAddress, rgb);
 
             int pixelOffset = 3 * ((tmpl->imageHeight - 1 - j) * tmpl->imageWidth + i);
             for(int c = 0; c < 3; c++)
@@ -761,8 +764,7 @@ int main(int argc, char **argv)
 
     for(auto& s: { "gl_FragCoord", "color"}) {
         if (tmpl.data_symbols.find(s) == tmpl.data_symbols.end()) {
-            std::cerr << "No memory location for required variable " << s << ".\n";
-            exit(EXIT_FAILURE);
+            std::cerr << "Warning: no memory location for required variable " << s << ".\n";
         }
     }
     for(auto& s: { "iResolution", "iTime", "iMouse"}) {
@@ -774,9 +776,21 @@ int main(int argc, char **argv)
 
     shared.img = new unsigned char[tmpl.imageWidth * tmpl.imageHeight * 3];
 
-    tmpl.gl_FragCoordAddress = tmpl.data_symbols["gl_FragCoord"];
-    tmpl.colorAddress = tmpl.data_symbols["color"];
-    tmpl.iTimeAddress = tmpl.data_symbols["iTime"];
+    if(tmpl.data_symbols.find("gl_FragCoord") != tmpl.data_symbols.end()) {
+        tmpl.gl_FragCoordAddress = tmpl.data_symbols["gl_FragCoord"];
+    } else {
+        tmpl.gl_FragCoordAddress = 0xFFFFFFFF;
+    }
+    if(tmpl.data_symbols.find("color") != tmpl.data_symbols.end()) {
+        tmpl.colorAddress = tmpl.data_symbols["color"];
+    } else {
+        tmpl.colorAddress = 0xFFFFFFFF;
+    }
+    if(tmpl.data_symbols.find("iTime") != tmpl.data_symbols.end()) {
+        tmpl.iTimeAddress = tmpl.data_symbols["iTime"];
+    } else {
+        tmpl.iTimeAddress = 0xFFFFFFFF;
+    }
 
     tmpl.startX = 0;
     tmpl.afterLastX = tmpl.imageWidth;
