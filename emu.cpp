@@ -794,13 +794,14 @@ int main(int argc, char **argv)
 
     std::vector<std::thread *> thread;
 
+    shared.rowsLeft = tmpl.afterLastY - tmpl.startY;
+
     for (int t = 0; t < threadCount; t++) {
         thread.push_back(new std::thread(render, &debugOptions, &tmpl, &shared, tmpl.startY + t, threadCount));
     }
 
     // Progress information.
     Timer frameElapsed;
-    shared.rowsLeft = tmpl.afterLastY - tmpl.startY;
     thread.push_back(new std::thread(showProgress, &tmpl, &shared, frameElapsed.startTime()));
 
     // Wait for worker threads to quit.
