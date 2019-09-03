@@ -425,6 +425,14 @@ static float runMathFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *t
     // Set RA to catch final return.
     core.regs.x[1] = 0xfffffffe;
 
+    // Fill registers with known values so we can see which ones aren't being saved.
+    for (int i = 3; i < 32; i++) {
+        core.regs.x[i] = i*i*i;
+    }
+    for (int i = 0; i < 32; i++) {
+        core.regs.f[i] = i*i*i + 123;
+    }
+
     GPUCore::Registers oldRegs;
     try {
         do {
@@ -455,6 +463,18 @@ static float runMathFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *t
         std::cerr << "Unexpected core step status " << status << '\n';
         dumpGPUCore(core);
         exit(EXIT_FAILURE);
+    }
+
+    // Check registers so we can see which ones aren't being saved.
+    for (int i = 3; i < 32; i++) {
+        if (core.regs.x[i] != i*i*i) {
+            std::cerr << "Error: Register x" << i << " isn't being saved in " << funcName << "\n";
+        }
+    }
+    for (int i = 0; i < 32; i++) {
+        if (core.regs.f[i] != i*i*i + 123) {
+            std::cerr << "Error: Register f" << i << " isn't being saved in " << funcName << "\n";
+        }
     }
 
     // Pop result off the stack.

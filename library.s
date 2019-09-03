@@ -1640,9 +1640,13 @@ atanTable_f32:
         ; Save registers.
         sw      a0, -4(sp)
         sw      a1, -8(sp)
-        fsw     ft0, -12(sp)
-        fsw     ft1, -16(sp)
-        fsw     ft2, -20(sp)
+        sw      a2, -12(sp)
+        fsw     ft0, -16(sp)
+        fsw     ft1, -20(sp)
+        fsw     ft2, -24(sp)
+        fsw     ft3, -28(sp)
+        fsw     ft4, -32(sp)
+        fsw     ft5, -36(sp)
 
         ; Fetch parameter.
         flw     ft0, 0(sp)
@@ -1719,9 +1723,9 @@ atanTable_f32:
         ; clipped-off significand back into a float, subtract it from
         ; the original computed significand, and multiply it by 64 to
         ; put it in the range [0.0, 1.0).
-        slli    a3, a0, 17                  ; Convert back to significand.
-        or      a3, a3, a1                  ; Exponent for 2^0.
-        fmv.s.x ft2, a3                     ; Convert to float in range [1.0, 2.0).
+        slli    a2, a0, 17                  ; Convert back to significand.
+        or      a2, a2, a1                  ; Exponent for 2^0.
+        fmv.s.x ft2, a2                     ; Convert to float in range [1.0, 2.0).
         fsub.s  ft1, ft1, ft2               ; Error between original significand and clipped-off.
         flw     ft2, .log2dinv(x0)          ; 64 = 2^6, since 6 bits are the table index.
         fmul.s  ft2, ft1, ft2               ; Multiply by 64 to get [0.0, 1.0) value = b.
@@ -1774,9 +1778,13 @@ atanTable_f32:
         ; Restore registers.
         lw      a0, -4(sp)
         lw      a1, -8(sp)
-        flw     ft0, -12(sp)
-        flw     ft1, -16(sp)
-        flw     ft2, -20(sp)
+        lw      a2, -12(sp)
+        flw     ft0, -16(sp)
+        flw     ft1, -20(sp)
+        flw     ft2, -24(sp)
+        flw     ft3, -28(sp)
+        flw     ft4, -32(sp)
+        flw     ft5, -36(sp)
 
         ; Return.
         jalr x0, ra, 0

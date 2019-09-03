@@ -36,7 +36,7 @@
 *.ppm
 /shade
 /as
-/gpuemu
+/emu
 /pcopy_test
 *.dSYM
 *.gif
