@@ -14,6 +14,9 @@
 .one:
         .fword  1.0
 
+.three:
+        .fword  3.0
+
 .point5:
         .fword  0.5
 
@@ -1585,8 +1588,63 @@ atanTable_f32:
         jalr x0, ra, 0
 
 .smoothstep:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; Save registers.
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
+        fsw     ft3, -16(sp)
+        fsw     ft4, -20(sp)
+        sw      a0, -24(sp)
+
+        flw     ft0, 0(sp)                  ; Parameter edge0.
+        flw     ft1, 4(sp)                  ; Parameter edge1.
+        flw     ft2, 8(sp)                  ; Parameter x.
+
+        fsub.s  ft3, ft1, ft0               ; edge1 - edge0
+        ; XXX use fclass.s
+        fmv.s.x ft4, zero                   ; 0.0
+        feq.s   a0, ft3, ft4                ; edge1 - edge0 == 0.0?
+        beq     a0, zero, .smoothstep_not_equal
+
+        ; Answer is undefined when edge0 and edge1 are equal.
+        fmv.s.x ft0, zero                   ; 0.0
+        jal     x0, .smoothstep_return
+
+.smoothstep_not_equal:
+        ; Compute position of x between edge0 and edge1 in range [0.0,1.0] (unclamped).
+        fsub.s  ft4, ft2, ft0               ; x - edge0
+        fdiv.s  ft4, ft4, ft3               ; t = (x - edge0)/(edge1 - edge0)
+
+        ; Clamped to [0.0,1.0].
+        fmv.s.x ft0, zero                   ; 0.0
+        fmax.s  ft4, ft4, ft0               ; Clamp to 0.0
+        flw     ft0, .one(zero)             ; 1.0
+        fmin.s  ft4, ft4, ft0               ; Clamp to 1.0
+
+        ; Compute spline.
+        fadd.s  ft0, ft4, ft4               ; 2*t
+        flw     ft1, .three(zero)           ; 3
+        fsub.s  ft0, ft1, ft0               ; 3 - 2*t
+        fmul.s  ft0, ft0, ft4               ; t*(3 - 2*t)
+        fmul.s  ft0, ft0, ft4               ; t*t*(3 - 2*t)
+
+.smoothstep_return:
+        ; Return value.
+        fsw     ft0, 8(sp)
+
+        ; Restore registers.
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
+        flw     ft3, -16(sp)
+        flw     ft4, -20(sp)
+        lw      a0, -24(sp)
+
+        ; We took three parameters and return one, so fix up stack.
+        addi    sp, sp, 8
+
+        ; Return.
+        jalr    x0, ra, 0
 
 .normalize1:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied

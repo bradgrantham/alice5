@@ -611,6 +611,14 @@ static void runLibraryTest(GPUEmuDebugOptions *debugOptions, CoreParameters *tmp
     tryTernaryFunction(debugOptions, tmpl, ".clamp", fclamp, -2.18, -29.49, 19.39, errors);
     tryTernaryFunction(debugOptions, tmpl, ".clamp", fclamp, 25.18, -29.49, 19.39, errors);
 
+    // .smoothstep
+    tryTernaryFunction(debugOptions, tmpl, ".smoothstep", smoothstep, -29.49, 19.39, -12.18, errors);
+    tryTernaryFunction(debugOptions, tmpl, ".smoothstep", smoothstep, -29.49, 19.39, -32.18, errors);
+    tryTernaryFunction(debugOptions, tmpl, ".smoothstep", smoothstep, -29.49, 19.39, -2.18, errors);
+    tryTernaryFunction(debugOptions, tmpl, ".smoothstep", smoothstep, -29.49, 19.39, 25.18, errors);
+    tryTernaryFunction(debugOptions, tmpl, ".smoothstep", smoothstep, 0.0, 0.0, 0.0, errors);
+    tryTernaryFunction(debugOptions, tmpl, ".smoothstep", smoothstep, 0.0, 0.0, 1.0, errors);
+
     std::cout << errors << " test errors.\n";
 }
 
