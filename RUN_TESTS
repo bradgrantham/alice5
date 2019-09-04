@@ -3,20 +3,20 @@
 set -e
 
 interpret=true
-compile=false
+emulate=false
 simulate=false
 
-if [ "$1" == "--compile" ]; then
-    compile=true
+if [ "$1" == "--emu" ]; then
+    emulate=true
     interpret=false
     shift
 elif [ "$1" == "--sim" ]; then
-    compile=false
+    emulate=false
     interpret=false
     simulate=true
     shift
 elif [ "$1" == "--all" ]; then
-    compile=true
+    emulate=true
     simulate=true
     shift
 fi
@@ -36,16 +36,16 @@ do
         ./shade --term -f 90 90 shaders/$shader.frag
         mv image0090.ppm $shader-interpret.ppm
     fi
-    if [ "$compile" = true -o "$simulate" = true ]; then
+    if [ "$emulate" = true -o "$simulate" = true ]; then
         ./shade -c -O -o x.s shaders/$shader.frag > /dev/null && \
         ./as -v x.s > x.lst
     fi
-    if [ "$compile" = true ]; then
+    if [ "$emulate" = true ]; then
         ./emu --subst -f 90 --term x.o && \
-        mv emulated.ppm $shader-compile.ppm
+        mv emulated.ppm $shader-emulate.ppm
     fi
     if [ "$simulate" = true ]; then
-        ./gpu/sim/obj_dir/VMain -j 1 -f 90 --term x.o && \
+        ./gpu/sim/obj_dir/VMain -f 90 --term x.o && \
         mv emulated.ppm $shader-simulate.ppm
     fi
 done
