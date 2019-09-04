@@ -1577,8 +1577,56 @@ atanTable_f32:
         jalr x0, ra, 0
 
 .normalize3:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; Save registers.
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
+        fsw     ft3, -16(sp)
+        fsw     ft4, -20(sp)
+        sw      ra, -24(sp)
+
+        ; Parameters.
+        flw     ft0, 0(sp)                  ; x
+        flw     ft1, 4(sp)                  ; y
+        flw     ft2, 8(sp)                  ; z
+
+        fmul.s  ft3, ft0, ft0               ; x^2
+        fmul.s  ft4, ft1, ft1               ; y^2
+        fadd.s  ft3, ft3, ft4               ; x^2 + y^2
+        fmul.s  ft4, ft2, ft2               ; z^2
+        fadd.s  ft3, ft3, ft4               ; x^2 + y^2 + z^2
+
+        ; Compute sqrt().
+        addi    sp, sp, -28                 ; Make room on stack.
+        fsw     ft3, 0(sp)                  ; Store parameter.
+        jal     ra, .sqrt                   ; Call our sqrt function.
+        flw     ft3, 0(sp)                  ; Pop result.
+        addi    sp, sp, 28                  ; Restore stack.
+
+        ; Compute sqrt() reciprocal.
+        flw     ft4, .one(zero)             ; 1.0
+        fdiv.s  ft3, ft4, ft3               ; 1.0/sqrt()
+
+        ; Divide vector by length.
+        fmul.s  ft0, ft0, ft3               ; x /= sqrt()
+        fmul.s  ft1, ft1, ft3               ; y /= sqrt()
+        fmul.s  ft2, ft2, ft3               ; z /= sqrt()
+
+        ; Return values.
+        fsw     ft0, 0(sp)
+        fsw     ft1, 4(sp)
+        fsw     ft2, 8(sp)
+
+        ; Restore registers.
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
+        flw     ft3, -16(sp)
+        flw     ft4, -20(sp)
+        lw      ra, -24(sp)
+
+        ; Return.
+        jalr    x0, ra, 0
 
 .normalize4:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
