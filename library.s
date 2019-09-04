@@ -2368,8 +2368,62 @@ atanTable_f32:
         jalr x0, ra, 0
 
 .distance3:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; Save registers.
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
+        fsw     ft3, -16(sp)
+        fsw     ft4, -20(sp)
+        fsw     ft5, -24(sp)
+        fsw     ft6, -28(sp)
+        fsw     ft7, -32(sp)
+        sw      ra, -36(sp)
+
+        ; Parameters.
+        flw     ft0, 0(sp)                  ; x1
+        flw     ft1, 4(sp)                  ; y1
+        flw     ft2, 8(sp)                  ; z1
+        flw     ft3, 12(sp)                 ; x2
+        flw     ft4, 16(sp)                 ; y2
+        flw     ft5, 20(sp)                 ; z2
+
+        fsub.s  ft6, ft0, ft3               ; x2 - x1
+        fmul.s  ft7, ft6, ft6               ; (x2 - x1)^2
+
+        fsub.s  ft6, ft1, ft4               ; y2 - y1
+        fmul.s  ft6, ft6, ft6               ; (y2 - y1)^2
+        fadd.s  ft7, ft7, ft6               ; (x2 - x1)^2 + (y2 - y1)^2
+
+        fsub.s  ft6, ft2, ft5               ; z2 - z1
+        fmul.s  ft6, ft6, ft6               ; (z2 - z1)^2
+        fadd.s  ft7, ft7, ft6               ; (x2 - x1)^2 + (y2 - y1)^2 + (z2 - z1)^2
+
+        ; Compute sqrt().
+        addi    sp, sp, -40                 ; Make room on stack.
+        fsw     ft7, 0(sp)                  ; Store parameter.
+        jal     ra, .sqrt                   ; Call our sqrt function.
+        flw     ft0, 0(sp)                  ; Pop result.
+        addi    sp, sp, 40                  ; Restore stack.
+
+        ; Return value.
+        fsw     ft0, 20(sp)
+
+        ; Restore registers.
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
+        flw     ft3, -16(sp)
+        flw     ft4, -20(sp)
+        flw     ft5, -24(sp)
+        flw     ft6, -28(sp)
+        flw     ft7, -32(sp)
+        lw      ra, -36(sp)
+
+        ; We took six parameters and return one, so fix up stack.
+        addi    sp, sp, 20
+
+        ; Return.
+        jalr    x0, ra, 0
 
 .distance4:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
