@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 interpret=true
 compile=false
 simulate=false
@@ -39,11 +41,11 @@ do
         ./shade -c -O -o x.s shaders/$shader.frag > /dev/null && \
         ./as -v x.s > x.lst
     fi
-    if [ "$compile" = true -a -e x.o ]; then
+    if [ "$compile" = true ]; then
         ./emu --subst -f 90 --term x.o && \
         mv emulated.ppm $shader-compile.ppm
     fi
-    if [ "$simulate" = true -a -e x.o ]; then
+    if [ "$simulate" = true ]; then
         ./gpu/sim/obj_dir/VMain -j 1 -f 90 --term x.o && \
         mv emulated.ppm $shader-simulate.ppm
     fi
