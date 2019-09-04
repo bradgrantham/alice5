@@ -37,7 +37,6 @@ do
         mv image0090.ppm $shader-interpret.ppm
     fi
     if [ "$compile" = true -o "$simulate" = true ]; then
-        rm x.o
         ./shade -c -O -o x.s shaders/$shader.frag > /dev/null && \
         ./as -v x.s > x.lst
     fi
