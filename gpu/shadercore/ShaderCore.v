@@ -42,6 +42,21 @@ module ShaderCore
     localparam STATE_HALTED /* verilator public */ = 4'd10;
     reg [3:0] state /* verilator public */;
 
+    // ALU operations.  In Verilator, the syntax "alu.ALU_OP_ADD" pulls
+    // this parameter from the submodule.  Quartus doesn't understand this,
+    // so we mirror them from ALU.v here.
+    localparam ALU_OP_ADD = 4'd1;
+    localparam ALU_OP_SUB = 4'd2;
+    localparam ALU_OP_SLL = 4'd3;
+    localparam ALU_OP_SRL = 4'd4;
+    localparam ALU_OP_SRA = 4'd5;
+    localparam ALU_OP_XOR = 4'd6;
+    localparam ALU_OP_AND = 4'd7;
+    localparam ALU_OP_OR = 4'd8;
+    localparam ALU_OP_SLT = 4'd9;
+    localparam ALU_OP_SLTU = 4'd10;
+    localparam ALU_OP_NONE = 4'd11;
+
     reg [WORD_WIDTH-1:0] PC /* verilator public */;
 
     // instruction latched for inst decoder
@@ -52,7 +67,7 @@ module ShaderCore
     wire [WORD_WIDTH-1:0] float_rs1_value /* verilator public */;
     wire [WORD_WIDTH-1:0] float_rs2_value /* verilator public */;
     reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;
-    reg [WORD_WIDTH-1:0] alu_result /* verilator public */ ;
+    wire [WORD_WIDTH-1:0] alu_result /* verilator public */ ;
     reg [WORD_WIDTH-1:0] rd_value /* verilator public */;
     reg [WORD_WIDTH-1:0] float_rd_value;
     reg enable_write_rd;
@@ -279,24 +294,24 @@ module ShaderCore
         $signed(32'hcafebabe);
 
     wire [3:0] alu_reg_imm_operator /* verilator public */ =
-        (decode_funct3_rm == 0) ? alu.ALU_OP_ADD :
-        (decode_funct3_rm == 1) ? alu.ALU_OP_SLL :
-        (decode_funct3_rm == 2) ? alu.ALU_OP_SLT :
-        (decode_funct3_rm == 3) ? alu.ALU_OP_SLTU :
-        (decode_funct3_rm == 4) ? alu.ALU_OP_XOR :
-        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? alu.ALU_OP_SRL : alu.ALU_OP_SRA) :
-        (decode_funct3_rm == 6) ? alu.ALU_OP_OR :
-        /* (decode_funct3_rm == 7) ? */ alu.ALU_OP_AND; // has to be AND
+        (decode_funct3_rm == 0) ? ALU_OP_ADD :
+        (decode_funct3_rm == 1) ? ALU_OP_SLL :
+        (decode_funct3_rm == 2) ? ALU_OP_SLT :
+        (decode_funct3_rm == 3) ? ALU_OP_SLTU :
+        (decode_funct3_rm == 4) ? ALU_OP_XOR :
+        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? ALU_OP_SRL : ALU_OP_SRA) :
+        (decode_funct3_rm == 6) ? ALU_OP_OR :
+        /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
 
     wire [3:0] alu_reg_reg_operator =
-        (decode_funct3_rm == 0) ? (decode_opcode_add_is_add ? alu.ALU_OP_ADD : alu.ALU_OP_SUB) :
-        (decode_funct3_rm == 1) ? alu.ALU_OP_SLL :
-        (decode_funct3_rm == 2) ? alu.ALU_OP_SLT :
-        (decode_funct3_rm == 3) ? alu.ALU_OP_SLTU :
-        (decode_funct3_rm == 4) ? alu.ALU_OP_XOR :
-        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? alu.ALU_OP_SRL : alu.ALU_OP_SRA) :
-        (decode_funct3_rm == 6) ? alu.ALU_OP_OR :
-        /* (decode_funct3_rm == 7) ? */ alu.ALU_OP_AND; // has to be AND
+        (decode_funct3_rm == 0) ? (decode_opcode_add_is_add ? ALU_OP_ADD : ALU_OP_SUB) :
+        (decode_funct3_rm == 1) ? ALU_OP_SLL :
+        (decode_funct3_rm == 2) ? ALU_OP_SLT :
+        (decode_funct3_rm == 3) ? ALU_OP_SLTU :
+        (decode_funct3_rm == 4) ? ALU_OP_XOR :
+        (decode_funct3_rm == 5) ? (decode_opcode_shift_is_logical ? ALU_OP_SRL : ALU_OP_SRA) :
+        (decode_funct3_rm == 6) ? ALU_OP_OR :
+        /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
 
     assign alu_operator =
         decode_opcode_is_ALU_reg_imm ? alu_reg_imm_operator :
@@ -309,8 +324,8 @@ module ShaderCore
             decode_opcode_is_load ||
             decode_opcode_is_flw ||
             decode_opcode_is_fsw ||
-            decode_opcode_is_store ) ? alu.ALU_OP_ADD :
-        alu.ALU_OP_NONE;
+            decode_opcode_is_store ) ? ALU_OP_ADD :
+        ALU_OP_NONE;
 
     ALU #(.WORD_WIDTH(WORD_WIDTH))
         alu 

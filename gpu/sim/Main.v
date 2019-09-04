@@ -50,10 +50,10 @@ module Main(
             .read_address({2'b00, data_ram_address[ADDRESS_WIDTH-1:2]}),
             .read_data(data_ram_out_data));
 
-    reg [ADDRESS_WIDTH-1:0] shadercore_inst_address;
-    reg [ADDRESS_WIDTH-1:0] shadercore_data_address;
-    reg [WORD_WIDTH-1:0] shadercore_data_write_data;
-    reg shadercore_enable_write_data;
+    wire [ADDRESS_WIDTH-1:0] shadercore_inst_address;
+    wire [ADDRESS_WIDTH-1:0] shadercore_data_address;
+    wire [WORD_WIDTH-1:0] shadercore_data_write_data;
+    wire shadercore_enable_write_data;
 
     ShaderCore #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
         shaderCore(
