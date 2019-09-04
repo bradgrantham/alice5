@@ -25,8 +25,8 @@ wire signed [7:0] exponent = exp_part - 127;
 
 // Detect special cases.
 wire exp_part_all_on = &exp_part;
-wire exp_part_all_off = !|exp_part;
-wire fract_part_all_off = !|fract_part;
+wire exp_part_all_off = !(|exp_part);
+wire fract_part_all_off = !(|fract_part);
 
 wire is_inf = exp_part_all_on & fract_part_all_off;
 wire is_qnan = exp_part_all_on & fract_part[22];

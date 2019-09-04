@@ -48,7 +48,7 @@ always @(*) begin
     endcase
 end
 
-wire is_zero = !|op;
+wire is_zero = !(|op);
 wire [7:0] exp_part = 8'd127 + {3'd0, shift};
 wire [22:0] fract_part = shift < 23 ? abs_op << (23 - shift) : abs_op >> (shift - 23);
 assign res = is_zero ? 32'h0 : { sign, exp_part, fract_part };
