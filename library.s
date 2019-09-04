@@ -2183,8 +2183,54 @@ atanTable_f32:
         jalr x0, ra, 0
 
 .cross:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; Save registers.
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
+        fsw     ft3, -16(sp)
+        fsw     ft4, -20(sp)
+        fsw     ft5, -24(sp)
+        fsw     ft6, -28(sp)
+        fsw     ft7, -32(sp)
+
+        ; Parameters.
+        flw     ft0, 0(sp)                  ; v1[0]
+        flw     ft1, 4(sp)                  ; v1[1]
+        flw     ft2, 8(sp)                  ; v1[2]
+        flw     ft3, 12(sp)                 ; v2[0]
+        flw     ft4, 16(sp)                 ; v2[1]
+        flw     ft5, 20(sp)                 ; v2[2]
+
+        fmul.s  ft6, ft1, ft5               ; v1[1]*v2[2]
+        fmul.s  ft7, ft4, ft2               ; v2[1]*v1[2]
+        fsub.s  ft6, ft6, ft7               ; v1[1]*v2[2] - v2[1]*v1[2]
+        fsw     ft6, 12(sp)                 ; Store cross[0]
+
+        fmul.s  ft6, ft2, ft3               ; v1[2]*v2[0]
+        fmul.s  ft7, ft5, ft0               ; v2[2]*v1[0]
+        fsub.s  ft6, ft6, ft7               ; v1[2]*v2[0] - v2[2]*v1[0]
+        fsw     ft6, 16(sp)                 ; Store cross[1]
+
+        fmul.s  ft6, ft0, ft4               ; v1[0]*v2[1]
+        fmul.s  ft7, ft3, ft1               ; v2[0]*v1[1]
+        fsub.s  ft6, ft6, ft7               ; v1[0]*v2[1] - v2[0]*v1[1]
+        fsw     ft6, 20(sp)                 ; Store cross[2]
+
+        ; Restore registers.
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
+        flw     ft3, -16(sp)
+        flw     ft4, -20(sp)
+        flw     ft5, -24(sp)
+        flw     ft6, -28(sp)
+        flw     ft7, -32(sp)
+
+        ; We took six parameters and return three, so fix up stack.
+        addi    sp, sp, 12
+
+        ; Return.
+        jalr    x0, ra, 0
 
 .log:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
