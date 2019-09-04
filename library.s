@@ -1530,8 +1530,28 @@ atanTable_f32:
         jalr x0, ra, 0
 
 .clamp:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; Save registers.
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+
+        flw     ft0, 0(sp)                  ; Parameter x.
+        flw     ft1, 4(sp)                  ; Parameter minVal.
+        fmax.s  ft0, ft0, ft1               ; max(x, minVal).
+        flw     ft1, 8(sp)                  ; Parameter maxVal.
+        fmin.s  ft0, ft0, ft1               ; min(max(x, minVal), maxVal).
+
+        ; Return value.
+        fsw     ft0, 8(sp)
+
+        ; Restore registers.
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+
+        ; We took three parameters and return one, so fix up stack.
+        addi    sp, sp, 8
+
+        ; Return.
+        jalr    x0, ra, 0
 
 .mix:
         ; Mixes between x and y according to a: x*(1.0 - a) + y*a

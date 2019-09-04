@@ -605,6 +605,12 @@ static void runLibraryTest(GPUEmuDebugOptions *debugOptions, CoreParameters *tmp
     tryTernaryFunction(debugOptions, tmpl, ".mix", fmix, -12.18, 182.181, 0.0, errors);
     tryTernaryFunction(debugOptions, tmpl, ".mix", fmix, -12.18, 182.181, 1.0, errors);
 
+    // .clamp
+    tryTernaryFunction(debugOptions, tmpl, ".clamp", fclamp, -12.18, -29.49, 19.39, errors);
+    tryTernaryFunction(debugOptions, tmpl, ".clamp", fclamp, -32.18, -29.49, 19.39, errors);
+    tryTernaryFunction(debugOptions, tmpl, ".clamp", fclamp, -2.18, -29.49, 19.39, errors);
+    tryTernaryFunction(debugOptions, tmpl, ".clamp", fclamp, 25.18, -29.49, 19.39, errors);
+
     std::cout << errors << " test errors.\n";
 }
 
