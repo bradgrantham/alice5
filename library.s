@@ -1476,8 +1476,61 @@ atanTable_f32:
         jalr x0, ra, 0
 
 .reflect3:
-        addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
-        jalr x0, ra, 0
+        ; Save registers.
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
+        fsw     ft2, -12(sp)
+        fsw     ft3, -16(sp)
+        fsw     ft4, -20(sp)
+        fsw     ft5, -24(sp)
+        fsw     ft6, -28(sp)
+        fsw     ft7, -32(sp)
+
+        ; Parameters.
+        flw     ft0, 0(sp)                  ; ix
+        flw     ft1, 4(sp)                  ; iy
+        flw     ft2, 8(sp)                  ; iz
+        flw     ft3, 12(sp)                 ; nx
+        flw     ft4, 16(sp)                 ; ny
+        flw     ft5, 20(sp)                 ; nz
+
+        ; Dot product of i and n.
+        fmul.s  ft6, ft0, ft3               ; ix*nx
+        fmul.s  ft7, ft1, ft4               ; iy*ny
+        fadd.s  ft6, ft6, ft7               ; ix*nx + iy*ny
+        fmul.s  ft7, ft2, ft5               ; iz*nz
+        fadd.s  ft6, ft6, ft7               ; ix*nx + iy*ny + iz*nz
+
+        ; Double dot product.
+        fadd.s  ft6, ft6, ft6
+
+        fmul.s  ft7, ft6, ft3               ; 2*dot*nx
+        fsub.s  ft0, ft0, ft7               ; ix - 2*dot*nx
+        fsw     ft0, 12(sp)
+
+        fmul.s  ft7, ft6, ft4               ; 2*dot*ny
+        fsub.s  ft1, ft1, ft7               ; iy - 2*dot*ny
+        fsw     ft1, 16(sp)
+
+        fmul.s  ft7, ft6, ft5               ; 2*dot*nz
+        fsub.s  ft2, ft2, ft7               ; iz - 2*dot*nz
+        fsw     ft2, 20(sp)
+
+        ; Restore registers.
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
+        flw     ft2, -12(sp)
+        flw     ft3, -16(sp)
+        flw     ft4, -20(sp)
+        flw     ft5, -24(sp)
+        flw     ft6, -28(sp)
+        flw     ft7, -32(sp)
+
+        ; We took six parameters and return three, so fix up stack.
+        addi    sp, sp, 12
+
+        ; Return.
+        jalr    x0, ra, 0
 
 .reflect4:
         addi x0, x0, 0  ; NOP caught by gpuemu; functionality will be proxied
