@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
     std::cout << "--------------------------- Float to int\n";
 
     // Test float-to-int.
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 25; i++) {
         float op;
         switch (i) {
             case 0:
@@ -191,12 +191,17 @@ int main(int argc, char **argv) {
                 op = -0.0;
                 break;
 
+            case 10:
+                op = -0.896246;
+                break;
+
             default:
                 op = rand_float()*1000 - 500;
                 break;
         }
 
         top->float_to_int_op = float_to_bits(op);
+        top->float_to_int_rmode = 1;
 
         // Unclocked.
         top->eval();

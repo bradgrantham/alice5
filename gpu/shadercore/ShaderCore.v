@@ -322,10 +322,6 @@ module ShaderCore
             .result(alu_result)
         );
 
-    // RISC-V rounding modes in order are RNE, RTZ, RDN, RUP
-    // RDN and RUP
-    reg [1:0] rounding_mode_reg;
-
     wire opcode_uses_fpu =
         decode_opcode_is_fadd ||
         decode_opcode_is_fsub ||
@@ -338,6 +334,7 @@ module ShaderCore
         // XXX decode_opcode_is_fcvt_f2i
         // XXX decode_opcode_is_fcvt_i2f
     reg [2:0] fpu_op;
+    reg [1:0] fpu_rmode;
     wire [31:0] fpu_result;
     wire fpu_inf;
     wire fpu_snan;
@@ -351,7 +348,7 @@ module ShaderCore
         fpu
         (
             .clk(clock),
-            .rmode(rmode),
+            .rmode(fpu_rmode),
             .fpu_op(fpu_op),
             .opa(float_rs1_value),
             .opb(float_rs2_value),
@@ -393,6 +390,7 @@ module ShaderCore
         float_to_int
         (
             .op(float_rs1_value),
+            .rmode(fpu_rmode),
             .res(float_to_int_result)
         );
 
@@ -468,7 +466,8 @@ module ShaderCore
                             decode_opcode_is_fdiv ? 3 :
                             7; /* XXX undefined */
 
-                        rounding_mode_reg <=
+                        // RISC-V rounding modes in order are RNE, RTZ, RDN, RUP
+                        fpu_rmode <=
                             (decode_funct3_rm == 0) ? 0 :
                             (decode_funct3_rm == 1) ? 1 :
                             (decode_funct3_rm == 2) ? 3 :

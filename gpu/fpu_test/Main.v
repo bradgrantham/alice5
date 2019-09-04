@@ -18,6 +18,7 @@ module Main(
     output wire cmp_inf, cmp_zero,
 
     input wire [31:0] float_to_int_op,
+    input wire [1:0] float_to_int_rmode,
     output wire [31:0] float_to_int_res,
 
     input wire [31:0] int_to_float_op,
@@ -52,6 +53,7 @@ fcmp fcmp(
 
 float_to_int float_to_int(
     .op(float_to_int_op),
+    .rmode(float_to_int_rmode),
     .res(float_to_int_res));
 
 int_to_float int_to_float(
