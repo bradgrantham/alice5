@@ -39,13 +39,11 @@ do
         ./shade -c -O -o x.s shaders/$shader.frag > /dev/null && \
         ./as -v x.s > x.lst
     fi
-    if [ "$compile" = true ]; then
-        dd if=x.o bs=1 count=1 of=/dev/null 2>/dev/null && \
+    if [ "$compile" = true -a -e x.o ]; then
         ./emu --subst -f 90 --term x.o && \
         mv emulated.ppm $shader-compile.ppm
     fi
-    if [ "$simulate" = true ]; then
-        dd if=x.o bs=1 count=1 of=/dev/null 2>/dev/null && \
+    if [ "$simulate" = true -a -e x.o ]; then
         ./gpu/sim/obj_dir/VMain -j 1 -f 90 --term x.o && \
         mv emulated.ppm $shader-simulate.ppm
     fi
