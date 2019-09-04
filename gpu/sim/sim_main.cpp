@@ -305,8 +305,8 @@ struct CoreShared
     unsigned char *img;
     std::mutex rendererMutex;
 
-    // Number of rows still left to shade (for progress report).
-    std::atomic_int rowsLeft;
+    // Number of pixels still left to shade (for progress report).
+    std::atomic_int pixelsLeft;
 
     // These require exclusion using rendererMutex
     uint64_t clocksCount = 0;
@@ -346,36 +346,33 @@ struct SimDebugOptions
 };
 
 // Thread to show progress to the user.
-void showProgress(const CoreParameters* params, CoreShared* shared, std::chrono::time_point<std::chrono::steady_clock> startTime)
+void showProgress(const CoreParameters* params, CoreShared* shared, std::chrono::time_point<std::chrono::steady_clock> startTime, int totalPixels)
 {
-    int totalRows = params->afterLastY - params->startY;
-
     while(true) {
-        int left = shared->rowsLeft;
-        if (left == 0) {
+        int pixelsLeft = shared->pixelsLeft;
+        if (pixelsLeft == 0) {
             break;
         }
 
-        std::cout << left << " rows left of " << totalRows;
+        printf("%.2f%% done", (totalPixels - pixelsLeft)*100.0/totalPixels);
 
         // Estimate time left.
-        if (left != totalRows) {
+        if (pixelsLeft != totalPixels) {
             auto now = std::chrono::steady_clock::now();
             auto elapsedTime = now - startTime;
             auto elapsedSeconds = double(elapsedTime.count())*
                 std::chrono::steady_clock::period::num/
                 std::chrono::steady_clock::period::den;
-            auto secondsLeft = elapsedSeconds*left/(totalRows - left);
+            auto secondsLeft = int(elapsedSeconds*pixelsLeft/(totalPixels - pixelsLeft));
 
-            std::cout << " (" << int(secondsLeft) << " seconds left)   ";
+            int minutesLeft = secondsLeft/60;
+            secondsLeft -= minutesLeft*60;
+            printf(" (%d:%02d left)   ", minutesLeft, secondsLeft);
         }
         std::cout << "\r";
         std::cout.flush();
 
-        // Wait one second while polling.
-        for (int i = 0; i < 100 && shared->rowsLeft > 0; i++) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     // Clear the line.
@@ -635,8 +632,8 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             int pixelOffset = 3 * ((params->imageHeight - 1 - j) * params->imageWidth + i);
             for(int c = 0; c < 3; c++)
                 shared->img[pixelOffset + c] = std::clamp(int(rgb[c] * 255.99), 0, 255);
+            shared->pixelsLeft --;
         }
-        shared->rowsLeft --;
     }
     {
         std::scoped_lock l(shared->rendererMutex);
@@ -845,14 +842,17 @@ int main(int argc, char **argv)
 
     std::vector<std::thread *> thread;
 
+    int totalPixels = (params.afterLastY - params.startY)*(params.afterLastX - params.startX);
+    shared.pixelsLeft = totalPixels;
+
     for (int t = 0; t < threadCount; t++) {
         thread.push_back(new std::thread(render, &debugOptions, &params, &shared, params.startY + t, threadCount));
     }
 
     // Progress information.
     Timer frameElapsed;
-    shared.rowsLeft = params.afterLastY - params.startY;
-    thread.push_back(new std::thread(showProgress, &params, &shared, frameElapsed.startTime()));
+    thread.push_back(new std::thread(showProgress, &params, &shared,
+                frameElapsed.startTime(), totalPixels));
 
     // Wait for worker threads to quit.
     while(!thread.empty()) {
