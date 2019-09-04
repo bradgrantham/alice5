@@ -3,8 +3,8 @@ module Main(
     input wire clock,
     input wire reset_n,
     input wire run, // hold low and release reset to write inst and data
-    output reg halted,
-    output reg exception,
+    output wire halted,
+    output wire exception,
 
     input wire [15:0] ext_write_address,
     input wire [31:0] ext_write_data,
