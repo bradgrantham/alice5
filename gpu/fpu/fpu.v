@@ -475,8 +475,8 @@ always @(posedge clk)
 always @(posedge clk)
 	snan <= #1 snan_d;
 
-// synopsys translate_off
 `ifdef notdef
+// synopsys translate_off
 wire		mul_uf_del;
 wire		uf2_del, ufb2_del, ufc2_del,  underflow_d_del;
 wire		co_del;

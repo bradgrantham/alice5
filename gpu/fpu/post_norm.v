@@ -536,8 +536,8 @@ assign ine =	op_f2i ? f2i_ine :
 // ---------------------------------------------------------------------
 // Debugging Stuff
 
-// synopsys translate_off
 `ifdef notdef
+// synopsys translate_off
 
 wire	[26:0]	fracta_del, fractb_del;
 wire	[2:0]	grs_del;
@@ -624,8 +624,8 @@ always @(test.error_event)
 
 endmodule
 
-// synopsys translate_off
 `ifdef notdef
+// synopsys translate_off
 
 module delay1(clk, in, out);
 parameter	N = 1;
