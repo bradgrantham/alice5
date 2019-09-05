@@ -853,7 +853,8 @@ int main(int argc, char **argv)
     std::cout << shared.dispatchedCount << " instructions executed.\n";
     float fps = 50000000.0f / shared.dispatchedCount;
     std::cout << fps << " fps estimated at 50 MHz.\n";
-    std::cout << "at least " << (int)ceilf(5.0 / fps) << " cores required at 50 MHz for 5 fps.\n";
+    float wvgaFps = fps * tmpl.imageWidth / 800 * tmpl.imageHeight / 480;
+    std::cout << "at least " << (int)ceilf(5.0 / wvgaFps) << " cores required at 50 MHz for 5 fps at 800x480.\n";
 
     FILE *fp = fopen("emulated.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", tmpl.imageWidth, tmpl.imageHeight);

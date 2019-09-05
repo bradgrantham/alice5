@@ -870,7 +870,8 @@ int main(int argc, char **argv)
     std::cout << shared.clocksCount << " clocks cycled.\n";
     float fps = 50000000.0f / shared.clocksCount;
     std::cout << fps << " fps estimated at 50 MHz.\n";
-    std::cout << "at least " << (int)ceilf(5.0 / fps) << " cores required at 50 MHz for 5 fps.\n";
+    float wvgaFps = fps * params.imageWidth / 800 * params.imageHeight / 480;
+    std::cout << "at least " << (int)ceilf(5.0 / wvgaFps) << " cores required at 50 MHz for 5 fps at 800x480.\n";
 
     FILE *fp = fopen("emulated.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", params.imageWidth, params.imageHeight);
