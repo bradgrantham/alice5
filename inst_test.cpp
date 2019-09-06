@@ -100,6 +100,18 @@ std::vector<InstTest> tests = {
             {0x48, 0x100}, {0x4C, 0x200},
         }, {}, {}, {},
     },
+    {
+        "fpu",
+        "fpu.s",
+        {}, { },
+        {
+            {0x0, {0.5, 0.0}},
+            {0x4, {2.0, 0.0}},
+            {0x8, {1.5, 0.0}},
+            {0xC, {-.5, 0.0}},
+        },
+        {}, {},
+    },
 };
 
 std::string readFileContents(std::string fileName)
@@ -164,10 +176,10 @@ bool runTest(const InstTest& test, const std::string& engineCommand, std::map<ui
         uint32_t addr = mem.first;
         uint32_t value = mem.second;
         if(memoryResults.find(addr) == memoryResults.end()) {
-            std::cerr << "internal error: didn't find value for address 0x" << to_hex(addr) << " in emu results!\n";
+            std::cerr << "error, \"" << test.name << "\", didn't find value for address 0x" << to_hex(addr) << " in return from engine\n";
             return false;
         } else if(memoryResults[addr] != value) {
-            std::cerr << "error: value 0x" << to_hex(memoryResults[addr]) << " at address 0x" << to_hex(addr) << " doesn't match expected value 0x" << to_hex(value) << "\n";
+            std::cerr << "error, \"" << test.name << "\", value 0x" << to_hex(memoryResults[addr]) << " at address 0x" << to_hex(addr) << " doesn't match expected value 0x" << to_hex(value) << "\n";
             passed = false;
         }
     }
@@ -176,12 +188,12 @@ bool runTest(const InstTest& test, const std::string& engineCommand, std::map<ui
         uint32_t addr = mem.first;
         ApproximateFloat value = mem.second;
         if(memoryResults.find(addr) == memoryResults.end()) {
-            std::cerr << "internal error: didn't find value for address 0x" << to_hex(addr) << " in emu results!\n";
+            std::cerr << "error, \"" << test.name << "\", didn't find value for address 0x" << to_hex(addr) << " in return from engine\n";
             return false;
         } else {
             float value2 = intToFloat(memoryResults[addr]);
             if(!nearlyEqual(value.first, value2, value.second)) {
-                std::cerr << "error: value " << value2 << " at address 0x" << to_hex(addr) << " isn't within " << value.second << " of expected value " << value.first << "\n";
+                std::cerr << "error, \"" << test.name << "\", value " << value2 << " at address 0x" << to_hex(addr) << " isn't within " << value.second << " of expected value " << value.first << "\n";
                 passed = false;
             }
         }
@@ -204,11 +216,11 @@ int main(int argc, char **argv)
     for(const auto& test: tests) {
         std::string actualSourceFileName = "inst_test_sources/" + test.assemblyFileName;
 
-        std::string assemblerCommand = std::string("./as -o /tmp/x.o ") + actualSourceFileName;
+        std::string assemblerCommand = std::string("./as -o /tmp/x.o ") + actualSourceFileName + " >/tmp/x.out 2>&1";
         int result = system(assemblerCommand.c_str());
 
         if(result != 0) {
-            std::cerr << "failed assembling " << actualSourceFileName << "!  Test " << test.name << " skipped.\n";
+            std::cerr << "error, " << test.name << ", failed assembling " << actualSourceFileName << "\n";
             failedTestsCount++;
         } else {
 
