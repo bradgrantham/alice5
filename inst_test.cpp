@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 // Union for converting from float to int and back.
 union FloatUint32 {
@@ -183,7 +184,13 @@ bool runTest(const InstTest& test, const std::string& engineCommand, std::map<ui
 int main(int argc, char **argv)
 {
     int failedTestsCount = 0;
-    std::string engineName = "./emu";
+
+    if(argc < 2) {
+        std::cout << "usage: " << argv[0] << " engine # e.g. emu or gpu/sim/obj_dir/VMain\n";
+        exit(EXIT_FAILURE);
+    }
+
+    std::string engineName = argv[1];
 
     for(const auto& test: tests) {
         std::string actualSourceFileName = "gpuemutest/" + test.assemblyFileName;
@@ -200,6 +207,7 @@ int main(int argc, char **argv)
 
             std::map<uint32_t, uint32_t> memoryResults;
 
+            std::cout << "command " << engineCommand << "\n";
             bool passed = runTest(test, engineCommand, memoryResults);
             if(!passed) {
                 failedTestsCount++;
