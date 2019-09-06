@@ -79,6 +79,14 @@ struct InstTest
 
 std::vector<InstTest> tests = {
     {
+        "loadstore",
+        "loadstore.s",
+        {},
+        {
+            {0x4, 0x31415927},
+        }, {}, {}, {},
+    },
+    {
         "fclass.s",
         "fclass.s",
         {},
@@ -86,11 +94,8 @@ std::vector<InstTest> tests = {
             {0x28, 0x1}, {0x2C, 0x2}, {0x30, 0x4}, {0x34, 0x8},
             {0x38, 0x10}, {0x3C, 0x20}, {0x40, 0x40}, {0x44, 0x80},
             {0x48, 0x100}, {0x4C, 0x200},
-        },
-        {},
-        {},
-        {},
-    }
+        }, {}, {}, {},
+    },
 };
 
 std::string readFileContents(std::string fileName)
@@ -207,7 +212,6 @@ int main(int argc, char **argv)
 
             std::map<uint32_t, uint32_t> memoryResults;
 
-            std::cout << "command " << engineCommand << "\n";
             bool passed = runTest(test, engineCommand, memoryResults);
             if(!passed) {
                 failedTestsCount++;
