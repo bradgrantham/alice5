@@ -378,6 +378,46 @@ module ShaderCore
             .div_by_zero(fpu_div_by_zero)
         );
 
+    // https://blogs.msdn.microsoft.com/premk/2006/02/25/ieee-754-floating-point-special-values-and-ranges/
+    // infinity is exponent all 1s and mantissa all 0s
+    wire fclass_is_inf = &float_rs1_value[30:23] && !(|float_rs1_value[22:0]);
+    // denorm is exponent all 0s and mantissa is not 0s
+    wire fclass_is_denorm = !(|float_rs1_value[30:23]) && (|float_rs1_value[22:0]);
+    // normal is exponent not all 1s and not all 0s.
+    wire fclass_is_normal = !(&float_rs1_value[30:23]) && (|float_rs1_value[30:23]);
+    // zero is every bit 0
+    wire fclass_is_zero = !(|float_rs1_value[30:0]);
+    // sign is bit 31
+    wire fclass_is_negative = float_rs1_value[31];
+    wire fclass_is_positive = !float_rs1_value[31];
+
+    // signaling NaN has exponent all 1s and bit 22 = 0 and bit 21 = 1 and remaining mantissa bits 0s
+    wire fclass_is_snan = &float_rs1_value[30:23] && (!float_rs1_value[22]) & (|float_rs1_value[21:0]);
+    // quiet NaN has exponent all 1s and bit 22 1s and remaining mantissa bits 0
+    wire fclass_is_qnan = float_rs1_value[22];
+
+    wire fclass_is_pos_inf = fclass_is_inf && fclass_is_positive;
+    wire fclass_is_pos_normal = fclass_is_normal && fclass_is_positive;
+    wire fclass_is_pos_denorm = fclass_is_denorm && fclass_is_positive;
+    wire fclass_is_pos_zero = fclass_is_zero && fclass_is_positive;
+    wire fclass_is_neg_zero = fclass_is_zero && fclass_is_negative;
+    wire fclass_is_neg_denorm = fclass_is_denorm && fclass_is_negative;
+    wire fclass_is_neg_normal = fclass_is_normal && fclass_is_negative;
+    wire fclass_is_neg_inf = fclass_is_inf && fclass_is_negative;
+
+    wire [9:0] fclass_result = {
+        fclass_is_snan,
+        fclass_is_qnan,
+        fclass_is_pos_inf,
+        fclass_is_pos_normal,
+        fclass_is_pos_denorm,
+        fclass_is_pos_zero,
+        fclass_is_neg_zero,
+        fclass_is_neg_denorm,
+        fclass_is_neg_normal,
+        fclass_is_neg_inf
+    };
+
     wire fcmp_unordered;
     wire fcmp_altb;
     wire fcmp_blta;
@@ -562,7 +602,8 @@ module ShaderCore
                             (decode_opcode_is_jalr || decode_opcode_is_jal) ? (PC + 4) :
                             decode_opcode_is_fcmp ? (comparison_succeeded_reg ? 32'b1 : 32'b0) :
                             decode_opcode_is_fcvt_f2i ? float_to_int_result :
-                            decode_opcode_is_fmv_f2i ? float_rs1_value :
+                            decode_opcode_is_fmv_f2i ?
+                                ((decode_funct3_rm == 0) ? float_rs1_value : $unsigned(fclass_result)) :
                             decode_opcode_is_load ? data_ram_read_result :
                                 $unsigned(alu_result);
 
