@@ -193,7 +193,7 @@ int main(int argc, char **argv)
     std::string engineName = argv[1];
 
     for(const auto& test: tests) {
-        std::string actualSourceFileName = "gpuemutest/" + test.assemblyFileName;
+        std::string actualSourceFileName = "inst_test_sources/" + test.assemblyFileName;
 
         std::string assemblerCommand = std::string("./as -o /tmp/x.o ") + actualSourceFileName;
         int result = system(assemblerCommand.c_str());
