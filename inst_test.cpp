@@ -3,10 +3,14 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <set>
 #include <vector>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+
+// To Do:
+// Test description field
 
 // Union for converting from float to int and back.
 union FloatUint32 {
@@ -77,7 +81,23 @@ struct InstTest
     std::map<int, ApproximateFloat> expectedFRegisters;  // IGNORED - store values in memory
 };
 
-std::vector<InstTest> tests = {
+std::vector<InstTest> possibleTests = {
+    {
+        "alu",
+        "alu.s",
+        {},
+        {
+            {0x04, 0x31415A26},
+            {0x08, 0xa5},
+            {0x0C, 0x25},
+            {0x10, 0x314159A7},
+            {0x14, 0x31415982},
+            {0x18, 0xfffffff6},
+            {0x1C, 0x6282B24E},
+            {0x20, 0x18A0AC93},
+            {0x24, 0xD8A0AC93},
+        }, {}, {}, {},
+    },
     {
         "loadstore",
         "loadstore.s",
@@ -129,17 +149,17 @@ std::string readFileContents(std::string fileName)
     return text;
 }
 
-std::string getTestEngineCommand(const std::string& engineName, const InstTest& test)
+std::string getTestEngineCommand(const std::string& engineName, const InstTest* test)
 {
     std::string engineCommand = engineName + " -j 1 --pixel 0 0";
-    if((test.expectedMemoryUInt32s.size() > 0) || (test.expectedMemoryFloats.size() > 0)) {
+    if((test->expectedMemoryUInt32s.size() > 0) || (test->expectedMemoryFloats.size() > 0)) {
         engineCommand += " --dumpmem ";
         bool prefixComma = false;
-        for(const auto& mem: test.expectedMemoryUInt32s) {
+        for(const auto& mem: test->expectedMemoryUInt32s) {
             engineCommand += (prefixComma ? "," : "") + std::to_string(mem.first);
             prefixComma = true;
         }
-        for(const auto& mem: test.expectedMemoryFloats) {
+        for(const auto& mem: test->expectedMemoryFloats) {
             engineCommand += (prefixComma ? "," : "") + std::to_string(mem.first);
             prefixComma = true;
         }
@@ -148,7 +168,7 @@ std::string getTestEngineCommand(const std::string& engineName, const InstTest& 
     return engineCommand;
 }
 
-bool runTest(const InstTest& test, const std::string& engineCommand, std::map<uint32_t, uint32_t>& memoryResults)
+bool runTest(const InstTest* test, const std::string& engineCommand, std::map<uint32_t, uint32_t>& memoryResults)
 {
     // adapted from https://www.jeremymorgan.com/tutorials/c-programming/how-to-capture-the-output-of-a-linux-command-in-c/
     FILE * stream;
@@ -172,28 +192,28 @@ bool runTest(const InstTest& test, const std::string& engineCommand, std::map<ui
         pclose(stream);
     }
 
-    for(const auto& mem: test.expectedMemoryUInt32s) {
+    for(const auto& mem: test->expectedMemoryUInt32s) {
         uint32_t addr = mem.first;
         uint32_t value = mem.second;
         if(memoryResults.find(addr) == memoryResults.end()) {
-            std::cerr << "error, \"" << test.name << "\", didn't find value for address 0x" << to_hex(addr) << " in return from engine\n";
+            std::cerr << "error, \"" << test->name << "\", didn't find value for address 0x" << to_hex(addr) << " in return from engine\n";
             return false;
         } else if(memoryResults[addr] != value) {
-            std::cerr << "error, \"" << test.name << "\", value 0x" << to_hex(memoryResults[addr]) << " at address 0x" << to_hex(addr) << " doesn't match expected value 0x" << to_hex(value) << "\n";
+            std::cerr << "error, \"" << test->name << "\", value 0x" << to_hex(memoryResults[addr]) << " at address 0x" << to_hex(addr) << " doesn't match expected value 0x" << to_hex(value) << "\n";
             passed = false;
         }
     }
 
-    for(const auto& mem: test.expectedMemoryFloats) {
+    for(const auto& mem: test->expectedMemoryFloats) {
         uint32_t addr = mem.first;
         ApproximateFloat value = mem.second;
         if(memoryResults.find(addr) == memoryResults.end()) {
-            std::cerr << "error, \"" << test.name << "\", didn't find value for address 0x" << to_hex(addr) << " in return from engine\n";
+            std::cerr << "error, \"" << test->name << "\", didn't find value for address 0x" << to_hex(addr) << " in return from engine\n";
             return false;
         } else {
             float value2 = intToFloat(memoryResults[addr]);
             if(!nearlyEqual(value.first, value2, value.second)) {
-                std::cerr << "error, \"" << test.name << "\", value " << value2 << " at address 0x" << to_hex(addr) << " isn't within " << value.second << " of expected value " << value.first << "\n";
+                std::cerr << "error, \"" << test->name << "\", value " << value2 << " at address 0x" << to_hex(addr) << " isn't within " << value.second << " of expected value " << value.first << "\n";
                 passed = false;
             }
         }
@@ -202,29 +222,125 @@ bool runTest(const InstTest& test, const std::string& engineCommand, std::map<ui
     return passed;
 }
 
+void usage(const char *progname)
+{
+    printf("usage: %s [options] testEngine # e.g. emu or gpu/sim/obj_dir/VMain\n", progname);
+    printf("options:\n");
+    printf("\t-v               Print detailed information about how tests are being run\n");
+    printf("\t--test TESTNAME  Run specified test (can be repeated)\n");
+    printf("\t--list           Print a list of tests and exit\n");
+}
+
+void printTests()
+{
+    size_t testNameMaxSize = 0;
+    for(const auto& test: possibleTests) {
+        testNameMaxSize = std::max(testNameMaxSize, test.name.size());
+    }
+    std::cout << std::setw(testNameMaxSize) << "Test" << " : Description\n";
+    for(const auto& test: possibleTests) {
+        std::cout << std::setw(testNameMaxSize) << test.name << " : " << std::setw(0) << "\"" << test.assemblyFileName << "\"\n";
+    }
+}
+
 int main(int argc, char **argv)
 {
     int failedTestsCount = 0;
+    bool beVerbose = false;
+    bool printTestNames = false;
 
-    if(argc < 2) {
-        std::cout << "usage: " << argv[0] << " engine # e.g. emu or gpu/sim/obj_dir/VMain\n";
+    std::map<std::string, const InstTest*> testsByName;
+    for(const auto& t : possibleTests) {
+        testsByName[t.name] = &t;
+    }
+
+    std::vector<const InstTest*> testsToRun;
+
+    char *progname = argv[0];
+    argv++; argc--;
+
+    while(argc > 0 && argv[0][0] == '-') {
+        if(strcmp(argv[0], "-v") == 0) {
+
+            beVerbose = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "--list") == 0) {
+
+            printTestNames = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "--test") == 0) {
+
+            if(argc < 2) {
+                std::cerr << "Expected test name for \"--test\"\n";
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            std::string testName = std::string(argv[1]);
+            argv+=2; argc-=2;
+
+            const auto it = testsByName.find(testName);
+            if(it == testsByName.end()) {
+                std::cerr << "Test " << it->second->name << " is not in the list of tests.\n";
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            testsToRun.push_back(it->second);
+
+        } else if(strcmp(argv[0], "-h") == 0) {
+
+            usage(progname);
+            exit(EXIT_SUCCESS);
+
+        } else {
+
+            usage(progname);
+            exit(EXIT_FAILURE);
+
+        }
+    }
+
+    if(printTestNames) {
+        printTests();
+        exit(EXIT_SUCCESS);
+    }
+
+    if(argc < 1) {
+        usage(progname);
         exit(EXIT_FAILURE);
     }
 
-    std::string engineName = argv[1];
+    std::string engineName = argv[0];
 
-    for(const auto& test: tests) {
-        std::string actualSourceFileName = "inst_test_sources/" + test.assemblyFileName;
+    if(testsToRun.size() == 0) {
+        for(const auto& test: testsByName) {
+            const InstTest* t = test.second;
+            testsToRun.push_back(t);
+        }
+    }
+
+    for(const auto& test : testsToRun) {
+        if(beVerbose) {
+            std::cout << "test,\"" << test->name << "\"\n";
+        }
+        std::string actualSourceFileName = "inst_test_sources/" + test->assemblyFileName;
 
         std::string assemblerCommand = std::string("./as -o /tmp/x.o ") + actualSourceFileName + " >/tmp/x.out 2>&1";
+        if(beVerbose) {
+            std::cout << "assembly,\"" << assemblerCommand << "\"\n"; 
+        }
         int result = system(assemblerCommand.c_str());
 
         if(result != 0) {
-            std::cerr << "error, " << test.name << ", failed assembling " << actualSourceFileName << "\n";
+            std::cerr << "error, " << test->name << ", failed assembling " << actualSourceFileName << "\n";
             failedTestsCount++;
         } else {
 
             std::string engineCommand = getTestEngineCommand(engineName, test);
+            if(beVerbose) {
+                std::cout << "run,\"" << engineCommand << "\"\n";
+            }
 
             std::map<uint32_t, uint32_t> memoryResults;
 
