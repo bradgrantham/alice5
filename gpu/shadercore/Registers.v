@@ -19,7 +19,7 @@ module Registers
     output wire [WORD_WIDTH-1:0] read2_data
 );
 
-    BlockRam #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+    RegisterFile #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
         bank1(
             .clock(clock),
             .write_address(write_address),
@@ -28,7 +28,7 @@ module Registers
             .read_address(read1_address),
             .read_data(read1_data));
 
-    BlockRam #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+    RegisterFile #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
         bank2(
             .clock(clock),
             .write_address(write_address),

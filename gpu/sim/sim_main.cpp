@@ -21,7 +21,7 @@
 #include "VMain_Main.h"
 #include "VMain_Registers.h"
 #include "VMain_ShaderCore.h"
-#include "VMain_BlockRam__A5.h"
+#include "VMain_RegisterFile__A5.h"
 #include "VMain_BlockRam__A10.h"
 
 template<typename T>
