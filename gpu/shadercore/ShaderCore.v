@@ -29,8 +29,7 @@ module ShaderCore
     localparam STATE_FETCH /* verilator public */ = 4'd01;
     localparam STATE_FETCH2 /* verilator public */ = 4'd02;
     localparam STATE_DECODE /* verilator public */ = 4'd03;
-    localparam STATE_REGISTERS /* verilator public */ = 4'd04;
-    localparam STATE_ALU /* verilator public */ = 4'd05;
+    localparam STATE_EXECUTE /* verilator public */ = 4'd04;
     localparam STATE_FPU1 /* verilator public */ = 4'd11;
     localparam STATE_FPU2 /* verilator public */ = 4'd12;
     localparam STATE_FPU3 /* verilator public */ = 4'd13;
@@ -221,7 +220,6 @@ module ShaderCore
     wire decoded_bgeu = (decode_funct3_rm == 7);
 
     wire comparison_succeeded;
-    reg comparison_succeeded_reg;
 
     Comparison
         comparison(
@@ -462,6 +460,8 @@ module ShaderCore
     wire [31:0] fsgnjn_result /* verilator public */ = {~float_rs2_value[31], float_rs1_value[30:0]};
     wire [31:0] fsgnjx_result /* verilator public */ = {float_rs1_value[31] ^ float_rs2_value[31], float_rs1_value[30:0]};
 
+    wire halt = decode_opcode_is_system && (decode_imm_alu_load[11:0] == 12'd1);
+
     always @(posedge clock) begin
         if(!reset_n) begin
 
@@ -507,12 +507,14 @@ module ShaderCore
                     STATE_DECODE: begin
                         // clock the 32 bits of instruction into decoded signals
                         inst_to_decode <= inst_ram_read_result;
-                        state <= STATE_REGISTERS;
+                        state <= STATE_EXECUTE;
                     end
 
-                    STATE_REGISTERS: begin
-                        halted <= decode_opcode_is_system &&
-                            (decode_imm_alu_load[11:0] == 12'd1);
+                    STATE_EXECUTE: begin
+                        // want decode of instruction and registers output to be settled here
+                        // ALU operation occurs in alu instance
+
+                        halted <= halt;
                             
                         fpu_op <=
                             decode_opcode_is_fadd ? 0 :
@@ -528,7 +530,13 @@ module ShaderCore
                             (decode_funct3_rm == 2) ? 3 :
                             /* (decode_funct3_rm == 3) ? */ 2;
 
-                        state <= opcode_uses_fpu ? STATE_FPU1 : STATE_ALU;
+                        rd_address <= decode_rd;
+
+                        state <= halt ? STATE_HALTED :
+                            opcode_uses_fpu ? STATE_FPU1 :
+                            (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
+                            (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
+                            STATE_RETIRE;
                     end
 
                     STATE_FPU1: begin
@@ -546,23 +554,6 @@ module ShaderCore
                     STATE_FPU4: begin
                         rd_address <= decode_rd;
                         state <= STATE_RETIRE;
-                    end
-
-                    STATE_ALU: begin
-                        // want decode of instruction and registers output to be settled here
-                        // ALU operation occurs in alu instance
-
-                        comparison_succeeded_reg <= 
-                            decode_opcode_is_fcmp ? fcmp_succeeded : 
-                            decode_opcode_is_fminmax ? fminmax_choose_rs1 : 
-                            comparison_succeeded;
-
-                        rd_address <= decode_rd;
-
-                        state <= halted ? STATE_HALTED :
-                            (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
-                            (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
-                            STATE_RETIRE;
                     end
 
                     STATE_LOAD: begin
@@ -598,9 +589,10 @@ module ShaderCore
                             decode_opcode_is_fmv_f2i ||
                             decode_opcode_is_fcmp) &&
                             (rd_address != 0);
+
                         rd_value <= 
                             (decode_opcode_is_jalr || decode_opcode_is_jal) ? (PC + 4) :
-                            decode_opcode_is_fcmp ? (comparison_succeeded_reg ? 32'b1 : 32'b0) :
+                            decode_opcode_is_fcmp ? (fcmp_succeeded ? 32'b1 : 32'b0) :
                             decode_opcode_is_fcvt_f2i ? float_to_int_result :
                             decode_opcode_is_fmv_f2i ?
                                 ((decode_funct3_rm == 0) ? float_rs1_value : $unsigned(fclass_result)) :
@@ -613,7 +605,7 @@ module ShaderCore
                             decode_opcode_is_fcvt_i2f ? int_to_float_result :
                             decode_opcode_is_fmv_i2f ? rs1_value :
                             decode_opcode_is_fminmax ? (
-                                comparison_succeeded_reg ? float_rs1_value : float_rs2_value
+                                fminmax_choose_rs1 ? float_rs1_value : float_rs2_value
                             ) :
                             decode_opcode_is_fsgnj ? (
                                 (decode_funct3_rm == 0) ? fsgnj_result :
@@ -628,7 +620,7 @@ module ShaderCore
                         PC <= 
                             (decode_opcode_is_jal ||
                                  decode_opcode_is_jalr) ? $unsigned({alu_result[WORD_WIDTH-1:1],1'b0}) :
-                            (decode_opcode_is_branch && comparison_succeeded_reg) ? $unsigned(alu_result) :
+                            (decode_opcode_is_branch && comparison_succeeded) ? $unsigned(alu_result) :
                             (PC + 4);
 
                         // load into registers?

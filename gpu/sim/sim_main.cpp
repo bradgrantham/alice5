@@ -39,8 +39,7 @@ const char *stateToString(int state)
         case VMain_ShaderCore::STATE_FETCH: return "STATE_FETCH"; break;
         case VMain_ShaderCore::STATE_FETCH2: return "STATE_FETCH2"; break;
         case VMain_ShaderCore::STATE_DECODE: return "STATE_DECODE"; break;
-        case VMain_ShaderCore::STATE_REGISTERS: return "STATE_REGISTERS"; break;
-        case VMain_ShaderCore::STATE_ALU: return "STATE_ALU"; break;
+        case VMain_ShaderCore::STATE_EXECUTE: return "STATE_EXECUTE"; break;
         case VMain_ShaderCore::STATE_RETIRE: return "STATE_RETIRE"; break;
         case VMain_ShaderCore::STATE_LOAD: return "STATE_LOAD"; break;
         case VMain_ShaderCore::STATE_LOAD2: return "STATE_LOAD2"; break;
@@ -479,7 +478,7 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
             (*insts)++;
         }
 
-        if((top->Main->shaderCore->state == VMain_ShaderCore::STATE_ALU) ||
+        if((top->Main->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
             (top->Main->shaderCore->state == VMain_ShaderCore::STATE_FPU1)
             ) {
             if(debugOptions->dumpState) {
