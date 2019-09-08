@@ -349,6 +349,7 @@ module ShaderCore
     reg [2:0] fpu_op;
     reg [1:0] fpu_rmode;
     wire [31:0] fpu_result;
+    /* verilator lint_off UNUSED */
     wire fpu_inf;
     wire fpu_snan;
     wire fpu_qnan;
@@ -357,6 +358,7 @@ module ShaderCore
     wire fpu_underflow;
     wire fpu_zero;
     wire fpu_div_by_zero;
+    /* verilator lint_on UNUSED */
     fpu
         fpu
         (
@@ -416,12 +418,16 @@ module ShaderCore
         fclass_is_neg_inf
     };
 
+    /* verilator lint_off UNUSED */
     wire fcmp_unordered;
+    /* verilator lint_on UNUSED */
     wire fcmp_altb;
-    wire fcmp_blta;
     wire fcmp_aeqb;
+    /* verilator lint_off UNUSED */
+    wire fcmp_blta;
     wire fcmp_inf;
     wire fcmp_zero;
+    /* verilator lint_on UNUSED */
     fcmp
         fcmp
         (
@@ -435,8 +441,6 @@ module ShaderCore
             .zero(fcmp_zero)
         );
 
-    reg opcode_is_fcvt_w_s;
-    reg opcode_is_fcvt_s_w;
     wire [WORD_WIDTH-1:0] float_to_int_result;
     // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
     float_to_int
