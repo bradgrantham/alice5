@@ -241,7 +241,7 @@ module ShaderCore
         (decode_funct3_rm == 0) ? (fcmp_altb || fcmp_aeqb) :
         (decode_funct3_rm == 1) ? (fcmp_altb) :
         (decode_funct3_rm == 2) ? (fcmp_aeqb) :
-        0;
+        1'b0;
     wire fminmax_choose_rs1 =
         (decode_funct3_rm == 0) ? fcmp_altb :
         /* (decode_funct3_rm == 1) ? */  !fcmp_altb;
@@ -517,18 +517,18 @@ module ShaderCore
                         halted <= halt;
                             
                         fpu_op <=
-                            decode_opcode_is_fadd ? 0 :
-                            decode_opcode_is_fsub ? 1 :
-                            decode_opcode_is_fmul ? 2 :
-                            decode_opcode_is_fdiv ? 3 :
-                            7; /* XXX undefined */
+                            decode_opcode_is_fadd ? 3'd0 :
+                            decode_opcode_is_fsub ? 3'd1 :
+                            decode_opcode_is_fmul ? 3'd2 :
+                            decode_opcode_is_fdiv ? 3'd3 :
+                            3'd7; /* XXX undefined */
 
                         // RISC-V rounding modes in order are RNE, RTZ, RDN, RUP
                         fpu_rmode <=
-                            (decode_funct3_rm == 0) ? 0 :
-                            (decode_funct3_rm == 1) ? 1 :
-                            (decode_funct3_rm == 2) ? 3 :
-                            /* (decode_funct3_rm == 3) ? */ 2;
+                            (decode_funct3_rm == 0) ? 2'd0 :
+                            (decode_funct3_rm == 1) ? 2'd1 :
+                            (decode_funct3_rm == 2) ? 2'd3 :
+                            /* (decode_funct3_rm == 3) ? */ 2'd2;
 
                         rd_address <= decode_rd;
 

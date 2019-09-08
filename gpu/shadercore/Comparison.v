@@ -22,7 +22,7 @@ module Comparison
         compare_greater_equal ? ($signed(v1) >= $signed(v2)) :
         compare_less_than_unsigned ? ($unsigned(v1) < $unsigned(v2)) :
         compare_greater_equal_unsigned ? ($unsigned(v1) >= $unsigned(v2)) :
-        0;
+        1'b0;
 
 endmodule
 

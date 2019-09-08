@@ -21,7 +21,7 @@ wire sign = op[31];
 
 // Logical parts.
 wire [31:0] significand = { 8'h0, 1'b1, fract_part };
-wire signed [7:0] exponent = exp_part - 127;
+wire signed [7:0] exponent = exp_part - 8'd127;
 
 // Detect special cases.
 wire exp_part_all_on = &exp_part;
@@ -34,10 +34,10 @@ wire is_snan = exp_part_all_on & !fract_part[22] & |fract_part[21:0];
 wire is_zero = exp_part_all_off & fract_part_all_off;
 
 wire [22:0] fractional_part /* verilog public */ =
-            (exponent < -22) ? 0 :
+            (exponent < -22) ? 23'd0 :
             (exponent < 0) ? (significand >> -exponent) :
             (exponent < 23) ? (significand << exponent) :
-            0;
+            23'd0;
 
 wire lsbs_are_nonzero /* verilog public */ = |fractional_part;
 wire lsbsmsb_is_nonzero /* verilog public */ = fractional_part[22];

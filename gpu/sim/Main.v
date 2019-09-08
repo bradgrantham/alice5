@@ -70,8 +70,8 @@ module Main(
             .data_ram_read_result(data_ram_out_data)
             );
 
-    assign inst_ram_write = !run ? ext_enable_write_inst : 0;
-    assign inst_ram_write_data = !run ? ext_write_data : 0;
+    assign inst_ram_write = !run ? ext_enable_write_inst : 1'b0;
+    assign inst_ram_write_data = !run ? ext_write_data : 1'b0;
     assign inst_ram_address = !run ? ext_write_address : shadercore_inst_address;
 
     assign data_ram_write = !run ? ext_enable_write_data : shadercore_enable_write_data;
