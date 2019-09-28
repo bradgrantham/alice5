@@ -36,20 +36,20 @@ module Main(
 
     wire [31:0] h2f_value;
 
-    wire reset_n = h2f_value[H2F_RESET_N_BIT];
-    wire run = h2f_value[H2F_RUN_BIT];
-    wire h2f_request = h2f_value[H2F_REQUEST_BIT];
-    wire [7:0] h2f_command = h2f_value[23:16];
+    wire reset_n /* verilator public */ = h2f_value[H2F_RESET_N_BIT];
+    wire run /* verilator public */ = h2f_value[H2F_RUN_BIT];
+    wire h2f_request /* verilator public */ = h2f_value[H2F_REQUEST_BIT];
+    wire [7:0] h2f_command /* verilator public */ = h2f_value[23:16];
 
     // FPGA-to-HPS communication
 
-    reg f2h_busy;
-    reg f2h_cmd_error;
-    reg f2h_run_halted;
-    reg f2h_run_exception;
-    reg [23:0] f2h_data_field;
+    reg f2h_busy /* verilator public */;
+    reg f2h_cmd_error /* verilator public */;
+    reg f2h_run_halted /* verilator public */;
+    reg f2h_run_exception /* verilator public */;
+    reg [23:0] f2h_data_field /* verilator public */;
 
-    wire [31:0] f2h_value = {
+    wire [31:0] f2h_value /* verilator public */ = {
         f2h_run_halted,
         f2h_run_exception,
         f2h_busy,
@@ -59,9 +59,9 @@ module Main(
     };
 
     // Internal state maintained for H2F and F2H communication
-    reg [31:0] read_register;
-    reg [15:0] write_register_low16;
-    reg [15:0] write_register_high16;
+    reg [31:0] read_register /* verilator public */;
+    reg [15:0] write_register_low16 /* verilator public */;
+    reg [15:0] write_register_high16 /* verilator public */;
 
     // State machine states for completing command processing
     localparam STATE_INIT = 0;
@@ -74,7 +74,7 @@ module Main(
     localparam STATE_WAIT_READ_X_REG = 5;
     localparam STATE_WAIT_READ_F_REG = 6;
     localparam STATE_WAIT_READ_SPECIAL = 7;
-    reg [3:0] state;
+    reg [3:0] state /* verilator public */;
 
 
 `ifdef VERILATOR
