@@ -15,9 +15,9 @@ module Main(
 
     // HPS-to-FPGA communication
 
-    localparam H2F_RESET_N_BIT = 31;
-    localparam H2F_RUN_BIT = 30;
-    localparam H2F_REQUEST_BIT = 29;
+    localparam H2F_RESET_N_BIT = 31;            // Reset cores, active low
+    localparam H2F_RUN_BIT = 30;                // Operate cores, active high
+    localparam H2F_REQUEST_BIT = 29;            // Set high if request command is in H2F[23:0]
 
     localparam H2F_CMD_PUT_LOW_16 = 8'd0;       // Put 15:0 into low 16 of write register
     localparam H2F_CMD_PUT_HIGH_16 = 8'd1;      // Put 15:0 into high 16 of write register
