@@ -11,6 +11,8 @@
 #include <thread>
 #include <vector>
 
+#define SIMULATE 1
+
 #include "risc-v.h"
 #include "timer.h"
 #include "disassemble.h"
@@ -136,6 +138,185 @@ uint32_t floatToInt(float f) {
     return u.i;
 }
 
+// Proposed H2F interface for testing a single core
+constexpr uint32_t h2f_reset_n_bit          = 0x80000000;
+constexpr uint32_t h2f_not_reset            = h2f_reset_n_bit;
+constexpr uint32_t h2f_run_bit              = 0x40000000;
+constexpr uint32_t h2f_request_bit          = 0x20000000;
+
+constexpr uint32_t h2f_state_reset            = 0;
+constexpr uint32_t h2f_state_idle             = h2f_not_reset;
+constexpr uint32_t h2f_state_request_cmd      = h2f_not_reset | h2f_request_bit;
+constexpr uint32_t h2f_state_run              = h2f_not_reset | h2f_run_bit;
+
+constexpr uint32_t h2f_cmd_put_low_16       = 0x00000000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_put_high_16      = 0x00010000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_write_inst_ram   = 0x00020000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_write_data_ram   = 0x00030000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_read_inst_ram    = 0x00040000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_read_data_ram    = 0x00050000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_read_x_reg       = 0x00060000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_read_f_reg       = 0x00070000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_read_special     = 0x00080000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_special_PC           = 0x00000000;
+constexpr uint32_t h2f_cmd_get_low_16       = 0x00090000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_get_high_16      = 0x00100000 | h2f_state_request_cmd;
+
+// Proposed F2H interface for testing a single core
+const uint32_t f2h_run_halted_bit       = 0x80000000;
+const uint32_t f2h_run_exception_bit    = 0x40000000;
+const uint32_t f2h_run_exc_data_mask    = 0x00FFFFFF;
+const uint32_t f2h_busy_bit             = 0x20000000;
+const uint32_t f2h_phase_busy           = f2h_busy_bit;
+const uint32_t f2h_phase_ready          = 0;
+const uint32_t f2h_cmd_response_mask    = 0x0000FFFF;
+
+// uint32_t *h2f;
+// uint32_t *f2h;
+
+using namespace std::chrono_literals;
+#if SIMULATE
+const std::chrono::duration<float, std::micro> h2f_timeout_micros = 1000us;
+#else
+const std::chrono::duration<float, std::micro> h2f_timeout_micros = 10us;
+#endif
+
+void setH2FState(VMain* top, uint32_t state)
+{
+    top->sim_h2f_value = state;
+}
+
+bool waitOnPhaseOrTimeout(int phase, VMain* top)
+{
+
+    uint32_t phaseExpected = phase ? f2h_busy_bit : 0;
+    auto start = std::chrono::high_resolution_clock::now();
+    while((top->sim_f2h_value & f2h_busy_bit) != phaseExpected) {
+#if SIMULATE
+        // cycle simulation clock
+        top->clock = 1;
+        top->eval();
+        top->clock = 0;
+        top->eval();
+#else
+        // nanosleep and check clock for timeout
+        std::this_thread::sleep_for(1us);
+#endif
+        auto now = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float, std::micro> elapsed = now - start;
+        if(elapsed > h2f_timeout_micros) {
+            std::cerr << "waitOnPhaseOrTimeout : timeout waiting for FPGA to change phase\n";
+            return false;
+        }
+    }
+    return true;
+}
+
+bool processCommand(uint32_t command, VMain* top)
+{
+    // double-check we are in idle
+    if(!waitOnPhaseOrTimeout(f2h_phase_ready, top)) {
+        std::cerr << "processCommand : timeout waiting on FPGA to become idle before sending command\n";
+        return false;
+    }
+    
+    // send the command and then wait for core to report it is processing the command
+    top->sim_h2f_value = command;
+    if(!waitOnPhaseOrTimeout(f2h_phase_busy, top)) {
+        std::cerr << "processCommand : timeout waiting on FPGA to indicate busy processing command\n";
+        return false;
+    }
+
+    // return to idle state and wait for the core to tell us it's also idle.
+    top->sim_h2f_value = h2f_state_idle;
+    if(!waitOnPhaseOrTimeout(f2h_phase_ready, top)) {
+        std::cerr << "processCommand : timeout waiting on FPGA to indicate command is completed\n";
+        return false;
+    }
+
+    return true;
+}
+
+enum RamType { INST_RAM, DATA_RAM };
+
+void writeWordToRam(uint32_t value, uint32_t address, RamType ramType, VMain *top)
+{
+    // put low 16 bits into write register 
+    processCommand(h2f_cmd_put_low_16 | (value & 0xFFFF), top);
+
+    // put high 16 bits into write register 
+    processCommand(h2f_cmd_put_high_16 | ((value >> 16) & 0xFFFF), top);
+
+    // send the command to store the word from the write register into memory
+    if(ramType == INST_RAM) {
+        processCommand(h2f_cmd_write_inst_ram | (address & 0xFFFF), top);
+    } else {
+        processCommand(h2f_cmd_write_data_ram | (address & 0xFFFF), top);
+    }
+}
+
+uint32_t readWordFromRam(uint32_t address, RamType ramType, VMain *top)
+{
+    uint32_t value;
+
+    // send the command to latch the word from memory into the read register
+    if(ramType == INST_RAM) {
+        processCommand(h2f_cmd_read_inst_ram | (address & 0xFFFF), top);
+    } else {
+        processCommand(h2f_cmd_read_data_ram | (address & 0xFFFF), top);
+    }
+
+    // put low 16 bits of read register on low 16 bits of F2H
+    processCommand(h2f_cmd_get_low_16, top);
+
+    // get low 16 bits into value
+    value = top->sim_f2h_value & 0xFFFF;
+
+    // put high 16 bits of read register on low 16 bits of F2H
+    processCommand(h2f_cmd_get_high_16, top);
+
+    // get high 16 bits into value
+    value = value | ((top->sim_f2h_value & 0xFFFF) << 16);
+
+    return value;
+}
+
+enum RegisterKind {X_REG, F_REG, PC_REG};
+
+uint32_t readReg(RegisterKind kind, int reg, VMain* top)
+{
+    uint32_t value;
+
+    // send the command to latch the register into the read register
+    if(kind == X_REG) {
+        processCommand(h2f_cmd_read_x_reg | (reg & 0x1F), top);
+    } else if(kind == PC_REG) {
+        processCommand(h2f_cmd_read_special | h2f_special_PC, top);
+    } else {
+        processCommand(h2f_cmd_read_f_reg | (reg & 0x1F), top);
+    }
+
+    // put low 16 bits of read register on low 16 bits of F2H
+    processCommand(h2f_cmd_get_low_16, top);
+
+    // get low 16 bits into value
+    value = top->sim_f2h_value & f2h_cmd_response_mask;
+
+    // put high 16 bits of read register on low 16 bits of F2H
+    processCommand(h2f_cmd_get_high_16, top);
+
+    // get high 16 bits into value
+    value = value | ((top->sim_f2h_value & f2h_cmd_response_mask) << 16);
+
+    return value;
+}
+
+uint32_t readPC(VMain* top)
+{
+    return readReg(PC_REG, 0, top);
+}
+
+
 void dumpRegisters(VMain* top)
 {
     // Dump register contents.
@@ -167,44 +348,7 @@ void dumpRegisters(VMain* top)
     std::cout << " pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
 }
 
-void writeWordToRam(uint32_t word, uint32_t byteaddr, bool inst_not_data, VMain *top)
-{
-    top->ext_write_address = byteaddr;
-    top->ext_write_data = word;
-
-    if(inst_not_data) {
-        top->ext_enable_write_inst = 1;
-    } else {
-        top->ext_enable_write_data = 1;
-    }
-
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-
-    if(inst_not_data) {
-        top->ext_enable_write_inst = 0;
-    } else {
-        top->ext_enable_write_data = 0;
-    }
-
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-}
-
-uint32_t readWordFromRam(uint32_t byteaddr, bool inst_not_data, VMain *top)
-{
-    // TODO: use a state machine through Main to read memory using clock
-    if(inst_not_data)
-        return top->Main->instRam->memory[byteaddr / 4];
-    else
-        return top->Main->dataRam->memory[byteaddr / 4];
-}
-
-void writeBytesToRam(const std::vector<uint8_t>& bytes, bool inst_not_data, bool dumpState, VMain *top)
+void writeBytesToRam(const std::vector<uint8_t>& bytes, RamType ramType, bool dumpState, VMain *top)
 {
     // Write inst bytes to inst memory
     for(uint32_t byteaddr = 0; byteaddr < bytes.size(); byteaddr += 4) {
@@ -214,9 +358,10 @@ void writeBytesToRam(const std::vector<uint8_t>& bytes, bool inst_not_data, bool
             bytes[byteaddr + 2] << 16 |
             bytes[byteaddr + 3] << 24;
 
-        writeWordToRam(word, byteaddr, inst_not_data, top);
         if(dumpState)
-            std::cout << "Writing to " << (inst_not_data ? "inst" : "data") << " address " << byteaddr << " value 0x" << to_hex(top->ext_write_data) << "\n";
+            std::cout << "Writing to " << ((ramType == INST_RAM) ? "inst" : "data") << " address " << byteaddr << " value 0x" << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
+
+        writeWordToRam(word, byteaddr, ramType, top);
 
     }
 }
@@ -225,7 +370,7 @@ template <class TYPE>
 void set(VMain *top, uint32_t address, const TYPE& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
-    writeWordToRam(*reinterpret_cast<const uint32_t*>(&value), address, false, top);
+    writeWordToRam(*reinterpret_cast<const uint32_t*>(&value), address, DATA_RAM, top);
 }
 
 template <class TYPE, unsigned long N>
@@ -233,7 +378,7 @@ void set(VMain *top, uint32_t address, const std::array<TYPE, N>& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
     for(unsigned long i = 0; i < N; i++)
-        writeWordToRam(*reinterpret_cast<const uint32_t*>(&value[i]), address + i * sizeof(uint32_t), false, top);
+        writeWordToRam(*reinterpret_cast<const uint32_t*>(&value[i]), address + i * sizeof(uint32_t), DATA_RAM, top);
 }
 
 template <class TYPE, unsigned long N>
@@ -242,7 +387,7 @@ void get(VMain *top, uint32_t address, std::array<TYPE, N>& value)
     // TODO: use a state machine through Main to read memory using clock
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
     for(unsigned long i = 0; i < N; i++)
-        *reinterpret_cast<uint32_t*>(&value[i]) = readWordFromRam(address + i * sizeof(uint32_t), false, top);
+        *reinterpret_cast<uint32_t*>(&value[i]) = readWordFromRam(address + i * sizeof(uint32_t), DATA_RAM, top);
 }
 
 typedef std::array<float,1> v1float;
@@ -404,12 +549,8 @@ void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_
 
 void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *params, VMain *top, uint32_t *clocks, uint32_t *insts)
 {
-    // Run one clock cycle in reset to process STATE_INIT
-    top->reset_n = 0;
-    top->run = 0;
-
-    top->ext_enable_write_inst = 0;
-    top->ext_enable_write_data = 0;
+    // Run one clock cycle in not-run reset to process STATE_INIT
+    setH2FState(top, h2f_state_reset);
 
     top->clock = 1;
     top->eval();
@@ -418,7 +559,7 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     (*clocks)++;
 
     // Release reset
-    top->reset_n = 1;
+    setH2FState(top, h2f_state_idle);
 
     // run == 0, nothing should be happening here.
     top->clock = 1;
@@ -427,7 +568,7 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     top->eval();
     (*clocks)++;
     // Run
-    top->run = 1;
+    setH2FState(top, h2f_state_run);
 
     std::string pad = "                     ";
 
@@ -438,7 +579,7 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     for(int i = 0; i < 32; i++) oldFRegs[i] = top->Main->shaderCore->float_registers->bank1->memory[i];
     oldPC = top->Main->shaderCore->PC;
 
-    while (!Verilated::gotFinish() && !top->halted) {
+    while (!Verilated::gotFinish() && !(top->sim_f2h_value & f2h_run_halted_bit)) {
 
         top->clock = 1;
         top->eval();
@@ -538,11 +679,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
     // Set up inst Ram
     // Run one clock cycle in reset to process STATE_INIT
-    top->reset_n = 0;
-    top->run = 0;
-
-    top->ext_enable_write_inst = 0;
-    top->ext_enable_write_data = 0;
+    setH2FState(top, h2f_state_reset);
 
     top->clock = 1;
     top->eval();
@@ -551,7 +688,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     clocks++;
 
     // Release reset
-    top->reset_n = 1;
+    setH2FState(top, h2f_state_idle);
 
     // run == 0, nothing should be happening here.
     top->clock = 1;
@@ -561,10 +698,10 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     clocks++;
 
     // TODO - should we count clocks issued here?
-    writeBytesToRam(params->inst_bytes, true, debugOptions->dumpState, top);
+    writeBytesToRam(params->inst_bytes, INST_RAM, debugOptions->dumpState, top);
 
     // TODO - should we count clocks issued here?
-    writeBytesToRam(params->data_bytes, false, debugOptions->dumpState, top);
+    writeBytesToRam(params->data_bytes, DATA_RAM, debugOptions->dumpState, top);
 
     // check words written to inst memory
     for(uint32_t byteaddr = 0; byteaddr < params->inst_bytes.size(); byteaddr += 4) {
@@ -622,7 +759,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             shadeOnePixel(debugOptions, params, top, &clocks, &insts);
 
             /* return to STATE_INIT so we can drive ext memory access */
-            top->run = 0;
+            setH2FState(top, h2f_state_idle);
 
             v3float rgb = {1, 0, 0};
             if(params->colorAddress != 0xFFFFFFFF)
