@@ -199,7 +199,7 @@ const char *cmdToString(uint32_t h2f)
 
 using namespace std::chrono_literals;
 #if SIMULATE
-constexpr std::chrono::duration<float, std::micro> h2f_timeout_micros = 10000us;
+constexpr std::chrono::duration<float, std::micro> h2f_timeout_micros = 1000000us;
 #else
 constexpr std::chrono::duration<float, std::micro> h2f_timeout_micros = 10us;
 #endif
@@ -221,28 +221,65 @@ uint32_t getF2H(VMain* top)
     return f2h_value;
 }
 
+void allowGPUProgress(VMain *top)
+{
+
+#if SIMULATE
+
+    // cycle simulation clock
+    top->clock = 1;
+    top->eval();
+
+    if(dumpH2FAndF2H) {
+        std::cout << "CLOCK = 0, state " << int(top->Main->state) << "\n";
+        std::cout << "h2f : " << to_hex(top->sim_h2f_value) << ", " << cmdToString(top->sim_h2f_value) << "\n";
+        std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
+        std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
+        std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
+        std::cout << "inst_ram_address = " << to_hex(top->Main->inst_ram_address) << "\n";
+        std::cout << "inst_ram_write_data = " << to_hex(top->Main->inst_ram_write_data) << "\n";
+    }
+
+    top->clock = 0;
+    top->eval();
+
+    if(dumpH2FAndF2H) {
+        std::cout << "CLOCK = 0, state " << int(top->Main->state) << "\n";
+        std::cout << "h2f : " << to_hex(top->sim_h2f_value) << ", " << cmdToString(top->sim_h2f_value) << "\n";
+        std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
+        std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
+        std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
+        std::cout << "inst_ram_address = " << to_hex(top->Main->inst_ram_address) << "\n";
+        std::cout << "inst_ram_write_data = " << to_hex(top->Main->inst_ram_write_data) << "\n";
+    }
+
+#else
+
+    // nanosleep
+    std::this_thread::sleep_for(1us);
+
+#endif
+
+}
+
 bool waitOnExitReset(VMain* top)
 {
     if(dumpH2FAndF2H) {
         std::cout << "waitOnExitReset()...\n";
     }
+
+    allowGPUProgress(top);
+
     auto start = std::chrono::high_resolution_clock::now();
     while((getF2H(top) & f2h_exited_reset_bit) != f2h_exited_reset_bit) {
-#if SIMULATE
-        // cycle simulation clock
-        top->clock = 1;
-        top->eval();
-        top->clock = 0;
-        top->eval();
-#else
-        // nanosleep and check clock for timeout
-        std::this_thread::sleep_for(1us);
-#endif
+
+        allowGPUProgress(top);
+
+        // Check clock for timeout
         auto now = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::micro> elapsed = now - start;
         if(elapsed > h2f_timeout_micros) {
-            std::cerr << "waitOnPhaseOrTimeout : timed out waiting for FPGA to change phase\n";
-            exit(EXIT_FAILURE);
+            std::cerr << "waitOnExitReset : timed out waiting for FPGA to change phase (" << elapsed.count() << ")\n";
             return false;
         }
     }
@@ -255,41 +292,19 @@ bool waitOnPhaseOrTimeout(int phase, VMain* top)
         std::cout << "waitOnPhaseOrTimeout(" << to_hex(phase) << ")...\n";
     }
     uint32_t phaseExpected = phase ? f2h_busy_bit : 0;
+
+    allowGPUProgress(top);
+
     auto start = std::chrono::high_resolution_clock::now();
     while((getF2H(top) & f2h_busy_bit) != phaseExpected) {
-#if SIMULATE
-        if(dumpH2FAndF2H) {
-            std::cout << "CLOCK = 0, state " << int(top->Main->state) << "\n";
-            std::cout << "h2f : " << to_hex(top->sim_h2f_value) << ", " << cmdToString(top->sim_h2f_value) << "\n";
-            std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
-            std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
-            std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
-            std::cout << "inst_ram_address = " << to_hex(top->Main->inst_ram_address) << "\n";
-            std::cout << "inst_ram_write_data = " << to_hex(top->Main->inst_ram_write_data) << "\n";
-        }
-        // cycle simulation clock
-        top->clock = 1;
-        top->eval();
-        if(dumpH2FAndF2H) {
-            std::cout << "CLOCK = 1, state " << int(top->Main->state) << "\n";
-            std::cout << "h2f : " << to_hex(top->sim_h2f_value) << ", " << cmdToString(top->sim_h2f_value) << "\n";
-            std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
-            std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
-            std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
-            std::cout << "inst_ram_address = " << to_hex(top->Main->inst_ram_address) << "\n";
-            std::cout << "inst_ram_write_data = " << to_hex(top->Main->inst_ram_write_data) << "\n";
-        }
-        top->clock = 0;
-        top->eval();
-#else
-        // nanosleep and check clock for timeout
-        std::this_thread::sleep_for(1us);
-#endif
+
+        allowGPUProgress(top);
+
+        // Check clock for timeout
         auto now = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::micro> elapsed = now - start;
         if(elapsed > h2f_timeout_micros) {
-            std::cerr << "waitOnPhaseOrTimeout : timed out waiting for FPGA to change phase\n";
-            exit(EXIT_FAILURE);
+            std::cerr << "waitOnPhaseOrTimeout : timed out waiting for FPGA to change phase (" << elapsed.count() << ")\n";
             return false;
         }
     }
@@ -323,19 +338,36 @@ bool processCommand(uint32_t command, VMain* top)
 
 enum RamType { INST_RAM, DATA_RAM };
 
+void CHECK(bool success, const char *filename, int line)
+{
+    bool stored_exit_flag = false;
+    bool exit_on_error;
+
+    if(!stored_exit_flag) {
+        exit_on_error = getenv("EXIT_ON_ERROR") != NULL;
+        stored_exit_flag = true;
+    }
+
+    if(!success) {
+        printf("command processing error at %s:%d\n", filename, line);
+        if(exit_on_error)
+            exit(1);
+    }
+}
+
 void writeWordToRam(uint32_t value, uint32_t address, RamType ramType, VMain *top)
 {
     // put low 16 bits into write register 
-    processCommand(h2f_cmd_put_low_16 | (value & 0xFFFF), top);
+    CHECK(processCommand(h2f_cmd_put_low_16 | (value & 0xFFFF), top), __FILE__, __LINE__);
 
     // put high 16 bits into write register 
-    processCommand(h2f_cmd_put_high_16 | ((value >> 16) & 0xFFFF), top);
+    CHECK(processCommand(h2f_cmd_put_high_16 | ((value >> 16) & 0xFFFF), top), __FILE__, __LINE__);
 
     // send the command to store the word from the write register into memory
     if(ramType == INST_RAM) {
-        processCommand(h2f_cmd_write_inst_ram | (address & 0xFFFF), top);
+        CHECK(processCommand(h2f_cmd_write_inst_ram | (address & 0xFFFF), top), __FILE__, __LINE__);
     } else {
-        processCommand(h2f_cmd_write_data_ram | (address & 0xFFFF), top);
+        CHECK(processCommand(h2f_cmd_write_data_ram | (address & 0xFFFF), top), __FILE__, __LINE__);
     }
 }
 
@@ -345,19 +377,19 @@ uint32_t readWordFromRam(uint32_t address, RamType ramType, VMain *top)
 
     // send the command to latch the word from memory into the read register
     if(ramType == INST_RAM) {
-        processCommand(h2f_cmd_read_inst_ram | (address & 0xFFFF), top);
+        CHECK(processCommand(h2f_cmd_read_inst_ram | (address & 0xFFFF), top), __FILE__, __LINE__);
     } else {
-        processCommand(h2f_cmd_read_data_ram | (address & 0xFFFF), top);
+        CHECK(processCommand(h2f_cmd_read_data_ram | (address & 0xFFFF), top), __FILE__, __LINE__);
     }
 
     // put low 16 bits of read register on low 16 bits of F2H
-    processCommand(h2f_cmd_get_low_16, top);
+    CHECK(processCommand(h2f_cmd_get_low_16, top), __FILE__, __LINE__);
 
     // get low 16 bits into value
     value = getF2H(top) & 0xFFFF;
 
     // put high 16 bits of read register on low 16 bits of F2H
-    processCommand(h2f_cmd_get_high_16, top);
+    CHECK(processCommand(h2f_cmd_get_high_16, top), __FILE__, __LINE__);
 
     // get high 16 bits into value
     value = value | ((getF2H(top) & 0xFFFF) << 16);
@@ -373,21 +405,21 @@ uint32_t readReg(RegisterKind kind, int reg, VMain* top)
 
     // send the command to latch the register into the read register
     if(kind == X_REG) {
-        processCommand(h2f_cmd_read_x_reg | (reg & 0x1F), top);
+        CHECK(processCommand(h2f_cmd_read_x_reg | (reg & 0x1F), top), __FILE__, __LINE__);
     } else if(kind == PC_REG) {
-        processCommand(h2f_cmd_read_special | h2f_special_PC, top);
+        CHECK(processCommand(h2f_cmd_read_special | h2f_special_PC, top), __FILE__, __LINE__);
     } else {
-        processCommand(h2f_cmd_read_f_reg | (reg & 0x1F), top);
+        CHECK(processCommand(h2f_cmd_read_f_reg | (reg & 0x1F), top), __FILE__, __LINE__);
     }
 
     // put low 16 bits of read register on low 16 bits of F2H
-    processCommand(h2f_cmd_get_low_16, top);
+    CHECK(processCommand(h2f_cmd_get_low_16, top), __FILE__, __LINE__);
 
     // get low 16 bits into value
     value = getF2H(top) & f2h_cmd_response_mask;
 
     // put high 16 bits of read register on low 16 bits of F2H
-    processCommand(h2f_cmd_get_high_16, top);
+    CHECK(processCommand(h2f_cmd_get_high_16, top), __FILE__, __LINE__);
 
     // get high 16 bits into value
     value = value | ((getF2H(top) & f2h_cmd_response_mask) << 16);
