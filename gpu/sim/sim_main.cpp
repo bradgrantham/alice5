@@ -12,6 +12,7 @@
 #include <vector>
 
 #define SIMULATE 1
+constexpr bool dumpH2FAndF2H = false; // true;
 
 #include "risc-v.h"
 #include "timer.h"
@@ -144,54 +145,89 @@ constexpr uint32_t h2f_not_reset            = h2f_reset_n_bit;
 constexpr uint32_t h2f_run_bit              = 0x40000000;
 constexpr uint32_t h2f_request_bit          = 0x20000000;
 
-constexpr uint32_t h2f_state_reset            = 0;
-constexpr uint32_t h2f_state_idle             = h2f_not_reset;
-constexpr uint32_t h2f_state_request_cmd      = h2f_not_reset | h2f_request_bit;
-constexpr uint32_t h2f_state_run              = h2f_not_reset | h2f_run_bit;
+constexpr uint32_t h2f_gpu_reset            = 0;
+constexpr uint32_t h2f_gpu_idle             = h2f_not_reset;
+constexpr uint32_t h2f_gpu_request_cmd      = h2f_not_reset | h2f_request_bit;
+constexpr uint32_t h2f_gpu_run              = h2f_not_reset | h2f_run_bit;
 
-constexpr uint32_t h2f_cmd_put_low_16       = 0x00000000 | h2f_state_request_cmd;
-constexpr uint32_t h2f_cmd_put_high_16      = 0x00010000 | h2f_state_request_cmd;
-constexpr uint32_t h2f_cmd_write_inst_ram   = 0x00020000 | h2f_state_request_cmd;
-constexpr uint32_t h2f_cmd_write_data_ram   = 0x00030000 | h2f_state_request_cmd;
-constexpr uint32_t h2f_cmd_read_inst_ram    = 0x00040000 | h2f_state_request_cmd;
-constexpr uint32_t h2f_cmd_read_data_ram    = 0x00050000 | h2f_state_request_cmd;
-constexpr uint32_t h2f_cmd_read_x_reg       = 0x00060000 | h2f_state_request_cmd;
-constexpr uint32_t h2f_cmd_read_f_reg       = 0x00070000 | h2f_state_request_cmd;
-constexpr uint32_t h2f_cmd_read_special     = 0x00080000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_mask             = 0x00FF0000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_put_low_16       = 0x00000000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_put_high_16      = 0x00010000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_write_inst_ram   = 0x00020000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_write_data_ram   = 0x00030000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_read_inst_ram    = 0x00040000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_read_data_ram    = 0x00050000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_read_x_reg       = 0x00060000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_read_f_reg       = 0x00070000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_read_special     = 0x00080000 | h2f_gpu_request_cmd;
 constexpr uint32_t h2f_special_PC           = 0x00000000;
-constexpr uint32_t h2f_cmd_get_low_16       = 0x00090000 | h2f_state_request_cmd;
-constexpr uint32_t h2f_cmd_get_high_16      = 0x00100000 | h2f_state_request_cmd;
+constexpr uint32_t h2f_cmd_get_low_16       = 0x00090000 | h2f_gpu_request_cmd;
+constexpr uint32_t h2f_cmd_get_high_16      = 0x000A0000 | h2f_gpu_request_cmd;
 
 // Proposed F2H interface for testing a single core
-const uint32_t f2h_run_halted_bit       = 0x80000000;
-const uint32_t f2h_run_exception_bit    = 0x40000000;
-const uint32_t f2h_run_exc_data_mask    = 0x00FFFFFF;
-const uint32_t f2h_busy_bit             = 0x20000000;
-const uint32_t f2h_phase_busy           = f2h_busy_bit;
-const uint32_t f2h_phase_ready          = 0;
-const uint32_t f2h_cmd_response_mask    = 0x0000FFFF;
+constexpr uint32_t f2h_exited_reset_bit     = 0x80000000;
+constexpr uint32_t f2h_busy_bit             = 0x40000000;
+constexpr uint32_t f2h_cmd_error_bit        = 0x20000000;
+constexpr uint32_t f2h_run_halted_bit       = 0x10000000;
+constexpr uint32_t f2h_run_exception_bit    = 0x08000000;
 
-// uint32_t *h2f;
-// uint32_t *f2h;
+constexpr uint32_t f2h_run_exc_data_mask    = 0x00FFFFFF;
+constexpr uint32_t f2h_phase_busy           = f2h_busy_bit;
+constexpr uint32_t f2h_phase_ready          = 0;
+constexpr uint32_t f2h_cmd_response_mask    = 0x0000FFFF;
+
+const char *cmdToString(uint32_t h2f)
+{
+    if(!(h2f & h2f_request_bit)) {
+        return "no request so no command";
+    }
+    switch(h2f & h2f_cmd_mask) {
+        case h2f_cmd_put_low_16: return "h2f_cmd_put_low_16";
+        case h2f_cmd_put_high_16: return "h2f_cmd_put_high_16";
+        case h2f_cmd_write_inst_ram: return "h2f_cmd_write_inst_ram";
+        case h2f_cmd_write_data_ram: return "h2f_cmd_write_data_ram";
+        case h2f_cmd_read_inst_ram: return "h2f_cmd_read_inst_ram";
+        case h2f_cmd_read_data_ram: return "h2f_cmd_read_data_ram";
+        case h2f_cmd_read_x_reg: return "h2f_cmd_read_x_reg";
+        case h2f_cmd_read_f_reg: return "h2f_cmd_read_f_reg";
+        case h2f_cmd_read_special: return "h2f_cmd_read_special";
+        case h2f_cmd_get_low_16: return "h2f_cmd_get_low_16";
+        case h2f_cmd_get_high_16: return "h2f_cmd_get_high_16";
+        default : return "unknown cmd"; break;
+    }
+}
 
 using namespace std::chrono_literals;
 #if SIMULATE
-const std::chrono::duration<float, std::micro> h2f_timeout_micros = 1000us;
+constexpr std::chrono::duration<float, std::micro> h2f_timeout_micros = 10000us;
 #else
-const std::chrono::duration<float, std::micro> h2f_timeout_micros = 10us;
+constexpr std::chrono::duration<float, std::micro> h2f_timeout_micros = 10us;
 #endif
 
-void setH2FState(VMain* top, uint32_t state)
+void setH2F(VMain* top, uint32_t state)
 {
+    if(dumpH2FAndF2H) {
+        std::cout << "set sim_h2f_value to " << to_hex(state) << "\n";
+    }
     top->sim_h2f_value = state;
 }
 
-bool waitOnPhaseOrTimeout(int phase, VMain* top)
+uint32_t getF2H(VMain* top)
 {
+    uint32_t f2h_value = top->sim_f2h_value;
+    if(dumpH2FAndF2H) {
+        std::cout << "get sim_f2h_value yields " << to_hex(f2h_value) << "\n";
+    }
+    return f2h_value;
+}
 
-    uint32_t phaseExpected = phase ? f2h_busy_bit : 0;
+bool waitOnExitReset(VMain* top)
+{
+    if(dumpH2FAndF2H) {
+        std::cout << "waitOnExitReset()...\n";
+    }
     auto start = std::chrono::high_resolution_clock::now();
-    while((top->sim_f2h_value & f2h_busy_bit) != phaseExpected) {
+    while((getF2H(top) & f2h_exited_reset_bit) != f2h_exited_reset_bit) {
 #if SIMULATE
         // cycle simulation clock
         top->clock = 1;
@@ -205,7 +241,55 @@ bool waitOnPhaseOrTimeout(int phase, VMain* top)
         auto now = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::micro> elapsed = now - start;
         if(elapsed > h2f_timeout_micros) {
-            std::cerr << "waitOnPhaseOrTimeout : timeout waiting for FPGA to change phase\n";
+            std::cerr << "waitOnPhaseOrTimeout : timed out waiting for FPGA to change phase\n";
+            exit(EXIT_FAILURE);
+            return false;
+        }
+    }
+    return true;
+}
+
+bool waitOnPhaseOrTimeout(int phase, VMain* top)
+{
+    if(dumpH2FAndF2H) {
+        std::cout << "waitOnPhaseOrTimeout(" << to_hex(phase) << ")...\n";
+    }
+    uint32_t phaseExpected = phase ? f2h_busy_bit : 0;
+    auto start = std::chrono::high_resolution_clock::now();
+    while((getF2H(top) & f2h_busy_bit) != phaseExpected) {
+#if SIMULATE
+        if(dumpH2FAndF2H) {
+            std::cout << "CLOCK = 0, state " << int(top->Main->state) << "\n";
+            std::cout << "h2f : " << to_hex(top->sim_h2f_value) << ", " << cmdToString(top->sim_h2f_value) << "\n";
+            std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
+            std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
+            std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
+            std::cout << "inst_ram_address = " << to_hex(top->Main->inst_ram_address) << "\n";
+            std::cout << "inst_ram_write_data = " << to_hex(top->Main->inst_ram_write_data) << "\n";
+        }
+        // cycle simulation clock
+        top->clock = 1;
+        top->eval();
+        if(dumpH2FAndF2H) {
+            std::cout << "CLOCK = 1, state " << int(top->Main->state) << "\n";
+            std::cout << "h2f : " << to_hex(top->sim_h2f_value) << ", " << cmdToString(top->sim_h2f_value) << "\n";
+            std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
+            std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
+            std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
+            std::cout << "inst_ram_address = " << to_hex(top->Main->inst_ram_address) << "\n";
+            std::cout << "inst_ram_write_data = " << to_hex(top->Main->inst_ram_write_data) << "\n";
+        }
+        top->clock = 0;
+        top->eval();
+#else
+        // nanosleep and check clock for timeout
+        std::this_thread::sleep_for(1us);
+#endif
+        auto now = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float, std::micro> elapsed = now - start;
+        if(elapsed > h2f_timeout_micros) {
+            std::cerr << "waitOnPhaseOrTimeout : timed out waiting for FPGA to change phase\n";
+            exit(EXIT_FAILURE);
             return false;
         }
     }
@@ -221,14 +305,14 @@ bool processCommand(uint32_t command, VMain* top)
     }
     
     // send the command and then wait for core to report it is processing the command
-    top->sim_h2f_value = command;
+    setH2F(top, command);
     if(!waitOnPhaseOrTimeout(f2h_phase_busy, top)) {
         std::cerr << "processCommand : timeout waiting on FPGA to indicate busy processing command\n";
         return false;
     }
 
     // return to idle state and wait for the core to tell us it's also idle.
-    top->sim_h2f_value = h2f_state_idle;
+    setH2F(top, h2f_gpu_idle);
     if(!waitOnPhaseOrTimeout(f2h_phase_ready, top)) {
         std::cerr << "processCommand : timeout waiting on FPGA to indicate command is completed\n";
         return false;
@@ -270,13 +354,13 @@ uint32_t readWordFromRam(uint32_t address, RamType ramType, VMain *top)
     processCommand(h2f_cmd_get_low_16, top);
 
     // get low 16 bits into value
-    value = top->sim_f2h_value & 0xFFFF;
+    value = getF2H(top) & 0xFFFF;
 
     // put high 16 bits of read register on low 16 bits of F2H
     processCommand(h2f_cmd_get_high_16, top);
 
     // get high 16 bits into value
-    value = value | ((top->sim_f2h_value & 0xFFFF) << 16);
+    value = value | ((getF2H(top) & 0xFFFF) << 16);
 
     return value;
 }
@@ -300,13 +384,13 @@ uint32_t readReg(RegisterKind kind, int reg, VMain* top)
     processCommand(h2f_cmd_get_low_16, top);
 
     // get low 16 bits into value
-    value = top->sim_f2h_value & f2h_cmd_response_mask;
+    value = getF2H(top) & f2h_cmd_response_mask;
 
     // put high 16 bits of read register on low 16 bits of F2H
     processCommand(h2f_cmd_get_high_16, top);
 
     // get high 16 bits into value
-    value = value | ((top->sim_f2h_value & f2h_cmd_response_mask) << 16);
+    value = value | ((getF2H(top) & f2h_cmd_response_mask) << 16);
 
     return value;
 }
@@ -550,7 +634,7 @@ void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_
 void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *params, VMain *top, uint32_t *clocks, uint32_t *insts)
 {
     // Run one clock cycle in not-run reset to process STATE_INIT
-    setH2FState(top, h2f_state_reset);
+    setH2F(top, h2f_gpu_reset);
 
     top->clock = 1;
     top->eval();
@@ -559,7 +643,8 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     (*clocks)++;
 
     // Release reset
-    setH2FState(top, h2f_state_idle);
+    setH2F(top, h2f_gpu_idle);
+    waitOnExitReset(top);
 
     // run == 0, nothing should be happening here.
     top->clock = 1;
@@ -568,7 +653,7 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     top->eval();
     (*clocks)++;
     // Run
-    setH2FState(top, h2f_state_run);
+    setH2F(top, h2f_gpu_run);
 
     std::string pad = "                     ";
 
@@ -579,7 +664,7 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     for(int i = 0; i < 32; i++) oldFRegs[i] = top->Main->shaderCore->float_registers->bank1->memory[i];
     oldPC = top->Main->shaderCore->PC;
 
-    while (!Verilated::gotFinish() && !(top->sim_f2h_value & f2h_run_halted_bit)) {
+    while (!Verilated::gotFinish() && !(getF2H(top) & f2h_run_halted_bit)) {
 
         top->clock = 1;
         top->eval();
@@ -679,7 +764,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
     // Set up inst Ram
     // Run one clock cycle in reset to process STATE_INIT
-    setH2FState(top, h2f_state_reset);
+    setH2F(top, h2f_gpu_reset);
 
     top->clock = 1;
     top->eval();
@@ -688,7 +773,8 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     clocks++;
 
     // Release reset
-    setH2FState(top, h2f_state_idle);
+    setH2F(top, h2f_gpu_idle);
+    waitOnExitReset(top);
 
     // run == 0, nothing should be happening here.
     top->clock = 1;
@@ -759,7 +845,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             shadeOnePixel(debugOptions, params, top, &clocks, &insts);
 
             /* return to STATE_INIT so we can drive ext memory access */
-            setH2FState(top, h2f_state_idle);
+            setH2F(top, h2f_gpu_idle);
 
             v3float rgb = {1, 0, 0};
             if(params->colorAddress != 0xFFFFFFFF)
