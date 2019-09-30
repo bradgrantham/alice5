@@ -1,6 +1,6 @@
 # Alice 5 - SPIR-V fragment shader GPU core based on RISC-V
 
-Our goal with Alice 5 is to create our own shader core and supporting hardware and software to download and display ShaderToy "toys". We hope to explore and understand to various degrees:
+Our goal with Alice 5 is to create our own shader core and supporting hardware and software to download and display ShaderToy projects. We hope to explore and understand to various degrees:
 1. ShaderToy shaders and structures
 1. Shader parsing using glslang to SPIR-V
 1. Shader compilation using software written from scratch
