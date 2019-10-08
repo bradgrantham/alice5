@@ -22,6 +22,7 @@ constexpr bool dumpH2FAndF2H = false; // true;
 
 #include "VMain.h"
 #include "VMain_Main.h"
+#include "VMain_GPU.h"
 #include "VMain_Registers.h"
 #include "VMain_ShaderCore.h"
 #include "VMain_RegisterFile__A5.h"
@@ -236,8 +237,6 @@ void allowGPUProgress(VMain *top)
         std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
         std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
         std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
-        std::cout << "inst_ram_address = " << to_hex(top->Main->inst_ram_address) << "\n";
-        std::cout << "inst_ram_write_data = " << to_hex(top->Main->inst_ram_write_data) << "\n";
     }
 
     top->clock = 0;
@@ -249,8 +248,6 @@ void allowGPUProgress(VMain *top)
         std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
         std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
         std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
-        std::cout << "inst_ram_address = " << to_hex(top->Main->inst_ram_address) << "\n";
-        std::cout << "inst_ram_write_data = " << to_hex(top->Main->inst_ram_write_data) << "\n";
     }
 
 #else
@@ -440,7 +437,7 @@ void dumpRegisters(VMain* top)
         // Draw in columns.
         int r = i%4*8 + i/4;
         std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
-            << to_hex(top->Main->shaderCore->registers->bank1->memory[r]) << "   ";
+            << to_hex(top->Main->gpu->shaderCore->registers->bank1->memory[r]) << "   ";
         if (i % 4 == 3) {
             std::cout << "\n";
         }
@@ -450,18 +447,18 @@ void dumpRegisters(VMain* top)
         int r = i%4*8 + i/4;
         if(false) {
             std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
-                << to_hex(top->Main->shaderCore->float_registers->bank1->memory[r]) << "   ";
+                << to_hex(top->Main->gpu->shaderCore->float_registers->bank1->memory[r]) << "   ";
         } else {
             std::cout << (r < 10 ? " " : "") << "f" << r << " = ";
             std::cout << std::setprecision(5) << std::setw(10) <<
-                intToFloat(top->Main->shaderCore->float_registers->bank1->memory[r]);
+                intToFloat(top->Main->gpu->shaderCore->float_registers->bank1->memory[r]);
             std::cout << std::setw(0) << "   ";
         }
         if (i % 4 == 3) {
             std::cout << "\n";
         }
     }
-    std::cout << " pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
+    std::cout << " pc = 0x" << to_hex(top->Main->gpu->shaderCore->PC) << "\n";
 }
 
 void writeBytesToRam(const std::vector<uint8_t>& bytes, RamType ramType, bool dumpState, VMain *top)
@@ -642,16 +639,16 @@ void showProgress(const CoreParameters* params, CoreShared* shared, std::chrono:
 void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_t prevF[32], VMain *top)
 {
     std::cout << std::setfill('0');
-    if(prevPC != top->Main->shaderCore->PC) {
-        std::cout << "pc changed to " << std::hex << std::setw(8) << top->Main->shaderCore->PC << std::dec << '\n';
+    if(prevPC != top->Main->gpu->shaderCore->PC) {
+        std::cout << "pc changed to " << std::hex << std::setw(8) << top->Main->gpu->shaderCore->PC << std::dec << '\n';
     }
     for(int i = 0; i < 32; i++) {
-        if(prevX[i] != top->Main->shaderCore->registers->bank1->memory[i]) {
-            std::cout << "x" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << top->Main->shaderCore->registers->bank1->memory[i] << std::dec << '\n';
+        if(prevX[i] != top->Main->gpu->shaderCore->registers->bank1->memory[i]) {
+            std::cout << "x" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << top->Main->gpu->shaderCore->registers->bank1->memory[i] << std::dec << '\n';
         }
     }
     for(int i = 0; i < 32; i++) {
-        float cur = intToFloat(top->Main->shaderCore->float_registers->bank1->memory[i]);
+        float cur = intToFloat(top->Main->gpu->shaderCore->float_registers->bank1->memory[i]);
         float prev = intToFloat(prevF[i]);
         bool bothnan = std::isnan(cur) && std::isnan(prev);
         if((prev != cur) && !bothnan) { // if both NaN, equality test still fails)
@@ -692,9 +689,9 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     uint32_t oldXRegs[32];
     uint32_t oldFRegs[32];
     uint32_t oldPC;
-    for(int i = 0; i < 32; i++) oldXRegs[i] = top->Main->shaderCore->registers->bank1->memory[i];
-    for(int i = 0; i < 32; i++) oldFRegs[i] = top->Main->shaderCore->float_registers->bank1->memory[i];
-    oldPC = top->Main->shaderCore->PC;
+    for(int i = 0; i < 32; i++) oldXRegs[i] = top->Main->gpu->shaderCore->registers->bank1->memory[i];
+    for(int i = 0; i < 32; i++) oldFRegs[i] = top->Main->gpu->shaderCore->float_registers->bank1->memory[i];
+    oldPC = top->Main->gpu->shaderCore->PC;
 
     while (!Verilated::gotFinish() && !(getF2H(top) & f2h_run_halted_bit)) {
 
@@ -704,14 +701,14 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
         if(false) {
             // left side of nonblocking assignments
             std::cout << pad << "between clock 1 and clock 0\n";
-            std::cout << pad << "CPU in state " << stateToString(top->Main->shaderCore->state) << " (" << int(top->Main->shaderCore->state) << ")\n";
-            std::cout << pad << "pc = 0x" << to_hex(top->Main->shaderCore->PC) << "\n";
-            std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->shaderCore->inst_ram_address) << "\n";
-            std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->shaderCore->inst_to_decode) << "\n";
-            std::cout << pad << "data_ram_write_data = 0x" << to_hex(top->Main->shaderCore->data_ram_write_data) << "\n";
-            std::cout << pad << "data_ram_address = 0x" << to_hex(top->Main->shaderCore->data_ram_address) << "\n";
-            std::cout << pad << "data_ram_read_result = 0x" << to_hex(top->Main->shaderCore->data_ram_read_result) << "\n";
-            std::cout << pad << "data_ram_write = 0x" << to_hex(top->Main->shaderCore->data_ram_write) << "\n";
+            std::cout << pad << "CPU in state " << stateToString(top->Main->gpu->shaderCore->state) << " (" << int(top->Main->gpu->shaderCore->state) << ")\n";
+            std::cout << pad << "pc = 0x" << to_hex(top->Main->gpu->shaderCore->PC) << "\n";
+            std::cout << pad << "inst_ram_address = 0x" << to_hex(top->Main->gpu->shaderCore->inst_ram_address) << "\n";
+            std::cout << pad << "inst_to_decode = 0x" << to_hex(top->Main->gpu->shaderCore->inst_to_decode) << "\n";
+            std::cout << pad << "data_ram_write_data = 0x" << to_hex(top->Main->gpu->shaderCore->data_ram_write_data) << "\n";
+            std::cout << pad << "data_ram_address = 0x" << to_hex(top->Main->gpu->shaderCore->data_ram_address) << "\n";
+            std::cout << pad << "data_ram_read_result = 0x" << to_hex(top->Main->gpu->shaderCore->data_ram_read_result) << "\n";
+            std::cout << pad << "data_ram_write = 0x" << to_hex(top->Main->gpu->shaderCore->data_ram_write) << "\n";
         }
 
         top->clock = 0;
@@ -725,37 +722,37 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
         if(debugOptions->dumpState) {
             // right side of nonblocking assignments
             std::cout << "between clock 0 and clock 1\n";
-            std::cout << "CPU in state " << stateToString(top->Main->shaderCore->state) << " (" << int(top->Main->shaderCore->state) << ")\n";
+            std::cout << "CPU in state " << stateToString(top->Main->gpu->shaderCore->state) << " (" << int(top->Main->gpu->shaderCore->state) << ")\n";
             if(false) {
-                std::cout << "inst_ram_address = 0x" << to_hex(top->Main->shaderCore->inst_ram_address) << "\n";
-                std::cout << "inst_to_decode = 0x" << to_hex(top->Main->shaderCore->inst_to_decode) << "\n";
+                std::cout << "inst_ram_address = 0x" << to_hex(top->Main->gpu->shaderCore->inst_ram_address) << "\n";
+                std::cout << "inst_to_decode = 0x" << to_hex(top->Main->gpu->shaderCore->inst_to_decode) << "\n";
             }
         }
 
-        if(top->Main->shaderCore->state == VMain_ShaderCore::STATE_RETIRE) {
+        if(top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_RETIRE) {
             (*insts)++;
         }
 
-        if((top->Main->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
-            (top->Main->shaderCore->state == VMain_ShaderCore::STATE_FPU1)
+        if((top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
+            (top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_FPU1)
             ) {
             if(debugOptions->dumpState) {
                 std::cout << "after DECODE - ";
-                printDecodedInst(top->Main->shaderCore->PC, top->Main->shaderCore->inst_to_decode, top->Main->shaderCore);
+                printDecodedInst(top->Main->gpu->shaderCore->PC, top->Main->gpu->shaderCore->inst_to_decode, top->Main->gpu->shaderCore);
             }
             if(debugOptions->printDisassembly) {
-                print_inst(top->Main->shaderCore->PC, top->Main->instRam->memory[top->Main->shaderCore->PC / 4], params->textAddressesToSymbols);
+                print_inst(top->Main->gpu->shaderCore->PC, top->Main->gpu->instRam->memory[top->Main->gpu->shaderCore->PC / 4], params->textAddressesToSymbols);
             }
         }
 
-        // if(top->Main->shaderCore->state == VMain_ShaderCore::STATE_FETCH) {
+        // if(top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_FETCH) {
             if(debugOptions->printCoreDiff) {
 
                 dumpRegsDiff(oldPC, oldXRegs, oldFRegs, top);
 
-                for(int i = 0; i < 32; i++) oldXRegs[i] = top->Main->shaderCore->registers->bank1->memory[i];
-                for(int i = 0; i < 32; i++) oldFRegs[i] = top->Main->shaderCore->float_registers->bank1->memory[i];
-                oldPC = top->Main->shaderCore->PC;
+                for(int i = 0; i < 32; i++) oldXRegs[i] = top->Main->gpu->shaderCore->registers->bank1->memory[i];
+                for(int i = 0; i < 32; i++) oldFRegs[i] = top->Main->gpu->shaderCore->float_registers->bank1->memory[i];
+                oldPC = top->Main->gpu->shaderCore->PC;
             }
         // }
 
@@ -779,7 +776,7 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
                 std::cout << "0x" << to_hex(i) << " :";
             }
 
-            std::cout << " " << to_hex(top->Main->dataRam->memory[i]) << "   ";
+            std::cout << " " << to_hex(top->Main->gpu->dataRam->memory[i]) << "   ";
             if (end) {
                 std::cout << "\n";
             }
@@ -828,9 +825,9 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             params->inst_bytes[byteaddr + 1] <<  8 |
             params->inst_bytes[byteaddr + 2] << 16 |
             params->inst_bytes[byteaddr + 3] << 24;
-        if(top->Main->instRam->memory[byteaddr >> 2] != inst_word) {
+        if(top->Main->gpu->instRam->memory[byteaddr >> 2] != inst_word) {
             std::cout << "error: inst memory[" << byteaddr << "] = "
-                << to_hex(top->Main->instRam->memory[byteaddr >> 2]) << ", should be "
+                << to_hex(top->Main->gpu->instRam->memory[byteaddr >> 2]) << ", should be "
                 << to_hex(inst_word) << "\n";
         }
     }
@@ -842,9 +839,9 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             params->data_bytes[byteaddr + 1] <<  8 |
             params->data_bytes[byteaddr + 2] << 16 |
             params->data_bytes[byteaddr + 3] << 24;
-        if(top->Main->dataRam->memory[byteaddr >> 2] != data_word) {
+        if(top->Main->gpu->dataRam->memory[byteaddr >> 2] != data_word) {
             std::cout << "error: data memory[" << byteaddr << "] = "
-                << to_hex(top->Main->dataRam->memory[byteaddr >> 2]) << ", should be "
+                << to_hex(top->Main->gpu->dataRam->memory[byteaddr >> 2]) << ", should be "
                 << to_hex(data_word) << "\n";
         }
     }

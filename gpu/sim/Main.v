@@ -1,6 +1,6 @@
 
 module Main(
-    input wire clock,   // hopefully will be 50 MHz FPGA clock later
+    input wire clock,
 
 `ifdef VERILATOR
     input [31:0] sim_h2f_value,
@@ -57,18 +57,20 @@ module Main(
     reg f2h_exited_reset /* verilator public */;
     reg f2h_busy /* verilator public */;
     reg f2h_cmd_error /* verilator public */;
-    reg f2h_run_halted /* verilator public */;
-    reg f2h_run_exception /* verilator public */;
+    wire f2h_run_halted /* verilator public */;
     reg [23:0] f2h_data_field /* verilator public */;
+
+    wire exception;
+    wire [23:0] exception_data;
 
     wire [31:0] f2h_value /* verilator public */ = {
         f2h_exited_reset,
         f2h_busy,
         f2h_cmd_error,
         f2h_run_halted,
-        f2h_run_exception,
+        exception,
         3'b0,
-        f2h_data_field
+        exception ? exception_data : f2h_data_field
     };
 
     // Internal state maintained for H2F and F2H communication
@@ -76,7 +78,8 @@ module Main(
     reg [15:0] write_register_low16 /* verilator public */;
     reg [15:0] write_register_high16 /* verilator public */;
 
-    // State machine states for completing command processing
+
+    // States for completing command processing
     localparam STATE_INIT = 0;
     localparam STATE_IDLE = 1;
     localparam STATE_ERROR = 2;
@@ -90,208 +93,193 @@ module Main(
     reg [3:0] state /* verilator public */;
 
 
-    // Instruction RAM write control
-    wire [ADDRESS_WIDTH-1:0] inst_ram_address /* verilator public */;
-    wire [WORD_WIDTH-1:0] inst_ram_write_data /* verilator public */;
-    wire inst_ram_write /* verilator public */;
-
-    // Data RAM write control
-    wire [ADDRESS_WIDTH-1:0] data_ram_address /* verilator public */;
-    wire [WORD_WIDTH-1:0] data_ram_write_data /* verilator public */;
-    wire data_ram_write /* verilator public */;
-
-    // Inst RAM read out
-    wire [WORD_WIDTH-1:0] inst_ram_out_data /* verilator public */;
-
-    // Data RAM read out
-    wire [WORD_WIDTH-1:0] data_ram_out_data /* verilator public */;
-
-    BlockRam #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
-        instRam(
-            .clock(clock),
-            .write_address({2'b00, inst_ram_address[ADDRESS_WIDTH-1:2]}),
-            .write(inst_ram_write),
-            .write_data(inst_ram_write_data),
-            .read_address({2'b00, inst_ram_address[ADDRESS_WIDTH-1:2]}),
-            .read_data(inst_ram_out_data));
-
-    BlockRam #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
-        dataRam(
-            .clock(clock),
-            .write_address({2'b00, data_ram_address[ADDRESS_WIDTH-1:2]}),
-            .write(data_ram_write),
-            .write_data(data_ram_write_data),
-            .read_address({2'b00, data_ram_address[ADDRESS_WIDTH-1:2]}),
-            .read_data(data_ram_out_data));
-
-    wire [ADDRESS_WIDTH-1:0] shadercore_inst_address;
-    wire [ADDRESS_WIDTH-1:0] shadercore_data_address;
-    wire [WORD_WIDTH-1:0] shadercore_data_write_data;
-    wire shadercore_enable_write_data;
-
-    ShaderCore #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
-        shaderCore(
-            .clock(clock),
-            .reset_n(reset_n),
-            .run(run),
-            .halted(f2h_run_halted),
-            .exception(f2h_run_exception),
-            .inst_ram_address(shadercore_inst_address),
-            .data_ram_address(shadercore_data_address),
-            .data_ram_write_data(shadercore_data_write_data),
-            .data_ram_write(shadercore_enable_write_data),
-            .inst_ram_read_result(inst_ram_out_data),
-            .data_ram_read_result(data_ram_out_data)
-            );
-
     reg ext_enable_write_inst /* verilator public */;
     reg ext_enable_write_data /* verilator public */;
 
     wire [31:0] write_data = {write_register_high16, write_register_low16};
     reg [15:0] cmd_parameter /* verilator public */;
 
-    assign inst_ram_write = !run ? ext_enable_write_inst : 1'b0;
-    assign inst_ram_write_data = !run ? write_data : 32'b0;
-    assign inst_ram_address = !run ? cmd_parameter : shadercore_inst_address;
 
-    assign data_ram_write = !run ? ext_enable_write_data : shadercore_enable_write_data;
-    assign data_ram_write_data = !run ? write_data : shadercore_data_write_data;
-    assign data_ram_address = !run ? cmd_parameter : shadercore_data_address;
+    // Various outputs from GPU
+    wire [WORD_WIDTH-1:0] inst_ram_out_result /* verilator public */;
+    wire [WORD_WIDTH-1:0] data_ram_out_result /* verilator public */;
+    wire [WORD_WIDTH-1:0] register_read_result /* verilator public */;
+    wire [WORD_WIDTH-1:0] floatreg_read_result /* verilator public */;
+    wire [WORD_WIDTH-1:0] specialreg_read_result /* verilator public */;
+
+    GPU #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+        gpu(
+            .clock(clock),
+            .reset_n(reset_n),
+            .run(run),
+
+            .halted(f2h_run_halted),
+            .exception(exception),
+            .exception_data(exception_data),
+
+            .ext_enable_write_inst(ext_enable_write_inst),
+            .ext_inst_address(cmd_parameter),
+            .ext_inst_input(write_data),
+            .ext_inst_output(inst_ram_out_result),
+
+            .ext_enable_write_data(ext_enable_write_data),
+            .ext_data_address(cmd_parameter),
+            .ext_data_input(write_data),
+            .ext_data_output(data_ram_out_result),
+
+            .ext_register_address(cmd_parameter),
+            .ext_register_output(register_read_result),
+
+            .ext_floatreg_address(cmd_parameter),
+            .ext_floatreg_output(floatreg_read_result),
+
+            .ext_specialreg_address(cmd_parameter),
+            .ext_specialreg_output(specialreg_read_result)
+            );
 
     always @(posedge clock) begin // {
         if(!reset_n) begin // {
 
             f2h_exited_reset <= 0;
             state <= STATE_INIT;
+            f2h_busy <= 1;
 
         end else begin // } {
 
-            if (h2f_request && !run) begin // {
+            if (run) begin // {
 
-                f2h_busy <= 1;
-                f2h_cmd_error <= 0;
+                // No command processing during run
+                // Could do something here, I guess
 
-                case (h2f_command)
-                    H2F_CMD_PUT_LOW_16: begin
-                        write_register_low16 <= h2f_parameter;
-                        state <= STATE_IDLE;
-                    end
-                    H2F_CMD_PUT_HIGH_16: begin
-                        write_register_high16 <= h2f_parameter;
-                        state <= STATE_IDLE;
-                    end
-                    H2F_CMD_WRITE_INST_RAM: begin
-                        ext_enable_write_inst <= 1;
-                        cmd_parameter <= h2f_parameter;
-                        // inst_ram_address gets cmd_parameter combinationally if !run
-                        // inst_ram_write_data gets {write_register_high16, write_register_low16} combinationally if !run
-                        state <= STATE_WAIT_WRITE_INST_RAM;
-                    end
-                    H2F_CMD_WRITE_DATA_RAM: begin
-                        ext_enable_write_data <= 1;
-                        cmd_parameter <= h2f_parameter;
-                        // data_ram_address gets cmd_parameter combinationally if !run
-                        // data_ram_write_data gets {write_register_high16, write_register_low16} combinationally if !run
-                        state <= STATE_WAIT_WRITE_DATA_RAM;
-                    end
-                    H2F_CMD_READ_INST_RAM: begin
-                        // inst_ram_address gets cmd_parameter combinationally if !run
-                        cmd_parameter <= h2f_parameter;
-                        state <= STATE_WAIT_READ_INST_RAM;
-                    end
-                    H2F_CMD_READ_DATA_RAM: begin
-                        // data_ram_address gets cmd_parameter combinationally if !run
-                        cmd_parameter <= h2f_parameter;
-                        state <= STATE_WAIT_READ_DATA_RAM;
-                    end
-                    H2F_CMD_READ_X_REG: begin
-                        // x_reg_number <= h2f_parameter;
-                        state <= STATE_WAIT_READ_X_REG;
-                    end
-                    H2F_CMD_READ_F_REG: begin
-                        // f_reg_number <= h2f_parameter;
-                        state <= STATE_WAIT_READ_F_REG;
-                    end
-                    H2F_CMD_READ_SPECIAL: begin
-                        // f_reg_number <= h2f_parameter;
-                        state <= STATE_WAIT_READ_SPECIAL;
-                    end
-                    H2F_CMD_GET_LOW_16: begin
-                        f2h_data_field <= {8'b0, read_register[15:0]};
-                        state <= STATE_IDLE;
-                    end
-                    H2F_CMD_GET_HIGH_16: begin
-                        f2h_data_field <= {8'b0, read_register[31:16]};
-                        state <= STATE_IDLE;
-                    end
-                    default: begin
-                        f2h_data_field <= F2H_ERR_UNKNOWN_CMD;
-                        state <= STATE_IDLE;
-                    end
-                endcase
             end else begin // } {
-                // I haven't extracted "f2h_busy <= 0" from any case
-                // statement yet because there could end up being
-                // transitional states in which the core is still busy
-                // on the way to STATE_IDLE
-                case (state) // {
-                    STATE_INIT: begin
-                        f2h_exited_reset <= 1;
-                        f2h_busy <= 1;
-                        f2h_cmd_error <= 0;
-                        state <= STATE_IDLE;
-                    end
-                    STATE_ERROR: begin
-                        f2h_busy <= 0;
-                        f2h_cmd_error <= 1;
-                        state <= STATE_ERROR;
-                    end
-                    STATE_IDLE: begin
-                        f2h_busy <= 0;
-                        state <= STATE_IDLE;
-                    end
-                    STATE_WAIT_WRITE_INST_RAM: begin
-                        // for now assume one cycle write
-                        ext_enable_write_inst <= 0;
-                        state <= STATE_IDLE;
-                        f2h_busy <= 0;
-                    end
-                    STATE_WAIT_WRITE_DATA_RAM: begin
-                        // for now assume one cycle write
-                        ext_enable_write_data <= 0;
-                        state <= STATE_IDLE;
-                        f2h_busy <= 0;
-                    end
-                    STATE_WAIT_READ_INST_RAM: begin
-                        // for now assume one cycle read
-                        read_register <= inst_ram_out_data;
-                        state <= STATE_IDLE;
-                        f2h_busy <= 0;
-                    end
-                    STATE_WAIT_READ_DATA_RAM: begin
-                        // for now assume one cycle read
-                        read_register <= data_ram_out_data;
-                        state <= STATE_IDLE;
-                        f2h_busy <= 0;
-                    end
-                    STATE_WAIT_READ_X_REG: begin
-                        read_register <= 32'hdeafca75;
-                        state <= STATE_IDLE;
-                        f2h_busy <= 0;
-                    end
-                    STATE_WAIT_READ_F_REG: begin
-                        read_register <= 32'hdeafca75;
-                        state <= STATE_IDLE;
-                        f2h_busy <= 0;
-                    end
-                    STATE_WAIT_READ_SPECIAL: begin
-                        read_register <= 32'hdeafca75;
-                        state <= STATE_IDLE;
-                        f2h_busy <= 0;
-                    end
-                endcase // }
 
-            end // }
+                if (h2f_request) begin // {
+
+                    // HPS has raised the bit to request processing of a command
+
+                    f2h_busy <= 1;
+                    f2h_cmd_error <= 0;
+
+                    case (h2f_command) // {
+                        H2F_CMD_PUT_LOW_16: begin
+                            write_register_low16 <= h2f_parameter;
+                            state <= STATE_IDLE;
+                        end
+                        H2F_CMD_PUT_HIGH_16: begin
+                            write_register_high16 <= h2f_parameter;
+                            state <= STATE_IDLE;
+                        end
+                        H2F_CMD_WRITE_INST_RAM: begin
+                            ext_enable_write_inst <= 1;
+                            cmd_parameter <= h2f_parameter;
+                            state <= STATE_WAIT_WRITE_INST_RAM;
+                        end
+                        H2F_CMD_WRITE_DATA_RAM: begin
+                            ext_enable_write_data <= 1;
+                            cmd_parameter <= h2f_parameter;
+                            state <= STATE_WAIT_WRITE_DATA_RAM;
+                        end
+                        H2F_CMD_READ_INST_RAM: begin
+                            cmd_parameter <= h2f_parameter;
+                            state <= STATE_WAIT_READ_INST_RAM;
+                        end
+                        H2F_CMD_READ_DATA_RAM: begin
+                            cmd_parameter <= h2f_parameter;
+                            state <= STATE_WAIT_READ_DATA_RAM;
+                        end
+                        H2F_CMD_READ_X_REG: begin
+                            cmd_parameter <= h2f_parameter;
+                            state <= STATE_WAIT_READ_X_REG;
+                        end
+                        H2F_CMD_READ_F_REG: begin
+                            cmd_parameter <= h2f_parameter;
+                            state <= STATE_WAIT_READ_F_REG;
+                        end
+                        H2F_CMD_READ_SPECIAL: begin
+                            cmd_parameter <= h2f_parameter;
+                            state <= STATE_WAIT_READ_SPECIAL;
+                        end
+                        H2F_CMD_GET_LOW_16: begin
+                            f2h_data_field <= {8'b0, read_register[15:0]};
+                            state <= STATE_IDLE;
+                        end
+                        H2F_CMD_GET_HIGH_16: begin
+                            f2h_data_field <= {8'b0, read_register[31:16]};
+                            state <= STATE_IDLE;
+                        end
+                        default: begin
+                            f2h_data_field <= F2H_ERR_UNKNOWN_CMD;
+                            state <= STATE_IDLE;
+                        end
+                    endcase // }
+
+                end else begin // } {
+
+                    // HPS has lowered the bit, so process command and deactivate busy bit when done
+
+                    // I haven't extracted "f2h_busy <= 0" from any case
+                    // statement yet because there could end up being
+                    // transitional states in which the core is still busy
+                    // on the way to STATE_IDLE
+                    case (state) // {
+                        STATE_INIT: begin
+                            f2h_exited_reset <= 1;
+                            f2h_cmd_error <= 0;
+                            state <= STATE_IDLE;
+                        end
+                        STATE_ERROR: begin
+                            f2h_busy <= 0;
+                            f2h_cmd_error <= 1;
+                            state <= STATE_ERROR;
+                        end
+                        STATE_IDLE: begin
+                            f2h_busy <= 0;
+                            state <= STATE_IDLE;
+                        end
+                        STATE_WAIT_WRITE_INST_RAM: begin
+                            // for now assume one cycle write
+                            ext_enable_write_inst <= 0;
+                            state <= STATE_IDLE;
+                            f2h_busy <= 0;
+                        end
+                        STATE_WAIT_WRITE_DATA_RAM: begin
+                            // for now assume one cycle write
+                            ext_enable_write_data <= 0;
+                            state <= STATE_IDLE;
+                            f2h_busy <= 0;
+                        end
+                        STATE_WAIT_READ_INST_RAM: begin
+                            // for now assume one cycle read
+                            read_register <= inst_ram_out_result;
+                            state <= STATE_IDLE;
+                            f2h_busy <= 0;
+                        end
+                        STATE_WAIT_READ_DATA_RAM: begin
+                            // for now assume one cycle read
+                            read_register <= data_ram_out_result;
+                            state <= STATE_IDLE;
+                            f2h_busy <= 0;
+                        end
+                        STATE_WAIT_READ_X_REG: begin
+                            read_register <= 32'hdeafca75;
+                            state <= STATE_IDLE;
+                            f2h_busy <= 0;
+                        end
+                        STATE_WAIT_READ_F_REG: begin
+                            read_register <= 32'hdeafca75;
+                            state <= STATE_IDLE;
+                            f2h_busy <= 0;
+                        end
+                        STATE_WAIT_READ_SPECIAL: begin
+                            read_register <= 32'hdeafca75;
+                            state <= STATE_IDLE;
+                            f2h_busy <= 0;
+                        end
+                    endcase // }
+
+                end // }
+
+            end // } {
 
         end // } 
 
