@@ -23,6 +23,7 @@ constexpr bool dumpH2FAndF2H = false; // true;
 #include "VMain.h"
 #include "VMain_Main.h"
 #include "VMain_GPU.h"
+#include "VMain_GPU32BitInterface.h"
 #include "VMain_Registers.h"
 #include "VMain_ShaderCore.h"
 #include "VMain_RegisterFile__A5.h"
@@ -232,22 +233,14 @@ void allowGPUProgress(VMain *top)
     top->eval();
 
     if(dumpH2FAndF2H) {
-        std::cout << "CLOCK = 0, state " << int(top->Main->state) << "\n";
-        std::cout << "h2f : " << to_hex(top->sim_h2f_value) << ", " << cmdToString(top->sim_h2f_value) << "\n";
-        std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
-        std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
-        std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
+        std::cout << "CLOCK = 1, state " << int(top->Main->gpu_if->state) << "\n";
     }
 
     top->clock = 0;
     top->eval();
 
     if(dumpH2FAndF2H) {
-        std::cout << "CLOCK = 0, state " << int(top->Main->state) << "\n";
-        std::cout << "h2f : " << to_hex(top->sim_h2f_value) << ", " << cmdToString(top->sim_h2f_value) << "\n";
-        std::cout << "cmd_parameter = " << to_hex(top->Main->cmd_parameter) << "\n";
-        std::cout << "write register = " << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
-        std::cout << "ext_enable_write_inst = " << (top->Main->ext_enable_write_inst ? "true" : "false") << "\n";
+        std::cout << "CLOCK = 0, state " << int(top->Main->gpu_if->state) << "\n";
     }
 
 #else
@@ -472,7 +465,7 @@ void writeBytesToRam(const std::vector<uint8_t>& bytes, RamType ramType, bool du
             bytes[byteaddr + 3] << 24;
 
         if(dumpState)
-            std::cout << "Writing to " << ((ramType == INST_RAM) ? "inst" : "data") << " address " << byteaddr << " value 0x" << to_hex((top->Main->write_register_high16 << 16) | top->Main->write_register_low16) << "\n";
+            std::cout << "Writing to " << ((ramType == INST_RAM) ? "inst" : "data") << " address " << byteaddr << " value 0x" << to_hex((top->Main->gpu_if->write_register_high16 << 16) | top->Main->gpu_if->write_register_low16) << "\n";
 
         writeWordToRam(word, byteaddr, ramType, top);
 
