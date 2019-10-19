@@ -5,9 +5,9 @@ module GPU
     input wire clock,
     input wire run,
 
-    output reg halted,
-    output reg exception,
-    output reg [23:0] exception_data,
+    output wire halted,
+    output wire exception,
+    output wire [23:0] exception_data,
 
     input wire ext_enable_write_inst_ram,
     input wire[ADDRESS_WIDTH-1:0] ext_inst_ram_address,
@@ -99,5 +99,7 @@ module GPU
 
     assign ext_inst_ram_output = inst_ram_out_data;
     assign ext_data_ram_output = data_ram_out_data;
+	 
+    assign exception_data = 0;
 
 endmodule
