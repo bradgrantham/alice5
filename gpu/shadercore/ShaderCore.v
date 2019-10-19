@@ -373,13 +373,95 @@ module ShaderCore
             .zero(fpu_zero),
             .div_by_zero(fpu_div_by_zero)
         );
+
+    wire [WORD_WIDTH-1:0] int_to_float_result;
+    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
+    int_to_float
+        int_to_float
+        (
+            .op(rs1_value),
+            .res(int_to_float_result)
+        );
+
+    wire [WORD_WIDTH-1:0] float_to_int_result;
+    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
+    float_to_int
+        float_to_int
+        (
+            .op(float_rs1_value),
+            .rmode(fpu_rmode),
+            .res(float_to_int_result)
+        );
+
+    /* verilator lint_off UNUSED */
+    wire fcmp_unordered;
+    /* verilator lint_on UNUSED */
+    wire fcmp_altb;
+    wire fcmp_aeqb;
+    /* verilator lint_off UNUSED */
+    wire fcmp_blta;
+    wire fcmp_inf;
+    wire fcmp_zero;
+    /* verilator lint_on UNUSED */
+    fcmp
+        fcmp
+        (
+            .opa(float_rs1_value),
+            .opb(float_rs2_value),
+            .unordered(fcmp_unordered),
+            .altb(fcmp_altb),
+            .blta(fcmp_blta),
+            .aeqb(fcmp_aeqb),
+            .inf(fcmp_inf),
+            .zero(fcmp_zero)
+        );
+
+
 `endif
 
 `ifndef VERILATOR
     // Altera ALTFP Modules
 
     reg [6:0] wait_count;
+
+    // ALTFP_COMPARE
+    localparam ALTFP_COMPARE_LATENCY = 6;
+    reg altfp_compare_enable;
+    wire fcmp_altb;
+    wire fcmp_aeqb;
+    wire fcmp_blta;
+    fp_compare fp_compare ( 
+	.clk_en(altfp_multiply_enable),
+	.clock(clock),
+	.dataa(float_rs1_value),
+	.datab(float_rs2_value),
+	.aeb(fcmp_aeqb),
+	.agb(fcmp_blta),
+	.alb(fcmp_altb)
+    );
     
+    // ALTFP_CONVERT int to float
+    localparam ALTFP_INT_TO_FLOAT_LATENCY = 6;
+    reg altfp_int_to_float_enable;
+    wire [31:0] int_to_float_result;
+    int_to_float int_to_float ( 
+	.clk_en(altfp_int_to_float_enable),
+	.clock(clock),
+	.dataa(float_rs1_value),
+	.result(int_to_float_result)
+    );
+
+    // ALTFP_CONVERT float to int
+    localparam ALTFP_FLOAT_TO_INT_LATENCY = 6;
+    reg altfp_float_to_int_enable;
+    wire [31:0] float_to_int_result;
+    float_to_int float_to_int ( 
+	.clk_en(altfp_float_to_int_enable),
+	.clock(clock),
+	.dataa(float_rs1_value),
+	.result(float_to_int_result)
+    );
+
     // ALTFP_MULT
 
     localparam ALTFP_MULTIPLY_LATENCY = 11;
@@ -459,48 +541,6 @@ module ShaderCore
         fclass_is_neg_normal,
         fclass_is_neg_inf
     };
-
-    /* verilator lint_off UNUSED */
-    wire fcmp_unordered;
-    /* verilator lint_on UNUSED */
-    wire fcmp_altb;
-    wire fcmp_aeqb;
-    /* verilator lint_off UNUSED */
-    wire fcmp_blta;
-    wire fcmp_inf;
-    wire fcmp_zero;
-    /* verilator lint_on UNUSED */
-    fcmp
-        fcmp
-        (
-            .opa(float_rs1_value),
-            .opb(float_rs2_value),
-            .unordered(fcmp_unordered),
-            .altb(fcmp_altb),
-            .blta(fcmp_blta),
-            .aeqb(fcmp_aeqb),
-            .inf(fcmp_inf),
-            .zero(fcmp_zero)
-        );
-
-    wire [WORD_WIDTH-1:0] float_to_int_result;
-    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
-    float_to_int
-        float_to_int
-        (
-            .op(float_rs1_value),
-            .rmode(fpu_rmode),
-            .res(float_to_int_result)
-        );
-
-    wire [WORD_WIDTH-1:0] int_to_float_result;
-    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
-    int_to_float
-        int_to_float
-        (
-            .op(rs1_value),
-            .res(int_to_float_result)
-        );
 
     wire [31:0] fsgnj_result /* verilator public */ = {float_rs2_value[31], float_rs1_value[30:0]};
     wire [31:0] fsgnjn_result /* verilator public */ = {~float_rs2_value[31], float_rs1_value[30:0]};
@@ -600,7 +640,9 @@ module ShaderCore
 			// XXX subtract one so that after one clock we compare to 0??
 			wait_count <= decode_opcode_is_fmul ? (ALTFP_MULTIPLY_LATENCY - 1) : 
 			    (decode_opcode_is_fadd |decode_opcode_is_fsub) ? (ALTFP_ADD_SUB_LATENCY - 1) : 
-                            decode_opcode_is_fcvt_i2f ? 4 :
+                            decode_opcode_is_fcvt_f2i ? (ALTFP_FLOAT_TO_INT_LATENCY - 1) :
+                            (decode_opcode_is_fcmp || decode_opcode_is_fminmax) ? (ALTFP_FLOAT_TO_INT_LATENCY - 1) :
+                            decode_opcode_is_fcvt_i2f ? (ALTFP_INT_TO_FLOAT_LATENCY - 1) :
 			    /* decode_opcode_is_fdiv ? */ (ALTFP_DIVIDE_LATENCY - 1);
 
 			// XXX is this dangerous?  Is clk to the altera
@@ -611,9 +653,12 @@ module ShaderCore
 			altfp_divide_enable <= decode_opcode_is_fdiv;
 			altfp_add_sub_enable <= decode_opcode_is_fadd || decode_opcode_is_fsub;
 			altfp_add <= decode_opcode_is_fadd;
+			altfp_float_to_int_enable <= decode_opcode_is_fcvt_f2i;
+			altfp_int_to_float_enable <= decode_opcode_is_fcvt_i2f;
+			altfp_compare_enable <= (decode_opcode_is_fminmax | decode_opcode_is_fcmp);
 
                         state <= halt ? STATE_HALTED :
-                            (decode_opcode_is_fcvt_i2f || decode_opcode_is_fmul || decode_opcode_is_fsub || decode_opcode_is_fadd || decode_opcode_is_fdiv) ? STATE_ALTFP_WAIT :
+                            (decode_opcode_is_fminmax | decode_opcode_is_fcmp || decode_opcode_is_fcvt_f2i || decode_opcode_is_fcvt_i2f || decode_opcode_is_fmul || decode_opcode_is_fsub || decode_opcode_is_fadd || decode_opcode_is_fdiv) ? STATE_ALTFP_WAIT :
                             (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
                             (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
                             STATE_RETIRE;
@@ -626,6 +671,10 @@ module ShaderCore
 			    altfp_multiply_enable <= 0;
 			    altfp_add_sub_enable <= 0;
 			    altfp_divide_enable <= 0;
+			    altfp_int_to_float_enable <= 0;
+			    altfp_float_to_int_enable <= 0;
+			    altfp_compare_enable <= 0;
+			    ;
 			    state <= STATE_RETIRE;
 			end else begin // } {
 			    wait_count <= wait_count - 1;
