@@ -424,6 +424,17 @@ module ShaderCore
 
     reg [6:0] wait_count;
 
+    // ALTFP_SQRT
+    localparam ALTFP_SQRT_LATENCY = 6;
+    reg altfp_sqrt_enable;
+    wire [31:0] altfp_sqrt_result;
+    fp_sqrt fp_sqrt (
+	.clk_en(altfp_multiply_enable),
+	.clock(clock),
+	.data(float_rs1_value),
+	.result(altfp_sqrt_result),
+    );
+
     // ALTFP_COMPARE
     localparam ALTFP_COMPARE_LATENCY = 6;
     reg altfp_compare_enable;
@@ -499,6 +510,13 @@ module ShaderCore
 	    .datab(float_rs2_value),
 	    .result(altfp_add_sub_result)
     );
+
+    wire opcode_requires_altfp_wait =
+        decode_opcode_is_fsqrt || decode_opcode_is_fminmax ||
+        decode_opcode_is_fcmp || decode_opcode_is_fcvt_f2i ||
+	decode_opcode_is_fcvt_i2f || decode_opcode_is_fmul ||
+	decode_opcode_is_fsub || decode_opcode_is_fadd ||
+	decode_opcode_is_fdiv;
 
 `endif
 
@@ -643,6 +661,7 @@ module ShaderCore
                             decode_opcode_is_fcvt_f2i ? (ALTFP_FLOAT_TO_INT_LATENCY - 1) :
                             (decode_opcode_is_fcmp || decode_opcode_is_fminmax) ? (ALTFP_FLOAT_TO_INT_LATENCY - 1) :
                             decode_opcode_is_fcvt_i2f ? (ALTFP_INT_TO_FLOAT_LATENCY - 1) :
+                            decode_opcode_is_fsqrt ? (ALTFP_SQRT_LATENCY - 1) :
 			    /* decode_opcode_is_fdiv ? */ (ALTFP_DIVIDE_LATENCY - 1);
 
 			// XXX is this dangerous?  Is clk to the altera
@@ -650,6 +669,7 @@ module ShaderCore
 			// So it might be 11 cycles for mult, might be
 			// 12, depending on whether first clock counts...
 			altfp_multiply_enable <= decode_opcode_is_fmul;
+			altfp_sqrt_enable <= decode_opcode_is_fsqrt;
 			altfp_divide_enable <= decode_opcode_is_fdiv;
 			altfp_add_sub_enable <= decode_opcode_is_fadd || decode_opcode_is_fsub;
 			altfp_add <= decode_opcode_is_fadd;
@@ -658,7 +678,7 @@ module ShaderCore
 			altfp_compare_enable <= (decode_opcode_is_fminmax | decode_opcode_is_fcmp);
 
                         state <= halt ? STATE_HALTED :
-                            (decode_opcode_is_fminmax | decode_opcode_is_fcmp || decode_opcode_is_fcvt_f2i || decode_opcode_is_fcvt_i2f || decode_opcode_is_fmul || decode_opcode_is_fsub || decode_opcode_is_fadd || decode_opcode_is_fdiv) ? STATE_ALTFP_WAIT :
+                            opcode_requires_altfp_wait ? STATE_ALTFP_WAIT :
                             (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
                             (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
                             STATE_RETIRE;
@@ -674,7 +694,8 @@ module ShaderCore
 			    altfp_int_to_float_enable <= 0;
 			    altfp_float_to_int_enable <= 0;
 			    altfp_compare_enable <= 0;
-			    ;
+			    altfp_sqrt_enable <= 0;
+
 			    state <= STATE_RETIRE;
 			end else begin // } {
 			    wait_count <= wait_count - 1;
@@ -758,6 +779,7 @@ module ShaderCore
                                 /* (decode_funct3_rm == 2) ? */ fsgnjx_result
                             ) :
 `ifndef VERILATOR
+                            decode_opcode_is_fsqrt ? altfp_sqrt_result :
                             decode_opcode_is_fmul ? altfp_multiply_result :
                             decode_opcode_is_fdiv ? altfp_divide_result :
                             /* (decode_opcode_is_fadd | decode_opcode_is_fsub) ? */ altfp_add_sub_result;
