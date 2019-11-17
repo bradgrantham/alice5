@@ -1029,6 +1029,7 @@ struct InsnGLSLstd450Sqrt : public Instruction {
     virtual void step(Interpreter *interpreter) { interpreter->stepGLSLstd450Sqrt(*this); }
     virtual uint32_t opcode() const { return 0x10000 | GLSLstd450Sqrt; }
     virtual std::string name() const { return "GLSLstd450Sqrt"; }
+    virtual void emit(Compiler *compiler);
 };
 
 // GLSLstd450FMin instruction (code 37).

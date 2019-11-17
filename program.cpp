@@ -829,6 +829,10 @@ void Program::expandVectorsInBlock(Block *block) {
                 expandVectorsTerOp<InsnSelect>(instruction, newList, replaced);
                 break;
 
+            case 0x10000 | GLSLstd450Sqrt:
+                 expandVectorsUniOp<InsnGLSLstd450Sqrt>(instruction, newList, replaced);
+                 break;
+
             case 0x10000 | GLSLstd450Sin:
                  expandVectorsUniOp<InsnGLSLstd450Sin>(instruction, newList, replaced);
                  break;

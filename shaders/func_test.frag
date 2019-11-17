@@ -9,7 +9,7 @@ float range_tick = 1.0;
 
 float f(float x)
 {
-    return log2(x);
+    return sqrt(x);
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )

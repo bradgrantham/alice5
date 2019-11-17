@@ -577,6 +577,11 @@ void InsnCopyObject::emit(Compiler *compiler)
     compiler->emit(ss1.str(), ss2.str());
 }
 
+void InsnGLSLstd450Sqrt::emit(Compiler *compiler)
+{
+    compiler->emitUniCall(".sqrt", resultId(), xId());
+}
+
 void InsnGLSLstd450Sin::emit(Compiler *compiler)
 {
     compiler->emitUniCall(".sin", resultId(), xId());
