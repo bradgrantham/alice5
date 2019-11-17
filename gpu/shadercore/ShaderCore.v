@@ -40,9 +40,10 @@ module ShaderCore
     localparam STATE_FPU2 /* verilator public */ = 4'd12;
     localparam STATE_FPU3 /* verilator public */ = 4'd13;
     localparam STATE_FPU4 /* verilator public */ = 4'd14;
-`else
-    localparam STATE_ALTFP_WAIT /* verilator public */ = 4'd15;
 `endif
+
+    localparam STATE_ALTFP_WAIT /* verilator public */ = 4'd15;
+
     reg [3:0] state /* verilator public */;
 
     // ALU operations.  In Verilator, the syntax "alu.ALU_OP_ADD" pulls
@@ -416,10 +417,8 @@ module ShaderCore
             .zero(fcmp_zero)
         );
 
-
 `endif
 
-`ifndef VERILATOR
     // Altera ALTFP Modules
 
     reg [6:0] wait_count;
@@ -429,11 +428,13 @@ module ShaderCore
     reg altfp_sqrt_enable;
     wire [31:0] altfp_sqrt_result;
     fp_sqrt fp_sqrt (
-	.clk_en(altfp_multiply_enable),
+	.clk_en(altfp_sqrt_enable),
 	.clock(clock),
 	.data(float_rs1_value),
-	.result(altfp_sqrt_result),
+	.result(altfp_sqrt_result)
     );
+
+`ifndef VERILATOR
 
     // ALTFP_COMPARE
     localparam ALTFP_COMPARE_LATENCY = 6;
@@ -511,6 +512,15 @@ module ShaderCore
 	    .result(altfp_add_sub_result)
     );
 
+`endif
+
+`ifdef VERILATOR
+
+    wire opcode_requires_altfp_wait =
+        decode_opcode_is_fsqrt;
+
+`else 
+
     wire opcode_requires_altfp_wait =
         decode_opcode_is_fsqrt || decode_opcode_is_fminmax ||
         decode_opcode_is_fcmp || decode_opcode_is_fcvt_f2i ||
@@ -574,8 +584,15 @@ module ShaderCore
             data_ram_write <= 0;
             enable_write_rd <= 0;
             enable_write_float_rd <= 0;
+            altfp_sqrt_enable <= 0;
+
 `ifndef VERILATOR
             altfp_multiply_enable <= 0;
+            altfp_add_sub_enable <= 0;
+            altfp_divide_enable <= 0;
+            altfp_int_to_float_enable <= 0;
+            altfp_float_to_int_enable <= 0;
+            altfp_compare_enable <= 0;
 `endif
 
             halted <= 0;
@@ -630,19 +647,6 @@ module ShaderCore
                             decode_opcode_is_fmul ? 3'd2 :
                             decode_opcode_is_fdiv ? 3'd3 :
                             3'd7; /* XXX undefined */
-
-                        // RISC-V rounding modes in order are RNE, RTZ, RDN, RUP
-                        fpu_rmode <=
-                            (decode_funct3_rm == 0) ? 2'd0 :
-                            (decode_funct3_rm == 1) ? 2'd1 :
-                            (decode_funct3_rm == 2) ? 2'd3 :
-                            /* (decode_funct3_rm == 3) ? */ 2'd2;
-
-                        state <= halt ? STATE_HALTED :
-                            (decode_opcode_is_fmul || decode_opcode_is_fsub || decode_opcode_is_fadd || decode_opcode_is_fdiv) ? STATE_FPU1 :
-                            (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
-                            (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
-                            STATE_RETIRE;
 `endif
 
                         // RISC-V rounding modes in order are RNE, RTZ, RDN, RUP
@@ -652,10 +656,30 @@ module ShaderCore
                             (decode_funct3_rm == 2) ? 2'd3 :
                             /* (decode_funct3_rm == 3) ? */ 2'd2;
 
-                        rd_address <= decode_rd;
 
-`ifndef VERILATOR
-			// XXX subtract one so that after one clock we compare to 0??
+`ifdef VERILATOR
+                        state <= halt ? STATE_HALTED :
+                            opcode_requires_altfp_wait ? STATE_ALTFP_WAIT :
+                            (decode_opcode_is_fmul || decode_opcode_is_fsub || decode_opcode_is_fadd || decode_opcode_is_fdiv) ? STATE_FPU1 :
+                            (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
+                            (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
+                            STATE_RETIRE;
+
+`else
+
+                        state <= halt ? STATE_HALTED :
+                            opcode_requires_altfp_wait ? STATE_ALTFP_WAIT :
+                            (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
+                            (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
+                            STATE_RETIRE;
+`endif
+
+`ifdef VERILATOR
+			wait_count <= 
+                            decode_opcode_is_fsqrt ? (ALTFP_SQRT_LATENCY - 1) :
+                            0;
+
+`else
 			wait_count <= decode_opcode_is_fmul ? (ALTFP_MULTIPLY_LATENCY - 1) : 
 			    (decode_opcode_is_fadd |decode_opcode_is_fsub) ? (ALTFP_ADD_SUB_LATENCY - 1) : 
                             decode_opcode_is_fcvt_f2i ? (ALTFP_FLOAT_TO_INT_LATENCY - 1) :
@@ -669,7 +693,6 @@ module ShaderCore
 			// So it might be 11 cycles for mult, might be
 			// 12, depending on whether first clock counts...
 			altfp_multiply_enable <= decode_opcode_is_fmul;
-			altfp_sqrt_enable <= decode_opcode_is_fsqrt;
 			altfp_divide_enable <= decode_opcode_is_fdiv;
 			altfp_add_sub_enable <= decode_opcode_is_fadd || decode_opcode_is_fsub;
 			altfp_add <= decode_opcode_is_fadd;
@@ -677,24 +700,25 @@ module ShaderCore
 			altfp_int_to_float_enable <= decode_opcode_is_fcvt_i2f;
 			altfp_compare_enable <= (decode_opcode_is_fminmax | decode_opcode_is_fcmp);
 
-                        state <= halt ? STATE_HALTED :
-                            opcode_requires_altfp_wait ? STATE_ALTFP_WAIT :
-                            (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
-                            (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
-                            STATE_RETIRE;
 `endif
+
+			altfp_sqrt_enable <= decode_opcode_is_fsqrt;
+
+                        rd_address <= decode_rd;
+
                     end
 						  
-`ifndef VERILATOR
                     STATE_ALTFP_WAIT: begin // {
 			if(wait_count == 0) begin // {
+			    altfp_sqrt_enable <= 0;
+`ifndef VERILATOR
 			    altfp_multiply_enable <= 0;
 			    altfp_add_sub_enable <= 0;
 			    altfp_divide_enable <= 0;
 			    altfp_int_to_float_enable <= 0;
 			    altfp_float_to_int_enable <= 0;
 			    altfp_compare_enable <= 0;
-			    altfp_sqrt_enable <= 0;
+`endif
 
 			    state <= STATE_RETIRE;
 			end else begin // } {
@@ -702,7 +726,6 @@ module ShaderCore
 			    state <= STATE_ALTFP_WAIT;
 			end // }
 		    end // }
-`endif
 
 `ifdef VERILATOR
                     STATE_FPU1: begin
@@ -766,6 +789,7 @@ module ShaderCore
                                 $unsigned(alu_result);
 
                         enable_write_float_rd <= inst_has_float_dest;
+`ifndef VERILATOR
                         float_rd_value <= 
                             decode_opcode_is_flw ? data_ram_read_result :
                             decode_opcode_is_fcvt_i2f ? int_to_float_result :
@@ -778,12 +802,24 @@ module ShaderCore
                                 (decode_funct3_rm == 1) ? fsgnjn_result :
                                 /* (decode_funct3_rm == 2) ? */ fsgnjx_result
                             ) :
-`ifndef VERILATOR
                             decode_opcode_is_fsqrt ? altfp_sqrt_result :
                             decode_opcode_is_fmul ? altfp_multiply_result :
                             decode_opcode_is_fdiv ? altfp_divide_result :
                             /* (decode_opcode_is_fadd | decode_opcode_is_fsub) ? */ altfp_add_sub_result;
 `else
+                        float_rd_value <= 
+                            decode_opcode_is_flw ? data_ram_read_result :
+                            decode_opcode_is_fcvt_i2f ? int_to_float_result :
+                            decode_opcode_is_fmv_i2f ? rs1_value :
+                            decode_opcode_is_fminmax ? (
+                                fminmax_choose_rs1 ? float_rs1_value : float_rs2_value
+                            ) :
+                            decode_opcode_is_fsgnj ? (
+                                (decode_funct3_rm == 0) ? fsgnj_result :
+                                (decode_funct3_rm == 1) ? fsgnjn_result :
+                                /* (decode_funct3_rm == 2) ? */ fsgnjx_result
+                            ) :
+                            decode_opcode_is_fsqrt ? altfp_sqrt_result :
                             /* fdiv, fadd, fsub */ fpu_result;
 `endif
 
