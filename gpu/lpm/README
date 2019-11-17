@@ -1,0 +1,7 @@
+These files were generated using the verilator_support Perl scripts
+from https://github.com/twosigma/verilator_support.git .
+
+They were generated as follows:
+    ./altera_lib_lpm.pl . ~/tmp/220model.v
+
+The 220model.v file is from Quartus 18
