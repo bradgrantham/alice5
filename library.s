@@ -202,8 +202,8 @@
 .sqrt:
         ; Doesn't honor IEEE 754; will return NaN for sqrt(-0).
         ; save registers
-        fsw     ft0, -16(sp)
-        fsw     ft1, -20(sp)
+        fsw     ft0, -4(sp)
+        fsw     ft1, -8(sp)
 
         flw     ft0, 0(sp)       ; load first parameter ("x"), doesn't have to be into ft0
 
@@ -213,8 +213,8 @@
         fsw     ft1, 0(sp)      ; store return value
 
         ; restore registers
-        flw     ft0, -16(sp)
-        flw     ft1, -20(sp)
+        flw     ft0, -4(sp)
+        flw     ft1, -8(sp)
 
         jalr x0, ra, 0                
 
