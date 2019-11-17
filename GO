@@ -26,12 +26,12 @@ if [ "$animate" == "1" ]; then
     mkdir anim
 
     seq 0 199 | while read frame; do
-        ./gpuemu -f $frame --term out.o
+        ./emu -f $frame --term out.o
         mv emulated.ppm anim/out-$(printf "%03d" $frame).ppm
     done
 
     convert anim/*.ppm out.gif
 else
-    ./gpuemu -f 90 --term out.o
+    ./emu -f 90 --term out.o
 fi
 
