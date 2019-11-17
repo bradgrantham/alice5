@@ -1,15 +1,15 @@
 
-float domain_min = -3.14159 * 5;
-float domain_max = 3.14159 * 5;
-float domain_tick = 3.14159;
+float domain_min = -10;
+float domain_max = 10;
+float domain_tick = 1;
 
-float range_min = -2;
-float range_max = 2;
+float range_min = -10;
+float range_max = 10;
 float range_tick = 1.0;
 
 float f(float x)
 {
-    return log2(x);
+    return sqrt(x);
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
