@@ -424,7 +424,7 @@ module ShaderCore
     reg [6:0] wait_count;
 
     // ALTFP_SQRT
-    localparam ALTFP_SQRT_LATENCY = 6;
+    localparam ALTFP_SQRT_LATENCY = 28;
     reg altfp_sqrt_enable;
     wire [31:0] altfp_sqrt_result;
     fp_sqrt fp_sqrt (
