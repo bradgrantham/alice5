@@ -5,7 +5,7 @@
 set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEBA6U23I7
 set_global_assignment -name TOP_LEVEL_ENTITY "DE10_NANO_SoC_GHRD"
-set_global_assignment -name LAST_QUARTUS_VERSION 16.0.2
+set_global_assignment -name LAST_QUARTUS_VERSION "18.1.0 Lite Edition"
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "17:14:54 MARCH 04,2015"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 #============================================================
@@ -472,6 +472,24 @@ set_global_assignment -name USE_DLL_FREQUENCY_FOR_DQS_DELAY_CHAIN ON
 set_global_assignment -name UNIPHY_SEQUENCER_DQS_CONFIG_ENABLE ON
 set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
 set_global_assignment -name ECO_REGENERATE_REPORT ON
+set_global_assignment -name VERILOG_FILE ../altera_fpu/fp_sqrt_altfp_sqrt_d7d.v
+set_global_assignment -name VERILOG_FILE ../altera_fpu/fp_sqrt_alt_sqrt_block_ocb.v
+set_global_assignment -name QIP_FILE ../altera_fpu/int_to_float.qip
+set_global_assignment -name QIP_FILE ../altera_fpu/fp_sqrt.qip
+set_global_assignment -name QIP_FILE ../altera_fpu/fp_divide.qip
+set_global_assignment -name QIP_FILE ../altera_fpu/fp_compare.qip
+set_global_assignment -name QIP_FILE ../altera_fpu/fp_add_sub.qip
+set_global_assignment -name QIP_FILE ../altera_fpu/float_to_int.qip
+set_global_assignment -name QIP_FILE ../altera_fpu/altfp_multiplier.qip
+set_global_assignment -name VERILOG_FILE ../sim/BlockRam.v
+set_global_assignment -name VERILOG_FILE ../shadercore/ShaderCore.v
+set_global_assignment -name VERILOG_FILE ../shadercore/RISCVDecode.v
+set_global_assignment -name VERILOG_FILE ../shadercore/Registers.v
+set_global_assignment -name VERILOG_FILE ../shadercore/RegisterFile.v
+set_global_assignment -name VERILOG_FILE ../shadercore/GPU32BitInterface.v
+set_global_assignment -name VERILOG_FILE ../shadercore/GPU.v
+set_global_assignment -name VERILOG_FILE ../shadercore/Comparison.v
+set_global_assignment -name VERILOG_FILE ../shadercore/ALU.v
 set_global_assignment -name SDC_FILE DE10_NANO_SOC_GHRD.sdc
 set_global_assignment -name VERILOG_FILE ip/intr_capturer/intr_capturer.v
 set_global_assignment -name VERILOG_FILE ip/edge_detect/altera_edge_detector.v
