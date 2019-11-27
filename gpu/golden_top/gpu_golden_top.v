@@ -174,13 +174,13 @@ module gpu_golden_top(
     assign sim_f2h_value = f2h_value;
     assign h2f_value = sim_h2f_value;
 `else
-    // cyclonev_hps_interface_mpu_general_purpose h2f_gp(
-         // .gp_in(f2h_value),    // Value to the HPS (continuous).
-         // .gp_out(h2f_value)    // Value from the HPS (latched).
-    // );
-    assign GPIO_0[31:0] = 32'bz;
-    assign h2f_value = GPIO_0[31:0];
-    assign GPIO_1[31:0] = f2h_value;
+    cyclonev_hps_interface_mpu_general_purpose h2f_gp(
+         .gp_in(f2h_value),    // Value to the HPS (continuous).
+         .gp_out(h2f_value)    // Value from the HPS (latched).
+    );
+    // assign GPIO_0[31:0] = 32'bz;
+    // assign h2f_value = GPIO_0[31:0];
+    // assign GPIO_1[31:0] = f2h_value;
 `endif
 
     wire [31:0] h2f_value;

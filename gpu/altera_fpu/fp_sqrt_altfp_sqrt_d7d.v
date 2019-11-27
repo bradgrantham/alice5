@@ -24,7 +24,7 @@ module  fp_sqrt_altfp_sqrt_d7d
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
-	logic   clk_en; // -- converted tristate to logic
+	// logic   clk_en; // -- converted tristate to logic
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_on
 `endif
