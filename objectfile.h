@@ -5,6 +5,8 @@
 #include <map>
 #include <string>
 
+#include "util.h"
+
 typedef std::map<std::string, uint32_t> SymbolTable;
 
 const uint32_t RunHeader1MagicExpected = 0x31354c41;
@@ -49,7 +51,7 @@ bool ReadBinary(std::ifstream& binaryFile, RunHeader2& header, SymbolTable& text
     }
 
     if(header.magic != RunHeader2MagicExpected) {
-        std::cerr << "ReadBinary : magic read did not match magic expected for RunHeader1\n";
+        std::cerr << "ReadBinary : magic read did not match magic expected for RunHeader2: " << to_hex(header.magic) << " instead of " << to_hex(RunHeader2MagicExpected) << "\n";
         return false;
     }
 
@@ -65,15 +67,14 @@ bool ReadBinary(std::ifstream& binaryFile, RunHeader2& header, SymbolTable& text
         uint32_t symbolAddress = symbolData[0];
         bool symbolInDataSegment = symbolData[1] != 0;
         uint32_t symbolStringLength = symbolData[2];
+	char cSymbol[symbolStringLength];
 
-        std::string symbol;
-        symbol.resize(symbolStringLength - 1);
-
-        binaryFile.read(symbol.data(), symbolStringLength);
+        binaryFile.read(cSymbol, symbolStringLength);
         if(!binaryFile) {
-            std::cerr << "ReadBinary : failed to symbol string for symbol " << i << ", only " << binaryFile.gcount() << " bytes read\n";
+            std::cerr << "ReadBinary : failed to read string for symbol " << i << ", only " << binaryFile.gcount() << " bytes read\n";
             return false;
         }
+        std::string symbol(cSymbol);
 
         if(symbolInDataSegment) {
             data_symbols[symbol] = symbolAddress;

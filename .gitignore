@@ -46,3 +46,8 @@ out.s
 *.lst
 out
 tags
+
+# Vim
+*~
+*.swp
+
