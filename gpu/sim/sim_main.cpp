@@ -29,14 +29,6 @@ constexpr bool dumpH2FAndF2H = false; // true;
 #include "VMain_RegisterFile__A5.h"
 #include "VMain_BlockRam__A10.h"
 
-template<typename T>
-std::string to_hex(T i) {
-    std::stringstream stream;
-    stream << std::setfill('0') << std::setw(sizeof(T) * 2) << std::hex << std::uppercase;
-    stream << uint64_t(i);
-    return stream.str();
-}
-
 const char *stateToString(int state)
 {
     switch(state) {
