@@ -302,7 +302,7 @@ enum RamType { INST_RAM, DATA_RAM };
 
 void CHECK(bool success, const char *filename, int line)
 {
-    bool stored_exit_flag = false;
+    static bool stored_exit_flag = false;
     bool exit_on_error;
 
     if(!stored_exit_flag) {
