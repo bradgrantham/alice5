@@ -1,6 +1,6 @@
 
 CFG_CXXFLAGS_STD_NEWEST=-std=c++17
-CXXFLAGS=-I../.. -std=c++17
+CXXFLAGS=-I../.. -std=c++17 -O2 -fno-strict-aliasing
 
 .PHONY: all
 all: drive
