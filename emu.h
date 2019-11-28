@@ -1,12 +1,13 @@
 #include <algorithm>
 #include <cstdint>
-#include <cmath>
+#include <math.h>
 #include <vector>
 #include <map>
 #include <set>
 #include <string>
 #include <cfenv>
 
+#include "util.h"
 #include "objectfile.h"
 
 const int RM_RNE = 0b000;
@@ -14,26 +15,6 @@ const int RM_RTZ = 0b001;
 const int RM_RDN = 0b010;
 const int RM_RUP = 0b011;
 const int RM_TONEAREST_MAX = 0b100;
-
-// Union for converting from float to int and back.
-union FloatUint32 {
-    float f;
-    uint32_t i;
-};
-
-// Bit-wise conversion from int to float.
-float intToFloat(uint32_t i) {
-    FloatUint32 u;
-    u.i = i;
-    return u.f;
-}
-
-// Bit-wise conversion from float to int.
-uint32_t floatToInt(float f) {
-    FloatUint32 u;
-    u.f = f;
-    return u.i;
-}
 
 // --- Copied from interpreter.cpp. Didn't bother putting in shared file ---
 // --- because these will be deleted when we move them to library.s      ---
