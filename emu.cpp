@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include "risc-v.h"
 #include "emu.h"
 #include "timer.h"
@@ -68,21 +69,34 @@ struct ReadOnlyMemory
     {
         if(verbose) { printf("read 16 from %08X\n", addr); std::cout.flush(); }
         assert(addr + 1 < memorybytes.size());
-        return *reinterpret_cast<uint16_t*>(memorybytes.data() + addr);
+        uint16_t v = 
+            (memorybytes[addr + 0] <<  0) |
+            (memorybytes[addr + 1] <<  8);
+        return v;
     }
     uint32_t read32(uint32_t addr)
     {
         if(verbose) { printf("read 32 from %08X\n", addr); std::cout.flush(); }
         assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
-        return *reinterpret_cast<uint32_t*>(memorybytes.data() + addr);
+        uint32_t v = 
+            (memorybytes[addr + 0] <<  0) |
+            (memorybytes[addr + 1] <<  8) |
+            (memorybytes[addr + 2] << 16) |
+            (memorybytes[addr + 3] << 24);
+        return v;
     }
     float readf(uint32_t addr)
     {
         if(verbose) { printf("read float from %08X\n", addr); std::cout.flush(); }
         assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
-        return *reinterpret_cast<float*>(memorybytes.data() + addr);
+        uint32_t v = 
+            (memorybytes[addr + 0] <<  0) |
+            (memorybytes[addr + 1] <<  8) |
+            (memorybytes[addr + 2] << 16) |
+            (memorybytes[addr + 3] << 24);
+        return intToFloat(v);
     }
 };
 
@@ -123,15 +137,16 @@ template <class MEMORY, class TYPE>
 void set(MEMORY& memory, uint32_t address, const TYPE& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
-    memory.write32(address, *reinterpret_cast<const uint32_t*>(&value));
+    memory.write32(address, toBits(value));
 }
 
 template <class MEMORY, class TYPE, unsigned long N>
 void set(MEMORY& memory, uint32_t address, const std::array<TYPE, N>& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
-    for(unsigned long i = 0; i < N; i++)
-        memory.write32(address + i * sizeof(uint32_t), *reinterpret_cast<const uint32_t*>(&value[i]));
+    for(uint32_t i = 0; i < N; i++) {
+        memory.write32(address + i * sizeof(uint32_t), toBits(value[i]));
+    }
 }
 
 template <class MEMORY, class TYPE, unsigned long N>
@@ -139,7 +154,7 @@ void get(MEMORY& memory, uint32_t address, std::array<TYPE, N>& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
     for(unsigned long i = 0; i < N; i++)
-        *reinterpret_cast<uint32_t*>(&value[i]) = memory.read32(address + i * sizeof(uint32_t));
+        value[i] = fromBits<TYPE>(memory.read32(address + i * sizeof(uint32_t)));
 }
 
 typedef std::array<float,1> v1float;
@@ -283,8 +298,8 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
 {
     uint64_t coreDispatchedCount = 0;
 
-    ReadWriteMemory data_memory(tmpl->data_bytes, false);
-    ReadOnlyMemory text_memory(tmpl->text_bytes, false);
+    ReadWriteMemory data_memory(tmpl->data_bytes, debugOptions->printMemoryAccess);
+    ReadOnlyMemory text_memory(tmpl->text_bytes, debugOptions->printMemoryAccess);
 
     GPUCore core(tmpl->text_symbols);
     GPUCore::Status status;
@@ -302,15 +317,20 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
         GPUCore::Registers oldRegs;
         for(int i = tmpl->startX; i < tmpl->afterLastX; i++) {
 
-            if(shared->coreHadAnException)
+            if(shared->coreHadAnException) {
                 return;
+            }
 
-            if(tmpl->gl_FragCoordAddress != 0xFFFFFFFF)
+            if(tmpl->gl_FragCoordAddress != 0xFFFFFFFF) {
                 set(data_memory, tmpl->gl_FragCoordAddress, v4float{i + 0.5f, j + 0.5f, 0, 0});
-            if(tmpl->colorAddress != 0xFFFFFFFF)
+            }
+            if(tmpl->colorAddress != 0xFFFFFFFF) {
                 set(data_memory, tmpl->colorAddress, v4float{1, 1, 1, 1});
-            if(false) // XXX TODO: when iTime is exported by compilation
+            }
+            if(false) {
+                // XXX TODO: when iTime is exported by compilation
                 set(data_memory, tmpl->iTimeAddress, tmpl->frameTime);
+            }
 
             core.regs.x[1] = 0xfffffffe; // Set RA to unlikely value to catch ret with no caller
             core.regs.pc = tmpl->initialPC;
@@ -469,12 +489,12 @@ static float runMathFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *t
     }
 
     // Check registers so we can see which ones aren't being saved.
-    for (int i = 3; i < 32; i++) {
+    for (unsigned int i = 3; i < 32; i++) {
         if (core.regs.x[i] != i*i*i) {
             std::cerr << "Error: Register x" << i << " isn't being saved in " << funcName << "\n";
         }
     }
-    for (int i = 0; i < 32; i++) {
+    for (unsigned int i = 0; i < 32; i++) {
         if (core.regs.f[i] != i*i*i + 123) {
             std::cerr << "Error: Register f" << i << " isn't being saved in " << funcName << "\n";
         }

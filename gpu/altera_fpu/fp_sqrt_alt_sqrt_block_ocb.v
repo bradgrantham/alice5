@@ -71,9 +71,9 @@ module  fp_sqrt_alt_sqrt_block_ocb
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
-	logic   aclr; // -- converted tristate to logic
-	logic   clken; // -- converted tristate to logic
-	logic   clock; // -- converted tristate to logic
+	// input wire   aclr; // -- converted tristate to logic
+	// input wire   clken; // -- converted tristate to logic
+	// input wire   clock; // -- converted tristate to logic
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_on
 `endif
