@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2012, Altera Corporation
+Copyright (C) 2016 Intel Corporation
 All rights reserved.
 
 SPDX-License-Identifier:    BSD-3-Clause
@@ -117,7 +117,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define RDIMM 0
 #define READ_AFTER_WRITE_CALIBRATION 1
 #define READ_VALID_FIFO_SIZE 16
-#define REG_FILE_INIT_SEQ_SIGNATURE 0x555504a0
+#define REG_FILE_INIT_SEQ_SIGNATURE 0x555504b5
 #define RLDRAM3 0
 #define RLDRAMII 0
 #define RLDRAMX 0

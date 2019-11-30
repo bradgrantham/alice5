@@ -1,4 +1,4 @@
-//Legal Notice: (C)2017 Altera Corporation. All rights reserved.  Your
+//Legal Notice: (C)2019 Altera Corporation. All rights reserved.  Your
 //use of Altera Corporation's design tools, logic functions and other
 //software and tools, and its AMPP partner logic functions, and any
 //output files any of the foregoing (including device programming or
@@ -40,10 +40,11 @@ module soc_system_jtag_uart_sim_scfifo_w (
   input   [  7: 0] fifo_wdata;
   input            fifo_wr;
 
-  wire             fifo_FF;
-  wire    [  7: 0] r_dat;
-  wire             wfifo_empty;
-  wire    [  5: 0] wfifo_used;
+
+wire             fifo_FF;
+wire    [  7: 0] r_dat;
+wire             wfifo_empty;
+wire    [  5: 0] wfifo_used;
 
 //synthesis translate_off
 //////////////// SIMULATION-ONLY CONTENTS
@@ -100,10 +101,11 @@ module soc_system_jtag_uart_scfifo_w (
   input            fifo_wr;
   input            rd_wfifo;
 
-  wire             fifo_FF;
-  wire    [  7: 0] r_dat;
-  wire             wfifo_empty;
-  wire    [  5: 0] wfifo_used;
+
+wire             fifo_FF;
+wire    [  7: 0] r_dat;
+wire             wfifo_empty;
+wire    [  5: 0] wfifo_used;
 
 //synthesis translate_off
 //////////////// SIMULATION-ONLY CONTENTS
@@ -181,15 +183,16 @@ module soc_system_jtag_uart_sim_scfifo_r (
   input            fifo_rd;
   input            rst_n;
 
-  reg     [ 31: 0] bytes_left;
-  wire             fifo_EF;
-  reg              fifo_rd_d;
-  wire    [  7: 0] fifo_rdata;
-  wire             new_rom;
-  wire    [ 31: 0] num_bytes;
-  wire    [  6: 0] rfifo_entries;
-  wire             rfifo_full;
-  wire    [  5: 0] rfifo_used;
+
+reg     [ 31: 0] bytes_left;
+wire             fifo_EF;
+reg              fifo_rd_d;
+wire    [  7: 0] fifo_rdata;
+wire             new_rom;
+wire    [ 31: 0] num_bytes;
+wire    [  6: 0] rfifo_entries;
+wire             rfifo_full;
+wire    [  5: 0] rfifo_used;
 
 //synthesis translate_off
 //////////////// SIMULATION-ONLY CONTENTS
@@ -265,10 +268,11 @@ module soc_system_jtag_uart_scfifo_r (
   input   [  7: 0] t_dat;
   input            wr_rfifo;
 
-  wire             fifo_EF;
-  wire    [  7: 0] fifo_rdata;
-  wire             rfifo_full;
-  wire    [  5: 0] rfifo_used;
+
+wire             fifo_EF;
+wire    [  7: 0] fifo_rdata;
+wire             rfifo_full;
+wire    [  5: 0] rfifo_used;
 
 //synthesis translate_off
 //////////////// SIMULATION-ONLY CONTENTS
@@ -356,47 +360,48 @@ module soc_system_jtag_uart (
   input            clk;
   input            rst_n;
 
-  reg              ac;
-  wire             activity;
-  wire             av_irq;
-  wire    [ 31: 0] av_readdata;
-  reg              av_waitrequest;
-  reg              dataavailable;
-  reg              fifo_AE;
-  reg              fifo_AF;
-  wire             fifo_EF;
-  wire             fifo_FF;
-  wire             fifo_clear;
-  wire             fifo_rd;
-  wire    [  7: 0] fifo_rdata;
-  wire    [  7: 0] fifo_wdata;
-  reg              fifo_wr;
-  reg              ien_AE;
-  reg              ien_AF;
-  wire             ipen_AE;
-  wire             ipen_AF;
-  reg              pause_irq;
-  wire    [  7: 0] r_dat;
-  wire             r_ena;
-  reg              r_val;
-  wire             rd_wfifo;
-  reg              read_0;
-  reg              readyfordata;
-  wire             rfifo_full;
-  wire    [  5: 0] rfifo_used;
-  reg              rvalid;
-  reg              sim_r_ena;
-  reg              sim_t_dat;
-  reg              sim_t_ena;
-  reg              sim_t_pause;
-  wire    [  7: 0] t_dat;
-  reg              t_dav;
-  wire             t_ena;
-  wire             t_pause;
-  wire             wfifo_empty;
-  wire    [  5: 0] wfifo_used;
-  reg              woverflow;
-  wire             wr_rfifo;
+
+reg              ac;
+wire             activity;
+wire             av_irq;
+wire    [ 31: 0] av_readdata;
+reg              av_waitrequest;
+reg              dataavailable;
+reg              fifo_AE;
+reg              fifo_AF;
+wire             fifo_EF;
+wire             fifo_FF;
+wire             fifo_clear;
+wire             fifo_rd;
+wire    [  7: 0] fifo_rdata;
+wire    [  7: 0] fifo_wdata;
+reg              fifo_wr;
+reg              ien_AE;
+reg              ien_AF;
+wire             ipen_AE;
+wire             ipen_AF;
+reg              pause_irq;
+wire    [  7: 0] r_dat;
+wire             r_ena;
+reg              r_val;
+wire             rd_wfifo;
+reg              read_0;
+reg              readyfordata;
+wire             rfifo_full;
+wire    [  5: 0] rfifo_used;
+reg              rvalid;
+reg              sim_r_ena;
+reg              sim_t_dat;
+reg              sim_t_ena;
+reg              sim_t_pause;
+wire    [  7: 0] t_dat;
+reg              t_dav;
+wire             t_ena;
+wire             t_pause;
+wire             wfifo_empty;
+wire    [  5: 0] wfifo_used;
+reg              woverflow;
+wire             wr_rfifo;
   //avalon_jtag_slave, which is an e_avalon_slave
   assign rd_wfifo = r_ena & ~wfifo_empty;
   assign wr_rfifo = t_ena & ~rfifo_full;
