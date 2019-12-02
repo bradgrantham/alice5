@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
 		    *p = (uint8_t) value;
 		    value += incr;
 		} else {
-		    printf("0x%X = 0x%X\n", address + i, *p);
+		    printf("0x%08X = 0x%02X\n", address + i, *p);
 		}
 	    }
 	    break;
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
 		    *p = (uint16_t) value;
 		    value += incr;
 		} else {
-		    printf("0x%X = 0x%X\n", address + i*2, *p);
+		    printf("0x%08X = 0x%04X\n", address + i*2, *p);
 		}
 	    }
 	    break;
@@ -164,7 +164,7 @@ int main(int argc, char *argv[])
 		    *p = (uint32_t) value;
 		    value += incr;
 		} else {
-		    printf("0x%X = 0x%X\n", address + i*4, *p);
+		    printf("0x%08X = 0x%08X\n", address + i*4, *p);
 		}
 	    }
 	    break;
@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
 		    *p = (uint64_t) value;
 		    value += incr;
 		} else {
-		    printf("0x%X = 0x%llx\n", address + i*8, *p);
+		    printf("0x%08X = 0x%016llx\n", address + i*8, *p);
 		}
 	    }
 	    break;
