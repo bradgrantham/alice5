@@ -99,7 +99,9 @@ module lpm_mult (
     assign i_clken = clken; // -- converted buf to assign
 
 // COMPONENT INSTANTIATIONS
+`ifndef VERILATOR
     LPM_HINT_EVALUATION eva();
+`endif 
 
 // FUNCTION DECLARATION
     // convert string to binary bits.
@@ -169,6 +171,7 @@ module lpm_mult (
             $finish;
         end
 
+`ifndef VERILATOR
         input_a_is_constant = eva.GET_PARAMETER_VALUE(lpm_hint, "INPUT_A_IS_CONSTANT");
 
         if (input_a_is_constant == "FIXED")
@@ -178,12 +181,14 @@ module lpm_mult (
         end
 
         input_b_is_constant = eva.GET_PARAMETER_VALUE(lpm_hint, "INPUT_B_IS_CONSTANT");
+        input_b_is_constant = "FALSE";
 
         if (input_b_is_constant == "FIXED")
         begin
             input_b_fixed_value = eva.GET_PARAMETER_VALUE(lpm_hint, "INPUT_B_FIXED_VALUE");
             datab_fixed = str2bin(input_b_fixed_value, lpm_widthb);
         end
+`endif 
 
         pipe_ptr = 0;
     end
