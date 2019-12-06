@@ -24,6 +24,8 @@ module ShaderCore
 
     localparam REGISTER_ADDRESS_WIDTH = 5;
 
+`undef ALTERA_FP_ONLY
+
     // CPU State Machine
     localparam STATE_INIT /* verilator public */ = 4'd00;
     localparam STATE_FETCH /* verilator public */ = 4'd01;
@@ -35,7 +37,7 @@ module ShaderCore
     localparam STATE_LOAD2 /* verilator public */ = 4'd08;
     localparam STATE_STORE /* verilator public */ = 4'd09;
     localparam STATE_HALTED /* verilator public */ = 4'd10;
-`ifdef VERILATOR
+`ifndef ALTERA_FP_ONLY
     localparam STATE_FPU1 /* verilator public */ = 4'd11;
     localparam STATE_FPU2 /* verilator public */ = 4'd12;
     localparam STATE_FPU3 /* verilator public */ = 4'd13;
@@ -342,7 +344,7 @@ module ShaderCore
 
     reg [1:0] fpu_rmode;
 
-`ifdef VERILATOR
+`ifndef ALTERA_FP_ONLY
     // Verilog FPU from opencores
     reg [2:0] fpu_op;
     wire [31:0] fpu_result;
@@ -434,7 +436,7 @@ module ShaderCore
 	.result(altfp_sqrt_result)
     );
 
-`ifndef VERILATOR
+`ifdef ALTERA_FP_ONLY
 
     // ALTFP_COMPARE
     localparam ALTFP_COMPARE_LATENCY = 6;
@@ -514,7 +516,7 @@ module ShaderCore
 
 `endif
 
-`ifdef VERILATOR
+`ifndef ALTERA_FP_ONLY
 
     wire opcode_requires_altfp_wait =
         decode_opcode_is_fsqrt;
@@ -586,7 +588,7 @@ module ShaderCore
             enable_write_float_rd <= 0;
             altfp_sqrt_enable <= 0;
 
-`ifndef VERILATOR
+`ifdef ALTERA_FP_ONLY
             altfp_multiply_enable <= 0;
             altfp_add_sub_enable <= 0;
             altfp_divide_enable <= 0;
@@ -640,7 +642,7 @@ module ShaderCore
 
                         halted <= halt;
                             
-`ifdef VERILATOR
+`ifndef ALTERA_FP_ONLY
                         fpu_op <=
                             decode_opcode_is_fadd ? 3'd0 :
                             decode_opcode_is_fsub ? 3'd1 :
@@ -657,7 +659,7 @@ module ShaderCore
                             /* (decode_funct3_rm == 3) ? */ 2'd2;
 
 
-`ifdef VERILATOR
+`ifndef ALTERA_FP_ONLY
                         state <= halt ? STATE_HALTED :
                             opcode_requires_altfp_wait ? STATE_ALTFP_WAIT :
                             (decode_opcode_is_fmul || decode_opcode_is_fsub || decode_opcode_is_fadd || decode_opcode_is_fdiv) ? STATE_FPU1 :
@@ -674,7 +676,7 @@ module ShaderCore
                             STATE_RETIRE;
 `endif
 
-`ifdef VERILATOR
+`ifndef ALTERA_FP_ONLY
 			wait_count <= 
                             decode_opcode_is_fsqrt ? (ALTFP_SQRT_LATENCY - 1) :
                             0;
@@ -711,7 +713,7 @@ module ShaderCore
                     STATE_ALTFP_WAIT: begin // {
 			if(wait_count == 0) begin // {
 			    altfp_sqrt_enable <= 0;
-`ifndef VERILATOR
+`ifdef ALTERA_FP_ONLY
 			    altfp_multiply_enable <= 0;
 			    altfp_add_sub_enable <= 0;
 			    altfp_divide_enable <= 0;
@@ -727,7 +729,7 @@ module ShaderCore
 			end // }
 		    end // }
 
-`ifdef VERILATOR
+`ifndef ALTERA_FP_ONLY
                     STATE_FPU1: begin
                         state <= STATE_FPU2;
                     end
@@ -789,7 +791,7 @@ module ShaderCore
                                 $unsigned(alu_result);
 
                         enable_write_float_rd <= inst_has_float_dest;
-`ifndef VERILATOR
+`ifdef ALTERA_FP_ONLY
                         float_rd_value <= 
                             decode_opcode_is_flw ? data_ram_read_result :
                             decode_opcode_is_fcvt_i2f ? int_to_float_result :
