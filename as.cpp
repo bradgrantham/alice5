@@ -16,6 +16,7 @@
 extern "C" {
 #include "riscv-disas.h"
 }
+#include "util.h"
 #include "emu.h"
 
 enum MessageCategory {
@@ -29,20 +30,6 @@ enum Segment {
     SEG_TEXT,
     SEG_DATA,
 };
-
-// Utility for converting a float to its bits.
-union FloatBits {
-    float f;
-    uint32_t b;
-};
-
-uint32_t float_to_bits(float f) {
-    FloatBits x;
-
-    x.f = f;
-
-    return x.b;
-}
 
 // Whether to output color codes in errors. We send errors to stderr, so use that.
 static bool useColors() {
@@ -637,7 +624,7 @@ private:
                     error("can only declare float data in data segment");
                 }
                 float value = readFloat();
-                uint32_t imm = float_to_bits(value);
+                uint32_t imm = floatToInt(value);
                 emitData(imm);
             } else if (opOrLabel == ".segment") {
                 std::string segmentType = readIdentifier();

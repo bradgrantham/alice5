@@ -29,14 +29,6 @@ constexpr bool dumpH2FAndF2H = false; // true;
 #include "VMain_RegisterFile__A5.h"
 #include "VMain_BlockRam__A10.h"
 
-template<typename T>
-std::string to_hex(T i) {
-    std::stringstream stream;
-    stream << std::setfill('0') << std::setw(sizeof(T) * 2) << std::hex << std::uppercase;
-    stream << uint64_t(i);
-    return stream.str();
-}
-
 const char *stateToString(int state)
 {
     switch(state) {
@@ -119,26 +111,6 @@ void printDecodedInst(uint32_t address, uint32_t inst, const VMain_ShaderCore *c
     } else {
         printf("0x%08X : 0x%08X - undecoded instruction\n", address, inst);
     }
-}
-
-// Union for converting from float to int and back.
-union FloatUint32 {
-    float f;
-    uint32_t i;
-};
-
-// Bit-wise conversion from int to float.
-float intToFloat(uint32_t i) {
-    FloatUint32 u;
-    u.i = i;
-    return u.f;
-}
-
-// Bit-wise conversion from float to int.
-uint32_t floatToInt(float f) {
-    FloatUint32 u;
-    u.f = f;
-    return u.i;
 }
 
 // Proposed H2F interface for testing a single core
@@ -330,7 +302,7 @@ enum RamType { INST_RAM, DATA_RAM };
 
 void CHECK(bool success, const char *filename, int line)
 {
-    bool stored_exit_flag = false;
+    static bool stored_exit_flag = false;
     bool exit_on_error;
 
     if(!stored_exit_flag) {
@@ -476,7 +448,7 @@ template <class TYPE>
 void set(VMain *top, uint32_t address, const TYPE& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
-    writeWordToRam(*reinterpret_cast<const uint32_t*>(&value), address, DATA_RAM, top);
+    writeWordToRam(toBits(value), address, DATA_RAM, top);
 }
 
 template <class TYPE, unsigned long N>
@@ -484,7 +456,7 @@ void set(VMain *top, uint32_t address, const std::array<TYPE, N>& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
     for(unsigned long i = 0; i < N; i++)
-        writeWordToRam(*reinterpret_cast<const uint32_t*>(&value[i]), address + i * sizeof(uint32_t), DATA_RAM, top);
+        writeWordToRam(toBits(value[i]), address + i * sizeof(uint32_t), DATA_RAM, top);
 }
 
 template <class TYPE, unsigned long N>
@@ -493,7 +465,7 @@ void get(VMain *top, uint32_t address, std::array<TYPE, N>& value)
     // TODO: use a state machine through Main to read memory using clock
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
     for(unsigned long i = 0; i < N; i++)
-        *reinterpret_cast<uint32_t*>(&value[i]) = readWordFromRam(address + i * sizeof(uint32_t), DATA_RAM, top);
+        value[i] = fromBits<TYPE>(readWordFromRam(address + i * sizeof(uint32_t), DATA_RAM, top)) ;
 }
 
 typedef std::array<float,1> v1float;
@@ -777,6 +749,14 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     }
 }
 
+// From https://en.cppreference.com/w/cpp/algorithm/clamp
+template<class T>
+constexpr const T& clamp( const T& v, const T& lo, const T& hi )
+{
+    assert( !(hi < lo) );
+    return (v < lo) ? lo : (hi < v) ? hi : v;
+}
+
 void render(const SimDebugOptions* debugOptions, const CoreParameters* params, CoreShared* shared, int start_row, int skip_rows)
 {
     VMain *top = new VMain;
@@ -875,14 +855,15 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
             int pixelOffset = 3 * ((params->imageHeight - 1 - j) * params->imageWidth + i);
             for(int c = 0; c < 3; c++)
-                shared->img[pixelOffset + c] = std::clamp(int(rgb[c] * 255.99), 0, 255);
+                shared->img[pixelOffset + c] = clamp(int(rgb[c] * 255.99), 0, 255);
             shared->pixelsLeft --;
         }
     }
     {
-        std::scoped_lock l(shared->rendererMutex);
+        shared->rendererMutex.lock();
         shared->dispatchedCount += insts;
         shared->clocksCount += clocks;
+        shared->rendererMutex.unlock();
     }
 
     top->final();

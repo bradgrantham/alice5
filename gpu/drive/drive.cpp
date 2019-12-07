@@ -21,7 +21,7 @@
 #define FPGA_GPI_OFFSET 0x14
 
 #define SIMULATE 1
-constexpr bool dumpH2FAndF2H = false; // true;
+constexpr bool dumpH2FAndF2H = false;
 
 #include "risc-v.h"
 #include "timer.h"
@@ -32,8 +32,8 @@ constexpr bool dumpH2FAndF2H = false; // true;
 template<class T>
 constexpr const T& clamp( const T& v, const T& lo, const T& hi )
 {
-	assert( !(hi < lo) );
-	return (v < lo) ? lo : (hi < v) ? hi : v;
+        assert( !(hi < lo) );
+        return (v < lo) ? lo : (hi < v) ? hi : v;
 }
 
 // Union for converting from float to int and back.
@@ -125,14 +125,6 @@ struct CoreShared
 {
     bool coreHadAnException = false; // Only set to true after initialization
     unsigned char *img;
-    std::mutex rendererMutex;
-
-    // Number of pixels still left to shade (for progress report).
-    std::atomic_int pixelsLeft;
-
-    // These require exclusion using rendererMutex
-    uint64_t clocksCount = 0;
-    uint64_t dispatchedCount = 0;
 
     volatile unsigned long *gpo;
     volatile unsigned long *gpi;
@@ -141,7 +133,7 @@ struct CoreShared
         if(dumpH2FAndF2H) {
             std::cout << "set sim_h2f_value to " << to_hex(state) << "\n";
         }
-	*gpo = state;
+        *gpo = state;
     }
 
     uint32_t getF2H()
@@ -156,7 +148,7 @@ struct CoreShared
 
 void allowGPUProgress()
 {
-	usleep(1);
+        // usleep(1);
 }
 
 // Returns whether it reset before timing out.
@@ -193,18 +185,20 @@ bool waitOnPhaseOrTimeout(int phase, CoreShared *shared)
 
     allowGPUProgress();
 
-    auto start = std::chrono::high_resolution_clock::now();
+    // auto start = std::chrono::high_resolution_clock::now();
     while((shared->getF2H() & f2h_busy_bit) != phaseExpected) {
 
         allowGPUProgress();
 
         // Check clock for timeout
+        /*
         auto now = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::micro> elapsed = now - start;
         if(elapsed > h2f_timeout_micros) {
             std::cerr << "waitOnPhaseOrTimeout : timed out waiting for FPGA to change phase (" << elapsed.count() << ")\n";
             return false;
         }
+        */
     }
     return true;
 }
@@ -238,8 +232,8 @@ enum RamType { INST_RAM, DATA_RAM };
 
 void CHECK(bool success, const char *filename, int line)
 {
-    bool stored_exit_flag = false;
-    bool exit_on_error;
+    static bool stored_exit_flag = false;
+    static bool exit_on_error;
 
     if(!stored_exit_flag) {
         exit_on_error = getenv("EXIT_ON_ERROR") != NULL;
@@ -446,15 +440,13 @@ struct CoreParameters
 
 struct SimDebugOptions
 {
-    bool printDisassembly = false;
-    bool printMemoryAccess = false;
 };
 
-void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *params, CoreShared *shared, uint32_t *clocks, uint32_t *insts)
+void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *params, CoreShared *shared)
 {
     // Run one clock cycle in not-run reset to process STATE_INIT
     shared->setH2F(h2f_gpu_reset);
-    usleep(1);
+    // usleep(1);
 
     // Release reset
     shared->setH2F(h2f_gpu_idle);
@@ -462,18 +454,13 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
 
     shared->setH2F(h2f_gpu_run);
 
-    std::string pad = "                     ";
-
     while (!(shared->getF2H() & f2h_run_halted_bit)) {
-	    usleep(1);
+            // usleep(1);
     }
 }
 
 void render(const SimDebugOptions* debugOptions, const CoreParameters* params, CoreShared* shared, int start_row)
 {
-    uint32_t clocks = 0;
-    uint32_t insts = 0;
-
     // Set up inst Ram
     // Run one clock cycle in reset to process STATE_INIT
     shared->setH2F(h2f_gpu_reset);
@@ -499,8 +486,10 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     }
 
     for(int j = start_row; j < params->afterLastY; j += 1) {
+        if (j % 10 == 0) {
+            std::cout << "j = " << j << "\n";
+        }
         for(int i = params->startX; i < params->afterLastX; i++) {
-
             if(params->gl_FragCoordAddress != 0xFFFFFFFF)
                 set(shared, params->gl_FragCoordAddress, v4float{i + 0.5f, j + 0.5f, 0, 0});
             if(params->colorAddress != 0xFFFFFFFF)
@@ -510,11 +499,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
             // core.regs.pc = params->initialPC; // XXX Ignored
 
-            if(debugOptions->printDisassembly) {
-                std::cout << "; pixel " << i << ", " << j << '\n';
-            }
-
-            shadeOnePixel(debugOptions, params, shared, &clocks, &insts);
+            shadeOnePixel(debugOptions, params, shared);
 
             /* return to STATE_INIT so we can drive ext memory access */
             shared->setH2F(h2f_gpu_idle);
@@ -526,14 +511,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             int pixelOffset = 3 * ((params->imageHeight - 1 - j) * params->imageWidth + i);
             for(int c = 0; c < 3; c++)
                 shared->img[pixelOffset + c] = clamp(int(rgb[c] * 255.99), 0, 255);
-            shared->pixelsLeft --;
         }
-    }
-    {
-        shared->rendererMutex.lock();
-        shared->dispatchedCount += insts;
-        shared->clocksCount += clocks;
-        shared->rendererMutex.unlock();
     }
 }
 
@@ -556,12 +534,7 @@ int main(int argc, char **argv)
     argv++; argc--;
 
     while(argc > 0 && argv[0][0] == '-') {
-        if(strcmp(argv[0], "-v") == 0) {
-
-            debugOptions.printMemoryAccess = true;
-            argv++; argc--;
-
-        } else if(strcmp(argv[0], "--pixel") == 0) {
+        if(strcmp(argv[0], "--pixel") == 0) {
 
             if(argc < 2) {
                 std::cerr << "Expected pixel X and Y for \"--pixel\"\n";
@@ -580,11 +553,6 @@ int main(int argc, char **argv)
         } else if(strcmp(argv[0], "--term") == 0) {
 
             imageToTerminal = true;
-            argv++; argc--;
-
-        } else if(strcmp(argv[0], "-S") == 0) {
-
-            debugOptions.printDisassembly = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "-f") == 0) {
@@ -632,13 +600,13 @@ int main(int argc, char **argv)
     }
     if(printSymbols) {
         for(auto& it: params.text_symbols) {
-		auto symbol = it.first;
-		auto address = it.second;
+            auto symbol = it.first;
+            auto address = it.second;
             std::cout << "text segment symbol \"" << symbol << "\" is at " << address << "\n";
         }
         for(auto& it: params.data_symbols) {
-		auto symbol = it.first;
-		auto address = it.second;
+            auto symbol = it.first;
+            auto address = it.second;
             std::cout << "data segment symbol \"" << symbol << "\" is at " << address << "\n";
         }
     }
@@ -655,11 +623,11 @@ int main(int argc, char **argv)
 
     binaryFile.close();
 
-        for(auto& it: params.text_symbols) {
-		auto symbol = it.first;
-		auto address = it.second;
-		params.textAddressesToSymbols[address] = symbol;
-	}
+    for(auto& it: params.text_symbols) {
+        auto symbol = it.first;
+        auto address = it.second;
+        params.textAddressesToSymbols[address] = symbol;
+    }
 
     assert(params.data_bytes.size() < RiscVInitialStackPointer);
     if(params.data_bytes.size() > RiscVInitialStackPointer - 1024) {
@@ -712,9 +680,6 @@ int main(int argc, char **argv)
         params.afterLastY = specificPixelY + 1;
     }
 
-    int totalPixels = (params.afterLastY - params.startY)*(params.afterLastX - params.startX);
-    shared.pixelsLeft = totalPixels;
-
     int devMem = open("/dev/mem", O_RDWR);
     if(devMem == -1) {
         perror("open");
@@ -736,14 +701,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    std::cout << shared.dispatchedCount << " instructions executed.\n";
-    std::cout << shared.clocksCount << " clocks cycled.\n";
-    float fps = 50000000.0f / shared.clocksCount;
-    std::cout << fps << " fps estimated at 50 MHz.\n";
-    float wvgaFps = fps * params.imageWidth / 800 * params.imageHeight / 480;
-    std::cout << "at least " << (int)ceilf(5.0 / wvgaFps) << " cores required at 50 MHz for 5 fps at 800x480.\n";
-
-    FILE *fp = fopen("emulated.ppm", "wb");
+    FILE *fp = fopen("fpga.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", params.imageWidth, params.imageHeight);
     fwrite(shared.img, 1, params.imageWidth * params.imageHeight * 3, fp);
     fclose(fp);
