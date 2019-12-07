@@ -42,10 +42,7 @@ const char *stateToString(int state)
         case VMain_ShaderCore::STATE_LOAD2: return "STATE_LOAD2"; break;
         case VMain_ShaderCore::STATE_STORE: return "STATE_STORE"; break;
         case VMain_ShaderCore::STATE_HALTED: return "STATE_HALTED"; break;
-        case VMain_ShaderCore::STATE_FPU1: return "STATE_FPU1"; break;
-        case VMain_ShaderCore::STATE_FPU2: return "STATE_FPU2"; break;
-        case VMain_ShaderCore::STATE_FPU3: return "STATE_FPU3"; break;
-        case VMain_ShaderCore::STATE_FPU4: return "STATE_FPU4"; break;
+        case VMain_ShaderCore::STATE_FP_WAIT: return "STATE_FP_WAIT"; break;
         default : return "unknown state"; break;
     }
 }
@@ -699,7 +696,7 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
         }
 
         if((top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
-            (top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_FPU1)
+            (top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_FP_WAIT)
             ) {
             if(debugOptions->dumpState) {
                 std::cout << "after DECODE - ";
