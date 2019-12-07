@@ -33,7 +33,9 @@ module ShaderCore
 
     localparam REGISTER_ADDRESS_WIDTH = 5;
 
-    // CPU State Machine
+
+    // CPU State Machine states -----------------------------------
+
     localparam STATE_INIT /* verilator public */ = 5'd00;
     localparam STATE_FETCH /* verilator public */ = 5'd01;
     localparam STATE_FETCH2 /* verilator public */ = 5'd02;
@@ -71,50 +73,14 @@ module ShaderCore
     localparam ALU_OP_SLTU = 4'd10;
     localparam ALU_OP_NONE = 4'd11;
 
+    // Program Counter
     reg [WORD_WIDTH-1:0] PC /* verilator public */;
 
-    // instruction latched for inst decoder
+    // Instruction latched for instruction decoder
     reg [WORD_WIDTH-1:0] inst_to_decode /* verilator public */;
 
-    wire [WORD_WIDTH-1:0] rs1_value /* verilator public */;
-    wire [WORD_WIDTH-1:0] rs2_value /* verilator public */;
-    wire [WORD_WIDTH-1:0] float_rs1_value /* verilator public */;
-    wire [WORD_WIDTH-1:0] float_rs2_value /* verilator public */;
-    wire [WORD_WIDTH-1:0] final_rs2_value /* verilator public */ = decode_opcode_is_fsw ? float_rs2_value : rs2_value;
-    reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;
-    wire [WORD_WIDTH-1:0] alu_result /* verilator public */ ;
-    reg [WORD_WIDTH-1:0] rd_value /* verilator public */;
-    reg [WORD_WIDTH-1:0] float_rd_value;
-    reg enable_write_rd;
-    reg enable_write_float_rd;
 
-    // Register bank.
-    Registers registers(
-        .clock(clock),
-
-        .write_address(rd_address),
-        .write(enable_write_rd),
-        .write_data(rd_value),
-
-        .read1_address(decode_rs1),
-        .read1_data(rs1_value),
-
-        .read2_address(decode_rs2),
-        .read2_data(rs2_value));
-
-    // Register bank.
-    Registers float_registers(
-        .clock(clock),
-
-        .write_address(rd_address),
-        .write(enable_write_float_rd),
-        .write_data(float_rd_value),
-
-        .read1_address(decode_rs1),
-        .read1_data(float_rs1_value),
-
-        .read2_address(decode_rs2),
-        .read2_data(float_rs2_value));
+    // Output from decoder ----------------------------------------
 
     wire decode_opcode_is_branch /* verilator public */;
     wire decode_opcode_is_ALU_reg_imm /* verilator public */;
@@ -162,6 +128,8 @@ module ShaderCore
     wire signed [12:0] decode_imm_branch /* verilator public */;
     wire signed [31:0] decode_imm_upper /* verilator public */;
     wire signed [20:0] decode_imm_jump /* verilator public */;
+
+    wire [WORD_WIDTH-1:0] alu_result /* verilator public */ ;
 
     RISCVDecode #(.INSN_WIDTH(WORD_WIDTH))
         instDecode(
@@ -212,6 +180,7 @@ module ShaderCore
             .imm_jump(decode_imm_jump)
             );
 
+    // Does the instruction have a float register destination?
     wire inst_has_float_dest =
         decode_opcode_is_fadd ||
         decode_opcode_is_fsub || 
@@ -228,6 +197,60 @@ module ShaderCore
         decode_opcode_is_fnmsub || 
         decode_opcode_is_fnmadd;
 
+
+    // Register banks ---------------------------------------------
+
+    // Integer register values for decoded integer register numbers
+    // (i.e. registers[rs1] and registers[rs2])
+    wire [WORD_WIDTH-1:0] rs1_value /* verilator public */;
+    wire [WORD_WIDTH-1:0] rs2_value /* verilator public */;
+
+    // Float register values for decoded integer register numbers
+    // (i.e. float_registers[rs1] and float_registers[rs2])
+    wire [WORD_WIDTH-1:0] float_rs1_value /* verilator public */;
+    wire [WORD_WIDTH-1:0] float_rs2_value /* verilator public */;
+
+    wire [WORD_WIDTH-1:0] final_rs2_value /* verilator public */ = decode_opcode_is_fsw ? float_rs2_value : rs2_value;
+
+    // Destination register 
+    reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;                // Number of destination register
+    reg [WORD_WIDTH-1:0] rd_value /* verilator public */;       // Value to store in destination integer register
+    reg [WORD_WIDTH-1:0] float_rd_value;                        // Value to store in destination float register
+    reg enable_write_rd;                                        // Whether to write the destination integer register
+    reg enable_write_float_rd;                                  // Whether to write the destination float register
+
+    // Integer register bank.
+    Registers registers(
+        .clock(clock),
+
+        .write_address(rd_address),
+        .write(enable_write_rd),
+        .write_data(rd_value),
+
+        .read1_address(decode_rs1),
+        .read1_data(rs1_value),
+
+        .read2_address(decode_rs2),
+        .read2_data(rs2_value));
+
+    // Float register bank.
+    Registers float_registers(
+        .clock(clock),
+
+        .write_address(rd_address),
+        .write(enable_write_float_rd),
+        .write_data(float_rd_value),
+
+        .read1_address(decode_rs1),
+        .read1_data(float_rs1_value),
+
+        .read2_address(decode_rs2),
+        .read2_data(float_rs2_value));
+
+
+    // Comparison -------------------------------------------------
+
+    // Slightly more human-readable decoded comparison
     wire decoded_beq = (decode_funct3_rm == 0);
     wire decoded_bne = (decode_funct3_rm == 1);
     wire decoded_blt = (decode_funct3_rm == 4);
@@ -250,24 +273,17 @@ module ShaderCore
             .result(comparison_succeeded)
             );
 
-// fle.s 14..12=0
-// flt.s 14..12=1
-// feq.s 14..12=2
-    wire fcmp_succeeded =
-        (decode_funct3_rm == 0) ? (fcmp_altb || fcmp_aeqb) :
-        (decode_funct3_rm == 1) ? (fcmp_altb) :
-        (decode_funct3_rm == 2) ? (fcmp_aeqb) :
-        1'b0;
-    wire fminmax_choose_rs1 =
-        (decode_funct3_rm == 0) ? fcmp_altb :
-        /* (decode_funct3_rm == 1) ? */  !fcmp_altb;
 
+    // ALU operations ---------------------------------------------
+
+    // ALU input wires
     wire signed [WORD_WIDTH-1:0] alu_op1 /* verilator public */ ;
     wire signed [WORD_WIDTH-1:0] alu_op2 /* verilator public */ ;
     wire signed [3:0] alu_operator /* verilator public */ ;
 
-    // If all parameters are signed, shorter parameters will be
-    // sign-extended, but Verilator complains about smaller components
+    // Choose ALU operand 1 from registers, instruction immediate field, or PC.
+    // (If all parameters are signed, shorter parameters will be
+    // sign-extended, but Verilator complains about smaller components)
     assign alu_op1 =
         (decode_opcode_is_ALU_reg_imm ||
            decode_opcode_is_ALU_reg_reg ||
@@ -281,18 +297,22 @@ module ShaderCore
         decode_opcode_is_branch ? $signed(PC) :
         $signed(32'hdeadbeef);
 
+    // Is ALU operation is a shift?
     wire alu_op_is_shift = (decode_funct3_rm == 1) || (decode_funct3_rm == 5);
 
 /* verilator lint_off WIDTH */
     /* skip extension warnings in alu_op2 below by extending everything */
+
     wire signed [WORD_WIDTH-1:0] extended_shamt = decode_shamt_ftype;
     wire signed [WORD_WIDTH-1:0] extended_imm_alu_load /* verilator public */ = decode_imm_alu_load;
     wire signed [WORD_WIDTH-1:0] masked_rs2_value = rs2_value[4:0];
     wire signed [WORD_WIDTH-1:0] extended_imm_jump = decode_imm_jump;
     wire signed [WORD_WIDTH-1:0] extended_imm_store = decode_imm_store;
     wire signed [WORD_WIDTH-1:0] extended_imm_branch = decode_imm_branch;
+
 /* verilator lint_on WIDTH */
 
+    // Choose ALU operand 2 from registers or one of the instruction immediate fields
     assign alu_op2 =
         decode_opcode_is_ALU_reg_imm ? 
             (alu_op_is_shift ? extended_shamt : extended_imm_alu_load) :
@@ -307,6 +327,7 @@ module ShaderCore
         decode_opcode_is_branch ? extended_imm_branch :
         $signed(32'hcafebabe);
 
+    // Set ALU operation between register and immediate value from decoded operation
     wire [3:0] alu_reg_imm_operator /* verilator public */ =
         (decode_funct3_rm == 0) ? ALU_OP_ADD :
         (decode_funct3_rm == 1) ? ALU_OP_SLL :
@@ -317,6 +338,7 @@ module ShaderCore
         (decode_funct3_rm == 6) ? ALU_OP_OR :
         /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
 
+    // Set ALU operation between register and register value from decoded operation
     wire [3:0] alu_reg_reg_operator =
         (decode_funct3_rm == 0) ? (decode_opcode_add_is_add ? ALU_OP_ADD : ALU_OP_SUB) :
         (decode_funct3_rm == 1) ? ALU_OP_SLL :
@@ -327,6 +349,7 @@ module ShaderCore
         (decode_funct3_rm == 6) ? ALU_OP_OR :
         /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
 
+    // Select between reg_imm and reg_reg ALU operation based on instruction
     assign alu_operator =
         decode_opcode_is_ALU_reg_imm ? alu_reg_imm_operator :
         decode_opcode_is_ALU_reg_reg ? alu_reg_reg_operator :
@@ -350,6 +373,18 @@ module ShaderCore
             .operator(alu_operator),
             .result(alu_result)
         );
+
+
+    // Floating point operations ----------------------------------
+
+    wire fcmp_succeeded =
+        (decode_funct3_rm == 0) ? (fcmp_altb || fcmp_aeqb) :
+        (decode_funct3_rm == 1) ? (fcmp_altb) :
+        (decode_funct3_rm == 2) ? (fcmp_aeqb) :
+        1'b0;
+    wire fminmax_choose_rs1 =
+        (decode_funct3_rm == 0) ? fcmp_altb :
+        /* (decode_funct3_rm == 1) ? */  !fcmp_altb;
 
     reg [1:0] fpu_rmode;
 
@@ -585,10 +620,15 @@ module ShaderCore
     wire [31:0] fsgnjn_result /* verilator public */ = {~float_rs2_value[31], float_rs1_value[30:0]};
     wire [31:0] fsgnjx_result /* verilator public */ = {float_rs1_value[31] ^ float_rs2_value[31], float_rs1_value[30:0]};
 
+
+    // CPU State Machine ------------------------------------------
+
     wire halt = decode_opcode_is_system && (decode_imm_alu_load[11:0] == 12'd1);
 
     always @(posedge clock) begin
         if(!reset_n) begin
+
+            // Initial values on RESET
 
             state <= STATE_INIT;
             PC <= 0;
@@ -621,6 +661,7 @@ module ShaderCore
                 case (state)
 
                     STATE_INIT: begin
+                        // XXX Do we need this?  Or just go straight from RESET to STATE_FETCH?
                         state <= STATE_FETCH;
                         PC <= 0;
                     end
@@ -630,8 +671,8 @@ module ShaderCore
                     // will be available here (or at least one clock
                     // earlier)
                     STATE_FETCH: begin
-                        // want PC to be settled here
-                        // get instruction from memory[PC]
+                        // Get instruction from memory[PC]
+                        // We want PC to be settled here.
                         enable_write_rd <= 0;
                         enable_write_float_rd <= 0;
                         inst_ram_address <= PC[ADDRESS_WIDTH-1:0];
@@ -639,17 +680,19 @@ module ShaderCore
                     end
 
                     STATE_FETCH2: begin
+                        // One wait state before trying to decode the output of FETCH
                         state <= STATE_DECODE;
                     end
 
                     STATE_DECODE: begin
-                        // clock the 32 bits of instruction into decoded signals
+                        // Clock the 32 bits of instruction into decoded signals
                         inst_to_decode <= inst_ram_read_result;
                         state <= STATE_EXECUTE;
                     end
 
                     STATE_EXECUTE: begin
-                        // want decode of instruction and registers output to be settled here
+                        // Perform the meat of the instruction
+                        // We want decode of instruction and registers output to be settled here
                         // ALU operation occurs in alu instance
 
                         halted <= halt;
@@ -723,6 +766,7 @@ module ShaderCore
                     end
 						  
                     STATE_ALTFP_WAIT: begin // {
+                        // Wait on the floating point operation
 			if(wait_count == 0) begin // {
 			    altfp_sqrt_enable <= 0;
 `ifndef VERILATOR
@@ -760,18 +804,20 @@ module ShaderCore
                     end
 `endif
                     STATE_LOAD: begin
-                        // want result of ALU to be settled here
+                        // Load memory using effective address calculated in ALU
+                        // We want result of ALU to be settled here
                         data_ram_address <= alu_result[ADDRESS_WIDTH-1:0];
                         state <= STATE_LOAD2;
                     end
 
                     STATE_LOAD2: begin
-                        // clock out load result
+                        // One wait state for loading memory
                         state <= STATE_RETIRE;
                     end
 
                     STATE_STORE: begin
-                        // want result of ALU to be settled here
+                        // Store memory using effective address calculated in ALU
+                        // We want result of ALU to be settled here
                         if (alu_result[WORD_WIDTH-1]) begin
                             // Write to SDRAM.
                             sdram_address <= alu_result[WORD_WIDTH-2:0];
@@ -798,6 +844,7 @@ module ShaderCore
                     end
 
                     STATE_RETIRE: begin
+                        // Finish operation by writing registers if necessary and updating PC
                         data_ram_write <= 0;
                         // want result of ALU to be settled here
 
