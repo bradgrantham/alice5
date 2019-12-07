@@ -171,7 +171,12 @@ module lpm_mult (
             $finish;
         end
 
-`ifndef VERILATOR
+`ifdef VERILATOR
+        input_a_is_constant = 0;
+        input_b_is_constant = 0;
+        dataa_fixed = 0;
+        datab_fixed = 0;
+`else
         input_a_is_constant = eva.GET_PARAMETER_VALUE(lpm_hint, "INPUT_A_IS_CONSTANT");
 
         if (input_a_is_constant == "FIXED")
