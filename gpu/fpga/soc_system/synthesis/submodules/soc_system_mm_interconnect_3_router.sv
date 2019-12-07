@@ -44,26 +44,26 @@
 
 module soc_system_mm_interconnect_3_router_default_decode
   #(
-     parameter DEFAULT_CHANNEL = 0,
-               DEFAULT_WR_CHANNEL = -1,
-               DEFAULT_RD_CHANNEL = -1,
+     parameter DEFAULT_CHANNEL = -1,
+               DEFAULT_WR_CHANNEL = 0,
+               DEFAULT_RD_CHANNEL = 1,
                DEFAULT_DESTID = 0 
    )
-  (output [98 - 98 : 0] default_destination_id,
-   output [1-1 : 0] default_wr_channel,
-   output [1-1 : 0] default_rd_channel,
-   output [1-1 : 0] default_src_channel
+  (output [104 - 104 : 0] default_destination_id,
+   output [2-1 : 0] default_wr_channel,
+   output [2-1 : 0] default_rd_channel,
+   output [2-1 : 0] default_src_channel
   );
 
   assign default_destination_id = 
-    DEFAULT_DESTID[98 - 98 : 0];
+    DEFAULT_DESTID[104 - 104 : 0];
 
   generate
     if (DEFAULT_CHANNEL == -1) begin : no_default_channel_assignment
       assign default_src_channel = '0;
     end
     else begin : default_channel_assignment
-      assign default_src_channel = 1'b1 << DEFAULT_CHANNEL;
+      assign default_src_channel = 2'b1 << DEFAULT_CHANNEL;
     end
   endgenerate
 
@@ -73,8 +73,8 @@ module soc_system_mm_interconnect_3_router_default_decode
       assign default_rd_channel = '0;
     end
     else begin : default_rw_channel_assignment
-      assign default_wr_channel = 1'b1 << DEFAULT_WR_CHANNEL;
-      assign default_rd_channel = 1'b1 << DEFAULT_RD_CHANNEL;
+      assign default_wr_channel = 2'b1 << DEFAULT_WR_CHANNEL;
+      assign default_rd_channel = 2'b1 << DEFAULT_RD_CHANNEL;
     end
   endgenerate
 
@@ -93,7 +93,7 @@ module soc_system_mm_interconnect_3_router
     // Command Sink (Input)
     // -------------------
     input                       sink_valid,
-    input  [112-1 : 0]    sink_data,
+    input  [118-1 : 0]    sink_data,
     input                       sink_startofpacket,
     input                       sink_endofpacket,
     output                      sink_ready,
@@ -102,8 +102,8 @@ module soc_system_mm_interconnect_3_router
     // Command Source (Output)
     // -------------------
     output                          src_valid,
-    output reg [112-1    : 0] src_data,
-    output reg [1-1 : 0] src_channel,
+    output reg [118-1    : 0] src_data,
+    output reg [2-1 : 0] src_channel,
     output                          src_startofpacket,
     output                          src_endofpacket,
     input                           src_ready
@@ -114,12 +114,12 @@ module soc_system_mm_interconnect_3_router
     // -------------------------------------------------------
     localparam PKT_ADDR_H = 67;
     localparam PKT_ADDR_L = 36;
-    localparam PKT_DEST_ID_H = 98;
-    localparam PKT_DEST_ID_L = 98;
-    localparam PKT_PROTECTION_H = 102;
-    localparam PKT_PROTECTION_L = 100;
-    localparam ST_DATA_W = 112;
-    localparam ST_CHANNEL_W = 1;
+    localparam PKT_DEST_ID_H = 104;
+    localparam PKT_DEST_ID_L = 104;
+    localparam PKT_PROTECTION_H = 108;
+    localparam PKT_PROTECTION_L = 106;
+    localparam ST_DATA_W = 118;
+    localparam ST_CHANNEL_W = 2;
     localparam DECODER_TYPE = 0;
 
     localparam PKT_TRANS_WRITE = 70;
@@ -135,6 +135,7 @@ module soc_system_mm_interconnect_3_router
     // during address decoding
     // -------------------------------------------------------
     localparam PAD0 = log2ceil(64'h100000000 - 64'h0); 
+    localparam PAD1 = log2ceil(64'h100000000 - 64'h0); 
     // -------------------------------------------------------
     // Work out which address bits are significant based on the
     // address range of the slaves. If the required width is too
@@ -150,6 +151,11 @@ module soc_system_mm_interconnect_3_router
     localparam RG = RANGE_ADDR_WIDTH;
     localparam REAL_ADDRESS_RANGE = OPTIMIZED_ADDR_H - PKT_ADDR_L;
 
+      reg [PKT_ADDR_W-1 : 0] address;
+      always @* begin
+        address = {PKT_ADDR_W{1'b0}};
+        address [REAL_ADDRESS_RANGE:0] = sink_data[OPTIMIZED_ADDR_H : PKT_ADDR_L];
+      end   
 
     // -------------------------------------------------------
     // Pass almost everything through, untouched
@@ -159,23 +165,31 @@ module soc_system_mm_interconnect_3_router
     assign src_startofpacket = sink_startofpacket;
     assign src_endofpacket   = sink_endofpacket;
     wire [PKT_DEST_ID_W-1:0] default_destid;
-    wire [1-1 : 0] default_src_channel;
+    wire [2-1 : 0] default_rd_channel;
+    wire [2-1 : 0] default_wr_channel;
 
 
 
 
+    // -------------------------------------------------------
+    // Write and read transaction signals
+    // -------------------------------------------------------
+    wire write_transaction;
+    assign write_transaction = sink_data[PKT_TRANS_WRITE];
+    wire read_transaction;
+    assign read_transaction  = sink_data[PKT_TRANS_READ];
 
 
     soc_system_mm_interconnect_3_router_default_decode the_default_decode(
       .default_destination_id (default_destid),
-      .default_wr_channel   (),
-      .default_rd_channel   (),
-      .default_src_channel  (default_src_channel)
+      .default_wr_channel   (default_wr_channel),
+      .default_rd_channel   (default_rd_channel),
+      .default_src_channel  ()
     );
 
     always @* begin
         src_data    = sink_data;
-        src_channel = default_src_channel;
+        src_channel = write_transaction ? default_wr_channel : default_rd_channel;
         src_data[PKT_DEST_ID_H:PKT_DEST_ID_L] = default_destid;
 
         // --------------------------------------------------
@@ -183,11 +197,18 @@ module soc_system_mm_interconnect_3_router
         // Sets the channel and destination ID based on the address
         // --------------------------------------------------
            
-         
+         if (write_transaction) begin
           // ( 0 .. 100000000 )
-          src_channel = 1'b1;
+          src_channel = 2'b01;
           src_data[PKT_DEST_ID_H:PKT_DEST_ID_L] = 0;
-	     
+	     end
+        
+           
+         if (read_transaction) begin
+          // ( 0 .. 100000000 )
+          src_channel = 2'b10;
+          src_data[PKT_DEST_ID_H:PKT_DEST_ID_L] = 0;
+	     end
         
 
 end

@@ -1,6 +1,5 @@
 /*
-Copyright (c) 2012, Altera Corporation
-All rights reserved.
+Copyright (C) 2018  Intel Corporation. All rights reserved.
 
 SPDX-License-Identifier:    BSD-3-Clause
 
@@ -11,7 +10,7 @@ modification, are permitted provided that the following conditions are met:
     * Redistributions in binary form must reproduce the above copyright
       notice, this list of conditions and the following disclaimer in the
       documentation and/or other materials provided with the distribution.
-    * Neither the name of Altera Corporation nor the
+    * Neither the name of Intel Corporation nor the
       names of its contributors may be used to endorse or promote products
       derived from this software without specific prior written permission.
 

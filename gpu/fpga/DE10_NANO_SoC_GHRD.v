@@ -195,8 +195,28 @@ soc_system u0(
                .hps_0_f2h_debug_reset_req_reset_n(~hps_debug_reset),        //      hps_0_f2h_debug_reset_req.reset_n
                .hps_0_f2h_stm_hw_events_stm_hwevents(stm_hw_events),        //        hps_0_f2h_stm_hw_events.stm_hwevents
                .hps_0_f2h_warm_reset_req_reset_n(~hps_warm_reset),          //       hps_0_f2h_warm_reset_req.reset_n
+               .hps_0_f2h_sdram0_data_address(sdram_address),         //          hps_0_f2h_sdram0_data.address
+               .hps_0_f2h_sdram0_data_burstcount(sdram_burstcount),      //                               .burstcount
+               .hps_0_f2h_sdram0_data_waitrequest(sdram_waitrequest),     //                               .waitrequest
+               .hps_0_f2h_sdram0_data_readdata(sdram_readdata),        //                               .readdata
+               .hps_0_f2h_sdram0_data_readdatavalid(sdram_readdatavalid),   //                               .readdatavalid
+               .hps_0_f2h_sdram0_data_read(sdram_read),            //                               .read
+               .hps_0_f2h_sdram0_data_writedata(sdram_writedata),       //                               .writedata
+               .hps_0_f2h_sdram0_data_byteenable(sdram_byteenable),      //                               .byteenable
+               .hps_0_f2h_sdram0_data_write(sdram_write)            //                               .write
 
            );
+
+wire [29:0] sdram_address = (sdram_gpu_address + 30'h3E000000) >> 2;
+wire [SDRAM_ADDRESS_WIDTH-1:0] sdram_gpu_address;
+wire [7:0] sdram_burstcount = 8'h01;
+wire sdram_waitrequest;
+wire [31:0] sdram_readdata;
+wire sdram_readdatavalid;
+wire sdram_read;
+wire [31:0] sdram_writedata;
+wire [3:0] sdram_byteenable = 4'b1111;
+wire sdram_write;
 
 // Debounce logic to clean out glitches within 1ms
 debounce debounce_inst(
@@ -270,6 +290,7 @@ assign LED[0] = led_level;
 
     localparam WORD_WIDTH = 32;
     localparam ADDRESS_WIDTH = 14;
+    localparam SDRAM_ADDRESS_WIDTH = 24;
 
 `ifdef VERILATOR
     assign sim_f2h_value = f2h_value;
@@ -344,7 +365,7 @@ assign LED[0] = led_level;
             .read_data(read_data)
         );
 
-    GPU #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+    GPU #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH), .SDRAM_ADDRESS_WIDTH(SDRAM_ADDRESS_WIDTH))
         gpu(
             .clock(clock),
             .reset_n(reset_n),
@@ -371,7 +392,17 @@ assign LED[0] = led_level;
             .ext_floatreg_output(floatreg_read_data),
 
             .ext_specialreg_address(rw_address),
-            .ext_specialreg_output(special_read_data)
+            .ext_specialreg_output(special_read_data),
+
+            // SDRAM interface
+            .sdram_address(sdram_gpu_address),
+            .sdram_waitrequest(sdram_waitrequest),
+            .sdram_readdata(sdram_readdata),
+            .sdram_readdatavalid(sdram_readdatavalid),
+            .sdram_read(sdram_read),
+            .sdram_writedata(sdram_writedata),
+            .sdram_write(sdram_write)
+
             );
 
 endmodule

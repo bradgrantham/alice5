@@ -1,5 +1,5 @@
 module ShaderCore
-    #(parameter WORD_WIDTH=32, ADDRESS_WIDTH=16) 
+    #(parameter WORD_WIDTH=32, ADDRESS_WIDTH=16, SDRAM_ADDRESS_WIDTH=24)
 (
     input wire clock,
     input wire run,
@@ -19,32 +19,42 @@ module ShaderCore
     input wire [WORD_WIDTH-1:0] inst_ram_read_result /* verilator public */,
 
     // Data RAM read out
-    input wire [WORD_WIDTH-1:0] data_ram_read_result /* verilator public */
+    input wire [WORD_WIDTH-1:0] data_ram_read_result /* verilator public */,
+
+    // SDRAM interface
+    output reg [SDRAM_ADDRESS_WIDTH-1:0] sdram_address /* verilator public */,
+    input wire sdram_waitrequest /* verilator public */,
+    input wire [WORD_WIDTH-1:0] sdram_readdata /* verilator public */,
+    input wire sdram_readdatavalid /* verilator public */,
+    output reg sdram_read /* verilator public */,
+    output reg [WORD_WIDTH-1:0] sdram_writedata /* verilator public */,
+    output reg sdram_write /* verilator public */
 );
 
     localparam REGISTER_ADDRESS_WIDTH = 5;
 
     // CPU State Machine
-    localparam STATE_INIT /* verilator public */ = 4'd00;
-    localparam STATE_FETCH /* verilator public */ = 4'd01;
-    localparam STATE_FETCH2 /* verilator public */ = 4'd02;
-    localparam STATE_DECODE /* verilator public */ = 4'd03;
-    localparam STATE_EXECUTE /* verilator public */ = 4'd04;
-    localparam STATE_RETIRE /* verilator public */ = 4'd06;
-    localparam STATE_LOAD /* verilator public */ = 4'd07;
-    localparam STATE_LOAD2 /* verilator public */ = 4'd08;
-    localparam STATE_STORE /* verilator public */ = 4'd09;
-    localparam STATE_HALTED /* verilator public */ = 4'd10;
+    localparam STATE_INIT /* verilator public */ = 5'd00;
+    localparam STATE_FETCH /* verilator public */ = 5'd01;
+    localparam STATE_FETCH2 /* verilator public */ = 5'd02;
+    localparam STATE_DECODE /* verilator public */ = 5'd03;
+    localparam STATE_EXECUTE /* verilator public */ = 5'd04;
+    localparam STATE_RETIRE /* verilator public */ = 5'd06;
+    localparam STATE_LOAD /* verilator public */ = 5'd07;
+    localparam STATE_LOAD2 /* verilator public */ = 5'd08;
+    localparam STATE_STORE /* verilator public */ = 5'd09;
+    localparam STATE_STORE_STALL /* verilator public */ = 5'd10;
+    localparam STATE_HALTED /* verilator public */ = 5'd11;
 `ifdef VERILATOR
-    localparam STATE_FPU1 /* verilator public */ = 4'd11;
-    localparam STATE_FPU2 /* verilator public */ = 4'd12;
-    localparam STATE_FPU3 /* verilator public */ = 4'd13;
-    localparam STATE_FPU4 /* verilator public */ = 4'd14;
+    localparam STATE_FPU1 /* verilator public */ = 5'd12;
+    localparam STATE_FPU2 /* verilator public */ = 5'd13;
+    localparam STATE_FPU3 /* verilator public */ = 5'd14;
+    localparam STATE_FPU4 /* verilator public */ = 5'd15;
 `endif
 
-    localparam STATE_ALTFP_WAIT /* verilator public */ = 4'd15;
+    localparam STATE_ALTFP_WAIT /* verilator public */ = 5'd16;
 
-    reg [3:0] state /* verilator public */;
+    reg [4:0] state /* verilator public */;
 
     // ALU operations.  In Verilator, the syntax "alu.ALU_OP_ADD" pulls
     // this parameter from the submodule.  Quartus doesn't understand this,
@@ -70,6 +80,7 @@ module ShaderCore
     wire [WORD_WIDTH-1:0] rs2_value /* verilator public */;
     wire [WORD_WIDTH-1:0] float_rs1_value /* verilator public */;
     wire [WORD_WIDTH-1:0] float_rs2_value /* verilator public */;
+    wire [WORD_WIDTH-1:0] final_rs2_value /* verilator public */ = decode_opcode_is_fsw ? float_rs2_value : rs2_value;
     reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;
     wire [WORD_WIDTH-1:0] alu_result /* verilator public */ ;
     reg [WORD_WIDTH-1:0] rd_value /* verilator public */;
@@ -598,6 +609,9 @@ module ShaderCore
             halted <= 0;
             exception <= 0;
 
+            sdram_write <= 1'h0;
+            sdram_read <= 1'h0;
+
             // reset registers?  Could assume they're junk in the compiler and save gates
 
         end else begin
@@ -758,10 +772,29 @@ module ShaderCore
 
                     STATE_STORE: begin
                         // want result of ALU to be settled here
-                        data_ram_address <= alu_result[ADDRESS_WIDTH-1:0];
-                        data_ram_write_data <= decode_opcode_is_fsw ? float_rs2_value : rs2_value;
-                        data_ram_write <= 1;
-                        state <= STATE_RETIRE;
+                        if (alu_result[WORD_WIDTH-1]) begin
+                            // Write to SDRAM.
+                            sdram_address <= alu_result[WORD_WIDTH-2:0];
+                            sdram_writedata <= final_rs2_value;
+                            sdram_write <= 1'h1;
+                            state <= STATE_STORE_STALL;
+                        end else begin
+                            // Write to internal data RAM.
+                            data_ram_address <= alu_result[ADDRESS_WIDTH-1:0];
+                            data_ram_write_data <= final_rs2_value;
+                            data_ram_write <= 1;
+                            state <= STATE_RETIRE;
+                        end
+                    end
+
+                    STATE_STORE_STALL: begin
+                        // Wait until our write is accepted. Note that this
+                        // code can be moved to STATE_RETIRE to save a clock
+                        // in most cases.
+                        if (!sdram_waitrequest) begin
+                            sdram_write <= 1'h0;
+                            state <= STATE_RETIRE;
+                        end
                     end
 
                     STATE_RETIRE: begin

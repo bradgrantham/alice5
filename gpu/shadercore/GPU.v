@@ -1,5 +1,5 @@
 module GPU
-    #(parameter WORD_WIDTH=32, ADDRESS_WIDTH=16) 
+    #(parameter WORD_WIDTH=32, ADDRESS_WIDTH=16, SDRAM_ADDRESS_WIDTH=24)
 (
     input wire reset_n,
     input wire clock,
@@ -26,7 +26,16 @@ module GPU
     output wire[WORD_WIDTH-1:0] ext_floatreg_output,
 
     input wire[ADDRESS_WIDTH-1:0] ext_specialreg_address,
-    output wire[WORD_WIDTH-1:0] ext_specialreg_output
+    output wire[WORD_WIDTH-1:0] ext_specialreg_output,
+
+    // SDRAM interface
+    output wire [SDRAM_ADDRESS_WIDTH-1:0] sdram_address /* verilator public */,
+    input wire sdram_waitrequest /* verilator public */,
+    input wire [WORD_WIDTH-1:0] sdram_readdata /* verilator public */,
+    input wire sdram_readdatavalid /* verilator public */,
+    output wire sdram_read /* verilator public */,
+    output wire [WORD_WIDTH-1:0] sdram_writedata /* verilator public */,
+    output wire sdram_write /* verilator public */
 );
 
     // Instruction RAM write control
@@ -68,7 +77,7 @@ module GPU
     wire [WORD_WIDTH-1:0] shadercore_data_ram_write_data;
     wire shadercore_enable_write_data_ram;
 
-    ShaderCore #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+    ShaderCore #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH), .SDRAM_ADDRESS_WIDTH(SDRAM_ADDRESS_WIDTH))
         shaderCore(
             .clock(clock),
             .reset_n(reset_n),
@@ -80,7 +89,14 @@ module GPU
             .data_ram_write_data(shadercore_data_ram_write_data),
             .data_ram_write(shadercore_enable_write_data_ram),
             .inst_ram_read_result(inst_ram_out_data),
-            .data_ram_read_result(data_ram_out_data)
+            .data_ram_read_result(data_ram_out_data),
+            .sdram_address(sdram_address),
+            .sdram_waitrequest(sdram_waitrequest),
+            .sdram_readdata(sdram_readdata),
+            .sdram_readdatavalid(sdram_readdatavalid),
+            .sdram_read(sdram_read),
+            .sdram_writedata(sdram_writedata),
+            .sdram_write(sdram_write)
             // XXX TODO register interface
             );
 

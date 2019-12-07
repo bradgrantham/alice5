@@ -72,6 +72,15 @@
 		.memory_mem_odt                        (<connected-to-memory_mem_odt>),                        //                               .mem_odt
 		.memory_mem_dm                         (<connected-to-memory_mem_dm>),                         //                               .mem_dm
 		.memory_oct_rzqin                      (<connected-to-memory_oct_rzqin>),                      //                               .oct_rzqin
-		.reset_reset_n                         (<connected-to-reset_reset_n>)                          //                          reset.reset_n
+		.reset_reset_n                         (<connected-to-reset_reset_n>),                         //                          reset.reset_n
+		.hps_0_f2h_sdram0_data_address         (<connected-to-hps_0_f2h_sdram0_data_address>),         //          hps_0_f2h_sdram0_data.address
+		.hps_0_f2h_sdram0_data_burstcount      (<connected-to-hps_0_f2h_sdram0_data_burstcount>),      //                               .burstcount
+		.hps_0_f2h_sdram0_data_waitrequest     (<connected-to-hps_0_f2h_sdram0_data_waitrequest>),     //                               .waitrequest
+		.hps_0_f2h_sdram0_data_readdata        (<connected-to-hps_0_f2h_sdram0_data_readdata>),        //                               .readdata
+		.hps_0_f2h_sdram0_data_readdatavalid   (<connected-to-hps_0_f2h_sdram0_data_readdatavalid>),   //                               .readdatavalid
+		.hps_0_f2h_sdram0_data_read            (<connected-to-hps_0_f2h_sdram0_data_read>),            //                               .read
+		.hps_0_f2h_sdram0_data_writedata       (<connected-to-hps_0_f2h_sdram0_data_writedata>),       //                               .writedata
+		.hps_0_f2h_sdram0_data_byteenable      (<connected-to-hps_0_f2h_sdram0_data_byteenable>),      //                               .byteenable
+		.hps_0_f2h_sdram0_data_write           (<connected-to-hps_0_f2h_sdram0_data_write>)            //                               .write
 	);
 

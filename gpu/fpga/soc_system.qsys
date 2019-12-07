@@ -13,7 +13,7 @@
    {
       datum _sortIndex
       {
-         value = "10";
+         value = "9";
          type = "int";
       }
    }
@@ -34,7 +34,7 @@
    {
       datum _sortIndex
       {
-         value = "7";
+         value = "6";
          type = "int";
       }
       datum sopceditor_expanded
@@ -60,7 +60,7 @@
    {
       datum _sortIndex
       {
-         value = "11";
+         value = "10";
          type = "int";
       }
       datum sopceditor_expanded
@@ -73,7 +73,7 @@
    {
       datum _sortIndex
       {
-         value = "8";
+         value = "7";
          type = "int";
       }
       datum sopceditor_expanded
@@ -101,14 +101,6 @@
       {
          value = "16384";
          type = "String";
-      }
-   }
-   element f2sdram_only_master
-   {
-      datum _sortIndex
-      {
-         value = "4";
-         type = "int";
       }
    }
    element fpga_only_master
@@ -162,7 +154,7 @@
    {
       datum _sortIndex
       {
-         value = "6";
+         value = "5";
          type = "int";
       }
       datum sopceditor_expanded
@@ -188,7 +180,7 @@
    {
       datum _sortIndex
       {
-         value = "9";
+         value = "8";
          type = "int";
       }
       datum sopceditor_expanded
@@ -214,7 +206,7 @@
    {
       datum _sortIndex
       {
-         value = "5";
+         value = "4";
          type = "int";
       }
    }
@@ -295,6 +287,11 @@
    type="reset"
    dir="end" />
  <interface
+   name="hps_0_f2h_sdram0_data"
+   internal="hps_0.f2h_sdram0_data"
+   type="avalon"
+   dir="end" />
+ <interface
    name="hps_0_f2h_stm_hw_events"
    internal="hps_0.f2h_stm_hw_events"
    type="conduit"
@@ -360,20 +357,6 @@
   <parameter name="simDoTestBenchWiring" value="false" />
   <parameter name="simDrivenValue" value="0" />
   <parameter name="width" value="4" />
- </module>
- <module
-   name="f2sdram_only_master"
-   kind="altera_jtag_avalon_master"
-   version="18.1"
-   enabled="1">
-  <parameter name="AUTO_DEVICE" value="5CSEBA6U23I7" />
-  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
-  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="7" />
-  <parameter name="COMPONENT_CLOCK" value="0" />
-  <parameter name="FAST_VER" value="0" />
-  <parameter name="FIFO_DEPTHS" value="2" />
-  <parameter name="PLI_PORT" value="50000" />
-  <parameter name="USE_PLI" value="0" />
  </module>
  <module
    name="fpga_only_master"
@@ -500,7 +483,7 @@
   <parameter name="F2SCLK_SDRAMCLK_FREQ" value="0" />
   <parameter name="F2SCLK_WARMRST_Enable" value="true" />
   <parameter name="F2SDRAM_Type">Avalon-MM Bidirectional</parameter>
-  <parameter name="F2SDRAM_Width" value="256" />
+  <parameter name="F2SDRAM_Width" value="32" />
   <parameter name="F2SINTERRUPT_Enable" value="true" />
   <parameter name="F2S_Width" value="2" />
   <parameter name="FIX_READ_LATENCY" value="8" />
@@ -1089,15 +1072,6 @@
  <connection
    kind="avalon"
    version="18.1"
-   start="f2sdram_only_master.master"
-   end="hps_0.f2h_sdram0_data">
-  <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x0000" />
-  <parameter name="defaultConnection" value="false" />
- </connection>
- <connection
-   kind="avalon"
-   version="18.1"
    start="fpga_only_master.master"
    end="button_pio.s1">
   <parameter name="arbitrationPriority" value="1" />
@@ -1137,11 +1111,6 @@
  <connection kind="clock" version="18.1" start="clk_0.clk" end="dipsw_pio.clk" />
  <connection kind="clock" version="18.1" start="clk_0.clk" end="button_pio.clk" />
  <connection kind="clock" version="18.1" start="clk_0.clk" end="jtag_uart.clk" />
- <connection
-   kind="clock"
-   version="18.1"
-   start="clk_0.clk"
-   end="f2sdram_only_master.clk" />
  <connection kind="clock" version="18.1" start="clk_0.clk" end="mm_bridge_0.clk" />
  <connection kind="clock" version="18.1" start="clk_0.clk" end="ILC.clk" />
  <connection
@@ -1204,11 +1173,6 @@
    version="18.1"
    start="clk_0.clk_reset"
    end="fpga_only_master.clk_reset" />
- <connection
-   kind="reset"
-   version="18.1"
-   start="clk_0.clk_reset"
-   end="f2sdram_only_master.clk_reset" />
  <connection
    kind="reset"
    version="18.1"
