@@ -33,5 +33,7 @@ if [ "$animate" == "1" ]; then
     convert anim/*.ppm out.gif
 else
     ./emu -f 90 --term out.o
+    ## (cd gpu/sim && make)
+    ## ./gpu/sim/obj_dir/VMain -f 90 --term out.o
 fi
 
