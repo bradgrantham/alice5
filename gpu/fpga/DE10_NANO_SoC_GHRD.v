@@ -289,7 +289,7 @@ assign LED[0] = led_level;
     wire clock = FPGA_CLK1_50;
 
     localparam WORD_WIDTH = 32;
-    localparam ADDRESS_WIDTH = 14;
+    localparam ADDRESS_WIDTH = 16;
     localparam SDRAM_ADDRESS_WIDTH = 24;
 
 `ifdef VERILATOR
