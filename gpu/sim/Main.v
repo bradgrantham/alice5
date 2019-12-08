@@ -2,15 +2,21 @@
 module Main(
     input wire clock,
 
-`ifdef VERILATOR
     input [31:0] sim_h2f_value,
-    output [31:0] sim_f2h_value
-`else
-`endif
+    output [31:0] sim_f2h_value,
+
+    output wire [29:0] sdram_address,
+    input wire sdram_waitrequest,
+    input wire [WORD_WIDTH-1:0] sdram_readdata,
+    input wire sdram_readdatavalid,
+    output wire sdram_read,
+    output wire [WORD_WIDTH-1:0] sdram_writedata,
+    output wire sdram_write
 );
 
     localparam WORD_WIDTH = 32;
     localparam ADDRESS_WIDTH = 16;
+    localparam SDRAM_ADDRESS_WIDTH = 24;
 
     // HPS-to-FPGA communication
 
@@ -56,6 +62,9 @@ module Main(
         enable_read_register ? register_read_data :
         enable_read_floatreg ? floatreg_read_data :
         /* enable_read_special ? */ special_read_data;
+
+    wire [29:0] sdram_address = (sdram_gpu_address + 30'h3E000000) >> 2;
+    wire [SDRAM_ADDRESS_WIDTH-1:0] sdram_gpu_address;
 
     GPU32BitInterface #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
         gpu_if(
@@ -111,7 +120,15 @@ module Main(
             .ext_floatreg_output(floatreg_read_data),
 
             .ext_specialreg_address(rw_address),
-            .ext_specialreg_output(special_read_data)
+            .ext_specialreg_output(special_read_data),
+
+            .sdram_address(sdram_gpu_address),
+            .sdram_waitrequest(sdram_waitrequest),
+            .sdram_readdata(sdram_readdata),
+            .sdram_readdatavalid(sdram_readdatavalid),
+            .sdram_read(sdram_read),
+            .sdram_writedata(sdram_writedata),
+            .sdram_write(sdram_write)
             );
 
 endmodule
