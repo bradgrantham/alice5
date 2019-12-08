@@ -702,8 +702,8 @@ int main(int argc, char **argv)
     } else {
         params.iTimeAddress = 0xFFFFFFFF;
     }
-    params.rowWidthAddress = params.data_symbols.at("rowWidthAddress");
-    params.colBufAddrAddress = params.data_symbols.at("colBufAddrAddress");
+    params.rowWidthAddress = params.data_symbols.at(".rowWidth");
+    params.colBufAddrAddress = params.data_symbols.at(".colBufAddr");
 
     params.startX = 0;
     params.afterLastX = params.imageWidth;
