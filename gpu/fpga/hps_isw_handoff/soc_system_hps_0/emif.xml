@@ -88,7 +88,7 @@
         <define name="RDIMM" value="0"/>
         <define name="READ_AFTER_WRITE_CALIBRATION" value="1"/>
         <define name="READ_VALID_FIFO_SIZE" value="16"/>
-        <define name="REG_FILE_INIT_SEQ_SIGNATURE" value="0x555504a0"/>
+        <define name="REG_FILE_INIT_SEQ_SIGNATURE" value="0x555504b5"/>
         <define name="RLDRAM3" value="0"/>
         <define name="RLDRAMII" value="0"/>
         <define name="RLDRAMX" value="0"/>

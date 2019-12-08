@@ -54,79 +54,96 @@ void dumpRegsDiff(const GPUCore::Registers& prev, const GPUCore::Registers& cur)
 struct ReadOnlyMemory
 {
     std::vector<uint8_t> memorybytes;
+    std::string label;
     bool verbose;
-    ReadOnlyMemory(const std::vector<uint8_t>& memorybytes_, bool verbose_ = false) :
+    ReadOnlyMemory(const std::vector<uint8_t>& memorybytes_, const std::string &label, bool verbose_ = false) :
         memorybytes(memorybytes_),
+        label(label),
         verbose(verbose_)
     {}
     uint8_t read8(uint32_t addr)
     {
-        if(verbose) { printf("read 8 from %08X\n", addr); std::cout.flush(); }
-        assert(addr < memorybytes.size());
-        return memorybytes[addr];
+        if (addr < memorybytes.size()) {
+            if(verbose) { printf("%s: read %2X from %08X\n", label.c_str(), memorybytes[addr], addr); std::cout.flush(); }
+            return memorybytes[addr];
+        } else {
+            printf("%s assertion failed: %08X < %08X\n", label.c_str(), addr, int(memorybytes.size()));
+            assert(false);
+        }
     }
     uint16_t read16(uint32_t addr)
     {
-        if(verbose) { printf("read 16 from %08X\n", addr); std::cout.flush(); }
-        assert(addr + 1 < memorybytes.size());
-        uint16_t v = 
-            (memorybytes[addr + 0] <<  0) |
-            (memorybytes[addr + 1] <<  8);
-        return v;
+        if (addr + 1 < memorybytes.size()) {
+            uint16_t v = 
+                (memorybytes[addr + 0] <<  0) |
+                (memorybytes[addr + 1] <<  8);
+            if(verbose) { printf("%s: read %04X from %08X\n", label.c_str(), v, addr); std::cout.flush(); }
+            return v;
+        } else {
+            printf("%s assertion failed: %08X < %08X\n", label.c_str(), addr + 1, int(memorybytes.size()));
+            assert(false);
+        }
     }
     uint32_t read32(uint32_t addr)
     {
-        if(verbose) { printf("read 32 from %08X\n", addr); std::cout.flush(); }
-        assert(addr < memorybytes.size());
-        assert(addr + 3 < memorybytes.size());
-        uint32_t v = 
-            (memorybytes[addr + 0] <<  0) |
-            (memorybytes[addr + 1] <<  8) |
-            (memorybytes[addr + 2] << 16) |
-            (memorybytes[addr + 3] << 24);
-        return v;
+        if (addr < memorybytes.size() && addr + 3 < memorybytes.size()) {
+            uint32_t v = 
+                (memorybytes[addr + 0] <<  0) |
+                (memorybytes[addr + 1] <<  8) |
+                (memorybytes[addr + 2] << 16) |
+                (memorybytes[addr + 3] << 24);
+            if(verbose) { printf("%s: read %08X from %08X\n", label.c_str(), v, addr); std::cout.flush(); }
+            return v;
+        } else {
+            printf("%s assertion failed: %08X < %08X\n", label.c_str(), addr + 3, int(memorybytes.size()));
+            assert(false);
+        }
     }
     float readf(uint32_t addr)
     {
-        if(verbose) { printf("read float from %08X\n", addr); std::cout.flush(); }
-        assert(addr < memorybytes.size());
-        assert(addr + 3 < memorybytes.size());
-        uint32_t v = 
-            (memorybytes[addr + 0] <<  0) |
-            (memorybytes[addr + 1] <<  8) |
-            (memorybytes[addr + 2] << 16) |
-            (memorybytes[addr + 3] << 24);
-        return intToFloat(v);
+        if (addr < memorybytes.size() && addr + 3 < memorybytes.size()) {
+            uint32_t v = 
+                (memorybytes[addr + 0] <<  0) |
+                (memorybytes[addr + 1] <<  8) |
+                (memorybytes[addr + 2] << 16) |
+                (memorybytes[addr + 3] << 24);
+            float f = intToFloat(v);
+            if(verbose) { printf("%s: read %f (%08X) from %08X\n", label.c_str(), f, v, addr); std::cout.flush(); }
+            return f;
+        } else {
+            printf("%s assertion failed: %08X < %08X\n", label.c_str(), addr + 3, int(memorybytes.size()));
+            assert(false);
+        }
     }
 };
 
 struct ReadWriteMemory : public ReadOnlyMemory
 {
-    ReadWriteMemory(const std::vector<uint8_t>& memorybytes_, bool verbose_ = false) :
-        ReadOnlyMemory(memorybytes_, verbose_)
+    ReadWriteMemory(const std::vector<uint8_t>& memorybytes_, const std::string &label, bool verbose_ = false) :
+        ReadOnlyMemory(memorybytes_, label, verbose_)
     {}
     void write8(uint32_t addr, uint32_t v)
     {
-        if(verbose) { printf("write 8 bits of %08X to %08X\n", v, addr); std::cout.flush(); }
+        if(verbose) { printf("%s: write 8 bits of %08X to %08X\n", label.c_str(), v, addr); std::cout.flush(); }
         assert(addr < memorybytes.size());
         memorybytes[addr] = static_cast<uint8_t>(v);
     }
     void write16(uint32_t addr, uint32_t v)
     {
-        if(verbose) { printf("write 16 bits of %08X to %08X\n", v, addr); std::cout.flush(); }
+        if(verbose) { printf("%s: write 16 bits of %08X to %08X\n", label.c_str(), v, addr); std::cout.flush(); }
         assert(addr + 1 < memorybytes.size());
         *reinterpret_cast<uint16_t*>(memorybytes.data() + addr) = static_cast<uint16_t>(v);
     }
     void write32(uint32_t addr, uint32_t v)
     {
-        if(verbose) { printf("write 32 bits of %08X to %08X\n", v, addr); std::cout.flush(); }
+        if(verbose) { printf("%s: write 32 bits of %08X to %08X\n", label.c_str(), v, addr); std::cout.flush(); }
         assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
         *reinterpret_cast<uint32_t*>(memorybytes.data() + addr) = v;
     }
     void writef(uint32_t addr, float v)
     {
-        if(verbose) { printf("write float %f to %08X\n", v, addr); std::cout.flush(); }
+        if(verbose) { printf("%s: write float %f to %08X\n", label.c_str(), v, addr); std::cout.flush(); }
         assert(addr < memorybytes.size());
         assert(addr + 3 < memorybytes.size());
         *reinterpret_cast<float*>(memorybytes.data() + addr) = v;
@@ -216,6 +233,7 @@ struct CoreShared
 {
     bool coreHadAnException = false; // Only set to true after initialization
     unsigned char *img;
+    std::vector<uint8_t> sdram;
     std::mutex rendererMutex;
 
     // Number of rows still left to shade (for progress report).
@@ -238,6 +256,8 @@ struct CoreParameters
     uint32_t gl_FragCoordAddress;
     uint32_t colorAddress;
     uint32_t iTimeAddress;
+    uint32_t rowWidthAddress;
+    uint32_t colBufAddrAddress;
 
     uint32_t initialPC;
 
@@ -298,8 +318,9 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
 {
     uint64_t coreDispatchedCount = 0;
 
-    ReadWriteMemory data_memory(tmpl->data_bytes, debugOptions->printMemoryAccess);
-    ReadOnlyMemory text_memory(tmpl->text_bytes, debugOptions->printMemoryAccess);
+    ReadWriteMemory data_memory(tmpl->data_bytes, "data_memory");
+    ReadOnlyMemory text_memory(tmpl->text_bytes, "text_memory");
+    ReadWriteMemory sdram(shared->sdram, "sdram");
 
     GPUCore core(tmpl->text_symbols);
     GPUCore::Status status;
@@ -315,70 +336,80 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
 
     for(int j = start_row; j < tmpl->afterLastY; j += skip_rows) {
         GPUCore::Registers oldRegs;
-        for(int i = tmpl->startX; i < tmpl->afterLastX; i++) {
 
-            if(shared->coreHadAnException) {
-                return;
-            }
-
-            if(tmpl->gl_FragCoordAddress != 0xFFFFFFFF) {
-                set(data_memory, tmpl->gl_FragCoordAddress, v4float{i + 0.5f, j + 0.5f, 0, 0});
-            }
-            if(tmpl->colorAddress != 0xFFFFFFFF) {
-                set(data_memory, tmpl->colorAddress, v4float{1, 1, 1, 1});
-            }
-            if(false) {
-                // XXX TODO: when iTime is exported by compilation
-                set(data_memory, tmpl->iTimeAddress, tmpl->frameTime);
-            }
-
-            core.regs.x[1] = 0xfffffffe; // Set RA to unlikely value to catch ret with no caller
-            core.regs.pc = tmpl->initialPC;
-
-            if(debugOptions->printDisassembly) {
-                std::cout << "; pixel " << i << ", " << j << '\n';
-            }
-
-            try {
-                do {
-                    if(debugOptions->printCoreDiff) {
-                        oldRegs = core.regs;
-                    }
-                    if(debugOptions->printDisassembly) {
-                        print_inst(core.regs.pc, text_memory.read32(core.regs.pc), tmpl->textAddressesToSymbols);
-                    }
-                    data_memory.verbose = debugOptions->printMemoryAccess;
-                    text_memory.verbose = debugOptions->printMemoryAccess;
-                    status = core.step(text_memory, data_memory);
-                    coreDispatchedCount ++;
-                    data_memory.verbose = false;
-                    text_memory.verbose = false;
-                    if(debugOptions->printCoreDiff) {
-                        dumpRegsDiff(oldRegs, core.regs);
-                    }
-                } while(core.regs.pc != 0xfffffffe && status == GPUCore::RUNNING);
-            } catch(const std::exception& e) {
-                std::cerr << "core " << start_row << ", " << e.what() << '\n';
-                dumpGPUCore(core);
-                shared->coreHadAnException = true;
-                return;
-            }
-
-            if(status != GPUCore::BREAK) {
-                std::cerr << "core " << start_row << ", " << "unexpected core step result " << status << '\n';
-                dumpGPUCore(core);
-                shared->coreHadAnException = true;
-                return;
-            }
-
-            v3float rgb = {1, 0, 0};
-            if(tmpl->colorAddress != 0xFFFFFFFF)
-                get(data_memory, tmpl->colorAddress, rgb);
-
-            int pixelOffset = 3 * ((tmpl->imageHeight - 1 - j) * tmpl->imageWidth + i);
-            for(int c = 0; c < 3; c++)
-                shared->img[pixelOffset + c] = std::clamp(int(rgb[c] * 255.99), 0, 255);
+        if(shared->coreHadAnException) {
+            return;
         }
+
+        if(tmpl->gl_FragCoordAddress != 0xFFFFFFFF) {
+            set(data_memory, tmpl->gl_FragCoordAddress, v4float{tmpl->startX + 0.5f, j + 0.5f, 0, 0});
+        }
+        if(tmpl->colorAddress != 0xFFFFFFFF) {
+            set(data_memory, tmpl->colorAddress, v4float{1, 1, 1, 1});
+        }
+        if(false) {
+            // XXX TODO: when iTime is exported by compilation
+            set(data_memory, tmpl->iTimeAddress, tmpl->frameTime);
+        }
+        uint32_t width = tmpl->afterLastX - tmpl->startX;
+        set(data_memory, tmpl->rowWidthAddress, width);
+        // Offset in pixels into the image.
+        uint32_t pixelOffset = (tmpl->imageHeight - 1 - j)*tmpl->imageWidth + tmpl->startX;
+        // Offset in bytes into the shared memory space.
+        uint32_t sdramAddr = pixelOffset*3*sizeof(float);
+        set(data_memory, tmpl->colBufAddrAddress, sdramAddr | 0x80000000);
+
+        core.regs.x[1] = 0xfffffffe; // Set RA to unlikely value to catch ret with no caller
+        core.regs.pc = tmpl->initialPC;
+
+        if(debugOptions->printDisassembly) {
+            std::cout << "; pixel " << tmpl->startX << ", " << j << '\n';
+        }
+
+        try {
+            do {
+                if(debugOptions->printCoreDiff) {
+                    oldRegs = core.regs;
+                }
+                if(debugOptions->printDisassembly) {
+                    print_inst(core.regs.pc, text_memory.read32(core.regs.pc), tmpl->textAddressesToSymbols);
+                }
+                data_memory.verbose = debugOptions->printMemoryAccess;
+                text_memory.verbose = debugOptions->printMemoryAccess && !debugOptions->printDisassembly;
+                sdram.verbose = debugOptions->printMemoryAccess;
+                status = core.step(text_memory, data_memory, sdram);
+                coreDispatchedCount ++;
+                data_memory.verbose = false;
+                text_memory.verbose = false;
+                sdram.verbose = false;
+                if(debugOptions->printCoreDiff) {
+                    dumpRegsDiff(oldRegs, core.regs);
+                }
+            } while(core.regs.pc != 0xfffffffe && status == GPUCore::RUNNING);
+        } catch(const std::exception& e) {
+            std::cerr << "core " << start_row << ", " << e.what() << '\n';
+            dumpGPUCore(core);
+            shared->coreHadAnException = true;
+            return;
+        }
+
+        if(status != GPUCore::BREAK) {
+            std::cerr << "core " << start_row << ", " << "unexpected core step result " << status << '\n';
+            dumpGPUCore(core);
+            shared->coreHadAnException = true;
+            return;
+        }
+
+        // Convert to bytes.
+        uint8_t *rgbByte = shared->img + pixelOffset*3;
+        for (int i = 0; i < width; i++) {
+            for (int c = 0; c < 3; c++) {
+                rgbByte[c] = std::clamp(int(sdram.readf(sdramAddr) * 255.99), 0, 255);
+                sdramAddr += sizeof(float);
+            }
+            rgbByte += 3;
+        }
+
         shared->rowsLeft --;
     }
     {
@@ -421,8 +452,10 @@ static bool nearlyEqual(float a, float b, float epsilon) {
 static float runMathFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *tmpl,
         const std::string &funcName, const std::vector<float> &params) {
 
-    ReadWriteMemory data_memory(tmpl->data_bytes, false);
-    ReadOnlyMemory text_memory(tmpl->text_bytes, false);
+    ReadWriteMemory data_memory(tmpl->data_bytes, "data_memory", false);
+    ReadOnlyMemory text_memory(tmpl->text_bytes, "text_memory", false);
+    std::vector<uint8_t> sdram_buffer; // Empty, shouldn't be accessed.
+    ReadWriteMemory sdram(sdram_buffer, "sdram", false);
 
     GPUCore core(tmpl->text_symbols);
     GPUCore::Status status;
@@ -469,7 +502,7 @@ static float runMathFunction(GPUEmuDebugOptions *debugOptions, CoreParameters *t
             }
             data_memory.verbose = debugOptions->printMemoryAccess;
             text_memory.verbose = debugOptions->printMemoryAccess;
-            status = core.step(text_memory, data_memory);
+            status = core.step(text_memory, data_memory, sdram);
             data_memory.verbose = false;
             text_memory.verbose = false;
             if(debugOptions->printCoreDiff) {
@@ -809,6 +842,7 @@ int main(int argc, char **argv)
     }
 
     shared.img = new unsigned char[tmpl.imageWidth * tmpl.imageHeight * 3];
+    shared.sdram.resize(16*1024*1024);
 
     if(tmpl.data_symbols.find("gl_FragCoord") != tmpl.data_symbols.end()) {
         tmpl.gl_FragCoordAddress = tmpl.data_symbols["gl_FragCoord"];
@@ -825,6 +859,8 @@ int main(int argc, char **argv)
     } else {
         tmpl.iTimeAddress = 0xFFFFFFFF;
     }
+    tmpl.rowWidthAddress = tmpl.data_symbols[".rowWidth"];
+    tmpl.colBufAddrAddress = tmpl.data_symbols[".colBufAddr"];
 
     tmpl.startX = 0;
     tmpl.afterLastX = tmpl.imageWidth;

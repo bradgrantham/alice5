@@ -4,10 +4,19 @@
 ;
 ; library of math functions
 
-; some useful constants
-
 .segment data
 
+; for communication with the driving code.
+.rowWidth:                      ; in pixels
+        .word   0
+.colBufAddr:                    ; in byte offset to shared SDRAM area, must have high bit set
+        .word   0
+.mailLoopX:
+        .word   0
+.mailLoopY:
+        .word   0
+
+; some useful constants
 .NaN:
         .word   0xffc00000      ; quiet? NaN result of sqrt(-1)
 
@@ -2555,4 +2564,59 @@ atanTable_f32:
 
         addi    sp, sp, 12      ; We took four parameters and return one, so fix up stack
         jalr x0, ra, 0
+
+.mainLoop:
+        ; Save return address and pixel shader address.
+        addi    sp, sp, -8
+        sw      a0, 4(sp)
+        sw      ra, 0(sp)
+
+        ; Save X and Y in case the shader damages them.
+        flw     ft0, gl_FragCoord(zero)
+        fsw     ft0, .mailLoopX(zero)
+        flw     ft0, gl_FragCoord + 4(zero)
+        fsw     ft0, .mailLoopY(zero)
+
+.mainLoopLoop:
+        ; See if we're done with the row.
+        lw      t0, .rowWidth(zero)
+        beq     t0, zero, .mainLoopDone
+
+        ; Decrement the width.
+        addi    t0, t0, -1
+        sw      t0, .rowWidth(zero)
+
+        ; Call the pixel shader.
+        lw      a0, 4(sp)
+        jalr    ra, a0, 0
+
+        ; Store the color.
+        lw      t0, .colBufAddr(zero)
+        flw     ft0, color(zero)
+        fsw     ft0, 0(t0)
+        flw     ft0, color + 4(zero)
+        fsw     ft0, 4(t0)
+        flw     ft0, color + 8(zero)
+        fsw     ft0, 8(t0)
+        addi    t0, t0, 12
+        sw      t0, .colBufAddr(zero)
+
+        ; Restore the X and Y coordinates, incrementing X.
+        flw     ft0, .mailLoopX(zero)
+        flw     ft1, .one(zero)
+        fadd.s  ft0, ft0, ft1
+        fsw     ft0, gl_FragCoord(zero)
+        fsw     ft0, .mailLoopX(zero)
+        flw     ft0, .mailLoopY(zero)
+        fsw     ft0, gl_FragCoord + 4(zero)
+
+        ; Next pixel.
+        jal     zero, .mainLoopLoop
+
+.mainLoopDone:
+        lw      a0, 4(sp)
+        lw      ra, 0(sp)
+        addi    sp, sp, 8
+
+        jalr    x0, ra, 0
 

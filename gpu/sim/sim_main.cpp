@@ -17,7 +17,7 @@ constexpr bool dumpH2FAndF2H = false; // true;
 #include "risc-v.h"
 #include "timer.h"
 #include "disassemble.h"
-
+#include "memory.h"
 #include "objectfile.h"
 
 #include "VMain.h"
@@ -28,6 +28,10 @@ constexpr bool dumpH2FAndF2H = false; // true;
 #include "VMain_ShaderCore.h"
 #include "VMain_RegisterFile__A5.h"
 #include "VMain_BlockRam__A10.h"
+
+// In words.
+static const uint32_t SDRAM_BASE = 0x3E000000 >> 2;
+static const uint32_t SDRAM_SIZE = (16*1024*1024) >> 2;
 
 const char *stateToString(int state)
 {
@@ -42,10 +46,7 @@ const char *stateToString(int state)
         case VMain_ShaderCore::STATE_LOAD2: return "STATE_LOAD2"; break;
         case VMain_ShaderCore::STATE_STORE: return "STATE_STORE"; break;
         case VMain_ShaderCore::STATE_HALTED: return "STATE_HALTED"; break;
-        case VMain_ShaderCore::STATE_FPU1: return "STATE_FPU1"; break;
-        case VMain_ShaderCore::STATE_FPU2: return "STATE_FPU2"; break;
-        case VMain_ShaderCore::STATE_FPU3: return "STATE_FPU3"; break;
-        case VMain_ShaderCore::STATE_FPU4: return "STATE_FPU4"; break;
+        case VMain_ShaderCore::STATE_FP_WAIT: return "STATE_FP_WAIT"; break;
         default : return "unknown state"; break;
     }
 }
@@ -526,6 +527,7 @@ struct CoreShared
     bool coreHadAnException = false; // Only set to true after initialization
     unsigned char *img;
     std::mutex rendererMutex;
+    Memory sdram;
 
     // Number of pixels still left to shade (for progress report).
     std::atomic_int pixelsLeft;
@@ -533,6 +535,12 @@ struct CoreShared
     // These require exclusion using rendererMutex
     uint64_t clocksCount = 0;
     uint64_t dispatchedCount = 0;
+
+    CoreShared()
+        : sdram(SDRAM_BASE, SDRAM_SIZE) {
+
+        // Nothing.
+    }
 };
 
 struct CoreParameters
@@ -547,6 +555,8 @@ struct CoreParameters
     uint32_t gl_FragCoordAddress;
     uint32_t colorAddress;
     uint32_t iTimeAddress;
+    uint32_t rowWidthAddress;
+    uint32_t colBufAddrAddress;
 
     uint32_t initialPC;
 
@@ -625,7 +635,7 @@ void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_
 }
 
 
-void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *params, VMain *top, uint32_t *clocks, uint32_t *insts)
+void shadeOneRow(const SimDebugOptions* debugOptions, const CoreParameters *params, CoreShared *shared, VMain *top, uint32_t *clocks, uint32_t *insts)
 {
     // Run one clock cycle in not-run reset to process STATE_INIT
     setH2F(top, h2f_gpu_reset);
@@ -661,6 +671,20 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
     while (!Verilated::gotFinish() && !(getF2H(top) & f2h_run_halted_bit)) {
 
         top->clock = 1;
+        top->eval();
+
+        // RAM.
+        shared->sdram.evalReadWrite(
+                top->sdram_read,
+                top->sdram_write,
+                top->sdram_address,
+                top->sdram_waitrequest,
+                top->sdram_readdatavalid,
+                top->sdram_readdata,
+                0xF,
+                top->sdram_writedata);
+
+        // Eval again immediately to update dependant wires.
         top->eval();
 
         if(false) {
@@ -699,7 +723,7 @@ void shadeOnePixel(const SimDebugOptions* debugOptions, const CoreParameters *pa
         }
 
         if((top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
-            (top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_FPU1)
+            (top->Main->gpu->shaderCore->state == VMain_ShaderCore::STATE_FP_WAIT)
             ) {
             if(debugOptions->dumpState) {
                 std::cout << "after DECODE - ";
@@ -829,35 +853,43 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     }
 
     for(int j = start_row; j < params->afterLastY; j += skip_rows) {
-        for(int i = params->startX; i < params->afterLastX; i++) {
+        if(params->gl_FragCoordAddress != 0xFFFFFFFF)
+            set(top, params->gl_FragCoordAddress, v4float{params->startX + 0.5f, j + 0.5f, 0, 0});
+        if(params->colorAddress != 0xFFFFFFFF)
+            set(top, params->colorAddress, v4float{1, 1, 1, 1});
+        if(false) // XXX TODO: when iTime is exported by compilation
+            set(top, params->iTimeAddress, params->frameTime);
+        uint32_t width = params->afterLastX - params->startX;
+        set(top, params->rowWidthAddress, width);
+        // Offset in pixels into the image.
+        uint32_t pixelOffset = (params->imageHeight - 1 - j)*params->imageWidth + params->startX;
+        // Offset in bytes into the shared memory space.
+        uint32_t sdramAddr = pixelOffset*3*sizeof(float);
+        set(top, params->colBufAddrAddress, sdramAddr | 0x80000000);
 
-            if(params->gl_FragCoordAddress != 0xFFFFFFFF)
-                set(top, params->gl_FragCoordAddress, v4float{i + 0.5f, j + 0.5f, 0, 0});
-            if(params->colorAddress != 0xFFFFFFFF)
-                set(top, params->colorAddress, v4float{1, 1, 1, 1});
-            if(false) // XXX TODO: when iTime is exported by compilation
-                set(top, params->iTimeAddress, params->frameTime);
-
-            // core.regs.pc = params->initialPC; // XXX Ignored
-
-            if(debugOptions->printDisassembly) {
-                std::cout << "; pixel " << i << ", " << j << '\n';
-            }
-
-            shadeOnePixel(debugOptions, params, top, &clocks, &insts);
-
-            /* return to STATE_INIT so we can drive ext memory access */
-            setH2F(top, h2f_gpu_idle);
-
-            v3float rgb = {1, 0, 0};
-            if(params->colorAddress != 0xFFFFFFFF)
-                get(top, params->colorAddress, rgb);
-
-            int pixelOffset = 3 * ((params->imageHeight - 1 - j) * params->imageWidth + i);
-            for(int c = 0; c < 3; c++)
-                shared->img[pixelOffset + c] = clamp(int(rgb[c] * 255.99), 0, 255);
-            shared->pixelsLeft --;
+        if(debugOptions->printDisassembly) {
+            std::cout << "; pixel " << params->startX << ", " << j << '\n';
         }
+
+        shadeOneRow(debugOptions, params, shared, top, &clocks, &insts);
+
+        /* return to STATE_INIT so we can drive ext memory access */
+        setH2F(top, h2f_gpu_idle);
+
+        // Convert image to bytes.
+        sdramAddr = (sdramAddr >> 2) + SDRAM_BASE;
+        uint8_t *rgbByte = shared->img + pixelOffset*3;
+        for (int i = 0; i < width; i++) {
+            for (int c = 0; c < 3; c++) {
+                uint32_t v = shared->sdram[sdramAddr];
+                float f = intToFloat(v);
+                rgbByte[c] = clamp(int(f * 255.99), 0, 255);
+                sdramAddr += 1;
+            }
+            rgbByte += 3;
+        }
+
+        shared->pixelsLeft -= width;
     }
     {
         shared->rendererMutex.lock();
@@ -1050,6 +1082,8 @@ int main(int argc, char **argv)
     } else {
         params.iTimeAddress = 0xFFFFFFFF;
     }
+    params.rowWidthAddress = params.data_symbols[".rowWidth"];
+    params.colBufAddrAddress = params.data_symbols[".colBufAddr"];
 
     params.startX = 0;
     params.afterLastX = params.imageWidth;

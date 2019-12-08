@@ -1,5 +1,5 @@
 module ShaderCore
-    #(parameter WORD_WIDTH=32, ADDRESS_WIDTH=16) 
+    #(parameter WORD_WIDTH=32, ADDRESS_WIDTH=16, SDRAM_ADDRESS_WIDTH=24)
 (
     input wire clock,
     input wire run,
@@ -19,32 +19,44 @@ module ShaderCore
     input wire [WORD_WIDTH-1:0] inst_ram_read_result /* verilator public */,
 
     // Data RAM read out
-    input wire [WORD_WIDTH-1:0] data_ram_read_result /* verilator public */
+    input wire [WORD_WIDTH-1:0] data_ram_read_result /* verilator public */,
+
+    // SDRAM interface
+    output reg [SDRAM_ADDRESS_WIDTH-1:0] sdram_address /* verilator public */,
+    input wire sdram_waitrequest /* verilator public */,
+    input wire [WORD_WIDTH-1:0] sdram_readdata /* verilator public */,
+    input wire sdram_readdatavalid /* verilator public */,
+    output reg sdram_read /* verilator public */,
+    output reg [WORD_WIDTH-1:0] sdram_writedata /* verilator public */,
+    output reg sdram_write /* verilator public */
 );
 
     localparam REGISTER_ADDRESS_WIDTH = 5;
 
-    // CPU State Machine
-    localparam STATE_INIT /* verilator public */ = 4'd00;
-    localparam STATE_FETCH /* verilator public */ = 4'd01;
-    localparam STATE_FETCH2 /* verilator public */ = 4'd02;
-    localparam STATE_DECODE /* verilator public */ = 4'd03;
-    localparam STATE_EXECUTE /* verilator public */ = 4'd04;
-    localparam STATE_RETIRE /* verilator public */ = 4'd06;
-    localparam STATE_LOAD /* verilator public */ = 4'd07;
-    localparam STATE_LOAD2 /* verilator public */ = 4'd08;
-    localparam STATE_STORE /* verilator public */ = 4'd09;
-    localparam STATE_HALTED /* verilator public */ = 4'd10;
-`ifdef VERILATOR
-    localparam STATE_FPU1 /* verilator public */ = 4'd11;
-    localparam STATE_FPU2 /* verilator public */ = 4'd12;
-    localparam STATE_FPU3 /* verilator public */ = 4'd13;
-    localparam STATE_FPU4 /* verilator public */ = 4'd14;
-`endif
+`undef ALTERA_FLOAT_TO_INT
+`undef ALTERA_INT_TO_FLOAT
+`undef ALTERA_FP_MULTIPLY
+`undef ALTERA_FP_DIVIDE
+`undef ALTERA_FP_ADD_SUB
+`undef ALTERA_FP_COMPARE
 
-    localparam STATE_ALTFP_WAIT /* verilator public */ = 4'd15;
 
-    reg [3:0] state /* verilator public */;
+    // CPU State Machine states -----------------------------------
+
+    localparam STATE_INIT /* verilator public */ = 5'd00;
+    localparam STATE_FETCH /* verilator public */ = 5'd01;
+    localparam STATE_FETCH2 /* verilator public */ = 5'd02;
+    localparam STATE_DECODE /* verilator public */ = 5'd03;
+    localparam STATE_EXECUTE /* verilator public */ = 5'd04;
+    localparam STATE_RETIRE /* verilator public */ = 5'd06;
+    localparam STATE_LOAD /* verilator public */ = 5'd07;
+    localparam STATE_LOAD2 /* verilator public */ = 5'd08;
+    localparam STATE_STORE /* verilator public */ = 5'd09;
+    localparam STATE_STORE_STALL /* verilator public */ = 5'd10;
+    localparam STATE_HALTED /* verilator public */ = 5'd11;
+    localparam STATE_FP_WAIT /* verilator public */ = 5'd16;
+
+    reg [4:0] state /* verilator public */;
 
     // ALU operations.  In Verilator, the syntax "alu.ALU_OP_ADD" pulls
     // this parameter from the submodule.  Quartus doesn't understand this,
@@ -61,49 +73,14 @@ module ShaderCore
     localparam ALU_OP_SLTU = 4'd10;
     localparam ALU_OP_NONE = 4'd11;
 
+    // Program Counter
     reg [WORD_WIDTH-1:0] PC /* verilator public */;
 
-    // instruction latched for inst decoder
+    // Instruction latched for instruction decoder
     reg [WORD_WIDTH-1:0] inst_to_decode /* verilator public */;
 
-    wire [WORD_WIDTH-1:0] rs1_value /* verilator public */;
-    wire [WORD_WIDTH-1:0] rs2_value /* verilator public */;
-    wire [WORD_WIDTH-1:0] float_rs1_value /* verilator public */;
-    wire [WORD_WIDTH-1:0] float_rs2_value /* verilator public */;
-    reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;
-    wire [WORD_WIDTH-1:0] alu_result /* verilator public */ ;
-    reg [WORD_WIDTH-1:0] rd_value /* verilator public */;
-    reg [WORD_WIDTH-1:0] float_rd_value;
-    reg enable_write_rd;
-    reg enable_write_float_rd;
 
-    // Register bank.
-    Registers registers(
-        .clock(clock),
-
-        .write_address(rd_address),
-        .write(enable_write_rd),
-        .write_data(rd_value),
-
-        .read1_address(decode_rs1),
-        .read1_data(rs1_value),
-
-        .read2_address(decode_rs2),
-        .read2_data(rs2_value));
-
-    // Register bank.
-    Registers float_registers(
-        .clock(clock),
-
-        .write_address(rd_address),
-        .write(enable_write_float_rd),
-        .write_data(float_rd_value),
-
-        .read1_address(decode_rs1),
-        .read1_data(float_rs1_value),
-
-        .read2_address(decode_rs2),
-        .read2_data(float_rs2_value));
+    // Output from decoder ----------------------------------------
 
     wire decode_opcode_is_branch /* verilator public */;
     wire decode_opcode_is_ALU_reg_imm /* verilator public */;
@@ -151,6 +128,8 @@ module ShaderCore
     wire signed [12:0] decode_imm_branch /* verilator public */;
     wire signed [31:0] decode_imm_upper /* verilator public */;
     wire signed [20:0] decode_imm_jump /* verilator public */;
+
+    wire [WORD_WIDTH-1:0] alu_result /* verilator public */ ;
 
     RISCVDecode #(.INSN_WIDTH(WORD_WIDTH))
         instDecode(
@@ -201,6 +180,7 @@ module ShaderCore
             .imm_jump(decode_imm_jump)
             );
 
+    // Does the instruction have a float register destination?
     wire inst_has_float_dest =
         decode_opcode_is_fadd ||
         decode_opcode_is_fsub || 
@@ -217,6 +197,60 @@ module ShaderCore
         decode_opcode_is_fnmsub || 
         decode_opcode_is_fnmadd;
 
+
+    // Register banks ---------------------------------------------
+
+    // Integer register values for decoded integer register numbers
+    // (i.e. registers[rs1] and registers[rs2])
+    wire [WORD_WIDTH-1:0] rs1_value /* verilator public */;
+    wire [WORD_WIDTH-1:0] rs2_value /* verilator public */;
+
+    // Float register values for decoded integer register numbers
+    // (i.e. float_registers[rs1] and float_registers[rs2])
+    wire [WORD_WIDTH-1:0] float_rs1_value /* verilator public */;
+    wire [WORD_WIDTH-1:0] float_rs2_value /* verilator public */;
+
+    wire [WORD_WIDTH-1:0] final_rs2_value /* verilator public */ = decode_opcode_is_fsw ? float_rs2_value : rs2_value;
+
+    // Destination register 
+    reg [REGISTER_ADDRESS_WIDTH-1:0] rd_address;                // Number of destination register
+    reg [WORD_WIDTH-1:0] rd_value /* verilator public */;       // Value to store in destination integer register
+    reg [WORD_WIDTH-1:0] float_rd_value;                        // Value to store in destination float register
+    reg enable_write_rd;                                        // Whether to write the destination integer register
+    reg enable_write_float_rd;                                  // Whether to write the destination float register
+
+    // Integer register bank.
+    Registers registers(
+        .clock(clock),
+
+        .write_address(rd_address),
+        .write(enable_write_rd),
+        .write_data(rd_value),
+
+        .read1_address(decode_rs1),
+        .read1_data(rs1_value),
+
+        .read2_address(decode_rs2),
+        .read2_data(rs2_value));
+
+    // Float register bank.
+    Registers float_registers(
+        .clock(clock),
+
+        .write_address(rd_address),
+        .write(enable_write_float_rd),
+        .write_data(float_rd_value),
+
+        .read1_address(decode_rs1),
+        .read1_data(float_rs1_value),
+
+        .read2_address(decode_rs2),
+        .read2_data(float_rs2_value));
+
+
+    // Comparison -------------------------------------------------
+
+    // Slightly more human-readable decoded comparison
     wire decoded_beq = (decode_funct3_rm == 0);
     wire decoded_bne = (decode_funct3_rm == 1);
     wire decoded_blt = (decode_funct3_rm == 4);
@@ -239,24 +273,17 @@ module ShaderCore
             .result(comparison_succeeded)
             );
 
-// fle.s 14..12=0
-// flt.s 14..12=1
-// feq.s 14..12=2
-    wire fcmp_succeeded =
-        (decode_funct3_rm == 0) ? (fcmp_altb || fcmp_aeqb) :
-        (decode_funct3_rm == 1) ? (fcmp_altb) :
-        (decode_funct3_rm == 2) ? (fcmp_aeqb) :
-        1'b0;
-    wire fminmax_choose_rs1 =
-        (decode_funct3_rm == 0) ? fcmp_altb :
-        /* (decode_funct3_rm == 1) ? */  !fcmp_altb;
 
+    // ALU operations ---------------------------------------------
+
+    // ALU input wires
     wire signed [WORD_WIDTH-1:0] alu_op1 /* verilator public */ ;
     wire signed [WORD_WIDTH-1:0] alu_op2 /* verilator public */ ;
     wire signed [3:0] alu_operator /* verilator public */ ;
 
-    // If all parameters are signed, shorter parameters will be
-    // sign-extended, but Verilator complains about smaller components
+    // Choose ALU operand 1 from registers, instruction immediate field, or PC.
+    // (If all parameters are signed, shorter parameters will be
+    // sign-extended, but Verilator complains about smaller components)
     assign alu_op1 =
         (decode_opcode_is_ALU_reg_imm ||
            decode_opcode_is_ALU_reg_reg ||
@@ -270,18 +297,22 @@ module ShaderCore
         decode_opcode_is_branch ? $signed(PC) :
         $signed(32'hdeadbeef);
 
+    // Is ALU operation is a shift?
     wire alu_op_is_shift = (decode_funct3_rm == 1) || (decode_funct3_rm == 5);
 
 /* verilator lint_off WIDTH */
     /* skip extension warnings in alu_op2 below by extending everything */
+
     wire signed [WORD_WIDTH-1:0] extended_shamt = decode_shamt_ftype;
     wire signed [WORD_WIDTH-1:0] extended_imm_alu_load /* verilator public */ = decode_imm_alu_load;
     wire signed [WORD_WIDTH-1:0] masked_rs2_value = rs2_value[4:0];
     wire signed [WORD_WIDTH-1:0] extended_imm_jump = decode_imm_jump;
     wire signed [WORD_WIDTH-1:0] extended_imm_store = decode_imm_store;
     wire signed [WORD_WIDTH-1:0] extended_imm_branch = decode_imm_branch;
+
 /* verilator lint_on WIDTH */
 
+    // Choose ALU operand 2 from registers or one of the instruction immediate fields
     assign alu_op2 =
         decode_opcode_is_ALU_reg_imm ? 
             (alu_op_is_shift ? extended_shamt : extended_imm_alu_load) :
@@ -296,6 +327,7 @@ module ShaderCore
         decode_opcode_is_branch ? extended_imm_branch :
         $signed(32'hcafebabe);
 
+    // Set ALU operation between register and immediate value from decoded operation
     wire [3:0] alu_reg_imm_operator /* verilator public */ =
         (decode_funct3_rm == 0) ? ALU_OP_ADD :
         (decode_funct3_rm == 1) ? ALU_OP_SLL :
@@ -306,6 +338,7 @@ module ShaderCore
         (decode_funct3_rm == 6) ? ALU_OP_OR :
         /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
 
+    // Set ALU operation between register and register value from decoded operation
     wire [3:0] alu_reg_reg_operator =
         (decode_funct3_rm == 0) ? (decode_opcode_add_is_add ? ALU_OP_ADD : ALU_OP_SUB) :
         (decode_funct3_rm == 1) ? ALU_OP_SLL :
@@ -316,6 +349,7 @@ module ShaderCore
         (decode_funct3_rm == 6) ? ALU_OP_OR :
         /* (decode_funct3_rm == 7) ? */ ALU_OP_AND; // has to be AND
 
+    // Select between reg_imm and reg_reg ALU operation based on instruction
     assign alu_operator =
         decode_opcode_is_ALU_reg_imm ? alu_reg_imm_operator :
         decode_opcode_is_ALU_reg_reg ? alu_reg_reg_operator :
@@ -340,195 +374,260 @@ module ShaderCore
             .result(alu_result)
         );
 
+
+    // Floating point operations ----------------------------------
+
+    wire fcmp_succeeded =
+        (decode_funct3_rm == 0) ? (fcmp_altb || fcmp_aeqb) :
+        (decode_funct3_rm == 1) ? (fcmp_altb) :
+        (decode_funct3_rm == 2) ? (fcmp_aeqb) :
+        1'b0;
+    wire fminmax_choose_rs1 =
+        (decode_funct3_rm == 0) ? fcmp_altb :
+        /* (decode_funct3_rm == 1) ? */  !fcmp_altb;
+
+    reg [5:0] fp_wait_count; // XXX MUST BE BIG ENOUGH TO HOLD ANY LATENCY COUNT
+
     reg [1:0] fpu_rmode;
 
-`ifdef VERILATOR
-    // Verilog FPU from opencores
-    reg [2:0] fpu_op;
-    wire [31:0] fpu_result;
-    /* verilator lint_off UNUSED */
-    wire fpu_inf;
-    wire fpu_snan;
-    wire fpu_qnan;
-    wire fpu_ine;
-    wire fpu_overflow;
-    wire fpu_underflow;
-    wire fpu_zero;
-    wire fpu_div_by_zero;
-    /* verilator lint_on UNUSED */
-    fpu
-        fpu
-        (
-            .clk(clock),
-            .rmode(fpu_rmode),
-            .fpu_op(fpu_op),
-            .opa(float_rs1_value),
-            .opb(float_rs2_value),
-            .out(fpu_result),
-            .inf(fpu_inf),
-            .snan(fpu_snan),
-            .qnan(fpu_qnan),
-            .ine(fpu_ine),
-            .overflow(fpu_overflow),
-            .underflow(fpu_underflow),
-            .zero(fpu_zero),
-            .div_by_zero(fpu_div_by_zero)
-        );
+    // Convert float to int ----------------------------
 
-    wire [WORD_WIDTH-1:0] int_to_float_result;
-    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
-    int_to_float
-        int_to_float
-        (
-            .op(rs1_value),
-            .res(int_to_float_result)
-        );
-
+    reg fp_float_to_int_enable;
     wire [WORD_WIDTH-1:0] float_to_int_result;
-    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
-    float_to_int
-        float_to_int
-        (
-            .op(float_rs1_value),
-            .rmode(fpu_rmode),
-            .res(float_to_int_result)
-        );
 
-    /* verilator lint_off UNUSED */
-    wire fcmp_unordered;
-    /* verilator lint_on UNUSED */
-    wire fcmp_altb;
-    wire fcmp_aeqb;
-    /* verilator lint_off UNUSED */
-    wire fcmp_blta;
-    wire fcmp_inf;
-    wire fcmp_zero;
-    /* verilator lint_on UNUSED */
-    fcmp
-        fcmp
-        (
-            .opa(float_rs1_value),
-            .opb(float_rs2_value),
-            .unordered(fcmp_unordered),
-            .altb(fcmp_altb),
-            .blta(fcmp_blta),
-            .aeqb(fcmp_aeqb),
-            .inf(fcmp_inf),
-            .zero(fcmp_zero)
-        );
-
-`endif
-
-    // Altera ALTFP Modules
-
-    reg [6:0] wait_count;
-
-    // ALTFP_SQRT
-    localparam ALTFP_SQRT_LATENCY = 28;
-    reg altfp_sqrt_enable;
-    wire [31:0] altfp_sqrt_result;
-    fp_sqrt fp_sqrt (
-	.clk_en(altfp_sqrt_enable),
-	.clock(clock),
-	.data(float_rs1_value),
-	.result(altfp_sqrt_result)
-    );
-
-`ifndef VERILATOR
-
-    // ALTFP_COMPARE
-    localparam ALTFP_COMPARE_LATENCY = 6;
-    reg altfp_compare_enable;
-    wire fcmp_altb;
-    wire fcmp_aeqb;
-    wire fcmp_blta;
-    fp_compare fp_compare ( 
-	.clk_en(altfp_multiply_enable),
-	.clock(clock),
-	.dataa(float_rs1_value),
-	.datab(float_rs2_value),
-	.aeb(fcmp_aeqb),
-	.agb(fcmp_blta),
-	.alb(fcmp_altb)
-    );
-    
-    // ALTFP_CONVERT int to float
-    localparam ALTFP_INT_TO_FLOAT_LATENCY = 6;
-    reg altfp_int_to_float_enable;
-    wire [31:0] int_to_float_result;
-    int_to_float int_to_float ( 
-	.clk_en(altfp_int_to_float_enable),
-	.clock(clock),
-	.dataa(float_rs1_value),
-	.result(int_to_float_result)
-    );
+`ifdef ALTERA_FLOAT_TO_INT
 
     // ALTFP_CONVERT float to int
-    localparam ALTFP_FLOAT_TO_INT_LATENCY = 6;
-    reg altfp_float_to_int_enable;
-    wire [31:0] float_to_int_result;
+    localparam FP_FLOAT_TO_INT_LATENCY = 6;
     float_to_int float_to_int ( 
-	.clk_en(altfp_float_to_int_enable),
+	.clk_en(fp_float_to_int_enable),
 	.clock(clock),
 	.dataa(float_rs1_value),
 	.result(float_to_int_result)
     );
 
-    // ALTFP_MULT
+`else
 
-    localparam ALTFP_MULTIPLY_LATENCY = 11;
-    reg altfp_multiply_enable;
-    wire [31:0] altfp_multiply_result;
-    altfp_multiplier altfp_multiply ( 
-	.clk_en(altfp_multiply_enable),
+    localparam FP_FLOAT_TO_INT_LATENCY = 6;
+    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
+    float_to_int float_to_int (
+        .op(float_rs1_value),
+        .rmode(fpu_rmode),
+        .res(float_to_int_result)
+    );
+
+`endif
+
+    // Convert int to float ----------------------------
+
+    reg fp_int_to_float_enable;
+    wire [WORD_WIDTH-1:0] int_to_float_result;
+
+`ifdef ALTERA_INT_TO_FLOAT
+
+    // ALTFP_CONVERT int to float
+    localparam FP_INT_TO_FLOAT_LATENCY = 6;
+    int_to_float int_to_float ( 
+	.clk_en(fp_int_to_float_enable),
+	.clock(clock),
+	.dataa(float_rs1_value),
+	.result(int_to_float_result)
+    );
+
+`else
+
+    // TODO need unsigned variant and honor decode_shamt_ftype = {0,1}
+    localparam FP_INT_TO_FLOAT_LATENCY = 4;
+    int_to_float int_to_float (
+        .op(rs1_value),
+        .res(int_to_float_result)
+    );
+
+`endif
+
+    // Floating point multiply -------------------------
+
+    reg fp_multiply_enable;
+    wire [31:0] fp_multiply_result;
+
+`ifdef ALTERA_FP_MULTIPLY
+
+    // ALTFP_MULT
+    localparam FP_MULTIPLY_LATENCY = 11;
+    altfp_multiplier fp_multiplier ( 
+	.clk_en(fp_multiply_enable),
 	.clock(clock),
 	.dataa(float_rs1_value),
 	.datab(float_rs2_value),
-	.result(altfp_multiply_result)
+	.result(fp_multiply_result)
     );
 
-    reg altfp_divide_enable;
-    wire [31:0] altfp_divide_result;
-    localparam ALTFP_DIVIDE_LATENCY = 14;
-    fp_divide altfp_divider (
-	    .clk_en(altfp_divide_enable),
-	    .clock(clock),
-	    .dataa(float_rs1_value),
-	    .datab(float_rs2_value),
-	    .result(altfp_divide_result)
-    );
+`else
 
-    localparam ALTFP_ADD_SUB_LATENCY = 14;
-    reg altfp_add_sub_enable;
-    reg altfp_add;
-    wire [31:0] altfp_add_sub_result;
-
-    fp_add_sub altfp_addsub (
-	    .clk_en(altfp_add_sub_enable),
-	    .clock(clock),
-	    .add_sub(altfp_add),
-	    .dataa(float_rs1_value),
-	    .datab(float_rs2_value),
-	    .result(altfp_add_sub_result)
+    // Verilog FPU from opencores
+    localparam FP_MULTIPLY_LATENCY = 4;
+    fpu fp_multiplier (
+        .clk(clock),
+        .rmode(fpu_rmode),
+        .fpu_op(3'd2),
+        .opa(float_rs1_value),
+        .opb(float_rs2_value),
+        .out(fp_multiply_result),
+/* verilator lint_off PINCONNECTEMPTY */
+        .ine(),
+        .inf(),
+        .snan(),
+        .qnan(),
+        .overflow(),
+        .underflow(),
+        .zero(),
+        .div_by_zero()
+/* verilator lint_on PINCONNECTEMPTY */
     );
 
 `endif
 
-`ifdef VERILATOR
+    // Floating point divide -------------------------
 
-    wire opcode_requires_altfp_wait =
-        decode_opcode_is_fsqrt;
+    reg fp_divide_enable;
+    wire [WORD_WIDTH-1:0] fp_divide_result;
 
-`else 
+`ifdef ALTERA_FP_DIVIDE
 
-    wire opcode_requires_altfp_wait =
-        decode_opcode_is_fsqrt || decode_opcode_is_fminmax ||
-        decode_opcode_is_fcmp || decode_opcode_is_fcvt_f2i ||
-	decode_opcode_is_fcvt_i2f || decode_opcode_is_fmul ||
-	decode_opcode_is_fsub || decode_opcode_is_fadd ||
-	decode_opcode_is_fdiv;
+    localparam FP_DIVIDE_LATENCY = 14;
+    fp_divide fp_divider (
+        .clk_en(fp_divide_enable),
+        .clock(clock),
+        .dataa(float_rs1_value),
+        .datab(float_rs2_value),
+        .result(fp_divide_result)
+    );
+
+`else
+
+    // Verilog FPU from opencores
+    localparam FP_DIVIDE_LATENCY = 4;
+    fpu fp_divider (
+        .clk(clock),
+        .rmode(fpu_rmode),
+        .fpu_op(3'd3),
+        .opa(float_rs1_value),
+        .opb(float_rs2_value),
+        .out(fp_divide_result),
+/* verilator lint_off PINCONNECTEMPTY */
+        .ine(),
+        .inf(),
+        .snan(),
+        .qnan(),
+        .overflow(),
+        .underflow(),
+        .zero(),
+        .div_by_zero()
+/* verilator lint_on PINCONNECTEMPTY */
+    );
 
 `endif
+
+    // Floating point add and subtract ---------------
+
+    reg fp_add_sub_enable;
+    reg fp_op_is_add;
+    wire [WORD_WIDTH-1:0] fp_add_sub_result;
+
+`ifdef ALTERA_FP_ADD_SUB
+
+    localparam FP_ADD_SUB_LATENCY = 14;
+
+    fp_add_sub fp_add_sub (
+        .clk_en(fp_add_sub_enable),
+        .clock(clock),
+        .add_sub(fp_op_is_add),
+        .dataa(float_rs1_value),
+        .datab(float_rs2_value),
+        .result(fp_add_sub_result)
+    );
+
+`else
+
+    // Verilog FPU from opencores
+    localparam FP_ADD_SUB_LATENCY = 4;
+
+    fpu fpu_add_sub (
+        .clk(clock),
+        .rmode(fpu_rmode),
+        .fpu_op(fp_op_is_add ? 3'd0 : 3'd1),
+        .opa(float_rs1_value),
+        .opb(float_rs2_value),
+        .out(fp_add_sub_result),
+/* verilator lint_off PINCONNECTEMPTY */
+        .ine(),
+        .inf(),
+        .snan(),
+        .qnan(),
+        .overflow(),
+        .underflow(),
+        .zero(),
+        .div_by_zero()
+/* verilator lint_on PINCONNECTEMPTY */
+    );
+
+`endif
+
+    // Floating point square root --------------------
+    // ALTFP_SQRT
+    localparam FP_SQRT_LATENCY = 28;
+    reg fp_sqrt_enable;
+    wire [31:0] fp_sqrt_result;
+    fp_sqrt fp_sqrt (
+	.clk_en(fp_sqrt_enable),
+	.clock(clock),
+	.data(float_rs1_value),
+	.result(fp_sqrt_result)
+    );
+
+    // Floating point compare ------------------------
+
+    reg fp_compare_enable;
+    wire fcmp_altb;
+    wire fcmp_aeqb;
+
+`ifdef ALTERA_FP_COMPARE
+
+    // ALTFP_COMPARE
+    localparam FP_COMPARE_LATENCY = 6;
+    fp_compare fp_compare ( 
+	.clk_en(fp_multiply_enable),
+	.clock(clock),
+	.dataa(float_rs1_value),
+	.datab(float_rs2_value),
+	.aeb(fcmp_aeqb),
+/* verilator lint_off PINCONNECTEMPTY */
+	.agb(),
+/* verilator lint_on PINCONNECTEMPTY */
+	.alb(fcmp_altb)
+    );
+    
+`else
+
+    localparam FP_COMPARE_LATENCY = 1;
+    fcmp fp_compare (
+        .opa(float_rs1_value),
+        .opb(float_rs2_value),
+        .altb(fcmp_altb),
+/* verilator lint_off PINCONNECTEMPTY */
+        .blta(),
+/* verilator lint_on PINCONNECTEMPTY */
+        .aeqb(fcmp_aeqb),
+/* verilator lint_off PINCONNECTEMPTY */
+        .unordered(),
+        .inf(),
+        .zero()
+/* verilator lint_on PINCONNECTEMPTY */
+    );
+
+`endif
+
+    // Floating point classify -----------------------
 
     // https://blogs.msdn.microsoft.com/premk/2006/02/25/ieee-754-floating-point-special-values-and-ranges/
     // infinity is exponent all 1s and mantissa all 0s
@@ -570,33 +669,53 @@ module ShaderCore
         fclass_is_neg_inf
     };
 
+    // Floating point sign transfer ------------------
+   
     wire [31:0] fsgnj_result /* verilator public */ = {float_rs2_value[31], float_rs1_value[30:0]};
     wire [31:0] fsgnjn_result /* verilator public */ = {~float_rs2_value[31], float_rs1_value[30:0]};
     wire [31:0] fsgnjx_result /* verilator public */ = {float_rs1_value[31] ^ float_rs2_value[31], float_rs1_value[30:0]};
+
+    // Does FPU operation require waiting?
+    wire opcode_requires_fp_wait =
+        decode_opcode_is_fsqrt ||
+        decode_opcode_is_fminmax ||
+        decode_opcode_is_fcmp ||
+        decode_opcode_is_fcvt_f2i ||
+	decode_opcode_is_fcvt_i2f ||
+        decode_opcode_is_fmul ||
+	decode_opcode_is_fsub ||
+        decode_opcode_is_fadd ||
+	decode_opcode_is_fdiv;
+
+
+    // CPU State Machine ------------------------------------------
 
     wire halt = decode_opcode_is_system && (decode_imm_alu_load[11:0] == 12'd1);
 
     always @(posedge clock) begin
         if(!reset_n) begin
 
+            // Initial values on RESET
+
             state <= STATE_INIT;
             PC <= 0;
             data_ram_write <= 0;
             enable_write_rd <= 0;
             enable_write_float_rd <= 0;
-            altfp_sqrt_enable <= 0;
 
-`ifndef VERILATOR
-            altfp_multiply_enable <= 0;
-            altfp_add_sub_enable <= 0;
-            altfp_divide_enable <= 0;
-            altfp_int_to_float_enable <= 0;
-            altfp_float_to_int_enable <= 0;
-            altfp_compare_enable <= 0;
-`endif
+            fp_sqrt_enable <= 0;
+            fp_multiply_enable <= 0;
+            fp_add_sub_enable <= 0;
+            fp_divide_enable <= 0;
+            fp_int_to_float_enable <= 0;
+            fp_float_to_int_enable <= 0;
+            fp_compare_enable <= 0;
 
             halted <= 0;
             exception <= 0;
+
+            sdram_write <= 1'h0;
+            sdram_read <= 1'h0;
 
             // reset registers?  Could assume they're junk in the compiler and save gates
 
@@ -607,6 +726,7 @@ module ShaderCore
                 case (state)
 
                     STATE_INIT: begin
+                        // XXX Do we need this?  Or just go straight from RESET to STATE_FETCH?
                         state <= STATE_FETCH;
                         PC <= 0;
                     end
@@ -616,8 +736,8 @@ module ShaderCore
                     // will be available here (or at least one clock
                     // earlier)
                     STATE_FETCH: begin
-                        // want PC to be settled here
-                        // get instruction from memory[PC]
+                        // Get instruction from memory[PC]
+                        // We want PC to be settled here.
                         enable_write_rd <= 0;
                         enable_write_float_rd <= 0;
                         inst_ram_address <= PC[ADDRESS_WIDTH-1:0];
@@ -625,30 +745,23 @@ module ShaderCore
                     end
 
                     STATE_FETCH2: begin
+                        // One wait state before trying to decode the output of FETCH
                         state <= STATE_DECODE;
                     end
 
                     STATE_DECODE: begin
-                        // clock the 32 bits of instruction into decoded signals
+                        // Clock the 32 bits of instruction into decoded signals
                         inst_to_decode <= inst_ram_read_result;
                         state <= STATE_EXECUTE;
                     end
 
                     STATE_EXECUTE: begin
-                        // want decode of instruction and registers output to be settled here
+                        // Perform the meat of the instruction
+                        // We want decode of instruction and registers output to be settled here
                         // ALU operation occurs in alu instance
 
                         halted <= halt;
                             
-`ifdef VERILATOR
-                        fpu_op <=
-                            decode_opcode_is_fadd ? 3'd0 :
-                            decode_opcode_is_fsub ? 3'd1 :
-                            decode_opcode_is_fmul ? 3'd2 :
-                            decode_opcode_is_fdiv ? 3'd3 :
-                            3'd7; /* XXX undefined */
-`endif
-
                         // RISC-V rounding modes in order are RNE, RTZ, RDN, RUP
                         fpu_rmode <=
                             (decode_funct3_rm == 0) ? 2'd0 :
@@ -656,115 +769,96 @@ module ShaderCore
                             (decode_funct3_rm == 2) ? 2'd3 :
                             /* (decode_funct3_rm == 3) ? */ 2'd2;
 
-
-`ifdef VERILATOR
                         state <= halt ? STATE_HALTED :
-                            opcode_requires_altfp_wait ? STATE_ALTFP_WAIT :
-                            (decode_opcode_is_fmul || decode_opcode_is_fsub || decode_opcode_is_fadd || decode_opcode_is_fdiv) ? STATE_FPU1 :
+                            opcode_requires_fp_wait ? STATE_FP_WAIT :
                             (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
                             (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
                             STATE_RETIRE;
 
-`else
-
-                        state <= halt ? STATE_HALTED :
-                            opcode_requires_altfp_wait ? STATE_ALTFP_WAIT :
-                            (decode_opcode_is_load || decode_opcode_is_flw) ? STATE_LOAD :
-                            (decode_opcode_is_store || decode_opcode_is_fsw) ? STATE_STORE :
-                            STATE_RETIRE;
-`endif
-
-`ifdef VERILATOR
-			wait_count <= 
-                            decode_opcode_is_fsqrt ? (ALTFP_SQRT_LATENCY - 1) :
-                            0;
-
-`else
-			wait_count <= decode_opcode_is_fmul ? (ALTFP_MULTIPLY_LATENCY - 1) : 
-			    (decode_opcode_is_fadd |decode_opcode_is_fsub) ? (ALTFP_ADD_SUB_LATENCY - 1) : 
-                            decode_opcode_is_fcvt_f2i ? (ALTFP_FLOAT_TO_INT_LATENCY - 1) :
-                            (decode_opcode_is_fcmp || decode_opcode_is_fminmax) ? (ALTFP_FLOAT_TO_INT_LATENCY - 1) :
-                            decode_opcode_is_fcvt_i2f ? (ALTFP_INT_TO_FLOAT_LATENCY - 1) :
-                            decode_opcode_is_fsqrt ? (ALTFP_SQRT_LATENCY - 1) :
-			    /* decode_opcode_is_fdiv ? */ (ALTFP_DIVIDE_LATENCY - 1);
+			fp_wait_count <= decode_opcode_is_fmul ? (FP_MULTIPLY_LATENCY - 1) : 
+			    (decode_opcode_is_fadd |decode_opcode_is_fsub) ? (FP_ADD_SUB_LATENCY - 1) : 
+                            decode_opcode_is_fcvt_f2i ? (FP_FLOAT_TO_INT_LATENCY - 1) :
+                            (decode_opcode_is_fcmp || decode_opcode_is_fminmax) ? (FP_FLOAT_TO_INT_LATENCY - 1) :
+                            decode_opcode_is_fcvt_i2f ? (FP_INT_TO_FLOAT_LATENCY - 1) :
+                            decode_opcode_is_fsqrt ? (FP_SQRT_LATENCY - 1) :
+			    /* decode_opcode_is_fdiv ? */ (FP_DIVIDE_LATENCY - 1);
 
 			// XXX is this dangerous?  Is clk to the altera
 			// float IP only active when clk_en has settled?
 			// So it might be 11 cycles for mult, might be
 			// 12, depending on whether first clock counts...
-			altfp_multiply_enable <= decode_opcode_is_fmul;
-			altfp_divide_enable <= decode_opcode_is_fdiv;
-			altfp_add_sub_enable <= decode_opcode_is_fadd || decode_opcode_is_fsub;
-			altfp_add <= decode_opcode_is_fadd;
-			altfp_float_to_int_enable <= decode_opcode_is_fcvt_f2i;
-			altfp_int_to_float_enable <= decode_opcode_is_fcvt_i2f;
-			altfp_compare_enable <= (decode_opcode_is_fminmax | decode_opcode_is_fcmp);
-
-`endif
-
-			altfp_sqrt_enable <= decode_opcode_is_fsqrt;
+			fp_multiply_enable <= decode_opcode_is_fmul;
+			fp_divide_enable <= decode_opcode_is_fdiv;
+			fp_add_sub_enable <= decode_opcode_is_fadd || decode_opcode_is_fsub;
+			fp_op_is_add <= decode_opcode_is_fadd;
+			fp_float_to_int_enable <= decode_opcode_is_fcvt_f2i;
+			fp_int_to_float_enable <= decode_opcode_is_fcvt_i2f;
+			fp_compare_enable <= (decode_opcode_is_fminmax | decode_opcode_is_fcmp);
+			fp_sqrt_enable <= decode_opcode_is_fsqrt;
 
                         rd_address <= decode_rd;
 
                     end
 						  
-                    STATE_ALTFP_WAIT: begin // {
-			if(wait_count == 0) begin // {
-			    altfp_sqrt_enable <= 0;
-`ifndef VERILATOR
-			    altfp_multiply_enable <= 0;
-			    altfp_add_sub_enable <= 0;
-			    altfp_divide_enable <= 0;
-			    altfp_int_to_float_enable <= 0;
-			    altfp_float_to_int_enable <= 0;
-			    altfp_compare_enable <= 0;
-`endif
-
+                    STATE_FP_WAIT: begin // {
+                        // Wait on the floating point operation
+			if(fp_wait_count == 0) begin // {
+			    fp_sqrt_enable <= 0;
+			    fp_multiply_enable <= 0;
+			    fp_add_sub_enable <= 0;
+			    fp_divide_enable <= 0;
+			    fp_int_to_float_enable <= 0;
+			    fp_float_to_int_enable <= 0;
+			    fp_compare_enable <= 0;
 			    state <= STATE_RETIRE;
 			end else begin // } {
-			    wait_count <= wait_count - 1;
-			    state <= STATE_ALTFP_WAIT;
+			    fp_wait_count <= fp_wait_count - 1;
+			    state <= STATE_FP_WAIT;
 			end // }
 		    end // }
 
-`ifdef VERILATOR
-                    STATE_FPU1: begin
-                        state <= STATE_FPU2;
-                    end
-
-                    STATE_FPU2: begin
-                        state <= STATE_FPU3;
-                    end
-
-                    STATE_FPU3: begin
-                        state <= STATE_FPU4;
-                    end
-
-                    STATE_FPU4: begin
-                        rd_address <= decode_rd;
-                        state <= STATE_RETIRE;
-                    end
-`endif
                     STATE_LOAD: begin
-                        // want result of ALU to be settled here
+                        // Load memory using effective address calculated in ALU
+                        // We want result of ALU to be settled here
                         data_ram_address <= alu_result[ADDRESS_WIDTH-1:0];
                         state <= STATE_LOAD2;
                     end
 
                     STATE_LOAD2: begin
-                        // clock out load result
+                        // One wait state for loading memory
                         state <= STATE_RETIRE;
                     end
 
                     STATE_STORE: begin
-                        // want result of ALU to be settled here
-                        data_ram_address <= alu_result[ADDRESS_WIDTH-1:0];
-                        data_ram_write_data <= decode_opcode_is_fsw ? float_rs2_value : rs2_value;
-                        data_ram_write <= 1;
-                        state <= STATE_RETIRE;
+                        // Store memory using effective address calculated in ALU
+                        // We want result of ALU to be settled here
+                        if (alu_result[WORD_WIDTH-1]) begin
+                            // Write to SDRAM.
+                            sdram_address <= alu_result[WORD_WIDTH-2:0];
+                            sdram_writedata <= final_rs2_value;
+                            sdram_write <= 1'h1;
+                            state <= STATE_STORE_STALL;
+                        end else begin
+                            // Write to internal data RAM.
+                            data_ram_address <= alu_result[ADDRESS_WIDTH-1:0];
+                            data_ram_write_data <= final_rs2_value;
+                            data_ram_write <= 1;
+                            state <= STATE_RETIRE;
+                        end
+                    end
+
+                    STATE_STORE_STALL: begin
+                        // Wait until our write is accepted. Note that this
+                        // code can be moved to STATE_RETIRE to save a clock
+                        // in most cases.
+                        if (!sdram_waitrequest) begin
+                            sdram_write <= 1'h0;
+                            state <= STATE_RETIRE;
+                        end
                     end
 
                     STATE_RETIRE: begin
+                        // Finish operation by writing registers if necessary and updating PC
                         data_ram_write <= 0;
                         // want result of ALU to be settled here
 
@@ -789,7 +883,6 @@ module ShaderCore
                                 $unsigned(alu_result);
 
                         enable_write_float_rd <= inst_has_float_dest;
-`ifndef VERILATOR
                         float_rd_value <= 
                             decode_opcode_is_flw ? data_ram_read_result :
                             decode_opcode_is_fcvt_i2f ? int_to_float_result :
@@ -802,26 +895,10 @@ module ShaderCore
                                 (decode_funct3_rm == 1) ? fsgnjn_result :
                                 /* (decode_funct3_rm == 2) ? */ fsgnjx_result
                             ) :
-                            decode_opcode_is_fsqrt ? altfp_sqrt_result :
-                            decode_opcode_is_fmul ? altfp_multiply_result :
-                            decode_opcode_is_fdiv ? altfp_divide_result :
-                            /* (decode_opcode_is_fadd | decode_opcode_is_fsub) ? */ altfp_add_sub_result;
-`else
-                        float_rd_value <= 
-                            decode_opcode_is_flw ? data_ram_read_result :
-                            decode_opcode_is_fcvt_i2f ? int_to_float_result :
-                            decode_opcode_is_fmv_i2f ? rs1_value :
-                            decode_opcode_is_fminmax ? (
-                                fminmax_choose_rs1 ? float_rs1_value : float_rs2_value
-                            ) :
-                            decode_opcode_is_fsgnj ? (
-                                (decode_funct3_rm == 0) ? fsgnj_result :
-                                (decode_funct3_rm == 1) ? fsgnjn_result :
-                                /* (decode_funct3_rm == 2) ? */ fsgnjx_result
-                            ) :
-                            decode_opcode_is_fsqrt ? altfp_sqrt_result :
-                            /* fdiv, fadd, fsub */ fpu_result;
-`endif
+                            decode_opcode_is_fsqrt ? fp_sqrt_result :
+                            decode_opcode_is_fmul ? fp_multiply_result :
+                            decode_opcode_is_fdiv ? fp_divide_result :
+                            /* (decode_opcode_is_fadd | decode_opcode_is_fsub) ? */ fp_add_sub_result;
 
                         // We know the result of ALU for jal has
                         // LSB 0, so just ignore LSB for both jal and

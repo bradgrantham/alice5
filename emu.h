@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <math.h>
+#include <cmath>
 #include <vector>
 #include <map>
 #include <set>
@@ -271,13 +272,13 @@ struct GPUCore
     };
 
     template <class ROM, class RWM>
-    Status step(ROM& text_memory, RWM& data_memory);
+    Status step(ROM& text_memory, RWM& data_memory, RWM& sdram);
 
     template <class ROM, class RWM>
-    Status stepUntilException(ROM& text_memory, RWM& data_memory)
+    Status stepUntilException(ROM& text_memory, RWM& data_memory, RWM& sdram)
     {
         Status status;
-        while((status = step(text_memory, data_memory)) == RUNNING);
+        while((status = step(text_memory, data_memory, sdram)) == RUNNING);
         return status;
     }
 };
@@ -312,7 +313,7 @@ const bool dump = false;
         case makeOpcode(7, (a), (b)):
 
 template <class ROM, class RWM>
-GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
+GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
 {
     uint32_t insn = text_memory.read32(regs.pc);
 
@@ -357,7 +358,18 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
         // fsw       imm12hi rs1 rs2 imm12lo 14..12=2 6..2=0x09 1..0=3
         case makeOpcode(2, 0x09, 3): {
             if(dump) std::cout << "fsw\n";
-            data_memory.writef(regs.x[rs1] + immS, regs.f[rs2]);
+            uint32_t addr = regs.x[rs1] + immS;
+            float data = regs.f[rs2];
+            RWM *rwm;
+            if ((addr & 0x80000000) != 0) {
+                // SDRAM write.
+                addr &= 0x7FFFFFFF;
+                rwm = &sdram;
+            } else {
+                // Data memory write.
+                rwm = &data_memory;
+            }
+            rwm->writef(addr, data);
             regs.pc += 4;
             break;
         }
@@ -571,10 +583,21 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory)
         case makeOpcode(2, 0x08, 3):
         { // sb, sh, sw
             if(dump) std::cout << "sw\n";
+            uint32_t addr = regs.x[rs1] + immS;
+            uint32_t data = regs.x[rs2];
+            RWM *rwm;
+            if ((addr & 0x80000000) != 0) {
+                // SDRAM write.
+                addr &= 0x7FFFFFFF;
+                rwm = &sdram;
+            } else {
+                // Data memory write.
+                rwm = &data_memory;
+            }
             switch(funct3) {
-                case 0: data_memory.write8(regs.x[rs1] + immS, regs.x[rs2] & 0xFF); break;
-                case 1: data_memory.write16(regs.x[rs1] + immS, regs.x[rs2] & 0xFFFF); break;
-                case 2: data_memory.write32(regs.x[rs1] + immS, regs.x[rs2]); break;
+                case 0: rwm->write8(addr, data & 0xFF); break;
+                case 1: rwm->write16(addr, data & 0xFFFF); break;
+                case 2: rwm->write32(addr, data); break;
             }
             regs.pc += 4;
             break;

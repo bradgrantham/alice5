@@ -73,7 +73,16 @@ module soc_system (
 	memory_mem_odt,
 	memory_mem_dm,
 	memory_oct_rzqin,
-	reset_reset_n);	
+	reset_reset_n,
+	hps_0_f2h_sdram0_data_address,
+	hps_0_f2h_sdram0_data_burstcount,
+	hps_0_f2h_sdram0_data_waitrequest,
+	hps_0_f2h_sdram0_data_readdata,
+	hps_0_f2h_sdram0_data_readdatavalid,
+	hps_0_f2h_sdram0_data_read,
+	hps_0_f2h_sdram0_data_writedata,
+	hps_0_f2h_sdram0_data_byteenable,
+	hps_0_f2h_sdram0_data_write);	
 
 	input	[1:0]	button_pio_external_connection_export;
 	input		clk_clk;
@@ -149,4 +158,13 @@ module soc_system (
 	output	[3:0]	memory_mem_dm;
 	input		memory_oct_rzqin;
 	input		reset_reset_n;
+	input	[29:0]	hps_0_f2h_sdram0_data_address;
+	input	[7:0]	hps_0_f2h_sdram0_data_burstcount;
+	output		hps_0_f2h_sdram0_data_waitrequest;
+	output	[31:0]	hps_0_f2h_sdram0_data_readdata;
+	output		hps_0_f2h_sdram0_data_readdatavalid;
+	input		hps_0_f2h_sdram0_data_read;
+	input	[31:0]	hps_0_f2h_sdram0_data_writedata;
+	input	[3:0]	hps_0_f2h_sdram0_data_byteenable;
+	input		hps_0_f2h_sdram0_data_write;
 endmodule

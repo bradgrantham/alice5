@@ -6,6 +6,12 @@ if [ "$1" == "--animate" ]; then
     shift
 fi
 
+sim=0
+if [ "$1" == "--sim" ]; then
+    sim=1
+    shift
+fi
+
 program="$1"
 if [ "$program" == "" ]; then
     echo "Usage: $0 program.frag"
@@ -32,6 +38,11 @@ if [ "$animate" == "1" ]; then
 
     convert anim/*.ppm out.gif
 else
-    ./emu -f 90 --term out.o
+    if [ "$sim" == "1" ]; then
+        (cd gpu/sim && make)
+        ./gpu/sim/obj_dir/VMain -f 90 --term out.o
+    else
+        ./emu -f 90 --term out.o
+    fi
 fi
 

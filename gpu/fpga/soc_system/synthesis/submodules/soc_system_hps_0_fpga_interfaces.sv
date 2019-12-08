@@ -1,13 +1,13 @@
-// (C) 2001-2016 Altera Corporation. All rights reserved.
-// Your use of Altera Corporation's design tools, logic functions and other 
+// (C) 2001-2018 Intel Corporation. All rights reserved.
+// Your use of Intel Corporation's design tools, logic functions and other 
 // software and tools, and its AMPP partner logic functions, and any output 
-// files any of the foregoing (including device programming or simulation 
+// files from any of the foregoing (including device programming or simulation 
 // files), and any associated documentation or information are expressly subject 
-// to the terms and conditions of the Altera Program License Subscription 
-// Agreement, Altera MegaCore Function License Agreement, or other applicable 
+// to the terms and conditions of the Intel Program License Subscription 
+// Agreement, Intel FPGA IP License Agreement, or other applicable 
 // license agreement, including, without limitation, that your use is for the 
-// sole purpose of programming logic devices manufactured by Altera and sold by 
-// Altera or its authorized distributors.  Please refer to the applicable 
+// sole purpose of programming logic devices manufactured by Intel and sold by 
+// Intel or its authorized distributors.  Please refer to the applicable 
 // agreement for further details.
 
 
@@ -142,14 +142,14 @@ module soc_system_hps_0_fpga_interfaces(
  ,input wire [1 - 1 : 0 ] h2f_RVALID
  ,output wire [1 - 1 : 0 ] h2f_RREADY
 // f2h_sdram0_data
- ,input wire [27 - 1 : 0 ] f2h_sdram0_ADDRESS
+ ,input wire [30 - 1 : 0 ] f2h_sdram0_ADDRESS
  ,input wire [8 - 1 : 0 ] f2h_sdram0_BURSTCOUNT
  ,output wire [1 - 1 : 0 ] f2h_sdram0_WAITREQUEST
- ,output wire [256 - 1 : 0 ] f2h_sdram0_READDATA
+ ,output wire [32 - 1 : 0 ] f2h_sdram0_READDATA
  ,output wire [1 - 1 : 0 ] f2h_sdram0_READDATAVALID
  ,input wire [1 - 1 : 0 ] f2h_sdram0_READ
- ,input wire [256 - 1 : 0 ] f2h_sdram0_WRITEDATA
- ,input wire [32 - 1 : 0 ] f2h_sdram0_BYTEENABLE
+ ,input wire [32 - 1 : 0 ] f2h_sdram0_WRITEDATA
+ ,input wire [4 - 1 : 0 ] f2h_sdram0_BYTEENABLE
  ,input wire [1 - 1 : 0 ] f2h_sdram0_WRITE
 // f2h_sdram0_clock
  ,input wire [1 - 1 : 0 ] f2h_sdram0_clk
@@ -160,22 +160,16 @@ module soc_system_hps_0_fpga_interfaces(
 );
 
 
-wire [15 - 1 : 0] intermediate;
+wire [9 - 1 : 0] intermediate;
 assign intermediate[0:0] = ~intermediate[1:1];
-assign intermediate[12:12] = intermediate[6:6]|intermediate[11:11];
-assign intermediate[2:2] = intermediate[13:13];
-assign intermediate[3:3] = intermediate[13:13];
-assign intermediate[4:4] = intermediate[13:13];
-assign intermediate[5:5] = intermediate[13:13];
-assign intermediate[7:7] = intermediate[13:13];
-assign intermediate[8:8] = intermediate[13:13];
-assign intermediate[9:9] = intermediate[13:13];
-assign intermediate[10:10] = intermediate[13:13];
-assign intermediate[14:14] = intermediate[13:13];
+assign intermediate[6:6] = intermediate[3:3]|intermediate[5:5];
+assign intermediate[2:2] = intermediate[7:7];
+assign intermediate[4:4] = intermediate[7:7];
+assign intermediate[8:8] = intermediate[7:7];
 assign f2h_sdram0_WAITREQUEST[0:0] = intermediate[0:0];
-assign intermediate[6:6] = f2h_sdram0_READ[0:0];
-assign intermediate[11:11] = f2h_sdram0_WRITE[0:0];
-assign intermediate[13:13] = f2h_sdram0_clk[0:0];
+assign intermediate[3:3] = f2h_sdram0_READ[0:0];
+assign intermediate[5:5] = f2h_sdram0_WRITE[0:0];
+assign intermediate[7:7] = f2h_sdram0_clk[0:0];
 
 cyclonev_hps_interface_clocks_resets clocks_resets(
  .f2h_pending_rst_ack({
@@ -603,55 +597,28 @@ cyclonev_hps_interface_fpga2sdram f2sdram(
  .cmd_data_0({
     18'b000000000000000000 // 59:42
    ,f2h_sdram0_BURSTCOUNT[7:0] // 41:34
-   ,5'b00000 // 33:29
-   ,f2h_sdram0_ADDRESS[26:0] // 28:2
-   ,intermediate[11:11] // 1:1
-   ,intermediate[6:6] // 0:0
+   ,2'b00 // 33:32
+   ,f2h_sdram0_ADDRESS[29:0] // 31:2
+   ,intermediate[5:5] // 1:1
+   ,intermediate[3:3] // 0:0
   })
 ,.cfg_port_width({
-    12'b000000000011 // 11:0
+    12'b000000000000 // 11:0
   })
-,.rd_valid_3({
+,.rd_valid_0({
     f2h_sdram0_READDATAVALID[0:0] // 0:0
   })
-,.wr_clk_3({
-    intermediate[10:10] // 0:0
-  })
-,.wr_clk_2({
-    intermediate[9:9] // 0:0
-  })
-,.wr_data_3({
-    2'b00 // 89:88
-   ,f2h_sdram0_BYTEENABLE[31:24] // 87:80
-   ,16'b0000000000000000 // 79:64
-   ,f2h_sdram0_WRITEDATA[255:192] // 63:0
-  })
-,.wr_clk_1({
-    intermediate[8:8] // 0:0
-  })
-,.wr_data_2({
-    2'b00 // 89:88
-   ,f2h_sdram0_BYTEENABLE[23:16] // 87:80
-   ,16'b0000000000000000 // 79:64
-   ,f2h_sdram0_WRITEDATA[191:128] // 63:0
-  })
 ,.wr_clk_0({
-    intermediate[7:7] // 0:0
-  })
-,.wr_data_1({
-    2'b00 // 89:88
-   ,f2h_sdram0_BYTEENABLE[15:8] // 87:80
-   ,16'b0000000000000000 // 79:64
-   ,f2h_sdram0_WRITEDATA[127:64] // 63:0
+    intermediate[4:4] // 0:0
   })
 ,.cfg_cport_type({
     12'b000000000011 // 11:0
   })
 ,.wr_data_0({
-    2'b00 // 89:88
-   ,f2h_sdram0_BYTEENABLE[7:0] // 87:80
-   ,16'b0000000000000000 // 79:64
-   ,f2h_sdram0_WRITEDATA[63:0] // 63:0
+    6'b000000 // 89:84
+   ,f2h_sdram0_BYTEENABLE[3:0] // 83:80
+   ,48'b000000000000000000000000000000000000000000000000 // 79:32
+   ,f2h_sdram0_WRITEDATA[31:0] // 31:0
   })
 ,.cfg_rfifo_cport_map({
     16'b0000000000000000 // 15:0
@@ -660,31 +627,13 @@ cyclonev_hps_interface_fpga2sdram f2sdram(
     18'b000000000000000000 // 17:0
   })
 ,.cmd_port_clk_0({
-    intermediate[14:14] // 0:0
+    intermediate[8:8] // 0:0
   })
 ,.cfg_cport_rfifo_map({
     18'b000000000000000000 // 17:0
   })
-,.rd_ready_3({
-    1'b1 // 0:0
-  })
-,.rd_ready_2({
-    1'b1 // 0:0
-  })
-,.rd_ready_1({
-    1'b1 // 0:0
-  })
 ,.rd_ready_0({
     1'b1 // 0:0
-  })
-,.rd_clk_3({
-    intermediate[5:5] // 0:0
-  })
-,.rd_clk_2({
-    intermediate[4:4] // 0:0
-  })
-,.rd_clk_1({
-    intermediate[3:3] // 0:0
   })
 ,.cmd_ready_0({
     intermediate[1:1] // 0:0
@@ -699,19 +648,10 @@ cyclonev_hps_interface_fpga2sdram f2sdram(
     1'b1 // 0:0
   })
 ,.cmd_valid_0({
-    intermediate[12:12] // 0:0
-  })
-,.rd_data_3({
-    f2h_sdram0_READDATA[255:192] // 63:0
-  })
-,.rd_data_2({
-    f2h_sdram0_READDATA[191:128] // 63:0
-  })
-,.rd_data_1({
-    f2h_sdram0_READDATA[127:64] // 63:0
+    intermediate[6:6] // 0:0
   })
 ,.rd_data_0({
-    f2h_sdram0_READDATA[63:0] // 63:0
+    f2h_sdram0_READDATA[31:0] // 31:0
   })
 ,.cfg_axi_mm_select({
     6'b000000 // 5:0

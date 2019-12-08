@@ -32,19 +32,23 @@ void Compiler::compile() {
     outFile << ".segment text\n";
     std::ostringstream ss;
 
-    ss << "lui   sp, %hi(" << RiscVInitialStackPointer << ")";
-    emit(ss.str(), "");
-
+    ss << "lui sp, %hi(" << RiscVInitialStackPointer << ")";
+    emit(ss.str(), "set up stack");
     if((RiscVInitialStackPointer & 0x3FF) != 0) {
         ss.str("");
-        ss << "addi   sp, sp, %lo(" << RiscVInitialStackPointer << ")";
+        ss << "addi sp, sp, %lo(" << RiscVInitialStackPointer << ")";
         emit(ss.str(), "");
     }
 
+    std::string mainName = pgm->functions.at(pgm->mainFunctionId)->cleanName;
     ss.str("");
-    ss << "jal ra, " << pgm->functions.at(pgm->mainFunctionId)->cleanName;
+    ss << "lui a0, %hi(" << mainName << ")";
+    emit(ss.str(), "address of pixel shader");
+    ss.str("");
+    ss << "addi a0, a0, %lo(" << mainName << ")";
     emit(ss.str(), "");
 
+    emit("jal ra, .mainLoop", "");
     emit("ebreak", "");
 
     // Emit instructions.

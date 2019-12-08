@@ -1,4 +1,4 @@
-//Legal Notice: (C)2017 Altera Corporation. All rights reserved.  Your
+//Legal Notice: (C)2019 Altera Corporation. All rights reserved.  Your
 //use of Altera Corporation's design tools, logic functions and other
 //software and tools, and its AMPP partner logic functions, and any
 //output files any of the foregoing (including device programming or
@@ -42,11 +42,12 @@ module soc_system_led_pio (
   input            write_n;
   input   [ 31: 0] writedata;
 
-  wire             clk_en;
-  reg     [  6: 0] data_out;
-  wire    [  6: 0] out_port;
-  wire    [  6: 0] read_mux_out;
-  wire    [ 31: 0] readdata;
+
+wire             clk_en;
+reg     [  6: 0] data_out;
+wire    [  6: 0] out_port;
+wire    [  6: 0] read_mux_out;
+wire    [ 31: 0] readdata;
   assign clk_en = 1;
   //s1, which is an e_avalon_slave
   assign read_mux_out = {7 {(address == 0)}} & data_out;
