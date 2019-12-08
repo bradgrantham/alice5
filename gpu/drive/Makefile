@@ -6,6 +6,7 @@ CXXFLAGS=-I../.. -std=c++17 -O2 -fno-strict-aliasing
 all: drive
 
 drive: drive.cpp ../../risc-v.h ../../timer.h ../../disassemble.h ../../objectfile.h
+	c++ $(CXXFLAGS) drive.cpp -o drive
 
 simple.o: simple.s
 	../../as -v -o simple.o simple.s > simple.lst

@@ -17,8 +17,11 @@
 #include <sys/mman.h>
 
 #define FPGA_MANAGER_BASE 0xFF706000
+#define FPGA_MANAGER_SIZE 64
 #define FPGA_GPO_OFFSET 0x10
 #define FPGA_GPI_OFFSET 0x14
+#define SHARED_MEM_BASE 0x3E000000
+#define SHARED_MEM_SIZE (16*1024*1024)
 
 #define SIMULATE 1
 constexpr bool dumpH2FAndF2H = false;
@@ -34,26 +37,6 @@ constexpr const T& clamp( const T& v, const T& lo, const T& hi )
 {
         assert( !(hi < lo) );
         return (v < lo) ? lo : (hi < v) ? hi : v;
-}
-
-// Union for converting from float to int and back.
-union FloatUint32 {
-    float f;
-    uint32_t i;
-};
-
-// Bit-wise conversion from int to float.
-float intToFloat(uint32_t i) {
-    FloatUint32 u;
-    u.i = i;
-    return u.f;
-}
-
-// Bit-wise conversion from float to int.
-uint32_t floatToInt(float f) {
-    FloatUint32 u;
-    u.f = f;
-    return u.i;
 }
 
 // Proposed H2F interface for testing a single core
@@ -128,6 +111,7 @@ struct CoreShared
 
     volatile unsigned long *gpo;
     volatile unsigned long *gpi;
+    volatile void *sdram;
 
     void setH2F(uint32_t state) {
         if(dumpH2FAndF2H) {
@@ -346,7 +330,7 @@ void set(CoreShared *shared, uint32_t address, const TYPE& value)
     writeWordToRam(*reinterpret_cast<const uint32_t*>(&value), address, DATA_RAM, shared);
 }
 
-template <class TYPE, unsigned int N>
+template <class TYPE, std::size_t N>
 void set(CoreShared *shared, uint32_t address, const std::array<TYPE, N>& value)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
@@ -354,7 +338,7 @@ void set(CoreShared *shared, uint32_t address, const std::array<TYPE, N>& value)
         writeWordToRam(*reinterpret_cast<const uint32_t*>(&value[i]), address + i * sizeof(uint32_t), DATA_RAM, shared);
 }
 
-template <class TYPE, unsigned int N>
+template <class TYPE, std::size_t N>
 void get(CoreShared *shared, uint32_t address, std::array<TYPE, N>& value)
 {
     // TODO: use a state machine through Main to read memory using clock
@@ -426,6 +410,8 @@ struct CoreParameters
     uint32_t gl_FragCoordAddress;
     uint32_t colorAddress;
     uint32_t iTimeAddress;
+    uint32_t rowWidthAddress;
+    uint32_t colBufAddrAddress;
 
     uint32_t initialPC;
 
@@ -489,28 +475,77 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         if (j % 10 == 0) {
             std::cout << "j = " << j << "\n";
         }
-        for(int i = params->startX; i < params->afterLastX; i++) {
-            if(params->gl_FragCoordAddress != 0xFFFFFFFF)
-                set(shared, params->gl_FragCoordAddress, v4float{i + 0.5f, j + 0.5f, 0, 0});
-            if(params->colorAddress != 0xFFFFFFFF)
-                set(shared, params->colorAddress, v4float{1, 1, 1, 1});
-            if(false) // XXX TODO: when iTime is exported by compilation
+
+        if (true) {
+            // Do a whole row at a time.
+            if(params->gl_FragCoordAddress != 0xFFFFFFFF) {
+                set(shared, params->gl_FragCoordAddress,
+                        v4float{params->startX + 0.5f, j + 0.5f, 0, 0});
+            }
+            if(false) {
+                // XXX TODO: when iTime is exported by compilation
                 set(shared, params->iTimeAddress, params->frameTime);
+            }
+            // Number of pixels in a row.
+            uint32_t width = params->afterLastX - params->startX;
+            set(shared, params->rowWidthAddress, width);
+            // Offset in pixels into the image.
+            uint32_t pixelOffset = (params->imageHeight - 1 - j)*params->imageWidth + params->startX;
+            // Offset in bytes into the shared memory space.
+            uint32_t offsetAddress = sizeof(float)*3*pixelOffset;
+            set(shared, params->colBufAddrAddress, offsetAddress | 0x80000000);
 
-            // core.regs.pc = params->initialPC; // XXX Ignored
+            // Run one clock cycle in not-run reset to process STATE_INIT
+            shared->setH2F(h2f_gpu_reset);
 
-            shadeOnePixel(debugOptions, params, shared);
+            // Release reset
+            shared->setH2F(h2f_gpu_idle);
+            waitOnExitReset(shared);
+
+            // Run the row.
+            shared->setH2F(h2f_gpu_run);
+            while (!(shared->getF2H() & f2h_run_halted_bit)) {
+                // Nothing.
+            }
 
             /* return to STATE_INIT so we can drive ext memory access */
             shared->setH2F(h2f_gpu_idle);
 
-            v3float rgb = {1, 0, 0};
-            if(params->colorAddress != 0xFFFFFFFF)
-                get(shared, params->colorAddress, rgb);
+            // Convert to bytes.
+            float *rgbFloat = (float *) shared->sdram + pixelOffset*3;
+            uint8_t *rgbByte = shared->img + pixelOffset*3;
+            for (int i = 0; i < width; i++) {
+                for (int c = 0; c < 3; c++) {
+                    rgbByte[c] = clamp(int(rgbFloat[c] * 255.99), 0, 255);
+                }
+                rgbFloat += 3;
+                rgbByte += 3;
+            }
+        } else {
+            // Do a pixel at a time.
+            for(int i = params->startX; i < params->afterLastX; i++) {
+                if(params->gl_FragCoordAddress != 0xFFFFFFFF)
+                    set(shared, params->gl_FragCoordAddress, v4float{i + 0.5f, j + 0.5f, 0, 0});
+                if(params->colorAddress != 0xFFFFFFFF)
+                    set(shared, params->colorAddress, v4float{1, 1, 1, 1});
+                if(false) // XXX TODO: when iTime is exported by compilation
+                    set(shared, params->iTimeAddress, params->frameTime);
 
-            int pixelOffset = 3 * ((params->imageHeight - 1 - j) * params->imageWidth + i);
-            for(int c = 0; c < 3; c++)
-                shared->img[pixelOffset + c] = clamp(int(rgb[c] * 255.99), 0, 255);
+                // core.regs.pc = params->initialPC; // XXX Ignored
+
+                shadeOnePixel(debugOptions, params, shared);
+
+                /* return to STATE_INIT so we can drive ext memory access */
+                shared->setH2F(h2f_gpu_idle);
+
+                v3float rgb = {1, 0, 0};
+                if(params->colorAddress != 0xFFFFFFFF)
+                    get(shared, params->colorAddress, rgb);
+
+                int pixelOffset = 3 * ((params->imageHeight - 1 - j) * params->imageWidth + i);
+                for(int c = 0; c < 3; c++)
+                    shared->img[pixelOffset + c] = clamp(int(rgb[c] * 255.99), 0, 255);
+            }
         }
     }
 }
@@ -667,6 +702,8 @@ int main(int argc, char **argv)
     } else {
         params.iTimeAddress = 0xFFFFFFFF;
     }
+    params.rowWidthAddress = params.data_symbols.at("rowWidthAddress");
+    params.colBufAddrAddress = params.data_symbols.at("colBufAddrAddress");
 
     params.startX = 0;
     params.afterLastX = params.imageWidth;
@@ -686,7 +723,8 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    unsigned char *mem = (unsigned char *)mmap(0, 64, PROT_READ | PROT_WRITE, /* MAP_NOCACHE | */ MAP_SHARED , devMem, FPGA_MANAGER_BASE);
+    // For GP register.
+    unsigned char *mem = (unsigned char *)mmap(0, FPGA_MANAGER_SIZE, PROT_READ | PROT_WRITE, /* MAP_NOCACHE | */ MAP_SHARED , devMem, FPGA_MANAGER_BASE);
     if(mem == MAP_FAILED) {
         perror("mmap");
         exit(EXIT_FAILURE);
@@ -694,6 +732,13 @@ int main(int argc, char **argv)
 
     shared.gpo = (unsigned long*)(mem + FPGA_GPO_OFFSET);
     shared.gpi = (unsigned long*)(mem + FPGA_GPI_OFFSET);
+
+    // For shared memory.
+    shared.sdram = mmap(0, SHARED_MEM_SIZE, PROT_READ | PROT_WRITE, /* MAP_NOCACHE | */ MAP_SHARED , devMem, SHARED_MEM_BASE);
+    if(shared.sdram == MAP_FAILED) {
+        perror("mmap");
+        exit(EXIT_FAILURE);
+    }
 
     render(&debugOptions, &params, &shared, params.startY);
 
