@@ -449,6 +449,9 @@ module ShaderCore
     wire [WORD_WIDTH-1:0] fpu_result;
     reg [1:0] fpu_op;
 
+    wire fpu_result_zero;
+    wire fpu_result_negative;
+
     fpu fpu (
         .clk(clock),
         .rmode(fpu_rmode),
@@ -456,6 +459,7 @@ module ShaderCore
         .opa(float_rs1_value),
         .opb(float_rs2_value),
         .out(fpu_result),
+        .zero(fpu_result_zero),
 /* verilator lint_off PINCONNECTEMPTY */
         .ine(),
         .inf(),
@@ -463,11 +467,11 @@ module ShaderCore
         .qnan(),
         .overflow(),
         .underflow(),
-        .zero(),
         .div_by_zero()
 /* verilator lint_on PINCONNECTEMPTY */
     );
 
+    assign fpu_result_negative = fpu_result[31];
 
     // Floating point multiply -------------------------
 
@@ -581,21 +585,9 @@ module ShaderCore
     
 `else
 
-    localparam FP_COMPARE_LATENCY = 1;
-    fcmp fp_compare (
-        .opa(float_rs1_value),
-        .opb(float_rs2_value),
-        .altb(fcmp_altb),
-/* verilator lint_off PINCONNECTEMPTY */
-        .blta(),
-/* verilator lint_on PINCONNECTEMPTY */
-        .aeqb(fcmp_aeqb),
-/* verilator lint_off PINCONNECTEMPTY */
-        .unordered(),
-        .inf(),
-        .zero()
-/* verilator lint_on PINCONNECTEMPTY */
-    );
+    localparam FP_COMPARE_LATENCY = 4;
+    assign fcmp_altb = fpu_result_negative;
+    assign fcmp_aeqb = fpu_result_zero;
 
 `endif
 
@@ -772,6 +764,7 @@ module ShaderCore
                             decode_opcode_is_fmul ? 3'd2 :
                             decode_opcode_is_fdiv ? 3'd3 :
                             decode_opcode_is_fadd ? 3'd0 :
+                            (decode_opcode_is_fminmax | decode_opcode_is_fcmp) ? 3'd1 :
                             /* subtract */ 3'd1;
 
                         rd_address <= decode_rd;
@@ -876,7 +869,8 @@ module ShaderCore
                             decode_opcode_is_fsqrt ? fp_sqrt_result :
                             decode_opcode_is_fmul ? fp_multiply_result :
                             decode_opcode_is_fdiv ? fp_divide_result :
-                            /* (decode_opcode_is_fadd | decode_opcode_is_fsub) ? */ fp_add_sub_result;
+                            (decode_opcode_is_fadd | decode_opcode_is_fsub) ? fp_add_sub_result :
+                            /* internal error - 6661234.0 */ 32'h4ACB48E4;
 
                         // We know the result of ALU for jal has
                         // LSB 0, so just ignore LSB for both jal and
