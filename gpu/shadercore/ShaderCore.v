@@ -445,6 +445,30 @@ module ShaderCore
 
 `endif
 
+    // Verilog FPU from opencores; used in multiply, divide, and add_sub
+    wire [WORD_WIDTH-1:0] fpu_result;
+    reg [1:0] fpu_op;
+
+    fpu fpu (
+        .clk(clock),
+        .rmode(fpu_rmode),
+        .fpu_op(fpu_op),
+        .opa(float_rs1_value),
+        .opb(float_rs2_value),
+        .out(fpu_result),
+/* verilator lint_off PINCONNECTEMPTY */
+        .ine(),
+        .inf(),
+        .snan(),
+        .qnan(),
+        .overflow(),
+        .underflow(),
+        .zero(),
+        .div_by_zero()
+/* verilator lint_on PINCONNECTEMPTY */
+    );
+
+
     // Floating point multiply -------------------------
 
     reg fp_multiply_enable;
@@ -466,24 +490,7 @@ module ShaderCore
 
     // Verilog FPU from opencores
     localparam FP_MULTIPLY_LATENCY = 4;
-    fpu fp_multiplier (
-        .clk(clock),
-        .rmode(fpu_rmode),
-        .fpu_op(3'd2),
-        .opa(float_rs1_value),
-        .opb(float_rs2_value),
-        .out(fp_multiply_result),
-/* verilator lint_off PINCONNECTEMPTY */
-        .ine(),
-        .inf(),
-        .snan(),
-        .qnan(),
-        .overflow(),
-        .underflow(),
-        .zero(),
-        .div_by_zero()
-/* verilator lint_on PINCONNECTEMPTY */
-    );
+    assign fp_multiply_result = fpu_result;
 
 `endif
 
@@ -507,24 +514,7 @@ module ShaderCore
 
     // Verilog FPU from opencores
     localparam FP_DIVIDE_LATENCY = 4;
-    fpu fp_divider (
-        .clk(clock),
-        .rmode(fpu_rmode),
-        .fpu_op(3'd3),
-        .opa(float_rs1_value),
-        .opb(float_rs2_value),
-        .out(fp_divide_result),
-/* verilator lint_off PINCONNECTEMPTY */
-        .ine(),
-        .inf(),
-        .snan(),
-        .qnan(),
-        .overflow(),
-        .underflow(),
-        .zero(),
-        .div_by_zero()
-/* verilator lint_on PINCONNECTEMPTY */
-    );
+    assign fp_divide_result = fpu_result;
 
 `endif
 
@@ -551,25 +541,7 @@ module ShaderCore
 
     // Verilog FPU from opencores
     localparam FP_ADD_SUB_LATENCY = 4;
-
-    fpu fpu_add_sub (
-        .clk(clock),
-        .rmode(fpu_rmode),
-        .fpu_op(fp_op_is_add ? 3'd0 : 3'd1),
-        .opa(float_rs1_value),
-        .opb(float_rs2_value),
-        .out(fp_add_sub_result),
-/* verilator lint_off PINCONNECTEMPTY */
-        .ine(),
-        .inf(),
-        .snan(),
-        .qnan(),
-        .overflow(),
-        .underflow(),
-        .zero(),
-        .div_by_zero()
-/* verilator lint_on PINCONNECTEMPTY */
-    );
+    assign fp_add_sub_result = fpu_result;
 
 `endif
 
@@ -795,6 +767,12 @@ module ShaderCore
 			fp_int_to_float_enable <= decode_opcode_is_fcvt_i2f;
 			fp_compare_enable <= (decode_opcode_is_fminmax | decode_opcode_is_fcmp);
 			fp_sqrt_enable <= decode_opcode_is_fsqrt;
+
+                        fpu_op <=
+                            decode_opcode_is_fmul ? 3'd2 :
+                            decode_opcode_is_fdiv ? 3'd3 :
+                            decode_opcode_is_fadd ? 3'd0 :
+                            /* subtract */ 3'd1;
 
                         rd_address <= decode_rd;
 
