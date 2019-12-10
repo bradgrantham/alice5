@@ -63,7 +63,7 @@ module Main(
         enable_read_floatreg ? floatreg_read_data :
         /* enable_read_special ? */ special_read_data;
 
-    wire [29:0] sdram_address = (sdram_gpu_address + 30'h3E000000) >> 2;
+    assign sdram_address = (sdram_gpu_address + 30'h3E000000) >> 2;
     wire [SDRAM_ADDRESS_WIDTH-1:0] sdram_gpu_address;
 
     GPU32BitInterface #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
