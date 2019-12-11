@@ -123,8 +123,9 @@ struct GPUCore
     };
     std::map<uint32_t, SubstituteFunction> substFunctions;
     std::map<uint32_t, std::string> substFunctionNames;
-
     std::set<std::string> substitutedFunctions;
+    AddressToSymbolTable libraryFunctions;
+    std::map<std::string, int> libraryFunctionHistogram;
 
     GPUCore(const SymbolTable& librarySymbols)
     {
@@ -198,6 +199,9 @@ struct GPUCore
                 substFunctions[librarySymbols.at(name)] = subst;
                 substFunctionNames[librarySymbols.at(name)] = name;
             }
+        }
+        for(auto& [name, address]: librarySymbols) {
+            libraryFunctions[address] = name;
         }
     }
 
@@ -316,6 +320,11 @@ template <class ROM, class RWM>
 GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
 {
     uint32_t insn = text_memory.read32(regs.pc);
+
+    auto lib = libraryFunctions.find(regs.pc);
+    if(lib != libraryFunctions.end()) {
+        libraryFunctionHistogram[lib->second]++;
+    }
 
     Status status = RUNNING;
 
