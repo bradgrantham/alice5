@@ -579,7 +579,9 @@ void InsnCopyObject::emit(Compiler *compiler)
 
 void InsnGLSLstd450Sqrt::emit(Compiler *compiler)
 {
-    compiler->emitUniCall(".sqrt", resultId(), xId());
+    std::ostringstream ss;
+    ss << "fsqrt.s " << compiler->reg(resultId()) << ", " << compiler->reg(xId());
+    compiler->emit(ss.str(), "");
 }
 
 void InsnGLSLstd450Sin::emit(Compiler *compiler)
