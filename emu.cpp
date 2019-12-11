@@ -227,6 +227,7 @@ void usage(const char* progname)
             int(std::thread::hardware_concurrency()));
     printf("\t--pixel X Y  Render only pixel X and Y\n");
     printf("\t--subst      Print which library functions were substituted\n");
+    printf("\t--libhist    Print which library functions were called and how many times\n");
 }
 
 struct CoreShared
@@ -241,6 +242,7 @@ struct CoreShared
 
     // These require exclusion using rendererMutex
     std::set<std::string> substitutedFunctions;
+    std::map<std::string, int> libraryFunctionHistogram;
     uint64_t dispatchedCount = 0;
 };
 
@@ -416,6 +418,9 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
         std::scoped_lock l(shared->rendererMutex);
         shared->dispatchedCount += coreDispatchedCount;
         shared->substitutedFunctions.insert(core.substitutedFunctions.begin(), core.substitutedFunctions.end());
+        for(auto [func, count] : core.libraryFunctionHistogram) {
+            shared->libraryFunctionHistogram[func] += count;
+        }
     }
 }
 
@@ -680,6 +685,7 @@ int main(int argc, char **argv)
     bool imageToTerminal = false;
     bool printSymbols = false;
     bool printSubstitutions = false;
+    bool printLibraryHistogram = false;
     bool runTest = false;
     bool printHeaderInfo = false;
     int specificPixelX = -1;
@@ -752,6 +758,11 @@ int main(int argc, char **argv)
         } else if(strcmp(argv[0], "-d") == 0) {
 
             printSymbols = true;
+            argv++; argc--;
+
+        } else if(strcmp(argv[0], "--libhist") == 0) {
+
+            printLibraryHistogram = true;
             argv++; argc--;
 
         } else if(strcmp(argv[0], "--subst") == 0) {
@@ -902,6 +913,12 @@ int main(int argc, char **argv)
     if(printSubstitutions) {
         for(auto& subst: shared.substitutedFunctions) {
             std::cout << "substituted for " << subst << '\n';
+        }
+    }
+
+    if(printLibraryHistogram) {
+        for(auto& func: shared.libraryFunctionHistogram) {
+            std::cout << func.first << " : " << func.second << "\n";
         }
     }
 

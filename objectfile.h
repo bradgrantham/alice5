@@ -8,6 +8,7 @@
 #include "util.h"
 
 typedef std::map<std::string, uint32_t> SymbolTable;
+typedef std::map<uint32_t, std::string> AddressToSymbolTable;
 
 const uint32_t RunHeader1MagicExpected = 0x31354c41;
 struct RunHeader1
