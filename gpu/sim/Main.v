@@ -17,6 +17,7 @@ module Main(
     localparam WORD_WIDTH = 32;
     localparam ADDRESS_WIDTH = 16;
     localparam SDRAM_ADDRESS_WIDTH = 24;
+    localparam CORE_COUNT = 1;
 
     // HPS-to-FPGA communication
 
@@ -128,7 +129,19 @@ module Main(
             .sdram_readdatavalid(sdram_readdatavalid),
             .sdram_read(sdram_read),
             .sdram_writedata(sdram_writedata),
-            .sdram_write(sdram_write)
+            .sdram_write(sdram_write),
+
+            .mem_request(mem_request[0]),
+            .mem_authorized(mem_authorized[0])
             );
+
+    // Memory arbiter.
+    wire [CORE_COUNT-1:0] mem_request;
+    wire [CORE_COUNT-1:0] mem_authorized;
+    MemArb #(.COUNT(CORE_COUNT)) memArb(
+        .clock(clock),
+        .reset_n(reset_n),
+        .request(mem_request),
+        .authorized(mem_authorized));
 
 endmodule

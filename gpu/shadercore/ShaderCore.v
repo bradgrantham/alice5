@@ -28,7 +28,10 @@ module ShaderCore
     input wire sdram_readdatavalid /* verilator public */,
     output reg sdram_read /* verilator public */,
     output reg [WORD_WIDTH-1:0] sdram_writedata /* verilator public */,
-    output reg sdram_write /* verilator public */
+    output reg sdram_write /* verilator public */,
+
+    output reg mem_request,
+    input wire mem_authorized
 );
 
     localparam REGISTER_ADDRESS_WIDTH = 5;
@@ -52,8 +55,9 @@ module ShaderCore
     localparam STATE_LOAD /* verilator public */ = 5'd07;
     localparam STATE_LOAD2 /* verilator public */ = 5'd08;
     localparam STATE_STORE /* verilator public */ = 5'd09;
-    localparam STATE_STORE_STALL /* verilator public */ = 5'd10;
-    localparam STATE_HALTED /* verilator public */ = 5'd11;
+    localparam STATE_STORE_REQUEST /* verilator public */ = 5'd10;
+    localparam STATE_STORE_STALL /* verilator public */ = 5'd11;
+    localparam STATE_HALTED /* verilator public */ = 5'd12;
     localparam STATE_FP_WAIT /* verilator public */ = 5'd16;
 
     reg [4:0] state /* verilator public */;
@@ -686,8 +690,12 @@ module ShaderCore
             halted <= 0;
             exception <= 0;
 
-            sdram_write <= 1'h0;
+            sdram_address <= 0;
             sdram_read <= 1'h0;
+            sdram_writedata <= 0;
+            sdram_write <= 1'h0;
+
+            mem_request <= 0;
 
             // reset registers?  Could assume they're junk in the compiler and save gates
 
@@ -811,11 +819,10 @@ module ShaderCore
                         // Store memory using effective address calculated in ALU
                         // We want result of ALU to be settled here
                         if (alu_result[WORD_WIDTH-1]) begin
-                            // Write to SDRAM.
-                            sdram_address <= alu_result[WORD_WIDTH-2:0];
-                            sdram_writedata <= final_rs2_value;
-                            sdram_write <= 1'h1;
-                            state <= STATE_STORE_STALL;
+                            // Write to SDRAM. Request access to the memory
+                            // controller.
+                            mem_request <= 1;
+                            state <= STATE_STORE_REQUEST;
                         end else begin
                             // Write to internal data RAM.
                             data_ram_address <= alu_result[ADDRESS_WIDTH-1:0];
@@ -825,12 +832,29 @@ module ShaderCore
                         end
                     end
 
+                    STATE_STORE_REQUEST: begin
+                        // Wait until the memory arbiter allows us to
+                        // use the memory controller.
+                        if (mem_authorized) begin
+                            sdram_address <= alu_result[WORD_WIDTH-2:0];
+                            sdram_writedata <= final_rs2_value;
+                            sdram_write <= 1'h1;
+                            state <= STATE_STORE_STALL;
+                        end
+                    end
+
                     STATE_STORE_STALL: begin
                         // Wait until our write is accepted. Note that this
                         // code can be moved to STATE_RETIRE to save a clock
                         // in most cases.
                         if (!sdram_waitrequest) begin
+                            // Be sure to zero out all asserted signals
+                            // because they may be wire-OR'ed with other
+                            // cores' signals to the memory controller.
+                            sdram_address <= 0;
+                            sdram_writedata <= 0;
                             sdram_write <= 1'h0;
+                            mem_request <= 0;
                             state <= STATE_RETIRE;
                         end
                     end
