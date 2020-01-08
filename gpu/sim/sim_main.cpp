@@ -206,14 +206,14 @@ void allowGPUProgress(VMain *top)
     top->eval();
 
     if(dumpH2FAndF2H) {
-        std::cout << "CLOCK = 1, state " << int(top->Main->gpu_if->state) << "\n";
+        // std::cout << "CLOCK = 1, state " << int(top->Main->gpu_if->state) << "\n";
     }
 
     top->clock = 0;
     top->eval();
 
     if(dumpH2FAndF2H) {
-        std::cout << "CLOCK = 0, state " << int(top->Main->gpu_if->state) << "\n";
+        // std::cout << "CLOCK = 0, state " << int(top->Main->gpu_if->state) << "\n";
     }
 
 #else
@@ -437,8 +437,9 @@ void writeBytesToRam(const std::vector<uint8_t>& bytes, RamType ramType, bool du
             bytes[byteaddr + 2] << 16 |
             bytes[byteaddr + 3] << 24;
 
-        if(dumpState)
-            std::cout << "Writing to " << ((ramType == INST_RAM) ? "inst" : "data") << " address " << byteaddr << " value 0x" << to_hex((top->Main->gpu_if->write_register_high16 << 16) | top->Main->gpu_if->write_register_low16) << "\n";
+        if(dumpState) {
+            // std::cout << "Writing to " << ((ramType == INST_RAM) ? "inst" : "data") << " address " << byteaddr << " value 0x" << to_hex((top->Main->gpu_if->write_register_high16 << 16) | top->Main->gpu_if->write_register_low16) << "\n";
+        }
 
         writeWordToRam(word, byteaddr, ramType, top);
 

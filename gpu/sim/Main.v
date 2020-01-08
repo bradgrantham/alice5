@@ -40,59 +40,8 @@ module Main(
     wire exception;
     wire [23:0] exception_data;
 
-    wire enable_write_inst_ram;
-    wire enable_write_data_ram;
-    wire enable_read_inst_ram;
-    wire enable_read_data_ram;
-    wire enable_read_register;
-    wire enable_read_floatreg;
-    wire enable_read_special;
-
-    wire [ADDRESS_WIDTH-1:0] rw_address;
-    wire [WORD_WIDTH-1:0] write_data;
-
-    wire [WORD_WIDTH - 1:0] inst_ram_read_data;
-    wire [WORD_WIDTH - 1:0] data_ram_read_data;
-    wire [WORD_WIDTH - 1:0] register_read_data;
-    wire [WORD_WIDTH - 1:0] floatreg_read_data;
-    wire [WORD_WIDTH - 1:0] special_read_data;
-
-    wire [WORD_WIDTH-1:0] read_data =
-        enable_read_inst_ram ? inst_ram_read_data :
-        enable_read_data_ram ? data_ram_read_data :
-        enable_read_register ? register_read_data :
-        enable_read_floatreg ? floatreg_read_data :
-        /* enable_read_special ? */ special_read_data;
-
     assign sdram_address = (sdram_gpu_address + 30'h3E000000) >> 2;
     wire [SDRAM_ADDRESS_WIDTH-1:0] sdram_gpu_address;
-
-    GPU32BitInterface #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
-        gpu_if(
-            .clock(clock),
-
-            .h2f_value(h2f_value),
-            .f2h_value(f2h_value),
-
-            .reset_n(reset_n),
-            .run(run),
-
-            .halted(gpu_halted),
-            .exception(exception),
-            .exception_data(exception_data),
-
-            .enable_write_inst_ram(enable_write_inst_ram),
-            .enable_write_data_ram(enable_write_data_ram),
-            .enable_read_inst_ram(enable_read_inst_ram),
-            .enable_read_data_ram(enable_read_data_ram),
-            .enable_read_register(enable_read_register),
-            .enable_read_floatreg(enable_read_floatreg),
-            .enable_read_special(enable_read_special),
-
-            .rw_address(rw_address),
-            .write_data(write_data),
-            .read_data(read_data)
-        );
 
     GPU #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
         gpu(
@@ -104,24 +53,8 @@ module Main(
             .exception(exception),
             .exception_data(exception_data),
 
-            .ext_enable_write_inst_ram(enable_write_inst_ram),
-            .ext_inst_ram_address(rw_address),
-            .ext_inst_ram_input(write_data),
-            .ext_inst_ram_output(inst_ram_read_data),
-
-            .ext_enable_write_data_ram(enable_write_data_ram),
-            .ext_data_ram_address(rw_address),
-            .ext_data_ram_input(write_data),
-            .ext_data_ram_output(data_ram_read_data),
-
-            .ext_register_address(rw_address),
-            .ext_register_output(register_read_data),
-
-            .ext_floatreg_address(rw_address),
-            .ext_floatreg_output(floatreg_read_data),
-
-            .ext_specialreg_address(rw_address),
-            .ext_specialreg_output(special_read_data),
+            .h2f_value(h2f_value),
+            .f2h_value(f2h_value),
 
             .sdram_address(sdram_gpu_address),
             .sdram_waitrequest(sdram_waitrequest),

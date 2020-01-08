@@ -1,32 +1,17 @@
 module GPU
     #(parameter WORD_WIDTH=32, ADDRESS_WIDTH=16, SDRAM_ADDRESS_WIDTH=24)
 (
-    input wire reset_n,
+    output wire reset_n,
     input wire clock,
-    input wire run,
+    output wire run,
 
     output wire halted,
     output wire exception,
     output wire [23:0] exception_data,
 
-    input wire ext_enable_write_inst_ram,
-    input wire[ADDRESS_WIDTH-1:0] ext_inst_ram_address,
-    input wire[WORD_WIDTH-1:0] ext_inst_ram_input,
-    output wire[WORD_WIDTH-1:0] ext_inst_ram_output,
-
-    input wire ext_enable_write_data_ram,
-    input wire[ADDRESS_WIDTH-1:0] ext_data_ram_address,
-    input wire[WORD_WIDTH-1:0] ext_data_ram_input,
-    output wire[WORD_WIDTH-1:0] ext_data_ram_output,
-
-    input wire[ADDRESS_WIDTH-1:0] ext_register_address,
-    output wire[WORD_WIDTH-1:0] ext_register_output,
-
-    input wire[ADDRESS_WIDTH-1:0] ext_floatreg_address,
-    output wire[WORD_WIDTH-1:0] ext_floatreg_output,
-
-    input wire[ADDRESS_WIDTH-1:0] ext_specialreg_address,
-    output wire[WORD_WIDTH-1:0] ext_specialreg_output,
+    // 32-bit interface.
+    input wire [31:0] h2f_value,
+    output wire [31:0] f2h_value,
 
     // SDRAM interface
     output wire [SDRAM_ADDRESS_WIDTH-1:0] sdram_address /* verilator public */,
@@ -80,6 +65,52 @@ module GPU
     wire [WORD_WIDTH-1:0] shadercore_data_ram_write_data;
     wire shadercore_enable_write_data_ram;
 
+    wire enable_write_inst_ram;
+    wire enable_write_data_ram;
+    wire enable_read_inst_ram;
+    wire enable_read_data_ram;
+    wire enable_read_register;
+    wire enable_read_floatreg;
+    wire enable_read_special;
+
+    wire [ADDRESS_WIDTH-1:0] rw_address;
+    wire [WORD_WIDTH-1:0] write_data;
+
+    wire [WORD_WIDTH-1:0] read_data =
+        enable_read_inst_ram ? inst_ram_out_data :
+        enable_read_data_ram ? data_ram_out_data :
+        // XXX TODO register interface
+        enable_read_register ? 32'hdeadbee1 :
+        enable_read_floatreg ? 32'hdeadbee2 :
+        /* enable_read_special ? */ 32'hdeadbee3;
+
+    GPU32BitInterface #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+        gpu_if(
+            .clock(clock),
+
+            .h2f_value(h2f_value),
+            .f2h_value(f2h_value),
+
+            .reset_n(reset_n),
+            .run(run),
+
+            .halted(halted),
+            .exception(exception),
+            .exception_data(exception_data),
+
+            .enable_write_inst_ram(enable_write_inst_ram),
+            .enable_write_data_ram(enable_write_data_ram),
+            .enable_read_inst_ram(enable_read_inst_ram),
+            .enable_read_data_ram(enable_read_data_ram),
+            .enable_read_register(enable_read_register),
+            .enable_read_floatreg(enable_read_floatreg),
+            .enable_read_special(enable_read_special),
+
+            .rw_address(rw_address),
+            .write_data(write_data),
+            .read_data(read_data)
+        );
+
     ShaderCore #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH), .SDRAM_ADDRESS_WIDTH(SDRAM_ADDRESS_WIDTH))
         shaderCore(
             .clock(clock),
@@ -105,22 +136,14 @@ module GPU
             // XXX TODO register interface
             );
 
-    // XXX TODO register interface
-    assign ext_register_output = 32'hdeadbee1;
-    assign ext_floatreg_output = 32'hdeadbee2;
-    assign ext_specialreg_output = 32'hdeadbee3;
+    assign inst_ram_write = !run ? enable_write_inst_ram : 1'b0;
+    assign inst_ram_write_data = !run ? write_data : 32'b0;
+    assign inst_ram_address = !run ? rw_address : shadercore_inst_ram_address;
 
-    assign inst_ram_write = !run ? ext_enable_write_inst_ram : 1'b0;
-    assign inst_ram_write_data = !run ? ext_inst_ram_input : 32'b0;
-    assign inst_ram_address = !run ? ext_inst_ram_address : shadercore_inst_ram_address;
+    assign data_ram_write = !run ? enable_write_data_ram : shadercore_enable_write_data_ram;
+    assign data_ram_write_data = !run ? write_data : shadercore_data_ram_write_data;
+    assign data_ram_address = !run ? rw_address : shadercore_data_ram_address;
 
-    assign data_ram_write = !run ? ext_enable_write_data_ram : shadercore_enable_write_data_ram;
-    assign data_ram_write_data = !run ? ext_data_ram_input : shadercore_data_ram_write_data;
-    assign data_ram_address = !run ? ext_data_ram_address : shadercore_data_ram_address;
-
-    assign ext_inst_ram_output = inst_ram_out_data;
-    assign ext_data_ram_output = data_ram_out_data;
-	 
     assign exception_data = 0;
 
 endmodule
