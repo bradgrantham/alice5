@@ -3,8 +3,8 @@ module Main(
     input wire clock,
     input wire reset_n,
 
-    input [31:0] sim_h2f_value [0:CORE_COUNT-1],
-    output [31:0] sim_f2h_value [0:CORE_COUNT-1],
+    input [31:0] h2f_value [0:CORE_COUNT-1],
+    output [31:0] f2h_value [0:CORE_COUNT-1],
 
     output wire [29:0] sdram_address,
     input wire sdram_waitrequest,
@@ -18,7 +18,7 @@ module Main(
     localparam WORD_WIDTH = 32;
     localparam ADDRESS_WIDTH = 16;
     localparam SDRAM_ADDRESS_WIDTH = 24;
-    localparam CORE_COUNT = 1;
+    localparam CORE_COUNT /* verilator public */ = 4;
 
     // wire cpu_reset_n;
     // wire run;
@@ -44,8 +44,8 @@ module Main(
                     // .exception(exception[core]),
                     // .exception_data(exception_data[core]),
 
-                    .h2f_value(sim_h2f_value[core]),
-                    .f2h_value(sim_f2h_value[core]),
+                    .h2f_value(h2f_value[core]),
+                    .f2h_value(f2h_value[core]),
 
                     .sdram_address(core_sdram_gpu_address[core]),
                     .sdram_waitrequest(sdram_waitrequest),
