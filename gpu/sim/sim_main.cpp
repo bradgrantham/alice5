@@ -800,20 +800,18 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     top->eval();
     top->reset_n = 1;
 
-    for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
-        resetCore(top, clocks, coreNumber);
-        loadMemory(debugOptions, params, top, coreNumber);
-    }
-
-    int coreNumber = 0;
-
     const float fw = params->imageWidth;
     const float fh = params->imageHeight;
     const float one = 1.0;
 
-    if (params->data_symbols.find(".anonymous") != params->data_symbols.end()) {
-        set(top, params->data_symbols.find(".anonymous")->second, v3float{fw, fh, one}, coreNumber);
-        set(top, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime, coreNumber);
+    for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
+        resetCore(top, clocks, coreNumber);
+        loadMemory(debugOptions, params, top, coreNumber);
+
+        if (params->data_symbols.find(".anonymous") != params->data_symbols.end()) {
+            set(top, params->data_symbols.find(".anonymous")->second, v3float{fw, fh, one}, coreNumber);
+            set(top, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime, coreNumber);
+        }
     }
 
     // Set up our work pool.
@@ -829,12 +827,15 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         coreIsWorking[coreNumber] = false;
     }
 
+    // Should eventually remove this and all the code that depends on it.
+    const int debugCoreNumber = 0;
+
     uint32_t oldXRegs[32];
     uint32_t oldFRegs[32];
     uint32_t oldPC;
-    for(int i = 0; i < 32; i++) oldXRegs[i] = getGpuByCore(top, coreNumber)->shaderCore->registers->bank1->memory[i];
-    for(int i = 0; i < 32; i++) oldFRegs[i] = getGpuByCore(top, coreNumber)->shaderCore->float_registers->bank1->memory[i];
-    oldPC = getGpuByCore(top, coreNumber)->shaderCore->PC;
+    for(int i = 0; i < 32; i++) oldXRegs[i] = getGpuByCore(top, debugCoreNumber)->shaderCore->registers->bank1->memory[i];
+    for(int i = 0; i < 32; i++) oldFRegs[i] = getGpuByCore(top, debugCoreNumber)->shaderCore->float_registers->bank1->memory[i];
+    oldPC = getGpuByCore(top, debugCoreNumber)->shaderCore->PC;
 
     while (!Verilated::gotFinish()) {
         // Dispatch work to idle cores.
@@ -888,14 +889,14 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             // left side of nonblocking assignments
             std::string pad = "                     ";
             std::cout << pad << "between clock 1 and clock 0\n";
-            std::cout << pad << "CPU in state " << stateToString(getGpuByCore(top, coreNumber)->shaderCore->state) << " (" << int(getGpuByCore(top, coreNumber)->shaderCore->state) << ")\n";
-            std::cout << pad << "pc = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->PC) << "\n";
-            std::cout << pad << "inst_ram_address = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->inst_ram_address) << "\n";
-            std::cout << pad << "inst_to_decode = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->inst_to_decode) << "\n";
-            std::cout << pad << "data_ram_write_data = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->data_ram_write_data) << "\n";
-            std::cout << pad << "data_ram_address = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->data_ram_address) << "\n";
-            std::cout << pad << "data_ram_read_result = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->data_ram_read_result) << "\n";
-            std::cout << pad << "data_ram_write = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->data_ram_write) << "\n";
+            std::cout << pad << "CPU in state " << stateToString(getGpuByCore(top, debugCoreNumber)->shaderCore->state) << " (" << int(getGpuByCore(top, debugCoreNumber)->shaderCore->state) << ")\n";
+            std::cout << pad << "pc = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->PC) << "\n";
+            std::cout << pad << "inst_ram_address = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->inst_ram_address) << "\n";
+            std::cout << pad << "inst_to_decode = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->inst_to_decode) << "\n";
+            std::cout << pad << "data_ram_write_data = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->data_ram_write_data) << "\n";
+            std::cout << pad << "data_ram_address = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->data_ram_address) << "\n";
+            std::cout << pad << "data_ram_read_result = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->data_ram_read_result) << "\n";
+            std::cout << pad << "data_ram_write = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->data_ram_write) << "\n";
         }
 
         top->clock = 0;
@@ -903,43 +904,43 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
         if(debugOptions->dumpState) {
 
-            dumpRegisters(top, 0);
+            dumpRegisters(top, debugCoreNumber);
         }
 
         if(debugOptions->dumpState) {
             // right side of nonblocking assignments
             std::cout << "between clock 0 and clock 1\n";
-            std::cout << "CPU in state " << stateToString(getGpuByCore(top, coreNumber)->shaderCore->state) << " (" << int(getGpuByCore(top, coreNumber)->shaderCore->state) << ")\n";
+            std::cout << "CPU in state " << stateToString(getGpuByCore(top, debugCoreNumber)->shaderCore->state) << " (" << int(getGpuByCore(top, debugCoreNumber)->shaderCore->state) << ")\n";
             if(false) {
-                std::cout << "inst_ram_address = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->inst_ram_address) << "\n";
-                std::cout << "inst_to_decode = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->inst_to_decode) << "\n";
+                std::cout << "inst_ram_address = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->inst_ram_address) << "\n";
+                std::cout << "inst_to_decode = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->inst_to_decode) << "\n";
             }
         }
 
-        if(getGpuByCore(top, coreNumber)->shaderCore->state == VMain_ShaderCore::STATE_RETIRE) {
+        if(getGpuByCore(top, debugCoreNumber)->shaderCore->state == VMain_ShaderCore::STATE_RETIRE) {
             insts++;
         }
 
-        if((getGpuByCore(top, coreNumber)->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
-            (getGpuByCore(top, coreNumber)->shaderCore->state == VMain_ShaderCore::STATE_FP_WAIT)
+        if((getGpuByCore(top, debugCoreNumber)->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
+            (getGpuByCore(top, debugCoreNumber)->shaderCore->state == VMain_ShaderCore::STATE_FP_WAIT)
             ) {
             if(debugOptions->dumpState) {
                 std::cout << "after DECODE - ";
-                printDecodedInst(getGpuByCore(top, coreNumber)->shaderCore->PC, getGpuByCore(top, coreNumber)->shaderCore->inst_to_decode, getGpuByCore(top, coreNumber)->shaderCore);
+                printDecodedInst(getGpuByCore(top, debugCoreNumber)->shaderCore->PC, getGpuByCore(top, debugCoreNumber)->shaderCore->inst_to_decode, getGpuByCore(top, debugCoreNumber)->shaderCore);
             }
             if(debugOptions->printDisassembly) {
-                print_inst(getGpuByCore(top, coreNumber)->shaderCore->PC, getGpuByCore(top, coreNumber)->instRam->memory[getGpuByCore(top, coreNumber)->shaderCore->PC / 4], params->textAddressesToSymbols);
+                print_inst(getGpuByCore(top, debugCoreNumber)->shaderCore->PC, getGpuByCore(top, debugCoreNumber)->instRam->memory[getGpuByCore(top, debugCoreNumber)->shaderCore->PC / 4], params->textAddressesToSymbols);
             }
         }
 
-        // if(getGpuByCore(top, coreNumber)->shaderCore->state == VMain_ShaderCore::STATE_FETCH) {
+        // if(getGpuByCore(top, debugCoreNumber)->shaderCore->state == VMain_ShaderCore::STATE_FETCH) {
             if(debugOptions->printCoreDiff) {
 
-                dumpRegsDiff(oldPC, oldXRegs, oldFRegs, top, 0);
+                dumpRegsDiff(oldPC, oldXRegs, oldFRegs, top, debugCoreNumber);
 
-                for(int i = 0; i < 32; i++) oldXRegs[i] = getGpuByCore(top, coreNumber)->shaderCore->registers->bank1->memory[i];
-                for(int i = 0; i < 32; i++) oldFRegs[i] = getGpuByCore(top, coreNumber)->shaderCore->float_registers->bank1->memory[i];
-                oldPC = getGpuByCore(top, coreNumber)->shaderCore->PC;
+                for(int i = 0; i < 32; i++) oldXRegs[i] = getGpuByCore(top, debugCoreNumber)->shaderCore->registers->bank1->memory[i];
+                for(int i = 0; i < 32; i++) oldFRegs[i] = getGpuByCore(top, debugCoreNumber)->shaderCore->float_registers->bank1->memory[i];
+                oldPC = getGpuByCore(top, debugCoreNumber)->shaderCore->PC;
             }
         // }
 
@@ -971,7 +972,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     if(debugOptions->dumpState) {
         std::cout << "halted.\n";
 
-        dumpRegisters(top, 0);
+        dumpRegisters(top, debugCoreNumber);
 
         // Dump contents of beginning of memory
         for (int i = 0; i < 16; i++) {
@@ -982,7 +983,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                 std::cout << "0x" << to_hex(i) << " :";
             }
 
-            std::cout << " " << to_hex(getGpuByCore(top, coreNumber)->dataRam->memory[i]) << "   ";
+            std::cout << " " << to_hex(getGpuByCore(top, debugCoreNumber)->dataRam->memory[i]) << "   ";
             if (end) {
                 std::cout << "\n";
             }
@@ -1186,7 +1187,7 @@ int main(int argc, char **argv)
     params.afterLastX = params.imageWidth;
     params.startY = 0;
     params.afterLastY = params.imageHeight;
-    params.afterLastY = 4; // XXX
+    // params.afterLastY = 4;
 
     if(specificPixelX != -1) {
         params.startX = specificPixelX;
