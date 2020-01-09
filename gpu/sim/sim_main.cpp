@@ -805,62 +805,64 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     top->eval();
     top->reset_n = 1;
 
+    for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
+        // Set up inst Ram
+        // Run one clock cycle in reset to process STATE_INIT
+        setH2F(top, h2f_gpu_reset, coreNumber);
+
+        top->clock = 1;
+        top->eval();
+        top->clock = 0;
+        top->eval();
+        clocks++;
+
+        // Release reset
+        setH2F(top, h2f_gpu_idle, coreNumber);
+        waitOnExitReset(top, coreNumber);
+
+        // run == 0, nothing should be happening here.
+        top->clock = 1;
+        top->eval();
+        top->clock = 0;
+        top->eval();
+        clocks++;
+
+        // TODO - should we count clocks issued here?
+        writeBytesToRam(params->inst_bytes, INST_RAM, debugOptions->dumpState, top, coreNumber);
+
+        // TODO - should we count clocks issued here?
+        writeBytesToRam(params->data_bytes, DATA_RAM, debugOptions->dumpState, top, coreNumber);
+
+        // check words written to inst memory
+        for(uint32_t byteaddr = 0; byteaddr < params->inst_bytes.size(); byteaddr += 4) {
+            uint32_t inst_word = 
+                params->inst_bytes[byteaddr + 0] <<  0 |
+                params->inst_bytes[byteaddr + 1] <<  8 |
+                params->inst_bytes[byteaddr + 2] << 16 |
+                params->inst_bytes[byteaddr + 3] << 24;
+            if(top->Main->GPU_FIELD->instRam->memory[byteaddr >> 2] != inst_word) {
+                std::cout << "error: inst memory[" << byteaddr << "] = "
+                    << to_hex(top->Main->GPU_FIELD->instRam->memory[byteaddr >> 2]) << ", should be "
+                    << to_hex(inst_word) << "\n";
+            }
+        }
+
+        // check words written to data memory
+        for(uint32_t byteaddr = 0; byteaddr < params->data_bytes.size(); byteaddr += 4) {
+            uint32_t data_word = 
+                params->data_bytes[byteaddr + 0] <<  0 |
+                params->data_bytes[byteaddr + 1] <<  8 |
+                params->data_bytes[byteaddr + 2] << 16 |
+                params->data_bytes[byteaddr + 3] << 24;
+            if(top->Main->GPU_FIELD->dataRam->memory[byteaddr >> 2] != data_word) {
+                std::cout << "error: data memory[" << byteaddr << "] = "
+                    << to_hex(top->Main->GPU_FIELD->dataRam->memory[byteaddr >> 2]) << ", should be "
+                    << to_hex(data_word) << "\n";
+            }
+        }
+    }
+
     int coreNumber = 0;
-
-    // Set up inst Ram
-    // Run one clock cycle in reset to process STATE_INIT
-    setH2F(top, h2f_gpu_reset, coreNumber);
-
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-    clocks++;
-
-    // Release reset
-    setH2F(top, h2f_gpu_idle, coreNumber);
-    waitOnExitReset(top, coreNumber);
-
-    // run == 0, nothing should be happening here.
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-    clocks++;
-
-    // TODO - should we count clocks issued here?
-    writeBytesToRam(params->inst_bytes, INST_RAM, debugOptions->dumpState, top, coreNumber);
-
-    // TODO - should we count clocks issued here?
-    writeBytesToRam(params->data_bytes, DATA_RAM, debugOptions->dumpState, top, coreNumber);
-
-    // check words written to inst memory
-    for(uint32_t byteaddr = 0; byteaddr < params->inst_bytes.size(); byteaddr += 4) {
-        uint32_t inst_word = 
-            params->inst_bytes[byteaddr + 0] <<  0 |
-            params->inst_bytes[byteaddr + 1] <<  8 |
-            params->inst_bytes[byteaddr + 2] << 16 |
-            params->inst_bytes[byteaddr + 3] << 24;
-        if(top->Main->GPU_FIELD->instRam->memory[byteaddr >> 2] != inst_word) {
-            std::cout << "error: inst memory[" << byteaddr << "] = "
-                << to_hex(top->Main->GPU_FIELD->instRam->memory[byteaddr >> 2]) << ", should be "
-                << to_hex(inst_word) << "\n";
-        }
-    }
-
-    // check words written to data memory
-    for(uint32_t byteaddr = 0; byteaddr < params->data_bytes.size(); byteaddr += 4) {
-        uint32_t data_word = 
-            params->data_bytes[byteaddr + 0] <<  0 |
-            params->data_bytes[byteaddr + 1] <<  8 |
-            params->data_bytes[byteaddr + 2] << 16 |
-            params->data_bytes[byteaddr + 3] << 24;
-        if(top->Main->GPU_FIELD->dataRam->memory[byteaddr >> 2] != data_word) {
-            std::cout << "error: data memory[" << byteaddr << "] = "
-                << to_hex(top->Main->GPU_FIELD->dataRam->memory[byteaddr >> 2]) << ", should be "
-                << to_hex(data_word) << "\n";
-        }
-    }
 
     const float fw = params->imageWidth;
     const float fh = params->imageHeight;
@@ -871,7 +873,19 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         set(top, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime, coreNumber);
     }
 
-    for(int j = start_row; j < params->afterLastY; j += skip_rows) {
+    // Set up our work pool.
+    std::vector<int> rowsToDo;
+    for (int j = start_row; j < params->afterLastY; j += skip_rows) {
+        rowsToDo.push_back(j);
+    }
+
+    // Dispatch rows to cores.
+    while (!rowsToDo.empty()) {
+        // Pop off a queue to do.
+        int j = rowsToDo.back();
+        rowsToDo.pop_back();
+
+        // Set up parameters.
         if(params->gl_FragCoordAddress != 0xFFFFFFFF)
             set(top, params->gl_FragCoordAddress, v4float{params->startX + 0.5f, j + 0.5f, 0, 0}, coreNumber);
         if(params->colorAddress != 0xFFFFFFFF)
@@ -894,19 +908,6 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
         /* return to STATE_INIT so we can drive ext memory access */
         setH2F(top, h2f_gpu_idle, coreNumber);
-
-        // Convert image to bytes.
-        sdramAddr = (sdramAddr >> 2) + SDRAM_BASE;
-        uint8_t *rgbByte = shared->img + pixelOffset*3;
-        for (int i = 0; i < width; i++) {
-            for (int c = 0; c < 3; c++) {
-                uint32_t v = shared->sdram[sdramAddr];
-                float f = intToFloat(v);
-                rgbByte[c] = clamp(int(f * 255.99), 0, 255);
-                sdramAddr += 1;
-            }
-            rgbByte += 3;
-        }
 
         shared->pixelsLeft -= width;
     }
@@ -1141,6 +1142,24 @@ int main(int argc, char **argv)
 
     if(shared.coreHadAnException) {
         exit(EXIT_FAILURE);
+    }
+
+    params.startX = 0;
+    params.afterLastX = params.imageWidth;
+    params.startY = 0;
+    params.afterLastY = params.imageHeight;
+
+    // Convert image to bytes.
+    uint32_t sdramAddr = SDRAM_BASE;
+    uint8_t *rgbByte = shared.img;
+    for (int y = 0; y < params.imageHeight; y++) {
+        for (int x = 0; x < params.imageWidth; x++) {
+            for (int c = 0; c < 3; c++) {
+                uint32_t v = shared.sdram[sdramAddr++];
+                float f = intToFloat(v);
+                *rgbByte++ = clamp(int(f * 255.99), 0, 255);
+            }
+        }
     }
 
     std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";
