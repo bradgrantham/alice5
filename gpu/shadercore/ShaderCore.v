@@ -666,6 +666,7 @@ module ShaderCore
 
     // CPU State Machine ------------------------------------------
 
+    // Detect ebreak opcode.
     wire halt = decode_opcode_is_system && (decode_imm_alu_load[11:0] == 12'd1);
 
     always @(posedge clock) begin

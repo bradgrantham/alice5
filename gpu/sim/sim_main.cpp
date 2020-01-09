@@ -10,6 +10,7 @@
 #include <sstream>
 #include <thread>
 #include <vector>
+#include <chrono>
 
 #define SIMULATE 1
 constexpr bool dumpH2FAndF2H = false; // true;
@@ -639,8 +640,7 @@ void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_
     std::cout << std::setfill(' ');
 }
 
-
-void shadeOneRow(const SimDebugOptions* debugOptions, const CoreParameters *params, CoreShared *shared, VMain *top, uint32_t *clocks, uint32_t *insts, int coreNumber)
+void startProgram(VMain *top, uint32_t &clocks, int coreNumber)
 {
     // Run one clock cycle in not-run reset to process STATE_INIT
     setH2F(top, h2f_gpu_reset, coreNumber);
@@ -649,7 +649,7 @@ void shadeOneRow(const SimDebugOptions* debugOptions, const CoreParameters *para
     top->eval();
     top->clock = 0;
     top->eval();
-    (*clocks)++;
+    clocks++;
 
     // Release reset
     setH2F(top, h2f_gpu_idle, coreNumber);
@@ -660,11 +660,167 @@ void shadeOneRow(const SimDebugOptions* debugOptions, const CoreParameters *para
     top->eval();
     top->clock = 0;
     top->eval();
-    (*clocks)++;
+    clocks++;
+
     // Run
     setH2F(top, h2f_gpu_run, coreNumber);
+}
 
-    std::string pad = "                     ";
+// From https://en.cppreference.com/w/cpp/algorithm/clamp
+template<class T>
+constexpr const T& clamp( const T& v, const T& lo, const T& hi )
+{
+    assert( !(hi < lo) );
+    return (v < lo) ? lo : (hi < v) ? hi : v;
+}
+
+/**
+ * Whether the particular core has halted.
+ */
+bool isCoreHalted(VMain *top, int coreNumber) {
+    return (getF2H(top, coreNumber) & f2h_run_halted_bit) != 0;
+}
+
+/**
+ * Configure the core to prepare to do this row. Does not start the program.
+ */
+void configureCoreForRow(const SimDebugOptions *debugOptions, const CoreParameters *params,
+        VMain *top, int row, int coreNumber)
+{
+    // Set up parameters.
+    if(params->gl_FragCoordAddress != 0xFFFFFFFF)
+        set(top, params->gl_FragCoordAddress, v4float{params->startX + 0.5f, row + 0.5f, 0, 0}, coreNumber);
+    if(params->colorAddress != 0xFFFFFFFF)
+        set(top, params->colorAddress, v4float{1, 1, 1, 1}, coreNumber);
+    if(false) // XXX TODO: when iTime is exported by compilation
+        set(top, params->iTimeAddress, params->frameTime, coreNumber);
+    uint32_t width = params->afterLastX - params->startX;
+    set(top, params->rowWidthAddress, width, coreNumber);
+    // Offset in pixels into the image.
+    uint32_t pixelOffset = (params->imageHeight - 1 - row)*params->imageWidth + params->startX;
+    // Offset in bytes into the shared memory space.
+    uint32_t sdramAddr = pixelOffset*3*sizeof(float);
+    set(top, params->colBufAddrAddress, sdramAddr | 0x80000000, coreNumber);
+
+    if(debugOptions->printDisassembly) {
+        std::cout << "; pixel " << params->startX << ", " << row << '\n';
+    }
+}
+
+/**
+ * Put the core briefly into reset, and take it back out. Leaves core
+ * in non-running mode.
+ */
+void resetCore(VMain *top, uint32_t &clocks, int coreNumber) {
+    // Run one clock cycle in reset to process STATE_INIT
+    setH2F(top, h2f_gpu_reset, coreNumber);
+
+    top->clock = 1;
+    top->eval();
+    top->clock = 0;
+    top->eval();
+    clocks++;
+
+    // Release reset
+    setH2F(top, h2f_gpu_idle, coreNumber);
+    waitOnExitReset(top, coreNumber);
+
+    // run == 0, nothing should be happening here.
+    top->clock = 1;
+    top->eval();
+    top->clock = 0;
+    top->eval();
+    clocks++;
+}
+
+/**
+ * Load instruction and data memory for the core.
+ */
+void loadMemory(const SimDebugOptions* debugOptions, const CoreParameters* params, VMain *top,
+        int coreNumber) {
+
+    // TODO - should we count clocks issued here?
+    writeBytesToRam(params->inst_bytes, INST_RAM, debugOptions->dumpState, top, coreNumber);
+
+    // TODO - should we count clocks issued here?
+    writeBytesToRam(params->data_bytes, DATA_RAM, debugOptions->dumpState, top, coreNumber);
+
+    // check words written to inst memory
+    for(uint32_t byteaddr = 0; byteaddr < params->inst_bytes.size(); byteaddr += 4) {
+        uint32_t inst_word = 
+            params->inst_bytes[byteaddr + 0] <<  0 |
+            params->inst_bytes[byteaddr + 1] <<  8 |
+            params->inst_bytes[byteaddr + 2] << 16 |
+            params->inst_bytes[byteaddr + 3] << 24;
+        if(top->Main->GPU_FIELD->instRam->memory[byteaddr >> 2] != inst_word) {
+            std::cout << "error: inst memory[" << byteaddr << "] = "
+                << to_hex(top->Main->GPU_FIELD->instRam->memory[byteaddr >> 2]) << ", should be "
+                << to_hex(inst_word) << "\n";
+        }
+    }
+
+    // check words written to data memory
+    for(uint32_t byteaddr = 0; byteaddr < params->data_bytes.size(); byteaddr += 4) {
+        uint32_t data_word = 
+            params->data_bytes[byteaddr + 0] <<  0 |
+            params->data_bytes[byteaddr + 1] <<  8 |
+            params->data_bytes[byteaddr + 2] << 16 |
+            params->data_bytes[byteaddr + 3] << 24;
+        if(top->Main->GPU_FIELD->dataRam->memory[byteaddr >> 2] != data_word) {
+            std::cout << "error: data memory[" << byteaddr << "] = "
+                << to_hex(top->Main->GPU_FIELD->dataRam->memory[byteaddr >> 2]) << ", should be "
+                << to_hex(data_word) << "\n";
+        }
+    }
+}
+
+void render(const SimDebugOptions* debugOptions, const CoreParameters* params, CoreShared* shared, int start_row, int skip_rows)
+{
+    VMain *top = new VMain;
+
+    uint32_t clocks = 0;
+    uint32_t insts = 0;
+
+    // Global reset.
+    top->reset_n = 0;
+    top->clock = 1;
+    top->eval();
+    top->clock = 0;
+    top->eval();
+    top->clock = 1;
+    top->eval();
+    top->clock = 0;
+    top->eval();
+    top->reset_n = 1;
+
+    for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
+        resetCore(top, clocks, coreNumber);
+        loadMemory(debugOptions, params, top, coreNumber);
+    }
+
+    int coreNumber = 0;
+
+    const float fw = params->imageWidth;
+    const float fh = params->imageHeight;
+    const float one = 1.0;
+
+    if (params->data_symbols.find(".anonymous") != params->data_symbols.end()) {
+        set(top, params->data_symbols.find(".anonymous")->second, v3float{fw, fh, one}, coreNumber);
+        set(top, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime, coreNumber);
+    }
+
+    // Set up our work pool.
+    std::vector<int> rowsToDo;
+    for (int j = start_row; j < params->afterLastY; j += skip_rows) {
+        rowsToDo.push_back(j);
+    }
+
+    // Keep track of which core is busy.
+    bool coreIsWorking[CORE_COUNT];
+    steady_clock::time_point coreStartTime[CORE_COUNT];
+    for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
+        coreIsWorking[coreNumber] = false;
+    }
 
     uint32_t oldXRegs[32];
     uint32_t oldFRegs[32];
@@ -673,7 +829,36 @@ void shadeOneRow(const SimDebugOptions* debugOptions, const CoreParameters *para
     for(int i = 0; i < 32; i++) oldFRegs[i] = top->Main->GPU_FIELD->shaderCore->float_registers->bank1->memory[i];
     oldPC = top->Main->GPU_FIELD->shaderCore->PC;
 
-    while (!Verilated::gotFinish() && !(getF2H(top, coreNumber) & f2h_run_halted_bit)) {
+    while (!Verilated::gotFinish()) {
+        // Dispatch work to idle cores.
+        int idleCoreCount = 0;
+        for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
+            if (!coreIsWorking[coreNumber]) {
+                // We have an idle core. Dispatch a row if we have one.
+                if (rowsToDo.empty()) {
+                    // No rows left.
+                    idleCoreCount++;
+                } else {
+                    printf("Core %d is idle\n", coreNumber);
+
+                    // Still rows left to do. Pop one off (any).
+                    int row = rowsToDo.back();
+                    rowsToDo.pop_back();
+                    printf("Row %d is next\n", row);
+
+                    resetCore(top, clocks, coreNumber);
+                    configureCoreForRow(debugOptions, params, top, row, coreNumber);
+                    startProgram(top, clocks, coreNumber);
+                    coreIsWorking[coreNumber] = true;
+                    coreStartTime[coreNumber] = steady_clock::now();
+                }
+            }
+        }
+        if (idleCoreCount == CORE_COUNT) {
+            // Done with all rendering.
+            printf("All cores are done, no more work to do.\n");
+            break;
+        }
 
         top->clock = 1;
         top->eval();
@@ -694,6 +879,7 @@ void shadeOneRow(const SimDebugOptions* debugOptions, const CoreParameters *para
 
         if(false) {
             // left side of nonblocking assignments
+            std::string pad = "                     ";
             std::cout << pad << "between clock 1 and clock 0\n";
             std::cout << pad << "CPU in state " << stateToString(top->Main->GPU_FIELD->shaderCore->state) << " (" << int(top->Main->GPU_FIELD->shaderCore->state) << ")\n";
             std::cout << pad << "pc = 0x" << to_hex(top->Main->GPU_FIELD->shaderCore->PC) << "\n";
@@ -724,7 +910,7 @@ void shadeOneRow(const SimDebugOptions* debugOptions, const CoreParameters *para
         }
 
         if(top->Main->GPU_FIELD->shaderCore->state == VMain_ShaderCore::STATE_RETIRE) {
-            (*insts)++;
+            insts++;
         }
 
         if((top->Main->GPU_FIELD->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
@@ -753,7 +939,26 @@ void shadeOneRow(const SimDebugOptions* debugOptions, const CoreParameters *para
         if(debugOptions->dumpState) {
             std::cout << "---\n";
         }
-        (*clocks)++;
+        clocks++;
+
+        // See if any cores are now idle.
+        for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
+            if (coreIsWorking[coreNumber] && isCoreHalted(top, coreNumber)) {
+                steady_clock::time_point now = steady_clock::now();
+                steady_clock::duration timeSpan = now - coreStartTime[coreNumber];
+                double seconds = double(timeSpan.count())*steady_clock::period::num/
+                    steady_clock::period::den;
+                printf("Core %d is no longer working (%.1f seconds)\n", coreNumber, seconds);
+
+                uint32_t width = params->afterLastX - params->startX;
+                shared->pixelsLeft -= width;
+
+                /* return to STATE_INIT so we can drive ext memory access */
+                setH2F(top, h2f_gpu_idle, coreNumber);
+
+                coreIsWorking[coreNumber] = false;
+            }
+        }
     }
 
     if(debugOptions->dumpState) {
@@ -775,141 +980,6 @@ void shadeOneRow(const SimDebugOptions* debugOptions, const CoreParameters *para
                 std::cout << "\n";
             }
         }
-    }
-}
-
-// From https://en.cppreference.com/w/cpp/algorithm/clamp
-template<class T>
-constexpr const T& clamp( const T& v, const T& lo, const T& hi )
-{
-    assert( !(hi < lo) );
-    return (v < lo) ? lo : (hi < v) ? hi : v;
-}
-
-void render(const SimDebugOptions* debugOptions, const CoreParameters* params, CoreShared* shared, int start_row, int skip_rows)
-{
-    VMain *top = new VMain;
-
-    uint32_t clocks = 0;
-    uint32_t insts = 0;
-
-    // Global reset.
-    top->reset_n = 0;
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-    top->reset_n = 1;
-
-    for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
-        // Set up inst Ram
-        // Run one clock cycle in reset to process STATE_INIT
-        setH2F(top, h2f_gpu_reset, coreNumber);
-
-        top->clock = 1;
-        top->eval();
-        top->clock = 0;
-        top->eval();
-        clocks++;
-
-        // Release reset
-        setH2F(top, h2f_gpu_idle, coreNumber);
-        waitOnExitReset(top, coreNumber);
-
-        // run == 0, nothing should be happening here.
-        top->clock = 1;
-        top->eval();
-        top->clock = 0;
-        top->eval();
-        clocks++;
-
-        // TODO - should we count clocks issued here?
-        writeBytesToRam(params->inst_bytes, INST_RAM, debugOptions->dumpState, top, coreNumber);
-
-        // TODO - should we count clocks issued here?
-        writeBytesToRam(params->data_bytes, DATA_RAM, debugOptions->dumpState, top, coreNumber);
-
-        // check words written to inst memory
-        for(uint32_t byteaddr = 0; byteaddr < params->inst_bytes.size(); byteaddr += 4) {
-            uint32_t inst_word = 
-                params->inst_bytes[byteaddr + 0] <<  0 |
-                params->inst_bytes[byteaddr + 1] <<  8 |
-                params->inst_bytes[byteaddr + 2] << 16 |
-                params->inst_bytes[byteaddr + 3] << 24;
-            if(top->Main->GPU_FIELD->instRam->memory[byteaddr >> 2] != inst_word) {
-                std::cout << "error: inst memory[" << byteaddr << "] = "
-                    << to_hex(top->Main->GPU_FIELD->instRam->memory[byteaddr >> 2]) << ", should be "
-                    << to_hex(inst_word) << "\n";
-            }
-        }
-
-        // check words written to data memory
-        for(uint32_t byteaddr = 0; byteaddr < params->data_bytes.size(); byteaddr += 4) {
-            uint32_t data_word = 
-                params->data_bytes[byteaddr + 0] <<  0 |
-                params->data_bytes[byteaddr + 1] <<  8 |
-                params->data_bytes[byteaddr + 2] << 16 |
-                params->data_bytes[byteaddr + 3] << 24;
-            if(top->Main->GPU_FIELD->dataRam->memory[byteaddr >> 2] != data_word) {
-                std::cout << "error: data memory[" << byteaddr << "] = "
-                    << to_hex(top->Main->GPU_FIELD->dataRam->memory[byteaddr >> 2]) << ", should be "
-                    << to_hex(data_word) << "\n";
-            }
-        }
-    }
-
-    int coreNumber = 0;
-
-    const float fw = params->imageWidth;
-    const float fh = params->imageHeight;
-    const float one = 1.0;
-
-    if (params->data_symbols.find(".anonymous") != params->data_symbols.end()) {
-        set(top, params->data_symbols.find(".anonymous")->second, v3float{fw, fh, one}, coreNumber);
-        set(top, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime, coreNumber);
-    }
-
-    // Set up our work pool.
-    std::vector<int> rowsToDo;
-    for (int j = start_row; j < params->afterLastY; j += skip_rows) {
-        rowsToDo.push_back(j);
-    }
-
-    // Dispatch rows to cores.
-    while (!rowsToDo.empty()) {
-        // Pop off a queue to do.
-        int j = rowsToDo.back();
-        rowsToDo.pop_back();
-
-        // Set up parameters.
-        if(params->gl_FragCoordAddress != 0xFFFFFFFF)
-            set(top, params->gl_FragCoordAddress, v4float{params->startX + 0.5f, j + 0.5f, 0, 0}, coreNumber);
-        if(params->colorAddress != 0xFFFFFFFF)
-            set(top, params->colorAddress, v4float{1, 1, 1, 1}, coreNumber);
-        if(false) // XXX TODO: when iTime is exported by compilation
-            set(top, params->iTimeAddress, params->frameTime, coreNumber);
-        uint32_t width = params->afterLastX - params->startX;
-        set(top, params->rowWidthAddress, width, coreNumber);
-        // Offset in pixels into the image.
-        uint32_t pixelOffset = (params->imageHeight - 1 - j)*params->imageWidth + params->startX;
-        // Offset in bytes into the shared memory space.
-        uint32_t sdramAddr = pixelOffset*3*sizeof(float);
-        set(top, params->colBufAddrAddress, sdramAddr | 0x80000000, coreNumber);
-
-        if(debugOptions->printDisassembly) {
-            std::cout << "; pixel " << params->startX << ", " << j << '\n';
-        }
-
-        shadeOneRow(debugOptions, params, shared, top, &clocks, &insts, coreNumber);
-
-        /* return to STATE_INIT so we can drive ext memory access */
-        setH2F(top, h2f_gpu_idle, coreNumber);
-
-        shared->pixelsLeft -= width;
     }
     {
         shared->rendererMutex.lock();
@@ -1109,6 +1179,7 @@ int main(int argc, char **argv)
     params.afterLastX = params.imageWidth;
     params.startY = 0;
     params.afterLastY = params.imageHeight;
+    params.afterLastY = 4; // XXX
 
     if(specificPixelX != -1) {
         params.startX = specificPixelX;
@@ -1130,8 +1201,10 @@ int main(int argc, char **argv)
 
     // Progress information.
     Timer frameElapsed;
-    thread.push_back(new std::thread(showProgress, &params, &shared,
-                frameElapsed.startTime(), totalPixels));
+    if (false) {
+        thread.push_back(new std::thread(showProgress, &params, &shared,
+                    frameElapsed.startTime(), totalPixels));
+    }
 
     // Wait for worker threads to quit.
     while(!thread.empty()) {
@@ -1143,11 +1216,6 @@ int main(int argc, char **argv)
     if(shared.coreHadAnException) {
         exit(EXIT_FAILURE);
     }
-
-    params.startX = 0;
-    params.afterLastX = params.imageWidth;
-    params.startY = 0;
-    params.afterLastY = params.imageHeight;
 
     // Convert image to bytes.
     uint32_t sdramAddr = SDRAM_BASE;
@@ -1170,7 +1238,7 @@ int main(int argc, char **argv)
     float wvgaFps = fps * params.imageWidth / 800 * params.imageHeight / 480;
     std::cout << "at least " << (int)ceilf(5.0 / wvgaFps) << " cores required at 50 MHz for 5 fps at 800x480.\n";
 
-    FILE *fp = fopen("emulated.ppm", "wb");
+    FILE *fp = fopen("simulated.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", params.imageWidth, params.imageHeight);
     fwrite(shared.img, 1, params.imageWidth * params.imageHeight * 3, fp);
     fclose(fp);
