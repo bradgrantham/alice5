@@ -816,8 +816,8 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
     // Set up our work pool.
     std::vector<int> rowsToDo;
-    for (int j = start_row; j < params->afterLastY; j += skip_rows) {
-        rowsToDo.push_back(j);
+    for (int row = start_row; row < params->afterLastY; row += skip_rows) {
+        rowsToDo.push_back(row);
     }
 
     // Keep track of which core is busy.
