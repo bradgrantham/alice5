@@ -40,7 +40,7 @@ if [ "$animate" == "1" ]; then
 else
     if [ "$sim" == "1" ]; then
         (cd gpu/sim && make)
-        ./gpu/sim/obj_dir/VMain -f 90 --term -j 1 out.o
+        ./gpu/sim/obj_dir/VMain -f 90 --term out.o
     else
         ./emu -f 90 --term out.o
     fi

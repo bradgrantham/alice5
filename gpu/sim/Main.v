@@ -1,16 +1,17 @@
 
 module Main(
     input wire clock,
+    input wire reset_n,
 
-    input [31:0] sim_h2f_value,
-    output [31:0] sim_f2h_value,
+    input [31:0] sim_h2f_value [0:CORE_COUNT-1],
+    output [31:0] sim_f2h_value [0:CORE_COUNT-1],
 
     output wire [29:0] sdram_address,
     input wire sdram_waitrequest,
     input wire [WORD_WIDTH-1:0] sdram_readdata,
     input wire sdram_readdatavalid,
     output wire sdram_read,
-    output wire [WORD_WIDTH-1:0] sdram_writedata,
+    output reg [WORD_WIDTH-1:0] sdram_writedata,
     output wire sdram_write
 );
 
@@ -19,54 +20,65 @@ module Main(
     localparam SDRAM_ADDRESS_WIDTH = 24;
     localparam CORE_COUNT = 1;
 
-    // HPS-to-FPGA communication
+    // wire cpu_reset_n;
+    // wire run;
+    // wire halted;
+    // wire exception;
+    // wire [23:0] exception_data;
 
-    wire [31:0] h2f_value;
-    wire [31:0] f2h_value;
-
-`ifdef VERILATOR
-    assign sim_f2h_value = f2h_value;
-    assign h2f_value = sim_h2f_value;
-`else
-    cyclonev_hps_interface_mpu_general_purpose h2f_gp(
-         .gp_in(f2h_value),    // Value to the HPS (continuous).
-         .gp_out(h2f_value)    // Value from the HPS (latched).
-    );
-`endif
-
-    wire reset_n;
-    wire run;
-    wire gpu_halted;
-    wire exception;
-    wire [23:0] exception_data;
-
+    // Add offset and adjust for byte vs. word addressing.
     assign sdram_address = (sdram_gpu_address + 30'h3E000000) >> 2;
-    wire [SDRAM_ADDRESS_WIDTH-1:0] sdram_gpu_address;
+    reg [SDRAM_ADDRESS_WIDTH-1:0] sdram_gpu_address;
 
-    GPU #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
-        gpu(
-            .clock(clock),
-            .reset_n(reset_n),
-            .run(run),
+    generate
+        genvar core;
 
-            .halted(gpu_halted),
-            .exception(exception),
-            .exception_data(exception_data),
+        for (core = 0; core < CORE_COUNT; core++) begin
+            GPU #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+                gpu(
+                    .clock(clock),
 
-            .h2f_value(h2f_value),
-            .f2h_value(f2h_value),
+                    // .reset_n(cpu_reset_n[core]),
+                    // .run(run[core]),
+                    // .halted(halted[core]),
+                    // .exception(exception[core]),
+                    // .exception_data(exception_data[core]),
 
-            .sdram_address(sdram_gpu_address),
-            .sdram_waitrequest(sdram_waitrequest),
-            .sdram_readdata(sdram_readdata),
-            .sdram_readdatavalid(sdram_readdatavalid),
-            .sdram_read(sdram_read),
-            .sdram_writedata(sdram_writedata),
-            .sdram_write(sdram_write),
+                    .h2f_value(sim_h2f_value[core]),
+                    .f2h_value(sim_f2h_value[core]),
 
-            .mem_request(mem_request[0]),
-            .mem_authorized(mem_authorized[0])
-            );
+                    .sdram_address(core_sdram_gpu_address[core]),
+                    .sdram_waitrequest(sdram_waitrequest),
+                    .sdram_readdata(sdram_readdata),
+                    .sdram_readdatavalid(sdram_readdatavalid),
+                    .sdram_read(core_sdram_read[core]),
+                    .sdram_writedata(core_sdram_writedata[core]),
+                    .sdram_write(core_sdram_write[core]),
+
+                    .mem_request(mem_request[core]),
+                    .mem_authorized(mem_authorized[core])
+                    );
+        end
+    endgenerate
+
+    // Wire-or the SDRAM outputs of the core.
+    wire [SDRAM_ADDRESS_WIDTH-1:0] core_sdram_gpu_address [0:CORE_COUNT-1];
+    wire [CORE_COUNT-1:0] core_sdram_read;
+    wire [CORE_COUNT-1:0] core_sdram_write;
+    wire [WORD_WIDTH-1:0] core_sdram_writedata [0:CORE_COUNT-1];
+
+    assign sdram_read = |core_sdram_read;
+    assign sdram_write = |core_sdram_write;
+
+    always @(*) begin
+        sdram_writedata = {CORE_COUNT{1'b0}};
+        sdram_gpu_address = {SDRAM_ADDRESS_WIDTH{1'b0}};
+
+        for (core = 0; core < CORE_COUNT; core++) begin
+            sdram_writedata = sdram_writedata | core_sdram_writedata[core];
+            sdram_gpu_address = sdram_gpu_address | core_sdram_gpu_address[core];
+        end
+    end
 
     // Memory arbiter.
     wire [CORE_COUNT-1:0] mem_request;
