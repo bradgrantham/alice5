@@ -877,8 +877,6 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                     // No rows left.
                     idleCoreCount++;
                 } else {
-                    printf("Core %d is idle, doing row %d.\n", coreNumber, row);
-
                     resetCore(top, clocks, coreNumber);
                     configureCoreForRow(debugOptions, params, top, row, coreNumber);
                     startProgram(top, clocks, coreNumber);
@@ -889,7 +887,6 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         }
         if (idleCoreCount == CORE_COUNT) {
             // Done with all rendering.
-            printf("All cores are done, no more work to do.\n");
             break;
         }
 
@@ -977,12 +974,6 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         // See if any cores are now idle.
         for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
             if (coreIsWorking[coreNumber] && isCoreHalted(top, coreNumber)) {
-                steady_clock::time_point now = steady_clock::now();
-                steady_clock::duration timeSpan = now - coreStartTime[coreNumber];
-                double seconds = double(timeSpan.count())*steady_clock::period::num/
-                    steady_clock::period::den;
-                printf("Core %d is no longer working (%.1f seconds)\n", coreNumber, seconds);
-
                 uint32_t width = params->afterLastX - params->startX;
                 shared->pixelsLeft -= width;
 
