@@ -36,6 +36,40 @@ constexpr int CORE_COUNT = VMain_Main::CORE_COUNT;
 static const uint32_t SDRAM_BASE = 0x3E000000 >> 2;
 static const uint32_t SDRAM_SIZE = (16*1024*1024) >> 2;
 
+// Work pool of integer work items.
+class WorkPool {
+    std::vector<int> mItems;
+    std::mutex mMutex;
+
+public:
+    // Add an item to the work pool.
+    void add(int item) {
+        mItems.push_back(item);
+    }
+
+    // Add all in a range.
+    void addRange(int begin, int end) {
+        for (int item = begin; item < end; item++) {
+            add(item);
+        }
+    }
+
+    // Get any item, or -1 if the work pool is empty.
+    int get() {
+        std::scoped_lock lock(mMutex);
+        int item;
+
+        if (mItems.empty()) {
+            item = -1;
+        } else {
+            item = mItems.back();
+            mItems.pop_back();
+        }
+
+        return item;
+    }
+};
+
 const char *stateToString(int state)
 {
     switch(state) {
@@ -781,7 +815,7 @@ void loadMemory(const SimDebugOptions* debugOptions, const CoreParameters* param
     }
 }
 
-void render(const SimDebugOptions* debugOptions, const CoreParameters* params, CoreShared* shared, int start_row, int skip_rows)
+void render(const SimDebugOptions* debugOptions, const CoreParameters* params, CoreShared* shared, WorkPool *workPool)
 {
     VMain *top = new VMain;
 
@@ -814,12 +848,6 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         }
     }
 
-    // Set up our work pool.
-    std::vector<int> rowsToDo;
-    for (int row = start_row; row < params->afterLastY; row += skip_rows) {
-        rowsToDo.push_back(row);
-    }
-
     // Keep track of which core is busy.
     bool coreIsWorking[CORE_COUNT];
     steady_clock::time_point coreStartTime[CORE_COUNT];
@@ -842,17 +870,14 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         int idleCoreCount = 0;
         for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
             if (!coreIsWorking[coreNumber]) {
+                int row = workPool->get();
+
                 // We have an idle core. Dispatch a row if we have one.
-                if (rowsToDo.empty()) {
+                if (row == -1) {
                     // No rows left.
                     idleCoreCount++;
                 } else {
-                    printf("Core %d is idle\n", coreNumber);
-
-                    // Still rows left to do. Pop one off (any).
-                    int row = rowsToDo.back();
-                    rowsToDo.pop_back();
-                    printf("Row %d is next\n", row);
+                    printf("Core %d is idle, doing row %d.\n", coreNumber, row);
 
                     resetCore(top, clocks, coreNumber);
                     configureCoreForRow(debugOptions, params, top, row, coreNumber);
@@ -1203,8 +1228,13 @@ int main(int argc, char **argv)
     int totalPixels = (params.afterLastY - params.startY)*(params.afterLastX - params.startX);
     shared.pixelsLeft = totalPixels;
 
+    // Set up our work pool.
+    WorkPool workPool;
+    workPool.addRange(params.startY, params.afterLastY);
+
+    // Start the threads.
     for (int t = 0; t < threadCount; t++) {
-        thread.push_back(new std::thread(render, &debugOptions, &params, &shared, params.startY + t, threadCount));
+        thread.push_back(new std::thread(render, &debugOptions, &params, &shared, &workPool));
     }
 
     // Progress information.
