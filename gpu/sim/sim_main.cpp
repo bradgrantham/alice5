@@ -216,64 +216,72 @@ constexpr std::chrono::duration<float, std::micro> h2f_timeout_micros = 1000000u
 constexpr std::chrono::duration<float, std::micro> h2f_timeout_micros = 10us;
 #endif
 
-void setH2F(VMain* top, uint32_t state, int coreNumber)
-{
-    if(dumpH2FAndF2H) {
-        std::cout << "set h2f_value[" << coreNumber << "] to " << to_hex(state) << "\n";
+class Hal {
+public:
+    virtual void setH2F(uint32_t value, int coreNumber) = 0;
+    virtual uint32_t getF2H(int coreNumber) = 0;
+    virtual uint32_t readRam(uint32_t wordAddress) = 0;
+    virtual void allowGpuProgress() = 0;
+};
+
+// HAL specifically for sim.
+class SimHal : public Hal {
+    VMain *mTop;
+    Memory *mSdram;
+    uint32_t mClocks;
+
+public:
+    SimHal(VMain *top, Memory *sdram) : mTop(top), mSdram(sdram), mClocks(0) {
+        // Nothing.
     }
-    top->h2f_value[coreNumber] = state;
-}
 
-uint32_t getF2H(VMain* top, int coreNumber)
-{
-    uint32_t f2h_value = top->f2h_value[coreNumber];
-    if(dumpH2FAndF2H) {
-        std::cout << "get f2h_value[" << coreNumber << "] yields " << to_hex(f2h_value) << "\n";
+    virtual void setH2F(uint32_t value, int coreNumber) {
+        if(dumpH2FAndF2H) {
+            std::cout << "set h2f_value[" << coreNumber << "] to " << to_hex(value) << "\n";
+        }
+        mTop->h2f_value[coreNumber] = value;
     }
-    return f2h_value;
-}
 
-void allowGPUProgress(VMain *top)
-{
+    virtual uint32_t getF2H(int coreNumber) {
+        uint32_t f2h_value = mTop->f2h_value[coreNumber];
+        if(dumpH2FAndF2H) {
+            std::cout << "get f2h_value[" << coreNumber << "] yields " << to_hex(f2h_value) << "\n";
+        }
+        return f2h_value;
+    }
 
+    virtual uint32_t readRam(uint32_t wordAddress) {
+        return (*mSdram)[wordAddress];
+    }
+
+    virtual void allowGpuProgress() {
 #if SIMULATE
-
-    // cycle simulation clock
-    top->clock = 1;
-    top->eval();
-
-    if(dumpH2FAndF2H) {
-        // std::cout << "CLOCK = 1, state " << int(top->Main->gpu_if->state) << "\n";
-    }
-
-    top->clock = 0;
-    top->eval();
-
-    if(dumpH2FAndF2H) {
-        // std::cout << "CLOCK = 0, state " << int(top->Main->gpu_if->state) << "\n";
-    }
-
+        // cycle simulation clock
+        mTop->clock = 1;
+        mTop->eval();
+        mTop->clock = 0;
+        mTop->eval();
+        mClocks++;
 #else
-
-    // nanosleep
-    std::this_thread::sleep_for(1us);
-
+        // TODO move this to other HAL.
+        // nanosleep
+        std::this_thread::sleep_for(1us);
 #endif
+    }
+};
 
-}
-
-bool waitOnExitReset(VMain* top, int coreNumber)
+bool waitOnExitReset(Hal *hal, int coreNumber)
 {
     if(dumpH2FAndF2H) {
         std::cout << "waitOnExitReset()...\n";
     }
 
-    allowGPUProgress(top);
+    hal->allowGpuProgress();
 
     auto start = std::chrono::high_resolution_clock::now();
-    while((getF2H(top, coreNumber) & f2h_exited_reset_bit) != f2h_exited_reset_bit) {
+    while((hal->getF2H(coreNumber) & f2h_exited_reset_bit) != f2h_exited_reset_bit) {
 
-        allowGPUProgress(top);
+        hal->allowGpuProgress();
 
         // Check clock for timeout
         auto now = std::chrono::high_resolution_clock::now();
@@ -286,19 +294,19 @@ bool waitOnExitReset(VMain* top, int coreNumber)
     return true;
 }
 
-bool waitOnPhaseOrTimeout(int phase, VMain* top, int coreNumber)
+bool waitOnPhaseOrTimeout(int phase, Hal *hal, int coreNumber)
 {
     if(dumpH2FAndF2H) {
         std::cout << "waitOnPhaseOrTimeout(" << to_hex(phase) << ")...\n";
     }
     uint32_t phaseExpected = phase ? f2h_busy_bit : 0;
 
-    allowGPUProgress(top);
+    hal->allowGpuProgress();
 
     auto start = std::chrono::high_resolution_clock::now();
-    while((getF2H(top, coreNumber) & f2h_busy_bit) != phaseExpected) {
+    while((hal->getF2H(coreNumber) & f2h_busy_bit) != phaseExpected) {
 
-        allowGPUProgress(top);
+        hal->allowGpuProgress();
 
         // Check clock for timeout
         auto now = std::chrono::high_resolution_clock::now();
@@ -311,24 +319,24 @@ bool waitOnPhaseOrTimeout(int phase, VMain* top, int coreNumber)
     return true;
 }
 
-bool processCommand(uint32_t command, VMain* top, int coreNumber)
+bool processCommand(uint32_t command, Hal *hal, int coreNumber)
 {
     // double-check we are in idle
-    if(!waitOnPhaseOrTimeout(f2h_phase_ready, top, coreNumber)) {
+    if(!waitOnPhaseOrTimeout(f2h_phase_ready, hal, coreNumber)) {
         std::cerr << "processCommand : timeout waiting on FPGA to become idle before sending command\n";
         return false;
     }
     
     // send the command and then wait for core to report it is processing the command
-    setH2F(top, command, coreNumber);
-    if(!waitOnPhaseOrTimeout(f2h_phase_busy, top, coreNumber)) {
+    hal->setH2F(command, coreNumber);
+    if(!waitOnPhaseOrTimeout(f2h_phase_busy, hal, coreNumber)) {
         std::cerr << "processCommand : timeout waiting on FPGA to indicate busy processing command\n";
         return false;
     }
 
     // return to idle state and wait for the core to tell us it's also idle.
-    setH2F(top, h2f_gpu_idle, coreNumber);
-    if(!waitOnPhaseOrTimeout(f2h_phase_ready, top, coreNumber)) {
+    hal->setH2F(h2f_gpu_idle, coreNumber);
+    if(!waitOnPhaseOrTimeout(f2h_phase_ready, hal, coreNumber)) {
         std::cerr << "processCommand : timeout waiting on FPGA to indicate command is completed\n";
         return false;
     }
@@ -355,81 +363,81 @@ void CHECK(bool success, const char *filename, int line)
     }
 }
 
-void writeWordToRam(uint32_t value, uint32_t address, RamType ramType, VMain *top, int coreNumber)
+void writeWordToRam(uint32_t value, uint32_t address, RamType ramType, Hal *hal, int coreNumber)
 {
     // put low 16 bits into write register 
-    CHECK(processCommand(h2f_cmd_put_low_16 | (value & 0xFFFF), top, coreNumber), __FILE__, __LINE__);
+    CHECK(processCommand(h2f_cmd_put_low_16 | (value & 0xFFFF), hal, coreNumber), __FILE__, __LINE__);
 
     // put high 16 bits into write register 
-    CHECK(processCommand(h2f_cmd_put_high_16 | ((value >> 16) & 0xFFFF), top, coreNumber), __FILE__, __LINE__);
+    CHECK(processCommand(h2f_cmd_put_high_16 | ((value >> 16) & 0xFFFF), hal, coreNumber), __FILE__, __LINE__);
 
     // send the command to store the word from the write register into memory
     if(ramType == INST_RAM) {
-        CHECK(processCommand(h2f_cmd_write_inst_ram | (address & 0xFFFF), top, coreNumber), __FILE__, __LINE__);
+        CHECK(processCommand(h2f_cmd_write_inst_ram | (address & 0xFFFF), hal, coreNumber), __FILE__, __LINE__);
     } else {
-        CHECK(processCommand(h2f_cmd_write_data_ram | (address & 0xFFFF), top, coreNumber), __FILE__, __LINE__);
+        CHECK(processCommand(h2f_cmd_write_data_ram | (address & 0xFFFF), hal, coreNumber), __FILE__, __LINE__);
     }
 }
 
-uint32_t readWordFromRam(uint32_t address, RamType ramType, VMain *top, int coreNumber)
+uint32_t readWordFromRam(uint32_t address, RamType ramType, Hal *hal, int coreNumber)
 {
     uint32_t value;
 
     // send the command to latch the word from memory into the read register
     if(ramType == INST_RAM) {
-        CHECK(processCommand(h2f_cmd_read_inst_ram | (address & 0xFFFF), top, coreNumber), __FILE__, __LINE__);
+        CHECK(processCommand(h2f_cmd_read_inst_ram | (address & 0xFFFF), hal, coreNumber), __FILE__, __LINE__);
     } else {
-        CHECK(processCommand(h2f_cmd_read_data_ram | (address & 0xFFFF), top, coreNumber), __FILE__, __LINE__);
+        CHECK(processCommand(h2f_cmd_read_data_ram | (address & 0xFFFF), hal, coreNumber), __FILE__, __LINE__);
     }
 
     // put low 16 bits of read register on low 16 bits of F2H
-    CHECK(processCommand(h2f_cmd_get_low_16, top, coreNumber), __FILE__, __LINE__);
+    CHECK(processCommand(h2f_cmd_get_low_16, hal, coreNumber), __FILE__, __LINE__);
 
     // get low 16 bits into value
-    value = getF2H(top, coreNumber) & 0xFFFF;
+    value = hal->getF2H(coreNumber) & 0xFFFF;
 
     // put high 16 bits of read register on low 16 bits of F2H
-    CHECK(processCommand(h2f_cmd_get_high_16, top, coreNumber), __FILE__, __LINE__);
+    CHECK(processCommand(h2f_cmd_get_high_16, hal, coreNumber), __FILE__, __LINE__);
 
     // get high 16 bits into value
-    value = value | ((getF2H(top, coreNumber) & 0xFFFF) << 16);
+    value = value | ((hal->getF2H(coreNumber) & 0xFFFF) << 16);
 
     return value;
 }
 
 enum RegisterKind {X_REG, F_REG, PC_REG};
 
-uint32_t readReg(RegisterKind kind, int reg, VMain* top, int coreNumber)
+uint32_t readReg(RegisterKind kind, int reg, Hal *hal, int coreNumber)
 {
     uint32_t value;
 
     // send the command to latch the register into the read register
     if(kind == X_REG) {
-        CHECK(processCommand(h2f_cmd_read_x_reg | (reg & 0x1F), top, coreNumber), __FILE__, __LINE__);
+        CHECK(processCommand(h2f_cmd_read_x_reg | (reg & 0x1F), hal, coreNumber), __FILE__, __LINE__);
     } else if(kind == PC_REG) {
-        CHECK(processCommand(h2f_cmd_read_special | h2f_special_PC, top, coreNumber), __FILE__, __LINE__);
+        CHECK(processCommand(h2f_cmd_read_special | h2f_special_PC, hal, coreNumber), __FILE__, __LINE__);
     } else {
-        CHECK(processCommand(h2f_cmd_read_f_reg | (reg & 0x1F), top, coreNumber), __FILE__, __LINE__);
+        CHECK(processCommand(h2f_cmd_read_f_reg | (reg & 0x1F), hal, coreNumber), __FILE__, __LINE__);
     }
 
     // put low 16 bits of read register on low 16 bits of F2H
-    CHECK(processCommand(h2f_cmd_get_low_16, top, coreNumber), __FILE__, __LINE__);
+    CHECK(processCommand(h2f_cmd_get_low_16, hal, coreNumber), __FILE__, __LINE__);
 
     // get low 16 bits into value
-    value = getF2H(top, coreNumber) & f2h_cmd_response_mask;
+    value = hal->getF2H(coreNumber) & f2h_cmd_response_mask;
 
     // put high 16 bits of read register on low 16 bits of F2H
-    CHECK(processCommand(h2f_cmd_get_high_16, top, coreNumber), __FILE__, __LINE__);
+    CHECK(processCommand(h2f_cmd_get_high_16, hal, coreNumber), __FILE__, __LINE__);
 
     // get high 16 bits into value
-    value = value | ((getF2H(top, coreNumber) & f2h_cmd_response_mask) << 16);
+    value = value | ((hal->getF2H(coreNumber) & f2h_cmd_response_mask) << 16);
 
     return value;
 }
 
-uint32_t readPC(VMain* top, int coreNumber)
+uint32_t readPC(Hal *hal, int coreNumber)
 {
-    return readReg(PC_REG, 0, top, coreNumber);
+    return readReg(PC_REG, 0, hal, coreNumber);
 }
 
 VMain_GPU *getGpuByCore(VMain *top, int coreNumber) {
@@ -442,14 +450,14 @@ VMain_GPU *getGpuByCore(VMain *top, int coreNumber) {
     }
 }
 
-void dumpRegisters(VMain* top, int coreNumber)
+void dumpRegisters(VMain_GPU *gpuCore)
 {
     // Dump register contents.
     for (int i = 0; i < 32; i++) {
         // Draw in columns.
         int r = i%4*8 + i/4;
         std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
-            << to_hex(getGpuByCore(top, coreNumber)->shaderCore->registers->bank1->memory[r]) << "   ";
+            << to_hex(gpuCore->shaderCore->registers->bank1->memory[r]) << "   ";
         if (i % 4 == 3) {
             std::cout << "\n";
         }
@@ -459,21 +467,21 @@ void dumpRegisters(VMain* top, int coreNumber)
         int r = i%4*8 + i/4;
         if(false) {
             std::cout << (r < 10 ? " " : "") << "x" << r << " = 0x"
-                << to_hex(getGpuByCore(top, coreNumber)->shaderCore->float_registers->bank1->memory[r]) << "   ";
+                << to_hex(gpuCore->shaderCore->float_registers->bank1->memory[r]) << "   ";
         } else {
             std::cout << (r < 10 ? " " : "") << "f" << r << " = ";
             std::cout << std::setprecision(5) << std::setw(10) <<
-                intToFloat(getGpuByCore(top, coreNumber)->shaderCore->float_registers->bank1->memory[r]);
+                intToFloat(gpuCore->shaderCore->float_registers->bank1->memory[r]);
             std::cout << std::setw(0) << "   ";
         }
         if (i % 4 == 3) {
             std::cout << "\n";
         }
     }
-    std::cout << " pc = 0x" << to_hex(getGpuByCore(top, coreNumber)->shaderCore->PC) << "\n";
+    std::cout << " pc = 0x" << to_hex(gpuCore->shaderCore->PC) << "\n";
 }
 
-void writeBytesToRam(const std::vector<uint8_t>& bytes, RamType ramType, bool dumpState, VMain *top, int coreNumber)
+void writeBytesToRam(const std::vector<uint8_t>& bytes, RamType ramType, bool dumpState, Hal *hal, int coreNumber)
 {
     // Write inst bytes to inst memory
     for(uint32_t byteaddr = 0; byteaddr < bytes.size(); byteaddr += 4) {
@@ -483,37 +491,33 @@ void writeBytesToRam(const std::vector<uint8_t>& bytes, RamType ramType, bool du
             bytes[byteaddr + 2] << 16 |
             bytes[byteaddr + 3] << 24;
 
-        if(dumpState) {
-            // std::cout << "Writing to " << ((ramType == INST_RAM) ? "inst" : "data") << " address " << byteaddr << " value 0x" << to_hex((top->Main->gpu_if->write_register_high16 << 16) | top->Main->gpu_if->write_register_low16) << "\n";
-        }
-
-        writeWordToRam(word, byteaddr, ramType, top, coreNumber);
+        writeWordToRam(word, byteaddr, ramType, hal, coreNumber);
 
     }
 }
 
 template <class TYPE>
-void set(VMain *top, uint32_t address, const TYPE& value, int coreNumber)
+void set(Hal *hal, uint32_t address, const TYPE& value, int coreNumber)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
-    writeWordToRam(toBits(value), address, DATA_RAM, top, coreNumber);
+    writeWordToRam(toBits(value), address, DATA_RAM, hal, coreNumber);
 }
 
 template <class TYPE, unsigned long N>
-void set(VMain *top, uint32_t address, const std::array<TYPE, N>& value, int coreNumber)
+void set(Hal *hal, uint32_t address, const std::array<TYPE, N>& value, int coreNumber)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
     for(unsigned long i = 0; i < N; i++)
-        writeWordToRam(toBits(value[i]), address + i * sizeof(uint32_t), DATA_RAM, top, coreNumber);
+        writeWordToRam(toBits(value[i]), address + i * sizeof(uint32_t), DATA_RAM, hal, coreNumber);
 }
 
 template <class TYPE, unsigned long N>
-void get(VMain *top, uint32_t address, std::array<TYPE, N>& value, int coreNumber)
+void get(Hal *hal, uint32_t address, std::array<TYPE, N>& value, int coreNumber)
 {
     // TODO: use a state machine through Main to read memory using clock
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
     for(unsigned long i = 0; i < N; i++)
-        value[i] = fromBits<TYPE>(readWordFromRam(address + i * sizeof(uint32_t), DATA_RAM, top, coreNumber)) ;
+        value[i] = fromBits<TYPE>(readWordFromRam(address + i * sizeof(uint32_t), DATA_RAM, hal, coreNumber)) ;
 }
 
 typedef std::array<float,1> v1float;
@@ -658,19 +662,19 @@ void showProgress(const CoreParameters* params, CoreShared* shared, std::chrono:
     std::cout << "                                                             \r";
 }
 
-void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_t prevF[32], VMain *top, int coreNumber)
+void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_t prevF[32], VMain_GPU *gpuCore)
 {
     std::cout << std::setfill('0');
-    if(prevPC != getGpuByCore(top, coreNumber)->shaderCore->PC) {
-        std::cout << "pc changed to " << std::hex << std::setw(8) << getGpuByCore(top, coreNumber)->shaderCore->PC << std::dec << '\n';
+    if(prevPC != gpuCore->shaderCore->PC) {
+        std::cout << "pc changed to " << std::hex << std::setw(8) << gpuCore->shaderCore->PC << std::dec << '\n';
     }
     for(int i = 0; i < 32; i++) {
-        if(prevX[i] != getGpuByCore(top, coreNumber)->shaderCore->registers->bank1->memory[i]) {
-            std::cout << "x" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << getGpuByCore(top, coreNumber)->shaderCore->registers->bank1->memory[i] << std::dec << '\n';
+        if(prevX[i] != gpuCore->shaderCore->registers->bank1->memory[i]) {
+            std::cout << "x" << std::setw(2) << i << " changed to " << std::hex << std::setw(8) << gpuCore->shaderCore->registers->bank1->memory[i] << std::dec << '\n';
         }
     }
     for(int i = 0; i < 32; i++) {
-        float cur = intToFloat(getGpuByCore(top, coreNumber)->shaderCore->float_registers->bank1->memory[i]);
+        float cur = intToFloat(gpuCore->shaderCore->float_registers->bank1->memory[i]);
         float prev = intToFloat(prevF[i]);
         bool bothnan = std::isnan(cur) && std::isnan(prev);
         if((prev != cur) && !bothnan) { // if both NaN, equality test still fails)
@@ -681,30 +685,21 @@ void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_
     std::cout << std::setfill(' ');
 }
 
-void startProgram(VMain *top, uint32_t &clocks, int coreNumber)
+void startProgram(Hal *hal, int coreNumber)
 {
     // Run one clock cycle in not-run reset to process STATE_INIT
-    setH2F(top, h2f_gpu_reset, coreNumber);
-
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-    clocks++;
+    hal->setH2F(h2f_gpu_reset, coreNumber);
+    hal->allowGpuProgress();
 
     // Release reset
-    setH2F(top, h2f_gpu_idle, coreNumber);
-    waitOnExitReset(top, coreNumber);
+    hal->setH2F(h2f_gpu_idle, coreNumber);
+    waitOnExitReset(hal, coreNumber);
 
     // run == 0, nothing should be happening here.
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-    clocks++;
+    hal->allowGpuProgress();
 
     // Run
-    setH2F(top, h2f_gpu_run, coreNumber);
+    hal->setH2F(h2f_gpu_run, coreNumber);
 }
 
 // From https://en.cppreference.com/w/cpp/algorithm/clamp
@@ -718,30 +713,30 @@ constexpr const T& clamp( const T& v, const T& lo, const T& hi )
 /**
  * Whether the particular core has halted.
  */
-bool isCoreHalted(VMain *top, int coreNumber) {
-    return (getF2H(top, coreNumber) & f2h_run_halted_bit) != 0;
+bool isCoreHalted(Hal *hal, int coreNumber) {
+    return (hal->getF2H(coreNumber) & f2h_run_halted_bit) != 0;
 }
 
 /**
  * Configure the core to prepare to do this row. Does not start the program.
  */
 void configureCoreForRow(const SimDebugOptions *debugOptions, const CoreParameters *params,
-        VMain *top, int row, int coreNumber)
+        Hal *hal, int row, int coreNumber)
 {
     // Set up parameters.
     if(params->gl_FragCoordAddress != 0xFFFFFFFF)
-        set(top, params->gl_FragCoordAddress, v4float{params->startX + 0.5f, row + 0.5f, 0, 0}, coreNumber);
+        set(hal, params->gl_FragCoordAddress, v4float{params->startX + 0.5f, row + 0.5f, 0, 0}, coreNumber);
     if(params->colorAddress != 0xFFFFFFFF)
-        set(top, params->colorAddress, v4float{1, 1, 1, 1}, coreNumber);
+        set(hal, params->colorAddress, v4float{1, 1, 1, 1}, coreNumber);
     if(false) // XXX TODO: when iTime is exported by compilation
-        set(top, params->iTimeAddress, params->frameTime, coreNumber);
+        set(hal, params->iTimeAddress, params->frameTime, coreNumber);
     uint32_t width = params->afterLastX - params->startX;
-    set(top, params->rowWidthAddress, width, coreNumber);
+    set(hal, params->rowWidthAddress, width, coreNumber);
     // Offset in pixels into the image.
     uint32_t pixelOffset = (params->imageHeight - 1 - row)*params->imageWidth + params->startX;
     // Offset in bytes into the shared memory space.
     uint32_t sdramAddr = pixelOffset*3*sizeof(float);
-    set(top, params->colBufAddrAddress, sdramAddr | 0x80000000, coreNumber);
+    set(hal, params->colBufAddrAddress, sdramAddr | 0x80000000, coreNumber);
 
     if(debugOptions->printDisassembly) {
         std::cout << "; pixel " << params->startX << ", " << row << '\n';
@@ -752,40 +747,32 @@ void configureCoreForRow(const SimDebugOptions *debugOptions, const CoreParamete
  * Put the core briefly into reset, and take it back out. Leaves core
  * in non-running mode.
  */
-void resetCore(VMain *top, uint32_t &clocks, int coreNumber) {
+void resetCore(Hal *hal, int coreNumber) {
     // Run one clock cycle in reset to process STATE_INIT
-    setH2F(top, h2f_gpu_reset, coreNumber);
-
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-    clocks++;
+    hal->setH2F(h2f_gpu_reset, coreNumber);
+    hal->allowGpuProgress();
 
     // Release reset
-    setH2F(top, h2f_gpu_idle, coreNumber);
-    waitOnExitReset(top, coreNumber);
+    hal->setH2F(h2f_gpu_idle, coreNumber);
+    waitOnExitReset(hal, coreNumber);
 
     // run == 0, nothing should be happening here.
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-    clocks++;
+    hal->allowGpuProgress();
 }
 
 /**
  * Load instruction and data memory for the core.
  */
-void loadMemory(const SimDebugOptions* debugOptions, const CoreParameters* params, VMain *top,
-        int coreNumber) {
+void loadMemory(const SimDebugOptions* debugOptions, const CoreParameters* params, Hal *hal,
+        VMain_GPU *gpuCore, int coreNumber) {
 
     // TODO - should we count clocks issued here?
-    writeBytesToRam(params->inst_bytes, INST_RAM, debugOptions->dumpState, top, coreNumber);
+    writeBytesToRam(params->inst_bytes, INST_RAM, debugOptions->dumpState, hal, coreNumber);
 
     // TODO - should we count clocks issued here?
-    writeBytesToRam(params->data_bytes, DATA_RAM, debugOptions->dumpState, top, coreNumber);
+    writeBytesToRam(params->data_bytes, DATA_RAM, debugOptions->dumpState, hal, coreNumber);
 
+#if SIMULATE
     // check words written to inst memory
     for(uint32_t byteaddr = 0; byteaddr < params->inst_bytes.size(); byteaddr += 4) {
         uint32_t inst_word = 
@@ -793,9 +780,9 @@ void loadMemory(const SimDebugOptions* debugOptions, const CoreParameters* param
             params->inst_bytes[byteaddr + 1] <<  8 |
             params->inst_bytes[byteaddr + 2] << 16 |
             params->inst_bytes[byteaddr + 3] << 24;
-        if(getGpuByCore(top, coreNumber)->instRam->memory[byteaddr >> 2] != inst_word) {
+        if(gpuCore->instRam->memory[byteaddr >> 2] != inst_word) {
             std::cout << "error: inst memory[" << byteaddr << "] = "
-                << to_hex(getGpuByCore(top, coreNumber)->instRam->memory[byteaddr >> 2])
+                << to_hex(gpuCore->instRam->memory[byteaddr >> 2])
                 << ", should be " << to_hex(inst_word) << "\n";
         }
     }
@@ -807,17 +794,20 @@ void loadMemory(const SimDebugOptions* debugOptions, const CoreParameters* param
             params->data_bytes[byteaddr + 1] <<  8 |
             params->data_bytes[byteaddr + 2] << 16 |
             params->data_bytes[byteaddr + 3] << 24;
-        if(getGpuByCore(top, coreNumber)->dataRam->memory[byteaddr >> 2] != data_word) {
+        if(gpuCore->dataRam->memory[byteaddr >> 2] != data_word) {
             std::cout << "error: data memory[" << byteaddr << "] = "
-                << to_hex(getGpuByCore(top, coreNumber)->dataRam->memory[byteaddr >> 2])
+                << to_hex(gpuCore->dataRam->memory[byteaddr >> 2])
                 << ", should be " << to_hex(data_word) << "\n";
         }
     }
+#endif
 }
 
+// Represents a single hardware machine (possibly with multiple FPGA cores).
 void render(const SimDebugOptions* debugOptions, const CoreParameters* params, CoreShared* shared, WorkPool *workPool)
 {
     VMain *top = new VMain;
+    SimHal hal(top, &shared->sdram);
 
     uint32_t clocks = 0;
     uint32_t insts = 0;
@@ -839,12 +829,12 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     const float one = 1.0;
 
     for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
-        resetCore(top, clocks, coreNumber);
-        loadMemory(debugOptions, params, top, coreNumber);
+        resetCore(&hal, coreNumber);
+        loadMemory(debugOptions, params, &hal, getGpuByCore(top, coreNumber), coreNumber);
 
         if (params->data_symbols.find(".anonymous") != params->data_symbols.end()) {
-            set(top, params->data_symbols.find(".anonymous")->second, v3float{fw, fh, one}, coreNumber);
-            set(top, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime, coreNumber);
+            set(&hal, params->data_symbols.find(".anonymous")->second, v3float{fw, fh, one}, coreNumber);
+            set(&hal, params->data_symbols.find(".anonymous")->second + sizeof(v3float), params->frameTime, coreNumber);
         }
     }
 
@@ -857,13 +847,14 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
     // Should eventually remove this and all the code that depends on it.
     const int debugCoreNumber = 0;
+    VMain_GPU *debugGpuCore = getGpuByCore(top, debugCoreNumber);
 
     uint32_t oldXRegs[32];
     uint32_t oldFRegs[32];
     uint32_t oldPC;
-    for(int i = 0; i < 32; i++) oldXRegs[i] = getGpuByCore(top, debugCoreNumber)->shaderCore->registers->bank1->memory[i];
-    for(int i = 0; i < 32; i++) oldFRegs[i] = getGpuByCore(top, debugCoreNumber)->shaderCore->float_registers->bank1->memory[i];
-    oldPC = getGpuByCore(top, debugCoreNumber)->shaderCore->PC;
+    for(int i = 0; i < 32; i++) oldXRegs[i] = debugGpuCore->shaderCore->registers->bank1->memory[i];
+    for(int i = 0; i < 32; i++) oldFRegs[i] = debugGpuCore->shaderCore->float_registers->bank1->memory[i];
+    oldPC = debugGpuCore->shaderCore->PC;
 
     while (!Verilated::gotFinish()) {
         // Dispatch work to idle cores.
@@ -879,9 +870,9 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                 } else {
                     printf("Core %d is idle, doing row %d.\n", coreNumber, row);
 
-                    resetCore(top, clocks, coreNumber);
-                    configureCoreForRow(debugOptions, params, top, row, coreNumber);
-                    startProgram(top, clocks, coreNumber);
+                    resetCore(&hal, coreNumber);
+                    configureCoreForRow(debugOptions, params, &hal, row, coreNumber);
+                    startProgram(&hal, coreNumber);
                     coreIsWorking[coreNumber] = true;
                     coreStartTime[coreNumber] = steady_clock::now();
                 }
@@ -914,14 +905,14 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             // left side of nonblocking assignments
             std::string pad = "                     ";
             std::cout << pad << "between clock 1 and clock 0\n";
-            std::cout << pad << "CPU in state " << stateToString(getGpuByCore(top, debugCoreNumber)->shaderCore->state) << " (" << int(getGpuByCore(top, debugCoreNumber)->shaderCore->state) << ")\n";
-            std::cout << pad << "pc = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->PC) << "\n";
-            std::cout << pad << "inst_ram_address = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->inst_ram_address) << "\n";
-            std::cout << pad << "inst_to_decode = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->inst_to_decode) << "\n";
-            std::cout << pad << "data_ram_write_data = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->data_ram_write_data) << "\n";
-            std::cout << pad << "data_ram_address = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->data_ram_address) << "\n";
-            std::cout << pad << "data_ram_read_result = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->data_ram_read_result) << "\n";
-            std::cout << pad << "data_ram_write = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->data_ram_write) << "\n";
+            std::cout << pad << "CPU in state " << stateToString(debugGpuCore->shaderCore->state) << " (" << int(debugGpuCore->shaderCore->state) << ")\n";
+            std::cout << pad << "pc = 0x" << to_hex(debugGpuCore->shaderCore->PC) << "\n";
+            std::cout << pad << "inst_ram_address = 0x" << to_hex(debugGpuCore->shaderCore->inst_ram_address) << "\n";
+            std::cout << pad << "inst_to_decode = 0x" << to_hex(debugGpuCore->shaderCore->inst_to_decode) << "\n";
+            std::cout << pad << "data_ram_write_data = 0x" << to_hex(debugGpuCore->shaderCore->data_ram_write_data) << "\n";
+            std::cout << pad << "data_ram_address = 0x" << to_hex(debugGpuCore->shaderCore->data_ram_address) << "\n";
+            std::cout << pad << "data_ram_read_result = 0x" << to_hex(debugGpuCore->shaderCore->data_ram_read_result) << "\n";
+            std::cout << pad << "data_ram_write = 0x" << to_hex(debugGpuCore->shaderCore->data_ram_write) << "\n";
         }
 
         top->clock = 0;
@@ -929,43 +920,43 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
         if(debugOptions->dumpState) {
 
-            dumpRegisters(top, debugCoreNumber);
+            dumpRegisters(debugGpuCore);
         }
 
         if(debugOptions->dumpState) {
             // right side of nonblocking assignments
             std::cout << "between clock 0 and clock 1\n";
-            std::cout << "CPU in state " << stateToString(getGpuByCore(top, debugCoreNumber)->shaderCore->state) << " (" << int(getGpuByCore(top, debugCoreNumber)->shaderCore->state) << ")\n";
+            std::cout << "CPU in state " << stateToString(debugGpuCore->shaderCore->state) << " (" << int(debugGpuCore->shaderCore->state) << ")\n";
             if(false) {
-                std::cout << "inst_ram_address = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->inst_ram_address) << "\n";
-                std::cout << "inst_to_decode = 0x" << to_hex(getGpuByCore(top, debugCoreNumber)->shaderCore->inst_to_decode) << "\n";
+                std::cout << "inst_ram_address = 0x" << to_hex(debugGpuCore->shaderCore->inst_ram_address) << "\n";
+                std::cout << "inst_to_decode = 0x" << to_hex(debugGpuCore->shaderCore->inst_to_decode) << "\n";
             }
         }
 
-        if(getGpuByCore(top, debugCoreNumber)->shaderCore->state == VMain_ShaderCore::STATE_RETIRE) {
+        if(debugGpuCore->shaderCore->state == VMain_ShaderCore::STATE_RETIRE) {
             insts++;
         }
 
-        if((getGpuByCore(top, debugCoreNumber)->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
-            (getGpuByCore(top, debugCoreNumber)->shaderCore->state == VMain_ShaderCore::STATE_FP_WAIT)
+        if((debugGpuCore->shaderCore->state == VMain_ShaderCore::STATE_EXECUTE) ||
+            (debugGpuCore->shaderCore->state == VMain_ShaderCore::STATE_FP_WAIT)
             ) {
             if(debugOptions->dumpState) {
                 std::cout << "after DECODE - ";
-                printDecodedInst(getGpuByCore(top, debugCoreNumber)->shaderCore->PC, getGpuByCore(top, debugCoreNumber)->shaderCore->inst_to_decode, getGpuByCore(top, debugCoreNumber)->shaderCore);
+                printDecodedInst(debugGpuCore->shaderCore->PC, debugGpuCore->shaderCore->inst_to_decode, debugGpuCore->shaderCore);
             }
             if(debugOptions->printDisassembly) {
-                print_inst(getGpuByCore(top, debugCoreNumber)->shaderCore->PC, getGpuByCore(top, debugCoreNumber)->instRam->memory[getGpuByCore(top, debugCoreNumber)->shaderCore->PC / 4], params->textAddressesToSymbols);
+                print_inst(debugGpuCore->shaderCore->PC, debugGpuCore->instRam->memory[debugGpuCore->shaderCore->PC / 4], params->textAddressesToSymbols);
             }
         }
 
-        // if(getGpuByCore(top, debugCoreNumber)->shaderCore->state == VMain_ShaderCore::STATE_FETCH) {
+        // if(debugGpuCore->shaderCore->state == VMain_ShaderCore::STATE_FETCH) {
             if(debugOptions->printCoreDiff) {
 
-                dumpRegsDiff(oldPC, oldXRegs, oldFRegs, top, debugCoreNumber);
+                dumpRegsDiff(oldPC, oldXRegs, oldFRegs, debugGpuCore);
 
-                for(int i = 0; i < 32; i++) oldXRegs[i] = getGpuByCore(top, debugCoreNumber)->shaderCore->registers->bank1->memory[i];
-                for(int i = 0; i < 32; i++) oldFRegs[i] = getGpuByCore(top, debugCoreNumber)->shaderCore->float_registers->bank1->memory[i];
-                oldPC = getGpuByCore(top, debugCoreNumber)->shaderCore->PC;
+                for(int i = 0; i < 32; i++) oldXRegs[i] = debugGpuCore->shaderCore->registers->bank1->memory[i];
+                for(int i = 0; i < 32; i++) oldFRegs[i] = debugGpuCore->shaderCore->float_registers->bank1->memory[i];
+                oldPC = debugGpuCore->shaderCore->PC;
             }
         // }
 
@@ -976,7 +967,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
         // See if any cores are now idle.
         for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
-            if (coreIsWorking[coreNumber] && isCoreHalted(top, coreNumber)) {
+            if (coreIsWorking[coreNumber] && isCoreHalted(&hal, coreNumber)) {
                 steady_clock::time_point now = steady_clock::now();
                 steady_clock::duration timeSpan = now - coreStartTime[coreNumber];
                 double seconds = double(timeSpan.count())*steady_clock::period::num/
@@ -987,7 +978,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                 shared->pixelsLeft -= width;
 
                 /* return to STATE_INIT so we can drive ext memory access */
-                setH2F(top, h2f_gpu_idle, coreNumber);
+                hal.setH2F(h2f_gpu_idle, coreNumber);
 
                 coreIsWorking[coreNumber] = false;
             }
@@ -997,7 +988,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     if(debugOptions->dumpState) {
         std::cout << "halted.\n";
 
-        dumpRegisters(top, debugCoreNumber);
+        dumpRegisters(debugGpuCore);
 
         // Dump contents of beginning of memory
         for (int i = 0; i < 16; i++) {
@@ -1008,7 +999,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                 std::cout << "0x" << to_hex(i) << " :";
             }
 
-            std::cout << " " << to_hex(getGpuByCore(top, debugCoreNumber)->dataRam->memory[i]) << "   ";
+            std::cout << " " << to_hex(debugGpuCore->dataRam->memory[i]) << "   ";
             if (end) {
                 std::cout << "\n";
             }
