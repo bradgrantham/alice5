@@ -880,7 +880,6 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         }
         if (idleCoreCount == CORE_COUNT) {
             // Done with all rendering.
-            printf("All cores are done, no more work to do.\n");
             break;
         }
 
