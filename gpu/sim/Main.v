@@ -71,7 +71,7 @@ module Main(
     assign sdram_write = |core_sdram_write;
 
     always @(*) begin
-        sdram_writedata = {CORE_COUNT{1'b0}};
+        sdram_writedata = {WORD_WIDTH{1'b0}};
         sdram_gpu_address = {SDRAM_ADDRESS_WIDTH{1'b0}};
 
         for (core = 0; core < CORE_COUNT; core++) begin

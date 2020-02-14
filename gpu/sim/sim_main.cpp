@@ -228,10 +228,10 @@ public:
 class SimHal : public Hal {
     VMain *mTop;
     Memory *mSdram;
-    uint32_t mClocks;
+    uint32_t mClockCount;
 
 public:
-    SimHal(VMain *top, Memory *sdram) : mTop(top), mSdram(sdram), mClocks(0) {
+    SimHal(VMain *top, Memory *sdram) : mTop(top), mSdram(sdram), mClockCount(0) {
         // Nothing.
     }
 
@@ -259,14 +259,32 @@ public:
         // cycle simulation clock
         mTop->clock = 1;
         mTop->eval();
+
+        // RAM.
+        mSdram->evalReadWrite(
+                mTop->sdram_read,
+                mTop->sdram_write,
+                mTop->sdram_address,
+                mTop->sdram_waitrequest,
+                mTop->sdram_readdatavalid,
+                mTop->sdram_readdata,
+                0xF,
+                mTop->sdram_writedata);
+
+        // Eval again immediately to update dependant wires.
+        mTop->eval();
         mTop->clock = 0;
         mTop->eval();
-        mClocks++;
+        mClockCount++;
 #else
         // TODO move this to other HAL.
         // nanosleep
         std::this_thread::sleep_for(1us);
 #endif
+    }
+
+    uint32_t getClockCount() const {
+        return mClockCount;
     }
 };
 
@@ -809,19 +827,12 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     VMain *top = new VMain;
     SimHal hal(top, &shared->sdram);
 
-    uint32_t clocks = 0;
     uint32_t insts = 0;
 
     // Global reset.
     top->reset_n = 0;
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
-    top->clock = 1;
-    top->eval();
-    top->clock = 0;
-    top->eval();
+    hal.allowGpuProgress();
+    hal.allowGpuProgress();
     top->reset_n = 1;
 
     const float fw = params->imageWidth;
@@ -883,24 +894,10 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             break;
         }
 
-        top->clock = 1;
-        top->eval();
-
-        // RAM.
-        shared->sdram.evalReadWrite(
-                top->sdram_read,
-                top->sdram_write,
-                top->sdram_address,
-                top->sdram_waitrequest,
-                top->sdram_readdatavalid,
-                top->sdram_readdata,
-                0xF,
-                top->sdram_writedata);
-
-        // Eval again immediately to update dependant wires.
-        top->eval();
+        hal.allowGpuProgress();
 
         if(false) {
+            // TODO this used to be when clock = 1, so maybe move to allowGpuProgress().
             // left side of nonblocking assignments
             std::string pad = "                     ";
             std::cout << pad << "between clock 1 and clock 0\n";
@@ -913,9 +910,6 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
             std::cout << pad << "data_ram_read_result = 0x" << to_hex(debugGpuCore->shaderCore->data_ram_read_result) << "\n";
             std::cout << pad << "data_ram_write = 0x" << to_hex(debugGpuCore->shaderCore->data_ram_write) << "\n";
         }
-
-        top->clock = 0;
-        top->eval();
 
         if(debugOptions->dumpState) {
 
@@ -962,7 +956,6 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
         if(debugOptions->dumpState) {
             std::cout << "---\n";
         }
-        clocks++;
 
         // See if any cores are now idle.
         for (int coreNumber = 0; coreNumber < CORE_COUNT; coreNumber++) {
@@ -1007,7 +1000,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     {
         shared->rendererMutex.lock();
         shared->dispatchedCount += insts;
-        shared->clocksCount += clocks;
+        shared->clocksCount += hal.getClockCount();
         shared->rendererMutex.unlock();
     }
 
@@ -1202,7 +1195,6 @@ int main(int argc, char **argv)
     params.afterLastX = params.imageWidth;
     params.startY = 0;
     params.afterLastY = params.imageHeight;
-    // params.afterLastY = 4;
 
     if(specificPixelX != -1) {
         params.startX = specificPixelX;
