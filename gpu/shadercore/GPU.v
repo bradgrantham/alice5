@@ -35,7 +35,10 @@ module GPU
     input wire sdram_readdatavalid /* verilator public */,
     output wire sdram_read /* verilator public */,
     output wire [WORD_WIDTH-1:0] sdram_writedata /* verilator public */,
-    output wire sdram_write /* verilator public */
+    output wire sdram_write /* verilator public */,
+
+    input wire [3:0] debug_selector,
+    output wire [7:0] debug_output
 );
 
     // Instruction RAM write control
@@ -96,7 +99,9 @@ module GPU
             .sdram_readdatavalid(sdram_readdatavalid),
             .sdram_read(sdram_read),
             .sdram_writedata(sdram_writedata),
-            .sdram_write(sdram_write)
+            .sdram_write(sdram_write),
+            .debug_selector(debug_selector),
+            .debug_output(debug_output)
             // XXX TODO register interface
             );
 

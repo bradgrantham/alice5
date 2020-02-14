@@ -99,10 +99,9 @@ wire                hps_debug_reset;
 wire     [27: 0]    stm_hw_events;
 wire                fpga_clk_50;
 // connection of internal logics
-assign LED[7: 1] = fpga_led_internal;
+// assign LED[7: 1] = fpga_led_internal;
 assign fpga_clk_50 = FPGA_CLK1_50;
 assign stm_hw_events = {{15{1'b0}}, SW, fpga_led_internal, fpga_debounced_buttons};
-
 
 
 //=======================================================
@@ -282,7 +281,7 @@ always @(posedge fpga_clk_50 or negedge hps_fpga_reset_n) begin
         counter <= counter + 1'b1;
 end
 
-assign LED[0] = led_level;
+/// assign LED[0] = led_level;
 
 // Alice 5 starting here.
 
@@ -401,8 +400,10 @@ assign LED[0] = led_level;
             .sdram_readdatavalid(sdram_readdatavalid),
             .sdram_read(sdram_read),
             .sdram_writedata(sdram_writedata),
-            .sdram_write(sdram_write)
+            .sdram_write(sdram_write),
 
+            .debug_selector(SW),
+            .debug_output(LED)
             );
 
 endmodule

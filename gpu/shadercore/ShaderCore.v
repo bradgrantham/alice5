@@ -28,7 +28,10 @@ module ShaderCore
     input wire sdram_readdatavalid /* verilator public */,
     output reg sdram_read /* verilator public */,
     output reg [WORD_WIDTH-1:0] sdram_writedata /* verilator public */,
-    output reg sdram_write /* verilator public */
+    output reg sdram_write /* verilator public */,
+
+    input wire [3:0] debug_selector,
+    output wire [7:0] debug_output
 );
 
     localparam REGISTER_ADDRESS_WIDTH = 5;
@@ -927,5 +930,22 @@ module ShaderCore
         end
     end
 
-endmodule
+    assign debug_output =
+        debug_selector == 0 ? PC[7:0] :
+        debug_selector == 1 ? PC[15:8] :
+        debug_selector == 2 ? { 3'b0, state } :
+        debug_selector == 3 ? { 4'b0, sdram_waitrequest, sdram_read, sdram_write, sdram_readdatavalid } :
+        debug_selector == 4 ? alu_result[7:0] :
+        debug_selector == 5 ? alu_result[15:8] :
+        debug_selector == 6 ? alu_result[23:16] :
+        debug_selector == 7 ? alu_result[31:24] :
+        debug_selector == 8 ? alu_op1[7:0] :
+        debug_selector == 9 ? alu_op1[15:8] :
+        debug_selector == 10 ? alu_op1[23:16] :
+        debug_selector == 11 ? alu_op1[31:24] :
+        debug_selector == 12 ? sdram_address[7:0] :
+        debug_selector == 13 ? sdram_address[15:8] :
+        debug_selector == 14 ? sdram_address[23:16] :
+        debug_selector == 15 ? sdram_address[31:24];
 
+endmodule
