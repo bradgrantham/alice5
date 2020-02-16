@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 # Fetch shaders from ShaderToy.
 
@@ -48,6 +49,13 @@ def fetch_and_make_local(shader_id, shadertoy_key):
                 local_file.write(asset)
                 local_file.close()
                 input["locally_saved"] = local_filename
+            elif input["ctype"] in ["buffer", "keyboard"]:
+                # shade or shader driver will take care of buffers, which are outputs of one pass to use as the input for another pass
+                # shade or shader driver will take care of keyboard input
+                pass
+            else:
+                print("unknown asset type " + input["ctype"] + " for asset " + input["src"])
+                sys.exit(1)
 
     local = open(dir + "/local.json", "w")
     local.write(json.dumps(toy, sort_keys=True, indent=4))
