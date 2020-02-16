@@ -8,6 +8,7 @@ precision highp float;
 layout (binding = 0) uniform params {
 	vec3 iResolution;            // viewport resolution in pixels
 	float iTime;                 // Current time
+	float iTimeDelta;            // Current time
 	ivec4 iMouse;                // Mouse coords and click coords
         vec3 iChannelResolution[4];  // channel resolution (in pixels)
         int iFrame;                  // index of playback frame

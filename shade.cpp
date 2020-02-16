@@ -759,6 +759,8 @@ void render(ShaderToyRenderPass* pass, int startRow, int skip, int frameNumber, 
 
     interpreter.set("iTime", when);
 
+    interpreter.set("iTimeDelta", 1.0f / 60.0f);
+
     interpreter.set("iMouse", v4float {0, 0, 0, 0});
 
     for(size_t i = 0; i < pass->inputs.size(); i++) {
