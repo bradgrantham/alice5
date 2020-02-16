@@ -135,6 +135,7 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Sha
             const std::string& src = input["src"].get<std::string>();
 
             bool isABuffer = (src.find("/media/previz/buffer") != std::string::npos);
+            bool isKeyboard = (input["ctype"].get<std::string>() == "keyboard");
 
             if(isABuffer) {
 
@@ -144,15 +145,27 @@ void getOrderedRenderPassesFromJSON(const std::string& filename, std::vector<Sha
                 inputs.push_back({channelNumber, channelId, {nullptr, sampler}});
                 asset_preamble.code += "layout (binding = " + std::to_string(channelNumber + 1) + ") uniform sampler2D iChannel" + std::to_string(channelNumber) + ";\n";
 
+            } else if(isKeyboard) {
+
+                ImagePtr fakeKeyboard(new Image(Image::FORMAT_R32G32B32A32_SFLOAT, Image::DIM_2D, 256, 3));
+                for(int j = 0; j < 3; j++) {
+                    for(int i = 0; i < 256; i++) {
+                        fakeKeyboard->set(i, j, {0, 0, 0, 0});
+                    }
+                }
+                Sampler sampler;
+                inputs.push_back({channelNumber, channelId, {fakeKeyboard, sampler}});
+                asset_preamble.code += "layout (binding = " + std::to_string(channelNumber + 1) + ") uniform sampler2D iChannel" + std::to_string(channelNumber) + ";\n";
+
+            } else if(input["ctype"].get<std::string>() != "texture") {
+
+                throw std::runtime_error("unsupported input type " + input["ctype"].get<std::string>());
+
             } else if(input.find("locally_saved") == input.end()) {
 
                 throw std::runtime_error("downloading assets is not supported; didn't find \"locally_saved\" key for an asset");
 
             } else {
-
-                if(input["ctype"].get<std::string>() != "texture") {
-                    throw std::runtime_error("unsupported input type " + input["ctype"].get<std::string>());
-                }
 
                 std::string asset_filename = getFilepathAdjacentToPath(input["locally_saved"].get<std::string>(), filename);
 
