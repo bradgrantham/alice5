@@ -243,6 +243,7 @@ struct CoreShared
     // These require exclusion using rendererMutex
     std::set<std::string> substitutedFunctions;
     std::map<std::string, int> libraryFunctionHistogram;
+    std::map<std::string, int> instructionHistogram;
     uint64_t dispatchedCount = 0;
 };
 
@@ -420,6 +421,9 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
         shared->substitutedFunctions.insert(core.substitutedFunctions.begin(), core.substitutedFunctions.end());
         for(auto [func, count] : core.libraryFunctionHistogram) {
             shared->libraryFunctionHistogram[func] += count;
+        }
+        for(auto [func, count] : core.instructionHistogram) {
+            shared->instructionHistogram[func] += count;
         }
     }
 }
@@ -920,6 +924,9 @@ int main(int argc, char **argv)
         for(auto& func: shared.libraryFunctionHistogram) {
             std::cout << func.first << " : " << func.second << "\n";
         }
+    }
+    for(auto& insn: shared.instructionHistogram) {
+        std::cout << insn.first << " : " << insn.second << "\n";
     }
 
     std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";

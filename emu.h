@@ -126,6 +126,7 @@ struct GPUCore
     std::set<std::string> substitutedFunctions;
     AddressToSymbolTable libraryFunctions;
     std::map<std::string, int> libraryFunctionHistogram;
+    std::map<std::string, int> instructionHistogram;
 
     GPUCore(const SymbolTable& librarySymbols)
     {
@@ -305,6 +306,7 @@ constexpr uint32_t makeOpcode(uint32_t bits14_12, uint32_t bits6_2, uint32_t bit
 }
 
 const bool dump = false;
+const bool makeInstructionHistogram = false;
 
 #define CASE_MAKE_OPCODE_ALL_FUNCT3(a, b) \
         case makeOpcode(0, (a), (b)): \
@@ -358,6 +360,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
     switch(insn & 0x707F) {
         // flw       rd rs1 imm12 14..12=2 6..2=0x01 1..0=3
         case makeOpcode(2, 0x01, 3): {
+            if(makeInstructionHistogram) { instructionHistogram["flw"]++; }
             if(dump) std::cout << "flw\n";
             regs.f[rd] = data_memory.readf(regs.x[rs1] + immI);
             regs.pc += 4;
@@ -366,6 +369,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
 
         // fsw       imm12hi rs1 rs2 imm12lo 14..12=2 6..2=0x09 1..0=3
         case makeOpcode(2, 0x09, 3): {
+            if(makeInstructionHistogram) { instructionHistogram["fsw"]++; }
             if(dump) std::cout << "fsw\n";
             uint32_t addr = regs.x[rs1] + immS;
             float data = regs.f[rs2];
@@ -386,6 +390,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x10, 3)
         {
             if(dump) std::cout << "fmadd\n";
+            if(makeInstructionHistogram) { instructionHistogram["fmadd"]++; }
             if(fmt == 0x0) { // size = .s
                 setrm(rm);
                 regs.f[rd] = regs.f[rs1] * regs.f[rs2] + regs.f[rs3];
@@ -417,12 +422,12 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
             if(dump) std::cout << "fadd etc\n";
             if(fmt == 0x0) { // size = .s
                 switch(ffunct) {
-                    case 0x00: /* fadd */ setrm(rm); regs.f[rd] = regs.f[rs1] + regs.f[rs2]; restorerm(); break;
-                    case 0x01: /* fsub */ setrm(rm); regs.f[rd] = regs.f[rs1] - regs.f[rs2]; restorerm(); break;
-                    case 0x02: /* fmul */ setrm(rm); regs.f[rd] = regs.f[rs1] * regs.f[rs2]; restorerm(); break;
-                    case 0x03: /* fdiv */ setrm(rm); regs.f[rd] = regs.f[rs1] / regs.f[rs2]; restorerm(); break;
-                    case 0x05: /* fmin or fmax */ regs.f[rd] = (funct3 == 0) ? fminf(regs.f[rs1], regs.f[rs2]) : fmaxf(regs.f[rs1], regs.f[rs2]); break;
-                    case 0x0B: /* fsqrt */ setrm(rm); regs.f[rd] = sqrtf(regs.f[rs1]); restorerm(); break;
+                    case 0x00: /* fadd */ setrm(rm); regs.f[rd] = regs.f[rs1] + regs.f[rs2]; restorerm(); if(makeInstructionHistogram) { instructionHistogram["fadd"]++; } break;
+                    case 0x01: /* fsub */ setrm(rm); regs.f[rd] = regs.f[rs1] - regs.f[rs2]; restorerm(); if(makeInstructionHistogram) { instructionHistogram["fsub"]++; } break;
+                    case 0x02: /* fmul */ setrm(rm); regs.f[rd] = regs.f[rs1] * regs.f[rs2]; restorerm(); if(makeInstructionHistogram) { instructionHistogram["fmul"]++; } break;
+                    case 0x03: /* fdiv */ setrm(rm); regs.f[rd] = regs.f[rs1] / regs.f[rs2]; restorerm(); if(makeInstructionHistogram) { instructionHistogram["fdiv"]++; } break;
+                    case 0x05: /* fmin or fmax */ regs.f[rd] = (funct3 == 0) ? fminf(regs.f[rs1], regs.f[rs2]) : fmaxf(regs.f[rs1], regs.f[rs2]); if(makeInstructionHistogram) { instructionHistogram["fmin,fmax"]++; } break;
+                    case 0x0B: /* fsqrt */ setrm(rm); regs.f[rd] = sqrtf(regs.f[rs1]); restorerm(); if(makeInstructionHistogram) { instructionHistogram["fsqrt"]++; } break;
                     case 0x14:  { // fp comparison
                         if(rd > 0) {
                             if(funct3 == 0x0) { // fle 
@@ -433,6 +438,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                                 regs.x[rd] = (regs.f[rs1] == regs.f[rs2]) ? 1 : 0;
                             }
                         }
+                        if(makeInstructionHistogram) { instructionHistogram["fcmp"]++; } 
                         break;
                     }
                     case 0x18: {
@@ -447,6 +453,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                                 regs.x[rd] = std::rint(std::clamp(regs.f[rs1], 0.0f, 4294967295.0f));
                                 restorerm();
                             }
+                            if(makeInstructionHistogram) { instructionHistogram["fcvt"]++; } 
                         }
                         break;
                     }
@@ -462,6 +469,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                         } else {
                             unimpl(insn, status);
                         }
+                        if(makeInstructionHistogram) { instructionHistogram["fmv.w.x"]++; } 
                         break;
                     }
 
@@ -473,6 +481,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                             } else {
                                 unimpl(insn, status);
                             }
+                            if(makeInstructionHistogram) { instructionHistogram["fmv.x.w"]++; } 
                         } else if(funct3 == 1) {
                             // fclass.s  rd rs1 24..20=0 31..27=0x1C 14..12=1 26..25=0 6..2=0x14 1..0=3
                             if(fmt == 0) {
@@ -514,6 +523,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                             } else {
                                 unimpl(insn, status);
                             }
+                            if(makeInstructionHistogram) { instructionHistogram["fclass"]++; } 
                         } else {
                             unimpl(insn, status);
                         }
@@ -543,6 +553,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                             printf("rs2 = %d\n", rs2);
                             unimpl(insn, status);
                         }
+                        if(makeInstructionHistogram) { instructionHistogram["fcvt.sw"]++; } 
                         break;
                     }
 
@@ -563,6 +574,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                             fd = 0;
                             unimpl(insn, status);
                         }
+                        if(makeInstructionHistogram) { instructionHistogram["fsgnj"]++; } 
                         regs.f[rd] = intToFloat(fd);
                         break;
                     }
@@ -584,6 +596,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
             } else {
                 unimpl(insn, status);
             }
+            if(makeInstructionHistogram) { instructionHistogram["ebreak"]++; } 
             break;
         }
 
@@ -609,6 +622,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                 case 2: rwm->write32(addr, data); break;
             }
             regs.pc += 4;
+            if(makeInstructionHistogram) { instructionHistogram["store"]++; } 
             break;
         }
 
@@ -626,6 +640,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                 }
             }
             regs.pc += 4;
+            if(makeInstructionHistogram) { instructionHistogram["load"]++; } 
             break;
         }
 
@@ -636,6 +651,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                 regs.x[rd] = immU;
             }
             regs.pc += 4;
+            if(makeInstructionHistogram) { instructionHistogram["lui"]++; } 
             break;
         }
  
@@ -651,12 +667,14 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                 case 7: regs.pc += (regs.x[rs1] >= regs.x[rs2]) ? immSB : 4; break;
                 default: unimpl(insn, status); break;
             }
+            if(makeInstructionHistogram) { instructionHistogram["branch"]++; }
             break;
         }
 
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x0C, 3)
         {
             if(dump) std::cout << "add etc\n";
+            if(makeInstructionHistogram) { instructionHistogram["add etc"]++; }
             if(rd > 0) {
                 switch(funct3) {
                     case 0: {
@@ -699,6 +717,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
 
         case makeOpcode(0, 0x19, 3): { // jalr
             if(dump) std::cout << "jalr\n";
+            if(makeInstructionHistogram) { instructionHistogram["jalr"]++; } 
             uint32_t ra = (regs.x[rs1] + immI) & ~0x00000001; // spec says set least significant bit to zero
             if(rd > 0) {
                 regs.x[rd] = regs.pc + 4;
@@ -710,6 +729,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x1b, 3)
         { // jal
             if(dump) std::cout << "jal\n";
+            if(makeInstructionHistogram) { instructionHistogram["jal"]++; } 
             if(rd > 0) {
                 regs.x[rd] = regs.pc + 4;
             }
@@ -720,6 +740,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
         CASE_MAKE_OPCODE_ALL_FUNCT3(0x04, 3)
         { // addi
             if(dump) std::cout << "addi etc\n";
+            if(makeInstructionHistogram) { instructionHistogram["addi etc"]++; } 
             if(rd > 0) {
                 switch(funct3) {
                     case 0: regs.x[rd] = regs.x[rs1] + immI; break;     // addi
@@ -744,6 +765,7 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
                     default: unimpl(insn, status); break;
                 }
             } else {
+                if(makeInstructionHistogram) { instructionHistogram["nop"]++; } 
                 if((funct3 == 0) && (rs1 == 0) && (immI == 0)) {
                     if(substFunctions.find(regs.pc) != substFunctions.end()) {
                         substitutedFunctions.insert(substFunctionNames[regs.pc]);
