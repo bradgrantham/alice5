@@ -4,6 +4,15 @@
 		.dipsw_pio_external_connection_export  (<connected-to-dipsw_pio_external_connection_export>),  //  dipsw_pio_external_connection.export
 		.hps_0_f2h_cold_reset_req_reset_n      (<connected-to-hps_0_f2h_cold_reset_req_reset_n>),      //       hps_0_f2h_cold_reset_req.reset_n
 		.hps_0_f2h_debug_reset_req_reset_n     (<connected-to-hps_0_f2h_debug_reset_req_reset_n>),     //      hps_0_f2h_debug_reset_req.reset_n
+		.hps_0_f2h_sdram0_data_address         (<connected-to-hps_0_f2h_sdram0_data_address>),         //          hps_0_f2h_sdram0_data.address
+		.hps_0_f2h_sdram0_data_burstcount      (<connected-to-hps_0_f2h_sdram0_data_burstcount>),      //                               .burstcount
+		.hps_0_f2h_sdram0_data_waitrequest     (<connected-to-hps_0_f2h_sdram0_data_waitrequest>),     //                               .waitrequest
+		.hps_0_f2h_sdram0_data_readdata        (<connected-to-hps_0_f2h_sdram0_data_readdata>),        //                               .readdata
+		.hps_0_f2h_sdram0_data_readdatavalid   (<connected-to-hps_0_f2h_sdram0_data_readdatavalid>),   //                               .readdatavalid
+		.hps_0_f2h_sdram0_data_read            (<connected-to-hps_0_f2h_sdram0_data_read>),            //                               .read
+		.hps_0_f2h_sdram0_data_writedata       (<connected-to-hps_0_f2h_sdram0_data_writedata>),       //                               .writedata
+		.hps_0_f2h_sdram0_data_byteenable      (<connected-to-hps_0_f2h_sdram0_data_byteenable>),      //                               .byteenable
+		.hps_0_f2h_sdram0_data_write           (<connected-to-hps_0_f2h_sdram0_data_write>),           //                               .write
 		.hps_0_f2h_stm_hw_events_stm_hwevents  (<connected-to-hps_0_f2h_stm_hw_events_stm_hwevents>),  //        hps_0_f2h_stm_hw_events.stm_hwevents
 		.hps_0_f2h_warm_reset_req_reset_n      (<connected-to-hps_0_f2h_warm_reset_req_reset_n>),      //       hps_0_f2h_warm_reset_req.reset_n
 		.hps_0_h2f_reset_reset_n               (<connected-to-hps_0_h2f_reset_reset_n>),               //                hps_0_h2f_reset.reset_n
@@ -73,14 +82,13 @@
 		.memory_mem_dm                         (<connected-to-memory_mem_dm>),                         //                               .mem_dm
 		.memory_oct_rzqin                      (<connected-to-memory_oct_rzqin>),                      //                               .oct_rzqin
 		.reset_reset_n                         (<connected-to-reset_reset_n>),                         //                          reset.reset_n
-		.hps_0_f2h_sdram0_data_address         (<connected-to-hps_0_f2h_sdram0_data_address>),         //          hps_0_f2h_sdram0_data.address
-		.hps_0_f2h_sdram0_data_burstcount      (<connected-to-hps_0_f2h_sdram0_data_burstcount>),      //                               .burstcount
-		.hps_0_f2h_sdram0_data_waitrequest     (<connected-to-hps_0_f2h_sdram0_data_waitrequest>),     //                               .waitrequest
-		.hps_0_f2h_sdram0_data_readdata        (<connected-to-hps_0_f2h_sdram0_data_readdata>),        //                               .readdata
-		.hps_0_f2h_sdram0_data_readdatavalid   (<connected-to-hps_0_f2h_sdram0_data_readdatavalid>),   //                               .readdatavalid
-		.hps_0_f2h_sdram0_data_read            (<connected-to-hps_0_f2h_sdram0_data_read>),            //                               .read
-		.hps_0_f2h_sdram0_data_writedata       (<connected-to-hps_0_f2h_sdram0_data_writedata>),       //                               .writedata
-		.hps_0_f2h_sdram0_data_byteenable      (<connected-to-hps_0_f2h_sdram0_data_byteenable>),      //                               .byteenable
-		.hps_0_f2h_sdram0_data_write           (<connected-to-hps_0_f2h_sdram0_data_write>)            //                               .write
+		.pio_0_external_connection_in_port     (<connected-to-pio_0_external_connection_in_port>),     //      pio_0_external_connection.in_port
+		.pio_0_external_connection_out_port    (<connected-to-pio_0_external_connection_out_port>),    //                               .out_port
+		.pio_1_external_connection_in_port     (<connected-to-pio_1_external_connection_in_port>),     //      pio_1_external_connection.in_port
+		.pio_1_external_connection_out_port    (<connected-to-pio_1_external_connection_out_port>),    //                               .out_port
+		.pio_2_external_connection_in_port     (<connected-to-pio_2_external_connection_in_port>),     //      pio_2_external_connection.in_port
+		.pio_2_external_connection_out_port    (<connected-to-pio_2_external_connection_out_port>),    //                               .out_port
+		.pio_3_external_connection_in_port     (<connected-to-pio_3_external_connection_in_port>),     //      pio_3_external_connection.in_port
+		.pio_3_external_connection_out_port    (<connected-to-pio_3_external_connection_out_port>)     //                               .out_port
 	);
 

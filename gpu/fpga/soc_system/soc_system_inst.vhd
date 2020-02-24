@@ -5,6 +5,15 @@
 			dipsw_pio_external_connection_export  : in    std_logic_vector(3 downto 0)  := (others => 'X'); -- export
 			hps_0_f2h_cold_reset_req_reset_n      : in    std_logic                     := 'X';             -- reset_n
 			hps_0_f2h_debug_reset_req_reset_n     : in    std_logic                     := 'X';             -- reset_n
+			hps_0_f2h_sdram0_data_address         : in    std_logic_vector(29 downto 0) := (others => 'X'); -- address
+			hps_0_f2h_sdram0_data_burstcount      : in    std_logic_vector(7 downto 0)  := (others => 'X'); -- burstcount
+			hps_0_f2h_sdram0_data_waitrequest     : out   std_logic;                                        -- waitrequest
+			hps_0_f2h_sdram0_data_readdata        : out   std_logic_vector(31 downto 0);                    -- readdata
+			hps_0_f2h_sdram0_data_readdatavalid   : out   std_logic;                                        -- readdatavalid
+			hps_0_f2h_sdram0_data_read            : in    std_logic                     := 'X';             -- read
+			hps_0_f2h_sdram0_data_writedata       : in    std_logic_vector(31 downto 0) := (others => 'X'); -- writedata
+			hps_0_f2h_sdram0_data_byteenable      : in    std_logic_vector(3 downto 0)  := (others => 'X'); -- byteenable
+			hps_0_f2h_sdram0_data_write           : in    std_logic                     := 'X';             -- write
 			hps_0_f2h_stm_hw_events_stm_hwevents  : in    std_logic_vector(27 downto 0) := (others => 'X'); -- stm_hwevents
 			hps_0_f2h_warm_reset_req_reset_n      : in    std_logic                     := 'X';             -- reset_n
 			hps_0_h2f_reset_reset_n               : out   std_logic;                                        -- reset_n
@@ -74,15 +83,14 @@
 			memory_mem_dm                         : out   std_logic_vector(3 downto 0);                     -- mem_dm
 			memory_oct_rzqin                      : in    std_logic                     := 'X';             -- oct_rzqin
 			reset_reset_n                         : in    std_logic                     := 'X';             -- reset_n
-			hps_0_f2h_sdram0_data_address         : in    std_logic_vector(29 downto 0) := (others => 'X'); -- address
-			hps_0_f2h_sdram0_data_burstcount      : in    std_logic_vector(7 downto 0)  := (others => 'X'); -- burstcount
-			hps_0_f2h_sdram0_data_waitrequest     : out   std_logic;                                        -- waitrequest
-			hps_0_f2h_sdram0_data_readdata        : out   std_logic_vector(31 downto 0);                    -- readdata
-			hps_0_f2h_sdram0_data_readdatavalid   : out   std_logic;                                        -- readdatavalid
-			hps_0_f2h_sdram0_data_read            : in    std_logic                     := 'X';             -- read
-			hps_0_f2h_sdram0_data_writedata       : in    std_logic_vector(31 downto 0) := (others => 'X'); -- writedata
-			hps_0_f2h_sdram0_data_byteenable      : in    std_logic_vector(3 downto 0)  := (others => 'X'); -- byteenable
-			hps_0_f2h_sdram0_data_write           : in    std_logic                     := 'X'              -- write
+			pio_0_external_connection_in_port     : in    std_logic_vector(31 downto 0) := (others => 'X'); -- in_port
+			pio_0_external_connection_out_port    : out   std_logic_vector(31 downto 0);                    -- out_port
+			pio_1_external_connection_in_port     : in    std_logic_vector(31 downto 0) := (others => 'X'); -- in_port
+			pio_1_external_connection_out_port    : out   std_logic_vector(31 downto 0);                    -- out_port
+			pio_2_external_connection_in_port     : in    std_logic_vector(31 downto 0) := (others => 'X'); -- in_port
+			pio_2_external_connection_out_port    : out   std_logic_vector(31 downto 0);                    -- out_port
+			pio_3_external_connection_in_port     : in    std_logic_vector(31 downto 0) := (others => 'X'); -- in_port
+			pio_3_external_connection_out_port    : out   std_logic_vector(31 downto 0)                     -- out_port
 		);
 	end component soc_system;
 
@@ -93,6 +101,15 @@
 			dipsw_pio_external_connection_export  => CONNECTED_TO_dipsw_pio_external_connection_export,  --  dipsw_pio_external_connection.export
 			hps_0_f2h_cold_reset_req_reset_n      => CONNECTED_TO_hps_0_f2h_cold_reset_req_reset_n,      --       hps_0_f2h_cold_reset_req.reset_n
 			hps_0_f2h_debug_reset_req_reset_n     => CONNECTED_TO_hps_0_f2h_debug_reset_req_reset_n,     --      hps_0_f2h_debug_reset_req.reset_n
+			hps_0_f2h_sdram0_data_address         => CONNECTED_TO_hps_0_f2h_sdram0_data_address,         --          hps_0_f2h_sdram0_data.address
+			hps_0_f2h_sdram0_data_burstcount      => CONNECTED_TO_hps_0_f2h_sdram0_data_burstcount,      --                               .burstcount
+			hps_0_f2h_sdram0_data_waitrequest     => CONNECTED_TO_hps_0_f2h_sdram0_data_waitrequest,     --                               .waitrequest
+			hps_0_f2h_sdram0_data_readdata        => CONNECTED_TO_hps_0_f2h_sdram0_data_readdata,        --                               .readdata
+			hps_0_f2h_sdram0_data_readdatavalid   => CONNECTED_TO_hps_0_f2h_sdram0_data_readdatavalid,   --                               .readdatavalid
+			hps_0_f2h_sdram0_data_read            => CONNECTED_TO_hps_0_f2h_sdram0_data_read,            --                               .read
+			hps_0_f2h_sdram0_data_writedata       => CONNECTED_TO_hps_0_f2h_sdram0_data_writedata,       --                               .writedata
+			hps_0_f2h_sdram0_data_byteenable      => CONNECTED_TO_hps_0_f2h_sdram0_data_byteenable,      --                               .byteenable
+			hps_0_f2h_sdram0_data_write           => CONNECTED_TO_hps_0_f2h_sdram0_data_write,           --                               .write
 			hps_0_f2h_stm_hw_events_stm_hwevents  => CONNECTED_TO_hps_0_f2h_stm_hw_events_stm_hwevents,  --        hps_0_f2h_stm_hw_events.stm_hwevents
 			hps_0_f2h_warm_reset_req_reset_n      => CONNECTED_TO_hps_0_f2h_warm_reset_req_reset_n,      --       hps_0_f2h_warm_reset_req.reset_n
 			hps_0_h2f_reset_reset_n               => CONNECTED_TO_hps_0_h2f_reset_reset_n,               --                hps_0_h2f_reset.reset_n
@@ -162,14 +179,13 @@
 			memory_mem_dm                         => CONNECTED_TO_memory_mem_dm,                         --                               .mem_dm
 			memory_oct_rzqin                      => CONNECTED_TO_memory_oct_rzqin,                      --                               .oct_rzqin
 			reset_reset_n                         => CONNECTED_TO_reset_reset_n,                         --                          reset.reset_n
-			hps_0_f2h_sdram0_data_address         => CONNECTED_TO_hps_0_f2h_sdram0_data_address,         --          hps_0_f2h_sdram0_data.address
-			hps_0_f2h_sdram0_data_burstcount      => CONNECTED_TO_hps_0_f2h_sdram0_data_burstcount,      --                               .burstcount
-			hps_0_f2h_sdram0_data_waitrequest     => CONNECTED_TO_hps_0_f2h_sdram0_data_waitrequest,     --                               .waitrequest
-			hps_0_f2h_sdram0_data_readdata        => CONNECTED_TO_hps_0_f2h_sdram0_data_readdata,        --                               .readdata
-			hps_0_f2h_sdram0_data_readdatavalid   => CONNECTED_TO_hps_0_f2h_sdram0_data_readdatavalid,   --                               .readdatavalid
-			hps_0_f2h_sdram0_data_read            => CONNECTED_TO_hps_0_f2h_sdram0_data_read,            --                               .read
-			hps_0_f2h_sdram0_data_writedata       => CONNECTED_TO_hps_0_f2h_sdram0_data_writedata,       --                               .writedata
-			hps_0_f2h_sdram0_data_byteenable      => CONNECTED_TO_hps_0_f2h_sdram0_data_byteenable,      --                               .byteenable
-			hps_0_f2h_sdram0_data_write           => CONNECTED_TO_hps_0_f2h_sdram0_data_write            --                               .write
+			pio_0_external_connection_in_port     => CONNECTED_TO_pio_0_external_connection_in_port,     --      pio_0_external_connection.in_port
+			pio_0_external_connection_out_port    => CONNECTED_TO_pio_0_external_connection_out_port,    --                               .out_port
+			pio_1_external_connection_in_port     => CONNECTED_TO_pio_1_external_connection_in_port,     --      pio_1_external_connection.in_port
+			pio_1_external_connection_out_port    => CONNECTED_TO_pio_1_external_connection_out_port,    --                               .out_port
+			pio_2_external_connection_in_port     => CONNECTED_TO_pio_2_external_connection_in_port,     --      pio_2_external_connection.in_port
+			pio_2_external_connection_out_port    => CONNECTED_TO_pio_2_external_connection_out_port,    --                               .out_port
+			pio_3_external_connection_in_port     => CONNECTED_TO_pio_3_external_connection_in_port,     --      pio_3_external_connection.in_port
+			pio_3_external_connection_out_port    => CONNECTED_TO_pio_3_external_connection_out_port     --                               .out_port
 		);
 

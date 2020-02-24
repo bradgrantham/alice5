@@ -203,7 +203,16 @@ soc_system u0(
                .hps_0_f2h_sdram0_data_read(sdram_read),            //                               .read
                .hps_0_f2h_sdram0_data_writedata(sdram_writedata),       //                               .writedata
                .hps_0_f2h_sdram0_data_byteenable(sdram_byteenable),      //                               .byteenable
-               .hps_0_f2h_sdram0_data_write(sdram_write)            //                               .write
+               .hps_0_f2h_sdram0_data_write(sdram_write),            //                               .write
+
+		.pio_0_external_connection_in_port     (pio_0_in),     //      pio_0_external_connection.in_port
+		.pio_0_external_connection_out_port    (pio_0_out),    //                               .out_port
+		.pio_1_external_connection_in_port     (pio_1_in),     //      pio_1_external_connection.in_port
+		.pio_1_external_connection_out_port    (pio_1_out),    //                               .out_port
+		.pio_2_external_connection_in_port     (pio_2_in),     //      pio_2_external_connection.in_port
+		.pio_2_external_connection_out_port    (pio_2_out),    //                               .out_port
+		.pio_3_external_connection_in_port     (pio_3_in),     //      pio_3_external_connection.in_port
+		.pio_3_external_connection_out_port    (pio_3_out)     //                               .out_port
 
            );
 
@@ -217,6 +226,15 @@ wire sdram_read;
 wire [31:0] sdram_writedata;
 wire [3:0] sdram_byteenable = 4'b1111;
 wire sdram_write;
+
+wire [31:0] pio_0_in;
+wire [31:0] pio_0_out;
+wire [31:0] pio_1_in;
+wire [31:0] pio_1_out;
+wire [31:0] pio_2_in;
+wire [31:0] pio_2_out;
+wire [31:0] pio_3_in;
+wire [31:0] pio_3_out;
 
 // Debounce logic to clean out glitches within 1ms
 debounce debounce_inst(
@@ -291,118 +309,94 @@ assign LED[0] = led_level;
     localparam WORD_WIDTH = 32;
     localparam ADDRESS_WIDTH = 16;
     localparam SDRAM_ADDRESS_WIDTH = 24;
+    localparam CORE_COUNT = 4;
 
-`ifdef VERILATOR
-    assign sim_f2h_value = f2h_value;
-    assign h2f_value = sim_h2f_value;
-`else
-    cyclonev_hps_interface_mpu_general_purpose h2f_gp(
-         .gp_in(f2h_value),    // Value to the HPS (continuous).
-         .gp_out(h2f_value)    // Value from the HPS (latched).
-    );
     // assign GPIO_0[31:0] = 32'bz;
     // assign h2f_value = GPIO_0[31:0];
     // assign GPIO_1[31:0] = f2h_value;
+
+    wire [31:0] core_communication_in [0:CORE_COUNT-1];
+    wire [31:0] core_communication_out [0:CORE_COUNT-1];
+
+    assign core_communication_in[0] = pio_0_in;
+    assign core_communication_out[0] = pio_0_out;
+    assign core_communication_in[1] = pio_1_in;
+    assign core_communication_out[1] = pio_1_out;
+    assign core_communication_in[2] = pio_2_in;
+    assign core_communication_out[2] = pio_2_out;
+    assign core_communication_in[3] = pio_3_in;
+    assign core_communication_out[3] = pio_3_out;
+
+    generate
+        genvar core;
+
+        for (core = 0; core < CORE_COUNT; core = core + 1) begin : GENERATE_CPU_CORES // Quartus requires name (e.g. " : XYZ")
+            GPU #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+                gpu(
+                    .clock(clock),
+
+                    // .reset_n(cpu_reset_n[core]),
+                    // .run(run[core]),
+                    // .halted(halted[core]),
+                    // .exception(exception[core]),
+                    // .exception_data(exception_data[core]),
+
+                    .h2f_value(core_communication_out[core]),
+                    .f2h_value(core_communication_in[core]),
+
+                    .sdram_address(core_sdram_gpu_address[core]),
+                    .sdram_waitrequest(sdram_waitrequest),
+                    .sdram_readdata(sdram_readdata),
+                    .sdram_readdatavalid(sdram_readdatavalid),
+                    .sdram_read(core_sdram_read[core]),
+                    .sdram_writedata(core_sdram_writedata[core]),
+                    .sdram_write(core_sdram_write[core]),
+
+                    .mem_request(mem_request[core]),
+                    .mem_authorized(mem_authorized[core])
+                    );
+        end
+    endgenerate
+
+    // Wire-or the SDRAM outputs of the core.
+    wire [SDRAM_ADDRESS_WIDTH-1:0] core_sdram_gpu_address [0:CORE_COUNT-1];
+    wire [CORE_COUNT-1:0] core_sdram_read;
+    wire [CORE_COUNT-1:0] core_sdram_write;
+    wire [WORD_WIDTH-1:0] core_sdram_writedata [0:CORE_COUNT-1];
+
+    assign sdram_read = |core_sdram_read;
+    assign sdram_write = |core_sdram_write;
+
+`ifdef notdef
+    always @(*) begin
+        sdram_writedata = {WORD_WIDTH{1'b0}};
+        sdram_gpu_address = {SDRAM_ADDRESS_WIDTH{1'b0}};
+
+        for (core = 0; core < CORE_COUNT; core++) begin
+            sdram_writedata = sdram_writedata | core_sdram_writedata[core];
+            sdram_gpu_address = sdram_gpu_address | core_sdram_gpu_address[core];
+        end
+    end
+`else
+    assign sdram_writedata =
+        core_sdram_writedata[0] |
+        core_sdram_writedata[1] |
+        core_sdram_writedata[2] |
+        core_sdram_writedata[3];
+    assign sdram_gpu_address =
+        core_sdram_gpu_address[0] |
+        core_sdram_gpu_address[1] |
+        core_sdram_gpu_address[2] |
+        core_sdram_gpu_address[3];
 `endif
 
-    wire [31:0] h2f_value;
-    wire [31:0] f2h_value;
-
-    wire reset_n;
-    wire run;
-    wire gpu_halted;
-    wire exception;
-    wire [23:0] exception_data;
-
-    wire enable_write_inst_ram;
-    wire enable_write_data_ram;
-    wire enable_read_inst_ram;
-    wire enable_read_data_ram;
-    wire enable_read_register;
-    wire enable_read_floatreg;
-    wire enable_read_special;
-
-    wire [ADDRESS_WIDTH-1:0] rw_address;
-    wire [WORD_WIDTH-1:0] write_data;
-
-    wire [WORD_WIDTH - 1:0] inst_ram_read_data;
-    wire [WORD_WIDTH - 1:0] data_ram_read_data;
-    wire [WORD_WIDTH - 1:0] register_read_data;
-    wire [WORD_WIDTH - 1:0] floatreg_read_data;
-    wire [WORD_WIDTH - 1:0] special_read_data;
-
-    wire [WORD_WIDTH-1:0] read_data =
-        enable_read_inst_ram ? inst_ram_read_data :
-        enable_read_data_ram ? data_ram_read_data :
-        enable_read_register ? register_read_data :
-        enable_read_floatreg ? floatreg_read_data :
-        /* enable_read_special ? */ special_read_data;
-
-    GPU32BitInterface #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
-        gpu_if(
-            .clock(clock),
-
-            .h2f_value(h2f_value),
-            .f2h_value(f2h_value),
-
-            .reset_n(reset_n),
-            .run(run),
-
-            .halted(gpu_halted),
-            .exception(exception),
-            .exception_data(exception_data),
-
-            .enable_write_inst_ram(enable_write_inst_ram),
-            .enable_write_data_ram(enable_write_data_ram),
-            .enable_read_inst_ram(enable_read_inst_ram),
-            .enable_read_data_ram(enable_read_data_ram),
-            .enable_read_register(enable_read_register),
-            .enable_read_floatreg(enable_read_floatreg),
-            .enable_read_special(enable_read_special),
-
-            .rw_address(rw_address),
-            .write_data(write_data),
-            .read_data(read_data)
-        );
-
-    GPU #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH), .SDRAM_ADDRESS_WIDTH(SDRAM_ADDRESS_WIDTH))
-        gpu(
-            .clock(clock),
-            .reset_n(reset_n),
-            .run(run),
-
-            .halted(gpu_halted),
-            .exception(exception),
-            .exception_data(exception_data),
-
-            .ext_enable_write_inst_ram(enable_write_inst_ram),
-            .ext_inst_ram_address(rw_address),
-            .ext_inst_ram_input(write_data),
-            .ext_inst_ram_output(inst_ram_read_data),
-
-            .ext_enable_write_data_ram(enable_write_data_ram),
-            .ext_data_ram_address(rw_address),
-            .ext_data_ram_input(write_data),
-            .ext_data_ram_output(data_ram_read_data),
-
-            .ext_register_address(rw_address),
-            .ext_register_output(register_read_data),
-
-            .ext_floatreg_address(rw_address),
-            .ext_floatreg_output(floatreg_read_data),
-
-            .ext_specialreg_address(rw_address),
-            .ext_specialreg_output(special_read_data),
-
-            // SDRAM interface
-            .sdram_address(sdram_gpu_address),
-            .sdram_waitrequest(sdram_waitrequest),
-            .sdram_readdata(sdram_readdata),
-            .sdram_readdatavalid(sdram_readdatavalid),
-            .sdram_read(sdram_read),
-            .sdram_writedata(sdram_writedata),
-            .sdram_write(sdram_write)
-
-            );
+    // Memory arbiter.
+    wire [CORE_COUNT-1:0] mem_request;
+    wire [CORE_COUNT-1:0] mem_authorized;
+    MemArb #(.COUNT(CORE_COUNT)) memArb(
+        .clock(clock),
+        .reset_n(hps_fpga_reset_n),
+        .request(mem_request),
+        .authorized(mem_authorized));
 
 endmodule
