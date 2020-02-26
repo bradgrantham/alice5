@@ -217,7 +217,7 @@ soc_system u0(
            );
 
 wire [29:0] sdram_address = (sdram_gpu_address + 30'h3E000000) >> 2;
-wire [SDRAM_ADDRESS_WIDTH-1:0] sdram_gpu_address;
+reg [SDRAM_ADDRESS_WIDTH-1:0] sdram_gpu_address;
 wire [7:0] sdram_burstcount = 8'h01;
 wire sdram_waitrequest;
 wire [31:0] sdram_readdata;
@@ -372,7 +372,7 @@ assign LED[0] = led_level;
         sdram_writedata = {WORD_WIDTH{1'b0}};
         sdram_gpu_address = {SDRAM_ADDRESS_WIDTH{1'b0}};
 
-        for (core = 0; core < CORE_COUNT; core++) begin
+        for (core = 0; core < CORE_COUNT; core = core + 1) begin
             sdram_writedata = sdram_writedata | core_sdram_writedata[core];
             sdram_gpu_address = sdram_gpu_address | core_sdram_gpu_address[core];
         end
@@ -383,11 +383,13 @@ assign LED[0] = led_level;
         core_sdram_writedata[1] |
         core_sdram_writedata[2] |
         core_sdram_writedata[3];
-    assign sdram_gpu_address =
-        core_sdram_gpu_address[0] |
-        core_sdram_gpu_address[1] |
-        core_sdram_gpu_address[2] |
-        core_sdram_gpu_address[3];
+    always @(*) begin
+	     sdram_gpu_address =
+            core_sdram_gpu_address[0] |
+            core_sdram_gpu_address[1] |
+            core_sdram_gpu_address[2] |
+				core_sdram_gpu_address[3];
+	 end
 `endif
 
     // Memory arbiter.
