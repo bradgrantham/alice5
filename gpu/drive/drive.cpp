@@ -16,10 +16,10 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#define FPGA_MANAGER_BASE 0xFF706000
+#define FPGA_MANAGER_BASE 0xFF208000
 #define FPGA_MANAGER_SIZE 64
-#define FPGA_GPO_OFFSET 0x10
-#define FPGA_GPI_OFFSET 0x14
+#define FPGA_GPO_OFFSET 0x0
+#define FPGA_GPI_OFFSET 0x0
 #define SHARED_MEM_BASE 0x3E000000
 #define SHARED_MEM_SIZE (16*1024*1024)
 
@@ -309,6 +309,24 @@ uint32_t readPC(CoreShared* shared)
 }
 
 
+void verifyBytesInRam(const std::vector<uint8_t>& bytes, RamType ramType, CoreShared *shared)
+{
+    // Write inst bytes to inst memory
+    for(uint32_t byteaddr = 0; byteaddr < bytes.size(); byteaddr += 4) {
+        uint32_t word = 
+            bytes[byteaddr + 0] <<  0 |
+            bytes[byteaddr + 1] <<  8 |
+            bytes[byteaddr + 2] << 16 |
+            bytes[byteaddr + 3] << 24;
+
+        uint32_t toTest = readWordFromRam(byteaddr, ramType, shared);
+	if(word != toTest) {
+	    std::cerr << "Value " << to_hex(word) << " expected at " << to_hex(byteaddr) << " differs from retrieved value " << to_hex(toTest) << "!\n";
+	}
+    }
+}
+
+
 void writeBytesToRam(const std::vector<uint8_t>& bytes, RamType ramType, CoreShared *shared)
 {
     // Write inst bytes to inst memory
@@ -461,6 +479,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 
     // TODO - should we count clocks issued here?
     writeBytesToRam(params->data_bytes, DATA_RAM, shared);
+    verifyBytesInRam(params->data_bytes, DATA_RAM, shared);
 
     const float fw = params->imageWidth;
     const float fh = params->imageHeight;
