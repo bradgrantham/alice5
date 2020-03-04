@@ -46,7 +46,7 @@ do
     fi
     if [ "$simulate" = true ]; then
         ./gpu/sim/obj_dir/VMain -f 90 --term x.o && \
-        mv emulated.ppm $shader-simulate.ppm
+        mv simulated.ppm $shader-simulate.ppm
     fi
 done
 
