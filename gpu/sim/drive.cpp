@@ -14,6 +14,7 @@
 
 #undef SIMULATE 
 constexpr bool dumpH2FAndF2H = false; // true;
+constexpr bool dumpCoreStatus = false; // true;
 
 #include "risc-v.h"
 #include "timer.h"
@@ -586,7 +587,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                     // No rows left.
                     idleCoreCount++;
                 } else {
-                    printf("Core %d is idle, doing row %d.\n", coreNumber, row);
+                    if(dumpCoreStatus) printf("Core %d is idle, doing row %d.\n", coreNumber, row);
 
                     resetCore(hal.get(), coreNumber);
                     configureCoreForRow(debugOptions, params, hal.get(), row, coreNumber);
@@ -675,7 +676,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                 steady_clock::duration timeSpan = now - coreStartTime[coreNumber];
                 double seconds = double(timeSpan.count())*steady_clock::period::num/
                     steady_clock::period::den;
-                printf("Core %d is no longer working (%.1f seconds)\n", coreNumber, seconds);
+                if(dumpCoreStatus) printf("Core %d is no longer working (%.1f seconds)\n", coreNumber, seconds);
 
                 uint32_t width = params->afterLastX - params->startX;
                 shared->pixelsLeft -= width;
