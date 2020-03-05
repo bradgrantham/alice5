@@ -144,10 +144,6 @@ public:
         return f2h_value;
     }
 
-    virtual uint32_t readRam(uint32_t wordAddress) {
-        return (*gSdram)[wordAddress];
-    }
-
     virtual void allowGpuProgress() {
 
         // cycle simulation clock
@@ -170,13 +166,6 @@ public:
         mTop->clock = 0;
         mTop->eval();
         mClockCount++;
-
-#if 0
-        // TODO move this to other HAL.
-        // nanosleep
-        std::this_thread::sleep_for(1us);
-#endif
-
     }
 
     uint32_t getClockCount() const {
@@ -195,7 +184,10 @@ public:
 
 Memory *SimHal::gSdram;
 
-Hal *HalGetInstance()
+// True if only one Instance can be created.
+bool HalCanCreateMultipleInstances = true;
+
+Hal *HalCreateInstance()
 {
     VMain *top = new VMain;
 
@@ -208,7 +200,6 @@ uint32_t HalReadMemory(uint32_t address)
 {
     return SimHal::readSdram(address);
 }
-
 
 VMain_GPU *getGpuByCore(VMain *top, int coreNumber) {
     switch (coreNumber) {

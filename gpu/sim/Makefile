@@ -2,6 +2,8 @@
 VERILATOR_ROOT=$(HOME)
 CFG_CXXFLAGS_STD_NEWEST=-std=c++17
 
+CXXFLAGS=-I../.. -std=c++17 -O2 -fno-strict-aliasing
+
 ADDITIONAL_SOURCES      = \
 	../../riscv-disas.c \
         drive.cpp \
@@ -13,6 +15,8 @@ OBJ_DIR=obj_dir
 
 # Display debug output.
 # V_BUILD_OPTS=OPT=-DVL_DEBUG
+
+default: build drive
 
 .PHONY: build
 build: verilate
@@ -35,6 +39,9 @@ red_green.s: ../../shaders/red_green.frag
 
 red_green.o: red_green.s
 	../../as -v -o red_green.o red_green.s > red_green.lst
+
+drive: drive.cpp realhardware.cpp hal.h corecomm.h ../../risc-v.h ../../timer.h ../../disassemble.h ../../objectfile.h
+	c++ $(CXXFLAGS) realhardware.cpp drive.cpp -o drive
 
 .PHONY: red_green
 red_green: build red_green.o

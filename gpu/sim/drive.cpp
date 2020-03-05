@@ -533,7 +533,7 @@ void loadMemory(const SimDebugOptions* debugOptions, const CoreParameters* param
 // Represents a single hardware machine (possibly with multiple FPGA cores).
 void render(const SimDebugOptions* debugOptions, const CoreParameters* params, CoreShared* shared, WorkPool *workPool)
 {
-    HalPtr hal {HalGetInstance()};
+    HalPtr hal {HalCreateInstance()};
 
     uint32_t insts = 0;
 
@@ -927,8 +927,16 @@ int main(int argc, char **argv)
     workPool.addRange(params.startY, params.afterLastY);
 
     // Start the threads.
-    for (int t = 0; t < threadCount; t++) {
+    if(!HalCanCreateMultipleInstances) {
+        if(threadCount > 1) {
+            std::cout << "threadCount was set to " << threadCount << " but implementation of Hal can only create one instance.\n";
+            std::cout << "Only one thread will be used.\n";
+        }
         thread.push_back(new std::thread(render, &debugOptions, &params, &shared, &workPool));
+    } else {
+        for (int t = 0; t < threadCount; t++) {
+            thread.push_back(new std::thread(render, &debugOptions, &params, &shared, &workPool));
+        }
     }
 
     // Progress information.
