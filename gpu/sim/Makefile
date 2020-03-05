@@ -41,7 +41,7 @@ red_green.o: red_green.s
 	../../as -v -o red_green.o red_green.s > red_green.lst
 
 drive: drive.cpp realhardware.cpp hal.h corecomm.h ../../risc-v.h ../../timer.h ../../disassemble.h ../../objectfile.h
-	c++ $(CXXFLAGS) realhardware.cpp drive.cpp -o drive
+	c++ $(CXXFLAGS) realhardware.cpp drive.cpp -o drive -lpthread
 
 .PHONY: red_green
 red_green: build red_green.o
