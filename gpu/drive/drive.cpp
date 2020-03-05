@@ -759,11 +759,16 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
     render(&debugOptions, &params, &shared, params.startY);
+    auto now = std::chrono::high_resolution_clock::now();
 
     if(shared.coreHadAnException) {
         exit(EXIT_FAILURE);
     }
+
+    auto frameElapsed = std::chrono::duration_cast<std::chrono::seconds> (now - start);
+    std::cout << "shading took " << frameElapsed.count() << " seconds.\n";
 
     FILE *fp = fopen("fpga.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", params.imageWidth, params.imageHeight);
