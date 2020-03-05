@@ -28,6 +28,13 @@ constexpr std::chrono::microseconds h2f_timeout(h2f_timeout_micros);
 
 typedef std::unique_ptr<Hal> HalPtr;
 
+class scoped_lock {
+    std::mutex& mut;
+public:
+    scoped_lock(std::mutex& mut) : mut(mut) { mut.lock(); }
+    ~scoped_lock() { mut.unlock(); }
+};
+
 // Work pool of integer work items.
 class WorkPool {
     std::vector<int> mItems;
@@ -48,7 +55,7 @@ public:
 
     // Get any item, or -1 if the work pool is empty.
     int get() {
-        std::scoped_lock lock(mMutex);
+        scoped_lock lock(mMutex);
         int item;
 
         if (mItems.empty()) {
@@ -255,7 +262,7 @@ void set(Hal *hal, uint32_t address, const TYPE& value, int coreNumber)
     writeWordToRam(toBits(value), address, DATA_RAM, hal, coreNumber);
 }
 
-template <class TYPE, unsigned long N>
+template <class TYPE, std::size_t N>
 void set(Hal *hal, uint32_t address, const std::array<TYPE, N>& value, int coreNumber)
 {
     static_assert(sizeof(TYPE) == sizeof(uint32_t));
@@ -332,7 +339,7 @@ struct CoreShared
     std::mutex rendererMutex;
 
     // Number of pixels still left to shade (for progress report).
-    std::atomic_int pixelsLeft;
+    int pixelsLeft;
 
     // These require exclusion using rendererMutex
     uint64_t clocksCount = 0;
@@ -382,7 +389,11 @@ struct SimDebugOptions
 void showProgress(const CoreParameters* params, CoreShared* shared, std::chrono::time_point<std::chrono::steady_clock> startTime, int totalPixels)
 {
     while(true) {
-        int pixelsLeft = shared->pixelsLeft;
+        int pixelsLeft;
+	{
+	    scoped_lock s(shared->rendererMutex);
+	    pixelsLeft = shared->pixelsLeft;
+	}
         if (pixelsLeft == 0) {
             break;
         }
@@ -679,7 +690,10 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                 if(dumpCoreStatus) printf("Core %d is no longer working (%.1f seconds)\n", coreNumber, seconds);
 
                 uint32_t width = params->afterLastX - params->startX;
-                shared->pixelsLeft -= width;
+		{
+		    scoped_lock s(shared->rendererMutex);
+		    shared->pixelsLeft -= width;
+		}
 
                 /* return to STATE_INIT so we can drive ext memory access */
                 hal->setH2F(h2f_gpu_idle, coreNumber);
@@ -839,10 +853,14 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
     if(printSymbols) {
-        for(auto& [symbol, address]: params.text_symbols) {
+        for(auto& it: params.text_symbols) {
+            auto symbol = it.first;
+            auto address = it.second;
             std::cout << "text segment symbol \"" << symbol << "\" is at " << address << "\n";
         }
-        for(auto& [symbol, address]: params.data_symbols) {
+        for(auto& it: params.data_symbols) {
+            auto symbol = it.first;
+            auto address = it.second;
             std::cout << "data segment symbol \"" << symbol << "\" is at " << address << "\n";
         }
     }
@@ -859,8 +877,11 @@ int main(int argc, char **argv)
 
     binaryFile.close();
 
-    for(auto& [symbol, address]: params.text_symbols)
+    for(auto& it: params.text_symbols) {
+        auto symbol = it.first;
+        auto address = it.second;
         params.textAddressesToSymbols[address] = symbol;
+    }
 
     assert(params.data_bytes.size() < RiscVInitialStackPointer);
     if(params.data_bytes.size() > RiscVInitialStackPointer - 1024) {
@@ -957,6 +978,8 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";
+
     // Convert image to bytes.
     uint32_t sdramAddr = SDRAM_BASE;
     uint8_t *rgbByte = shared.img;
@@ -970,7 +993,6 @@ int main(int argc, char **argv)
         }
     }
 
-    std::cout << "shading took " << frameElapsed.elapsed() << " seconds.\n";
     std::cout << shared.dispatchedCount << " instructions executed.\n";
     std::cout << shared.clocksCount << " clocks cycled.\n";
     float fps = 50000000.0f / shared.clocksCount;

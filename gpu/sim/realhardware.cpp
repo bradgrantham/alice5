@@ -90,7 +90,7 @@ public:
     }
 
     virtual void allowGpuProgress() {
-        std::this_thread::sleep_for(1us);
+        // std::this_thread::sleep_for(1us);
     }
 
     uint32_t getClockCount() const {
@@ -103,7 +103,7 @@ public:
 
     static uint32_t readSdram(uint32_t wordAddress)
     {
-        return (reinterpret_cast<volatile uint32_t*>(gSdram))[wordAddress];
+        return (reinterpret_cast<volatile uint32_t*>(gSdram))[wordAddress - (SHARED_MEM_BASE >> 2)];
     }
 };
 
