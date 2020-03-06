@@ -53,3 +53,12 @@ tags
 
 # Quartus preferences, etc
 gpu/fpga/.qsys_edit/*
+
+# Quartus intermediate files
+c5_pin_model_dump.txt
+hps_sdram_p0_summary.csv
+gpu/fpga/hps_isw_handoff/soc_system_hps_0/id
+gpu/incremental_db/*
+gpu/output_files/*
+gpu/simulation/*
+gpu/test.qws
