@@ -338,6 +338,8 @@ struct CoreShared
     unsigned char *img;
     std::mutex rendererMutex;
 
+    std::set<int> coresToUse;
+
     // Number of pixels still left to shade (for progress report).
     int pixelsLeft;
 
@@ -552,7 +554,16 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     const float fh = params->imageHeight;
     const float one = 1.0;
 
-    for (int coreNumber = 0; coreNumber < hal->getCoreCount(); coreNumber++) {
+    std::set<int> coresToUse;
+    if(!shared->coresToUse.empty()) {
+	coresToUse = shared->coresToUse;
+    } else {
+	for (int coreNumber = 0; coreNumber < hal->getCoreCount(); coreNumber++) {
+	    coresToUse.insert(coreNumber);
+	}
+    }
+
+    for (int coreNumber: coresToUse) {
         resetCore(hal.get(), coreNumber);
         loadMemory(debugOptions, params, hal.get(), coreNumber);
 
@@ -565,7 +576,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     // Keep track of which core is busy.
     bool coreIsWorking[hal->getCoreCount()];
     steady_clock::time_point coreStartTime[hal->getCoreCount()];
-    for (int coreNumber = 0; coreNumber < hal->getCoreCount(); coreNumber++) {
+    for (int coreNumber: coresToUse) {
         coreIsWorking[coreNumber] = false;
     }
 
@@ -589,7 +600,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
     while (true) {
         // Dispatch work to idle cores.
         int idleCoreCount = 0;
-        for (int coreNumber = 0; coreNumber < hal->getCoreCount(); coreNumber++) {
+	for (int coreNumber: coresToUse) {
             if (!coreIsWorking[coreNumber]) {
                 int row = workPool->get();
 
@@ -608,7 +619,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
                 }
             }
         }
-        if (idleCoreCount == hal->getCoreCount()) {
+        if (idleCoreCount == coresToUse.size()) {
             // Done with all rendering.
             break;
         }
@@ -681,7 +692,7 @@ void render(const SimDebugOptions* debugOptions, const CoreParameters* params, C
 #endif // SIMULATE
 
         // See if any cores are now idle.
-        for (int coreNumber = 0; coreNumber < hal->getCoreCount(); coreNumber++) {
+	for (int coreNumber: coresToUse) {
             if (coreIsWorking[coreNumber] && isCoreHalted(hal.get(), coreNumber)) {
                 steady_clock::time_point now = steady_clock::now();
                 steady_clock::duration timeSpan = now - coreStartTime[coreNumber];
@@ -817,6 +828,20 @@ int main(int argc, char **argv)
                 exit(EXIT_FAILURE);
             }
             params.frameTime = atoi(argv[1]) / 60.0f;
+            argv+=2; argc-=2;
+
+        } else if(strcmp(argv[0], "--cores") == 0) {
+
+            if(argc < 2) {
+                std::cerr << "Expected core list for \"-f\"\n";
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+	    char *coreString = strtok(argv[1], ",");
+	    while(coreString) {
+		shared.coresToUse.insert(atoi(coreString));
+		coreString = strtok(NULL, ",");
+	    }
             argv+=2; argc-=2;
 
         } else if(strcmp(argv[0], "-d") == 0) {
