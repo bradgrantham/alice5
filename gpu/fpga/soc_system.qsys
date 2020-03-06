@@ -282,6 +282,70 @@
          type = "String";
       }
    }
+   element pio_4
+   {
+      datum _sortIndex
+      {
+         value = "15";
+         type = "int";
+      }
+   }
+   element pio_4.s1
+   {
+      datum baseAddress
+      {
+         value = "49152";
+         type = "String";
+      }
+   }
+   element pio_5
+   {
+      datum _sortIndex
+      {
+         value = "16";
+         type = "int";
+      }
+   }
+   element pio_5.s1
+   {
+      datum baseAddress
+      {
+         value = "53248";
+         type = "String";
+      }
+   }
+   element pio_6
+   {
+      datum _sortIndex
+      {
+         value = "17";
+         type = "int";
+      }
+   }
+   element pio_6.s1
+   {
+      datum baseAddress
+      {
+         value = "57344";
+         type = "String";
+      }
+   }
+   element pio_7
+   {
+      datum _sortIndex
+      {
+         value = "18";
+         type = "int";
+      }
+   }
+   element pio_7.s1
+   {
+      datum baseAddress
+      {
+         value = "61440";
+         type = "String";
+      }
+   }
    element sysid_qsys
    {
       datum _sortIndex
@@ -396,6 +460,26 @@
  <interface
    name="pio_3_external_connection"
    internal="pio_3.external_connection"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="pio_4_external_connection"
+   internal="pio_4.external_connection"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="pio_5_external_connection"
+   internal="pio_5.external_connection"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="pio_6_external_connection"
+   internal="pio_6.external_connection"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="pio_7_external_connection"
+   internal="pio_7.external_connection"
    type="conduit"
    dir="end" />
  <interface name="reset" internal="clk_0.clk_in_reset" type="reset" dir="end" />
@@ -1107,6 +1191,62 @@
   <parameter name="simDrivenValue" value="0" />
   <parameter name="width" value="32" />
  </module>
+ <module name="pio_4" kind="altera_avalon_pio" version="18.1" enabled="1">
+  <parameter name="bitClearingEdgeCapReg" value="false" />
+  <parameter name="bitModifyingOutReg" value="false" />
+  <parameter name="captureEdge" value="false" />
+  <parameter name="clockRate" value="50000000" />
+  <parameter name="direction" value="InOut" />
+  <parameter name="edgeType" value="RISING" />
+  <parameter name="generateIRQ" value="false" />
+  <parameter name="irqType" value="LEVEL" />
+  <parameter name="resetValue" value="0" />
+  <parameter name="simDoTestBenchWiring" value="false" />
+  <parameter name="simDrivenValue" value="0" />
+  <parameter name="width" value="32" />
+ </module>
+ <module name="pio_5" kind="altera_avalon_pio" version="18.1" enabled="1">
+  <parameter name="bitClearingEdgeCapReg" value="false" />
+  <parameter name="bitModifyingOutReg" value="false" />
+  <parameter name="captureEdge" value="false" />
+  <parameter name="clockRate" value="50000000" />
+  <parameter name="direction" value="InOut" />
+  <parameter name="edgeType" value="RISING" />
+  <parameter name="generateIRQ" value="false" />
+  <parameter name="irqType" value="LEVEL" />
+  <parameter name="resetValue" value="0" />
+  <parameter name="simDoTestBenchWiring" value="false" />
+  <parameter name="simDrivenValue" value="0" />
+  <parameter name="width" value="32" />
+ </module>
+ <module name="pio_6" kind="altera_avalon_pio" version="18.1" enabled="1">
+  <parameter name="bitClearingEdgeCapReg" value="false" />
+  <parameter name="bitModifyingOutReg" value="false" />
+  <parameter name="captureEdge" value="false" />
+  <parameter name="clockRate" value="50000000" />
+  <parameter name="direction" value="InOut" />
+  <parameter name="edgeType" value="RISING" />
+  <parameter name="generateIRQ" value="false" />
+  <parameter name="irqType" value="LEVEL" />
+  <parameter name="resetValue" value="0" />
+  <parameter name="simDoTestBenchWiring" value="false" />
+  <parameter name="simDrivenValue" value="0" />
+  <parameter name="width" value="32" />
+ </module>
+ <module name="pio_7" kind="altera_avalon_pio" version="18.1" enabled="1">
+  <parameter name="bitClearingEdgeCapReg" value="false" />
+  <parameter name="bitModifyingOutReg" value="false" />
+  <parameter name="captureEdge" value="false" />
+  <parameter name="clockRate" value="50000000" />
+  <parameter name="direction" value="InOut" />
+  <parameter name="edgeType" value="RISING" />
+  <parameter name="generateIRQ" value="false" />
+  <parameter name="irqType" value="LEVEL" />
+  <parameter name="resetValue" value="0" />
+  <parameter name="simDoTestBenchWiring" value="false" />
+  <parameter name="simDrivenValue" value="0" />
+  <parameter name="width" value="32" />
+ </module>
  <module
    name="sysid_qsys"
    kind="altera_avalon_sysid_qsys"
@@ -1191,6 +1331,26 @@
  <connection kind="avalon" version="18.1" start="mm_bridge_0.m0" end="pio_3.s1">
   <parameter name="arbitrationPriority" value="1" />
   <parameter name="baseAddress" value="0xb000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection kind="avalon" version="18.1" start="mm_bridge_0.m0" end="pio_4.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0xc000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection kind="avalon" version="18.1" start="mm_bridge_0.m0" end="pio_5.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0xd000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection kind="avalon" version="18.1" start="mm_bridge_0.m0" end="pio_6.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0xe000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection kind="avalon" version="18.1" start="mm_bridge_0.m0" end="pio_7.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0xf000" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1293,6 +1453,42 @@
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
+   kind="avalon"
+   version="18.1"
+   start="fpga_only_master.master"
+   end="pio_4.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0xc000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="18.1"
+   start="fpga_only_master.master"
+   end="pio_5.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0xd000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="18.1"
+   start="fpga_only_master.master"
+   end="pio_6.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0xe000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="18.1"
+   start="fpga_only_master.master"
+   end="pio_7.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0xf000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
    kind="clock"
    version="18.1"
    start="clk_0.clk"
@@ -1313,6 +1509,10 @@
  <connection kind="clock" version="18.1" start="clk_0.clk" end="pio_1.clk" />
  <connection kind="clock" version="18.1" start="clk_0.clk" end="pio_2.clk" />
  <connection kind="clock" version="18.1" start="clk_0.clk" end="pio_3.clk" />
+ <connection kind="clock" version="18.1" start="clk_0.clk" end="pio_4.clk" />
+ <connection kind="clock" version="18.1" start="clk_0.clk" end="pio_5.clk" />
+ <connection kind="clock" version="18.1" start="clk_0.clk" end="pio_6.clk" />
+ <connection kind="clock" version="18.1" start="clk_0.clk" end="pio_7.clk" />
  <connection
    kind="clock"
    version="18.1"
@@ -1407,6 +1607,10 @@
  <connection kind="reset" version="18.1" start="clk_0.clk_reset" end="pio_1.reset" />
  <connection kind="reset" version="18.1" start="clk_0.clk_reset" end="pio_2.reset" />
  <connection kind="reset" version="18.1" start="clk_0.clk_reset" end="pio_3.reset" />
+ <connection kind="reset" version="18.1" start="clk_0.clk_reset" end="pio_4.reset" />
+ <connection kind="reset" version="18.1" start="clk_0.clk_reset" end="pio_5.reset" />
+ <connection kind="reset" version="18.1" start="clk_0.clk_reset" end="pio_6.reset" />
+ <connection kind="reset" version="18.1" start="clk_0.clk_reset" end="pio_7.reset" />
  <connection kind="reset" version="18.1" start="clk_0.clk_reset" end="ILC.reset_n" />
  <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
  <interconnectRequirement for="$system" name="qsys_mm.maxAdditionalLatency" value="1" />

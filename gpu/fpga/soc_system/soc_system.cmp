@@ -90,6 +90,14 @@
 			pio_2_external_connection_out_port    : out   std_logic_vector(31 downto 0);                    -- out_port
 			pio_3_external_connection_in_port     : in    std_logic_vector(31 downto 0) := (others => 'X'); -- in_port
 			pio_3_external_connection_out_port    : out   std_logic_vector(31 downto 0);                    -- out_port
+			pio_4_external_connection_in_port     : in    std_logic_vector(31 downto 0) := (others => 'X'); -- in_port
+			pio_4_external_connection_out_port    : out   std_logic_vector(31 downto 0);                    -- out_port
+			pio_5_external_connection_in_port     : in    std_logic_vector(31 downto 0) := (others => 'X'); -- in_port
+			pio_5_external_connection_out_port    : out   std_logic_vector(31 downto 0);                    -- out_port
+			pio_6_external_connection_in_port     : in    std_logic_vector(31 downto 0) := (others => 'X'); -- in_port
+			pio_6_external_connection_out_port    : out   std_logic_vector(31 downto 0);                    -- out_port
+			pio_7_external_connection_in_port     : in    std_logic_vector(31 downto 0) := (others => 'X'); -- in_port
+			pio_7_external_connection_out_port    : out   std_logic_vector(31 downto 0);                    -- out_port
 			reset_reset_n                         : in    std_logic                     := 'X'              -- reset_n
 		);
 	end component soc_system;

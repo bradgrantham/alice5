@@ -81,7 +81,6 @@
 		.memory_mem_odt                        (<connected-to-memory_mem_odt>),                        //                               .mem_odt
 		.memory_mem_dm                         (<connected-to-memory_mem_dm>),                         //                               .mem_dm
 		.memory_oct_rzqin                      (<connected-to-memory_oct_rzqin>),                      //                               .oct_rzqin
-		.reset_reset_n                         (<connected-to-reset_reset_n>),                         //                          reset.reset_n
 		.pio_0_external_connection_in_port     (<connected-to-pio_0_external_connection_in_port>),     //      pio_0_external_connection.in_port
 		.pio_0_external_connection_out_port    (<connected-to-pio_0_external_connection_out_port>),    //                               .out_port
 		.pio_1_external_connection_in_port     (<connected-to-pio_1_external_connection_in_port>),     //      pio_1_external_connection.in_port
@@ -89,6 +88,15 @@
 		.pio_2_external_connection_in_port     (<connected-to-pio_2_external_connection_in_port>),     //      pio_2_external_connection.in_port
 		.pio_2_external_connection_out_port    (<connected-to-pio_2_external_connection_out_port>),    //                               .out_port
 		.pio_3_external_connection_in_port     (<connected-to-pio_3_external_connection_in_port>),     //      pio_3_external_connection.in_port
-		.pio_3_external_connection_out_port    (<connected-to-pio_3_external_connection_out_port>)     //                               .out_port
+		.pio_3_external_connection_out_port    (<connected-to-pio_3_external_connection_out_port>),    //                               .out_port
+		.reset_reset_n                         (<connected-to-reset_reset_n>),                         //                          reset.reset_n
+		.pio_4_external_connection_in_port     (<connected-to-pio_4_external_connection_in_port>),     //      pio_4_external_connection.in_port
+		.pio_4_external_connection_out_port    (<connected-to-pio_4_external_connection_out_port>),    //                               .out_port
+		.pio_5_external_connection_in_port     (<connected-to-pio_5_external_connection_in_port>),     //      pio_5_external_connection.in_port
+		.pio_5_external_connection_out_port    (<connected-to-pio_5_external_connection_out_port>),    //                               .out_port
+		.pio_6_external_connection_in_port     (<connected-to-pio_6_external_connection_in_port>),     //      pio_6_external_connection.in_port
+		.pio_6_external_connection_out_port    (<connected-to-pio_6_external_connection_out_port>),    //                               .out_port
+		.pio_7_external_connection_in_port     (<connected-to-pio_7_external_connection_in_port>),     //      pio_7_external_connection.in_port
+		.pio_7_external_connection_out_port    (<connected-to-pio_7_external_connection_out_port>)     //                               .out_port
 	);
 

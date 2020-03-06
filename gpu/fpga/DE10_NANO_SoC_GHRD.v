@@ -212,7 +212,15 @@ soc_system u0(
 		.pio_2_external_connection_in_port     (pio_2_in),     //      pio_2_external_connection.in_port
 		.pio_2_external_connection_out_port    (pio_2_out),    //                               .out_port
 		.pio_3_external_connection_in_port     (pio_3_in),     //      pio_3_external_connection.in_port
-		.pio_3_external_connection_out_port    (pio_3_out)     //                               .out_port
+		.pio_3_external_connection_out_port    (pio_3_out),     //                               .out_port
+		.pio_4_external_connection_in_port     (pio_4_in),     //      pio_4_external_connection.in_port
+		.pio_4_external_connection_out_port    (pio_4_out),     //                               .out_port
+		.pio_5_external_connection_in_port     (pio_5_in),     //      pio_5_external_connection.in_port
+		.pio_5_external_connection_out_port    (pio_5_out),     //                               .out_port
+		.pio_6_external_connection_in_port     (pio_6_in),     //      pio_6_external_connection.in_port
+		.pio_6_external_connection_out_port    (pio_6_out),     //                               .out_port
+		.pio_7_external_connection_in_port     (pio_7_in),     //      pio_7_external_connection.in_port
+		.pio_7_external_connection_out_port    (pio_7_out)     //                               .out_port
 
            );
 
@@ -235,6 +243,14 @@ wire [31:0] pio_2_in;
 wire [31:0] pio_2_out;
 wire [31:0] pio_3_in;
 wire [31:0] pio_3_out;
+wire [31:0] pio_4_in;
+wire [31:0] pio_4_out;
+wire [31:0] pio_5_in;
+wire [31:0] pio_5_out;
+wire [31:0] pio_6_in;
+wire [31:0] pio_6_out;
+wire [31:0] pio_7_in;
+wire [31:0] pio_7_out;
 
 // Debounce logic to clean out glitches within 1ms
 debounce debounce_inst(
@@ -309,7 +325,7 @@ assign LED[0] = led_level;
     localparam WORD_WIDTH = 32;
     localparam ADDRESS_WIDTH = 16;
     localparam SDRAM_ADDRESS_WIDTH = 24;
-    localparam CORE_COUNT = 4;
+    localparam CORE_COUNT = 6;
 
     // assign GPIO_0[31:0] = 32'bz;
     // assign h2f_value = GPIO_0[31:0];
@@ -326,6 +342,10 @@ assign LED[0] = led_level;
     assign core_communication_out[2] = pio_2_out;
     assign core_communication_in[3] = pio_3_in;
     assign core_communication_out[3] = pio_3_out;
+    assign core_communication_in[4] = pio_4_in;
+    assign core_communication_out[4] = pio_4_out;
+    assign core_communication_in[5] = pio_5_in;
+    assign core_communication_out[5] = pio_5_out;
 
     generate
         genvar core;
@@ -382,13 +402,17 @@ assign LED[0] = led_level;
         core_sdram_writedata[0] |
         core_sdram_writedata[1] |
         core_sdram_writedata[2] |
-        core_sdram_writedata[3];
+        core_sdram_writedata[3] |
+        core_sdram_writedata[4] |
+        core_sdram_writedata[5];
     always @(*) begin
 	     sdram_gpu_address =
             core_sdram_gpu_address[0] |
             core_sdram_gpu_address[1] |
             core_sdram_gpu_address[2] |
-				core_sdram_gpu_address[3];
+	    core_sdram_gpu_address[3] |
+	    core_sdram_gpu_address[4] |
+	    core_sdram_gpu_address[5];
 	 end
 `endif
 

@@ -451,15 +451,18 @@ module ShaderCore
 
     // Verilog FPU from opencores; used in multiply, divide, and add_sub
     wire [WORD_WIDTH-1:0] fpu_result;
+    wire [WORD_WIDTH-1:0] fpu_result_tmp;
     reg [1:0] fpu_op;
+
+    localparam MANTISSA_BITS_TO_DISCARD = 2;
 
     fpu fpu (
         .clk(clock),
         .rmode(fpu_rmode),
         .fpu_op(fpu_op),
-        .opa(float_rs1_value),
-        .opb(float_rs2_value),
-        .out(fpu_result),
+        .opa({float_rs1_value[31:MANTISSA_BITS_TO_DISCARD],{MANTISSA_BITS_TO_DISCARD{1'b0}}}),
+        .opb({float_rs2_value[31:MANTISSA_BITS_TO_DISCARD],{MANTISSA_BITS_TO_DISCARD{1'b0}}}),
+        .out(fpu_result_tmp),
 /* verilator lint_off PINCONNECTEMPTY */
         .ine(),
         .inf(),
@@ -472,6 +475,7 @@ module ShaderCore
 /* verilator lint_on PINCONNECTEMPTY */
     );
 
+    assign fpu_result = {fpu_result_tmp[31:MANTISSA_BITS_TO_DISCARD],{MANTISSA_BITS_TO_DISCARD{1'b0}}};
 
     // Floating point multiply -------------------------
 

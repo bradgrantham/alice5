@@ -82,7 +82,6 @@ module soc_system (
 	memory_mem_odt,
 	memory_mem_dm,
 	memory_oct_rzqin,
-	reset_reset_n,
 	pio_0_external_connection_in_port,
 	pio_0_external_connection_out_port,
 	pio_1_external_connection_in_port,
@@ -90,7 +89,16 @@ module soc_system (
 	pio_2_external_connection_in_port,
 	pio_2_external_connection_out_port,
 	pio_3_external_connection_in_port,
-	pio_3_external_connection_out_port);	
+	pio_3_external_connection_out_port,
+	reset_reset_n,
+	pio_4_external_connection_in_port,
+	pio_4_external_connection_out_port,
+	pio_5_external_connection_in_port,
+	pio_5_external_connection_out_port,
+	pio_6_external_connection_in_port,
+	pio_6_external_connection_out_port,
+	pio_7_external_connection_in_port,
+	pio_7_external_connection_out_port);	
 
 	input	[1:0]	button_pio_external_connection_export;
 	input		clk_clk;
@@ -174,7 +182,6 @@ module soc_system (
 	output		memory_mem_odt;
 	output	[3:0]	memory_mem_dm;
 	input		memory_oct_rzqin;
-	input		reset_reset_n;
 	input	[31:0]	pio_0_external_connection_in_port;
 	output	[31:0]	pio_0_external_connection_out_port;
 	input	[31:0]	pio_1_external_connection_in_port;
@@ -183,4 +190,13 @@ module soc_system (
 	output	[31:0]	pio_2_external_connection_out_port;
 	input	[31:0]	pio_3_external_connection_in_port;
 	output	[31:0]	pio_3_external_connection_out_port;
+	input		reset_reset_n;
+	input	[31:0]	pio_4_external_connection_in_port;
+	output	[31:0]	pio_4_external_connection_out_port;
+	input	[31:0]	pio_5_external_connection_in_port;
+	output	[31:0]	pio_5_external_connection_out_port;
+	input	[31:0]	pio_6_external_connection_in_port;
+	output	[31:0]	pio_6_external_connection_out_port;
+	input	[31:0]	pio_7_external_connection_in_port;
+	output	[31:0]	pio_7_external_connection_out_port;
 endmodule

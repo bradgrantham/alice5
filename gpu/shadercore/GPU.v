@@ -42,22 +42,28 @@ module GPU
     // Data RAM read out
     wire [WORD_WIDTH-1:0] data_ram_out_data /* verilator public */;
 
-    BlockRam #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+    // Max 32K of INST RAM
+    localparam INST_ADDRESS_WIDTH = 15;
+    localparam INST_ADDRESS_ZERO_PAD = ADDRESS_WIDTH - INST_ADDRESS_WIDTH;
+    BlockRam #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(INST_ADDRESS_WIDTH))
         instRam(
             .clock(clock),
-            .write_address({2'b00, inst_ram_address[ADDRESS_WIDTH-1:2]}),
+            .write_address({{INST_ADDRESS_ZERO_PAD{1'b0}}, inst_ram_address[INST_ADDRESS_WIDTH-1:2]}),
             .write(inst_ram_write),
             .write_data(inst_ram_write_data),
-            .read_address({2'b00, inst_ram_address[ADDRESS_WIDTH-1:2]}),
+            .read_address({{INST_ADDRESS_ZERO_PAD{1'b0}}, inst_ram_address[INST_ADDRESS_WIDTH-1:2]}),
             .read_data(inst_ram_out_data));
 
-    BlockRam #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(ADDRESS_WIDTH))
+    // Max 8K of INST RAM
+    localparam DATA_ADDRESS_WIDTH = 13;
+    localparam DATA_ADDRESS_ZERO_PAD = ADDRESS_WIDTH - DATA_ADDRESS_WIDTH;
+    BlockRam #(.WORD_WIDTH(WORD_WIDTH), .ADDRESS_WIDTH(DATA_ADDRESS_WIDTH))
         dataRam(
             .clock(clock),
-            .write_address({2'b00, data_ram_address[ADDRESS_WIDTH-1:2]}),
+            .write_address({{DATA_ADDRESS_ZERO_PAD{1'b0}}, data_ram_address[DATA_ADDRESS_WIDTH-1:2]}),
             .write(data_ram_write),
             .write_data(data_ram_write_data),
-            .read_address({2'b00, data_ram_address[ADDRESS_WIDTH-1:2]}),
+            .read_address({{DATA_ADDRESS_ZERO_PAD{1'b0}}, data_ram_address[DATA_ADDRESS_WIDTH-1:2]}),
             .read_data(data_ram_out_data));
 
     wire [ADDRESS_WIDTH-1:0] shadercore_inst_ram_address;
