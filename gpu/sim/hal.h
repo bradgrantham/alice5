@@ -19,4 +19,6 @@ extern bool HalCanCreateMultipleInstances;
 
 uint32_t HalReadMemory(uint32_t address);
 
+std::string HalPreferredName();
+
 #endif /* __HAL_H__ */

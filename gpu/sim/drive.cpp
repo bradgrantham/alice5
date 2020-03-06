@@ -1025,7 +1025,10 @@ int main(int argc, char **argv)
     float wvgaFps = fps * params.imageWidth / 800 * params.imageHeight / 480;
     std::cout << "at least " << (int)ceilf(5.0 / wvgaFps) << " cores required at 50 MHz for 5 fps at 800x480.\n";
 
-    FILE *fp = fopen("simulated.ppm", "wb");
+    std::ostringstream ss;
+    ss << HalPreferredName() << ".ppm";
+
+    FILE *fp = fopen(ss.str().c_str(), "wb");
     fprintf(fp, "P6 %d %d 255\n", params.imageWidth, params.imageHeight);
     fwrite(shared.img, 1, params.imageWidth * params.imageHeight * 3, fp);
     fclose(fp);

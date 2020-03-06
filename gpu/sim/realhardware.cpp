@@ -124,3 +124,7 @@ uint32_t HalReadMemory(uint32_t address)
     return RealHardware::readSdram(address);
 }
 
+std::string HalPreferredName()
+{
+    return "fpga";
+}

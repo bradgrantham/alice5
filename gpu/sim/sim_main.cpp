@@ -265,3 +265,7 @@ void dumpRegsDiff(const uint32_t prevPC, const uint32_t prevX[32], const uint32_
     std::cout << std::setfill(' ');
 }
 
+std::string HalPreferredName()
+{
+    return "simulated";
+}
