@@ -51,3 +51,5 @@ tags
 *~
 *.swp
 
+# Quartus preferences, etc
+gpu/fpga/.qsys_edit/*
