@@ -454,7 +454,7 @@ module ShaderCore
     wire [WORD_WIDTH-1:0] fpu_result_tmp;
     reg [1:0] fpu_op;
 
-    localparam MANTISSA_BITS_TO_DISCARD = 2;
+    localparam MANTISSA_BITS_TO_DISCARD = 8;
 
     fpu fpu (
         .clk(clock),
