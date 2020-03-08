@@ -42,6 +42,7 @@ module ShaderCore
 `undef ALTERA_FP_DIVIDE
 `undef ALTERA_FP_ADD_SUB
 `undef ALTERA_FP_COMPARE
+`define NEED_OPENCORES_FPU // define if not using Altera div, mul or add_sub
 
 
     // CPU State Machine states -----------------------------------
@@ -449,10 +450,11 @@ module ShaderCore
 
 `endif
 
+`ifdef NEED_OPENCORES_FPU
+
     // Verilog FPU from opencores; used in multiply, divide, and add_sub
     wire [WORD_WIDTH-1:0] fpu_result;
     wire [WORD_WIDTH-1:0] fpu_result_tmp;
-    reg [1:0] fpu_op;
 
     localparam MANTISSA_BITS_TO_DISCARD = 8;
 
@@ -476,6 +478,10 @@ module ShaderCore
     );
 
     assign fpu_result = {fpu_result_tmp[31:MANTISSA_BITS_TO_DISCARD],{MANTISSA_BITS_TO_DISCARD{1'b0}}};
+
+`endif
+
+    reg [1:0] fpu_op;
 
     // Floating point multiply -------------------------
 
