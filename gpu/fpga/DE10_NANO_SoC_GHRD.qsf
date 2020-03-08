@@ -8,6 +8,7 @@ set_global_assignment -name TOP_LEVEL_ENTITY "DE10_NANO_SoC_GHRD"
 set_global_assignment -name LAST_QUARTUS_VERSION "18.1.0 Lite Edition"
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "17:14:54 MARCH 04,2015"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 2
 #============================================================
 # CLOCK
 #============================================================
@@ -482,7 +483,7 @@ set_global_assignment -name VERILOG_FILE ../fpu/fpu.v
 set_global_assignment -name VERILOG_FILE ../fpu/float_to_int.v
 set_global_assignment -name VERILOG_FILE ../fpu/fcmp.v
 set_global_assignment -name VERILOG_FILE ../fpu/except.v
-set_global_assignment -name VERILOG_FILE DE10_NANO_SoC_GHRD.v
+set_global_assignment -name VERILOG_FILE DE10_NANO_SoC_GHRD.v -hdl_version SystemVerilog_2005
 set_global_assignment -name VERILOG_FILE ../altera_fpu/fp_sqrt_altfp_sqrt_d7d.v
 set_global_assignment -name VERILOG_FILE ../altera_fpu/fp_sqrt_alt_sqrt_block_ocb.v
 set_global_assignment -name QIP_FILE ../altera_fpu/fp_sqrt.qip
@@ -501,4 +502,12 @@ set_global_assignment -name VERILOG_FILE ip/edge_detect/altera_edge_detector.v
 set_global_assignment -name VERILOG_FILE ip/debounce/debounce.v
 set_global_assignment -name QIP_FILE ip/altsource_probe/hps_reset.qip
 set_global_assignment -name QIP_FILE soc_system/synthesis/soc_system.qip
+set_global_assignment -name QIP_FILE pll.qip
+set_global_assignment -name SIP_FILE pll.sip
+set_global_assignment -name QIP_FILE pll50.qip
+set_global_assignment -name SIP_FILE pll50.sip
+set_global_assignment -name QIP_FILE pll85.qip
+set_global_assignment -name SIP_FILE pll85.sip
+set_global_assignment -name QIP_FILE pll90.qip
+set_global_assignment -name SIP_FILE pll90.sip
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
