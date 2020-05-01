@@ -29,7 +29,14 @@ The project included the following components:
 
 # RISC-V assembler
 
-* TODO LAWRENCE: Write up.
+The assembler is written in C++. It's a straightforward two-pass recursive-descent
+assembler from the official RISC-V mnemonics to RISC-V opcodes. It doesn't support
+the pseudo-instructions one sees in some RISC-V listings or disassemblers
+(e.g., `nop` for `addi x0, x0, 0`).
+
+Its source is in `as.cpp`. Use the `-v` flag to dump a listing to the standard output.
+
+    % ./as -v file.s > file.lst
 
 # RISC-V emulator
 
