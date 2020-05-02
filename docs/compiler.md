@@ -1,6 +1,4 @@
----
 title: Notes on the compiler back end
----
 
 # Notes on the compiler back end
 
