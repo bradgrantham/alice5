@@ -1,5 +1,3 @@
-title: Notes on the compiler back end
-
 # Notes on the compiler back end
 
 Lawrence's notes while researching SSA register assignment.

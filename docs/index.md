@@ -1,7 +1,3 @@
----
-title: The Alice V Project
----
-
 # Overview
 
 The Alice V project aimed to build a tablet that ran
