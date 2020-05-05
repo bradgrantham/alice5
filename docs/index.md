@@ -78,18 +78,21 @@ The `EBREAK` instruction halts execution and a bit is set to indicate completion
 
 # RISC-V emulator
 
-The [emulator](../emu.h) consists of a header-only implementation
-of our Harvard architecture IMF RISC-V and a C++ driver.  The driver
-loads a shader program and initializer data from our simplified
-binary format into separate instruction RAM and data RAM for each
-core, and maintains an emulated shared RAM into which every core
-writes its results.
+The emulator consists of a [header-only implementation](../emu.h)
+of our Harvard architecture IMF RISC-V and a [C++ driver](../emu.cpp).
+The emulator loads a shader program and initializer data from our
+simplified binary format into separate instruction RAM and data RAM
+for each core, and maintains an emulated shared RAM into which every
+core writes its results.
+using th
 
-The driver makes the assumption that the shader is structured to
-rasterize a row of pixels.  For each row, the driver program sets
-per-row pixel variables including the destination address for the
-row of pixels, then invokes the shader.  In this case, a shader
-halting means that a row has been shaded and written to shared RAM.
+Our emulator makes the assumption that the shader is structured to
+rasterize a row of pixels.  For each row, the emulator sets per-row
+pixel variables including the destination address for the row of
+pixels, then invokes the shader by repeatedly calling `GPUCore::step()`
+until the shader halts (an `EBREAK` instruction).  In this case, a
+shader halting means that a row has been shaded and written to
+shared RAM.
 
 The emulator creates multiple threads, both to test concurrency of
 cores and also to reduce our testing time.
