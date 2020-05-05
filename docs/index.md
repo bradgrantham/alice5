@@ -74,8 +74,7 @@ predefined size (32K in our current configuration) is private to
 each shader core.  GPU cores also share a segment of memory at
 `0x80000000` into which the GPU cores write their rasterized pixels.
 
-We use the `EBREAK` instruction to indicate completion of the shader program.
-On `EBREAK`, execution halts and a bit is set to indicate completion.
+The `EBREAK` instruction halts execution and a bit is set to indicate completion.
 
 # RISC-V emulator
 
@@ -88,14 +87,14 @@ writes its results.
 
 The driver makes the assumption that the shader is structured to
 rasterize a row of pixels.  For each row, the driver program sets
-per-row pixel variables including the row address, then invokes the
-shader.  In this case, a shader halting means that a row has been
-shaded and written to shared RAM.
+per-row pixel variables including the destination address for the
+row of pixels, then invokes the shader.  In this case, a shader
+halting means that a row has been shaded and written to shared RAM.
 
 The emulator creates multiple threads, both to test concurrency of
-cores but also to reduce our testing time.
+cores and also to reduce our testing time.
 
-On completion, the emulator writes the resulting image to a file
+When all rows are processed, the emulator writes the resulting image to a file
 and optionally to the screen using the iTerm image escape codes.
 
 # Multi-core RISC-V implementation in Verilog
