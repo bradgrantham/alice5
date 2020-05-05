@@ -245,6 +245,7 @@ struct CoreShared
     std::map<std::string, int> libraryFunctionHistogram;
     std::map<std::string, int> instructionHistogram;
     uint64_t dispatchedCount = 0;
+    uint32_t minSP = 0xFFFFFFFF;
 };
 
 struct CoreParameters
@@ -425,6 +426,7 @@ void render(const GPUEmuDebugOptions* debugOptions, const CoreParameters* tmpl, 
         for(auto [func, count] : core.instructionHistogram) {
             shared->instructionHistogram[func] += count;
         }
+        shared->minSP = std::min(shared->minSP, core.minSP);
     }
 }
 
@@ -935,6 +937,8 @@ int main(int argc, char **argv)
     std::cout << fps << " fps estimated at 50 MHz.\n";
     float wvgaFps = fps * tmpl.imageWidth / 800 * tmpl.imageHeight / 480;
     std::cout << "at least " << (int)ceilf(5.0 / wvgaFps) << " cores required at 50 MHz for 5 fps at 800x480.\n";
+
+    std::cout << "minimum stack pointer was " << to_hex(shared.minSP) << ".\n";
 
     FILE *fp = fopen("emulated.ppm", "wb");
     fprintf(fp, "P6 %d %d 255\n", tmpl.imageWidth, tmpl.imageHeight);

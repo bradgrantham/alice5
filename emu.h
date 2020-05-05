@@ -128,6 +128,8 @@ struct GPUCore
     std::map<std::string, int> libraryFunctionHistogram;
     std::map<std::string, int> instructionHistogram;
 
+    uint32_t minSP = 0xFFFFFFFF;
+
     GPUCore(const SymbolTable& librarySymbols)
     {
         std::fill(regs.x, regs.x + 32, 0);
@@ -1152,6 +1154,9 @@ GPUCore::Status GPUCore::step(ROM& text_memory, RWM& data_memory, RWM& sdram)
         default: {
             unimpl(insn, status);
         }
+    }
+    if(regs.x[2] > 0) {
+        minSP = std::min(regs.x[2], minSP);
     }
     return status;
 }
